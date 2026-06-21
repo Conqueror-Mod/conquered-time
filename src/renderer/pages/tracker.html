@@ -6,6 +6,9 @@
   content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; img-src 'self' data:;">
 <title>Conquered Time — Time Tracker</title>
 <link rel="stylesheet" href="../styles/design-system.css">
+<script>
+  (function(){var t=sessionStorage.getItem('ct_theme');var s=sessionStorage.getItem('ct_scale');if(t)document.documentElement.setAttribute('data-theme',t);if(s)document.documentElement.setAttribute('data-scale',s);document.documentElement.style.visibility='hidden';})();
+</script>
 <style>
   .tracker-topbar {
     background: var(--surface-1);
@@ -213,6 +216,7 @@
 
   window.addEventListener('DOMContentLoaded', async () => {
     await Shell.init('tracker');
+    document.documentElement.style.visibility = '';
     await loadCompanies();
 
     document.getElementById('company-select').addEventListener('change', onCompanyChange);
@@ -625,7 +629,7 @@
     const win = window.open('','_blank');
     win.document.write(`<!DOCTYPE html><html><head><title>Timesheet</title>
     <style>
-      body{font-family:Inter,Arial,sans-serif;font-size:12px;color:#111;padding:40px;max-width:960px;margin:0 auto;}
+      body{font-family:DM Sans,Arial,sans-serif;font-size:12px;color:#111;padding:40px;max-width:960px;margin:0 auto;}
       h1{font-size:20px;font-weight:600;margin:0 0 4px;}
       .meta{color:#666;font-size:11px;margin-bottom:4px;}
       .hier{font-size:11px;color:#2563eb;margin-bottom:20px;font-weight:500;}

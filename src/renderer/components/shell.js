@@ -29,7 +29,9 @@ const Shell = (() => {
   function buildSidebar(activeId, user) {
     const navItems = NAV.map(n => `
       <a class="nav-item ${n.id === activeId ? 'active' : ''}"
-         onclick="api.send('navigate', '${n.id}')">
+         tabindex="0"
+         onclick="api.send('navigate', '${n.id}')"
+         onkeydown="if(event.key==='Enter')api.send('navigate','${n.id}')">
         <span class="nav-icon">${n.icon}</span>
         ${n.label}
       </a>`).join('');
@@ -57,7 +59,7 @@ const Shell = (() => {
 
       <div class="sidebar-user">
         <div class="sidebar-user-name">${user?.username || '—'}</div>
-        <div class="sidebar-user-label">Active Session</div>
+        <div class="sidebar-active-badge">Active Session</div>
       </div>
     </div>`;
   }
@@ -171,19 +173,19 @@ const Shell = (() => {
             </div>
             <div class="toggle-row">
               <div class="toggle-info">
-                <div class="toggle-label">High Contrast</div>
-                <div class="toggle-desc">Increases border and text visibility</div>
+                <div class="toggle-label">Focus Indicators</div>
+                <div class="toggle-desc">Shows visible outlines for keyboard navigation</div>
               </div>
-              <button class="toggle-switch" id="toggle-contrast"
-                onclick="applyToggle('highContrast', this)"></button>
+              <button class="toggle-switch" id="toggle-focus"
+                onclick="applyToggle('focusIndicators', this)"></button>
             </div>
-            <div class="toggle-row">
-              <div class="toggle-info">
-                <div class="toggle-label">Colorblind Mode</div>
-                <div class="toggle-desc">Deuteranopia-safe color palette</div>
+            <div class="settings-row">
+              <div class="settings-row-label">Colorblind mode</div>
+              <div class="settings-btn-group" id="colorblind-btns">
+                <button class="s-btn" data-cb="off"           onclick="applyColorblind('off')">Off</button>
+                <button class="s-btn" data-cb="deuteranopia"  onclick="applyColorblind('deuteranopia')">Deuteranopia</button>
+                <button class="s-btn" data-cb="protanopia"    onclick="applyColorblind('protanopia')">Protanopia</button>
               </div>
-              <button class="toggle-switch" id="toggle-colorblind"
-                onclick="applyToggle('colorblind', this)"></button>
             </div>
           </div>
 
@@ -212,11 +214,13 @@ const Shell = (() => {
   async function init(activePage) {
     const user = await api.invoke('session:get');
     if (!user) { api.send('navigate', 'login'); return; }
+    window.__currentUsername = user?.username || 'YOU';
 
     const pageLabels = {
       dashboard:    'Dashboard',
       companies:    'Company Network',
       tracker:      'Time Tracker',
+      reports:      'Reports',
       'global-log': 'Global Log',
     };
 
@@ -240,12 +244,67 @@ const Shell = (() => {
     await Settings.load();
     syncSettingsModal();
 
-    // Close modal on Escape, open on Ctrl+,
+    // Global keyboard navigation
     document.addEventListener('keydown', e => {
-      if (e.key === 'Escape') closeSettingsModal();
+      const auditOpen    = document.getElementById('audit-warning-modal')?.style.display !== 'none';
+      const settingsOpen = document.getElementById('settings-modal')?.classList.contains('open');
+
+      // ── Escape: close whichever modal is open ─────────────────────────────
+      if (e.key === 'Escape') {
+        if (settingsOpen) { closeSettingsModal(); return; }
+        if (auditOpen)    { document.getElementById('audit-warn-dismiss')?.click(); return; }
+      }
+
+      // ── Settings modal: Ctrl+, ─────────────────────────────────────────────
       if (e.key === ',' && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
         openSettingsModal();
+        return;
+      }
+
+      // ── While a modal is open: trap Tab focus inside it ───────────────────
+      if (e.key === 'Tab' && (auditOpen || settingsOpen)) {
+        const modalId = auditOpen ? 'audit-warning-modal' : 'settings-modal';
+        const modal   = document.getElementById(modalId);
+        const focusable = Array.from(modal.querySelectorAll(
+          'button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        ));
+        if (!focusable.length) return;
+        const idx = focusable.indexOf(document.activeElement);
+        e.preventDefault();
+        if (e.shiftKey) {
+          focusable[idx <= 0 ? focusable.length - 1 : idx - 1].focus();
+        } else {
+          focusable[idx >= focusable.length - 1 ? 0 : idx + 1].focus();
+        }
+        return;
+      }
+
+      // ── Module switching: Ctrl+1–5 ─────────────────────────────────────────
+      if (e.ctrlKey && !e.shiftKey && !e.altKey) {
+        const pages = ['dashboard', 'companies', 'tracker', 'reports', 'global-log'];
+        const idx   = parseInt(e.key, 10) - 1;
+        if (idx >= 0 && idx < pages.length) {
+          e.preventDefault();
+          api.send('navigate', pages[idx]);
+          return;
+        }
+      }
+
+      // ── Sidebar arrow-key nav ──────────────────────────────────────────────
+      if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && !auditOpen && !settingsOpen) {
+        const items = Array.from(document.querySelectorAll('.nav-item'));
+        if (!items.length) return;
+        const idx = items.indexOf(document.activeElement);
+        if (idx === -1) {
+          // Nothing focused yet — focus the active item or first item
+          (document.querySelector('.nav-item.active') || items[0]).focus();
+          e.preventDefault();
+          return;
+        }
+        e.preventDefault();
+        if (e.key === 'ArrowUp')   items[Math.max(0, idx - 1)].focus();
+        if (e.key === 'ArrowDown') items[Math.min(items.length - 1, idx + 1)].focus();
       }
     });
 
@@ -329,11 +388,14 @@ function syncSettingsModal() {
 
   // Toggles
   const tm = document.getElementById('toggle-motion');
-  const tc = document.getElementById('toggle-contrast');
-  const tcb = document.getElementById('toggle-colorblind');
-  if (tm)  tm.classList.toggle('on',  s.reducedMotion);
-  if (tc)  tc.classList.toggle('on',  s.highContrast);
-  if (tcb) tcb.classList.toggle('on', s.colorblind);
+  const tf = document.getElementById('toggle-focus');
+  if (tm) tm.classList.toggle('on', s.reducedMotion);
+  if (tf) tf.classList.toggle('on', s.focusIndicators);
+
+  // Colorblind selector
+  document.querySelectorAll('[data-cb]').forEach(b => {
+    b.classList.toggle('active', b.dataset.cb === s.colorblind);
+  });
 }
 
 async function applyTheme(theme) {
@@ -357,6 +419,11 @@ async function applyToggle(key, btn) {
   btn.classList.toggle('on', newVal);
 }
 
+async function applyColorblind(mode) {
+  await Settings.set('colorblind', mode);
+  syncSettingsModal();
+}
+
 async function applyAutoSave(seconds) {
   await Settings.set('autoSaveInterval', seconds);
   syncSettingsModal();
@@ -377,6 +444,7 @@ function showAuditWarning(count, action) {
   dismissBtn.textContent = action === 'close' ? 'Close Anyway' : 'Lock Anyway';
 
   modal.style.display = 'flex';
+  setTimeout(() => viewBtn?.focus(), 50);
 
   const cleanup = () => { modal.style.display = 'none'; viewBtn.onclick = null; dismissBtn.onclick = null; };
 

@@ -6,6 +6,9 @@
   content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; img-src 'self' data:;">
 <title>Conquered Time — Dashboard</title>
 <link rel="stylesheet" href="../styles/design-system.css">
+<script>
+  (function(){var t=sessionStorage.getItem('ct_theme');var s=sessionStorage.getItem('ct_scale');if(t)document.documentElement.setAttribute('data-theme',t);if(s)document.documentElement.setAttribute('data-scale',s);document.documentElement.style.visibility='hidden';})();
+</script>
 <style>
   .dashboard-outer {
     display: flex;
@@ -102,6 +105,15 @@
     scrollbar-color: var(--border-light) transparent;
   }
   .quick-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+  /* ── Dashboard module accent colors ── */
+  #chip-today::before         { background: #03ecfc; }
+  #chip-week::before          { background: #030ffc; }
+  #chip-alltime::before       { background: #fc2403; }
+  #chip-companies::before     { background: #020a75; }
+  #panel-network::before      { background: #2aed07; }
+  #panel-activity::before     { background: #f2fa05; }
+  #panel-quickactions::before { background: #610030; }
 </style>
 </head>
 <body>
@@ -119,22 +131,22 @@
 
 <!-- Stat chips -->
 <div class="stat-grid mb-16" id="stat-grid">
-  <div class="stat-chip">
+  <div class="stat-chip" id="chip-today">
     <div class="stat-label">Today</div>
     <div class="stat-value" id="stat-today">—</div>
     <div class="stat-sub">hours logged</div>
   </div>
-  <div class="stat-chip violet">
+  <div class="stat-chip" id="chip-week">
     <div class="stat-label">This Week</div>
     <div class="stat-value" id="stat-week">—</div>
     <div class="stat-sub">hours logged</div>
   </div>
-  <div class="stat-chip yellow">
+  <div class="stat-chip" id="chip-alltime">
     <div class="stat-label">All Time</div>
     <div class="stat-value" id="stat-alltime">—</div>
     <div class="stat-sub">total hours</div>
   </div>
-  <div class="stat-chip blue">
+  <div class="stat-chip" id="chip-companies">
     <div class="stat-label">Companies</div>
     <div class="stat-value" id="stat-companies">—</div>
     <div class="stat-sub">active clients</div>
@@ -144,7 +156,7 @@
 <div class="dashboard-outer">
 <div class="dashboard-grid">
 
-  <div class="hud-panel fill">
+  <div class="hud-panel fill" id="panel-network">
     <div class="hud-panel-header">
       <div class="hud-panel-title">Company Network</div>
       <button class="btn-neutral" style="font-size:11px;padding:5px 10px;" onclick="api.send('navigate','companies')">View Full →</button>
@@ -155,7 +167,7 @@
     </div>
   </div>
 
-  <div class="hud-panel fill">
+  <div class="hud-panel fill" id="panel-activity">
     <div class="hud-panel-header">
       <div class="hud-panel-title">Recent Activity</div>
       <button class="btn-neutral" style="font-size:11px;padding:5px 10px;" onclick="api.send('navigate','global-log')">All Logs →</button>
@@ -169,7 +181,7 @@
     </div>
   </div>
 
-  <div class="hud-panel span-2">
+  <div class="hud-panel span-2" id="panel-quickactions">
     <div class="hud-panel-header">
       <div class="hud-panel-title">Quick Actions</div>
     </div>
@@ -194,6 +206,7 @@
 
   window.addEventListener('DOMContentLoaded', async () => {
     await Shell.init('dashboard');
+    document.documentElement.style.visibility = '';
     const mc = document.getElementById('main-content');
     if (mc) { mc.style.display = 'flex'; mc.style.flexDirection = 'column'; mc.style.overflow = 'hidden'; }
     await loadData();
@@ -308,10 +321,10 @@
       for (let gy = 0; gy < H; gy += 40) { ctx.beginPath(); ctx.moveTo(0,gy); ctx.lineTo(W,gy); ctx.stroke(); }
 
       if (companies.length === 0) {
-        drawSphereNode(ctx, cx, cy, 28, true, pulse, 'YOU');
+        drawSphereNode(ctx, cx, cy, 28, true, pulse, (window.__currentUsername || 'YOU'));
         ctx.fillStyle = c.node.label;
         ctx.globalAlpha = 0.4;
-        ctx.font = '12px Inter, sans-serif';
+        ctx.font = '12px DM Sans, system-ui, sans-serif';
         ctx.textAlign = 'center'; ctx.textBaseline = 'top';
         ctx.fillText('No companies yet', cx, cy + 40);
         ctx.globalAlpha = 1;
@@ -340,7 +353,7 @@
       });
 
       // Center node on top
-      drawSphereNode(ctx, cx, cy, 28, true, pulse, 'YOU');
+      drawSphereNode(ctx, cx, cy, 28, true, pulse, (window.__currentUsername || 'YOU'));
 
       miniAnimFrame = requestAnimationFrame(render);
     }
@@ -382,11 +395,11 @@
     hl.addColorStop(0,'rgba(255,255,255,0.14)'); hl.addColorStop(1,'rgba(255,255,255,0)');
     ctx.beginPath(); ctx.arc(x,y,pR,0,Math.PI*2); ctx.fillStyle=hl; ctx.fill();
     ctx.fillStyle=nc.label;
-    ctx.font=`${isCenter?'600 ':'500 '}${isCenter?10:9}px Inter, sans-serif`;
+    ctx.font=`${isCenter?'600 ':'500 '}${isCenter?10:9}px DM Sans, system-ui, sans-serif`;
     ctx.textAlign='center'; ctx.textBaseline='middle';
     ctx.fillText(label,x,y);
     if (!isCenter) {
-      ctx.fillStyle=nc.label; ctx.font='10px Inter, sans-serif';
+      ctx.fillStyle=nc.label; ctx.font='10px DM Sans, system-ui, sans-serif';
       ctx.textBaseline='top'; ctx.fillText(label,x,y+pR+5);
     }
   }

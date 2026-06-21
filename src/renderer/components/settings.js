@@ -11,8 +11,8 @@ const Settings = (() => {
     theme:            'arctic',   // slate | void | arctic | paper | quartz
     scale:            'normal',
     reducedMotion:    false,
-    highContrast:     true,
-    colorblind:       false,
+    colorblind:       'off',
+    focusIndicators:  false,
     timeFormat:       '24h',
     autoLockMinutes:   15,        // 0 = disabled
     autoSaveInterval:  60,        // seconds; 0 = disabled
@@ -25,9 +25,9 @@ const Settings = (() => {
     const root = document.documentElement;
     root.setAttribute('data-theme',          settings.theme);
     root.setAttribute('data-scale',          settings.scale);
-    root.setAttribute('data-reduced-motion', settings.reducedMotion ? 'true' : 'false');
-    root.setAttribute('data-high-contrast',  settings.highContrast  ? 'true' : 'false');
-    root.setAttribute('data-colorblind',     settings.colorblind    ? 'true' : 'false');
+    root.setAttribute('data-reduced-motion',   settings.reducedMotion  ? 'true' : 'false');
+    root.setAttribute('data-colorblind',       settings.colorblind  || 'off');
+    root.setAttribute('data-focus-indicators', settings.focusIndicators ? 'true' : 'false');
     window.__timeFormat = settings.timeFormat;
     // Cache to sessionStorage for login page pre-load
     try {
@@ -39,14 +39,14 @@ const Settings = (() => {
   // ── Load from DB and apply ─────────────────────────────────────────────────
   async function load() {
     try {
-      const keys = ['theme','scale','reducedMotion','highContrast','colorblind','timeFormat','autoLockMinutes','autoSaveInterval'];
+      const keys = ['theme','scale','reducedMotion','colorblind','focusIndicators','timeFormat','autoLockMinutes','autoSaveInterval'];
       for (const key of keys) {
         const val = await api.invoke('settings:get', `ui_${key}`);
         if (val !== null && val !== undefined) {
-          if (val === 'true')  current[key] = true;
+          if (key === 'autoLockMinutes' || key === 'autoSaveInterval') current[key] = parseInt(val, 10);
+          else if (key === 'colorblind') current[key] = val;
+          else if (val === 'true')  current[key] = true;
           else if (val === 'false') current[key] = false;
-          else if (key === 'autoLockMinutes')  current[key] = parseInt(val, 10);
-          else if (key === 'autoSaveInterval') current[key] = parseInt(val, 10);
           else current[key] = val;
         }
       }

@@ -6,6 +6,9 @@
   content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; img-src 'self' data:; blob:;">
 <title>Conquered Time — Reports</title>
 <link rel="stylesheet" href="../styles/design-system.css">
+<script>
+  (function(){var t=sessionStorage.getItem('ct_theme');var s=sessionStorage.getItem('ct_scale');if(t)document.documentElement.setAttribute('data-theme',t);if(s)document.documentElement.setAttribute('data-scale',s);document.documentElement.style.visibility='hidden';})();
+</script>
 <style>
   /* ── Tabs ── */
   .tab-bar {
@@ -346,6 +349,7 @@
 
   window.addEventListener('DOMContentLoaded', async () => {
     await Shell.init('reports');
+    document.documentElement.style.visibility = '';
     const mc = document.getElementById('main-content');
     if (mc) { mc.style.display = 'flex'; mc.style.flexDirection = 'column'; mc.style.overflow = 'hidden'; }
 
@@ -660,7 +664,7 @@
 
     const win = window.open('','_blank');
     win.document.write(`<!DOCTYPE html><html><head><title>Period Report</title>
-    <style>body{font-family:Inter,Arial,sans-serif;font-size:12px;color:#111;padding:40px;max-width:900px;margin:0 auto;}
+    <style>body{font-family:DM Sans,Arial,sans-serif;font-size:12px;color:#111;padding:40px;max-width:900px;margin:0 auto;}
     h1{font-size:20px;font-weight:600;margin:0 0 4px;}h2{font-size:13px;font-weight:600;color:#374151;margin:24px 0 8px;border-bottom:1px solid #e5e7eb;padding-bottom:4px;}
     .meta{color:#666;font-size:11px;margin-bottom:20px;}table{width:100%;border-collapse:collapse;margin-bottom:20px;}
     th{background:#f1f5f9;border-bottom:2px solid #2563eb;padding:8px;text-align:left;font-size:11px;font-weight:600;color:#374151;}
@@ -689,7 +693,7 @@
     }).join('');
     const win = window.open('','_blank');
     win.document.write(`<!DOCTYPE html><html><head><title>Company Report</title>
-    <style>body{font-family:Inter,Arial,sans-serif;font-size:12px;color:#111;padding:40px;max-width:900px;margin:0 auto;}
+    <style>body{font-family:DM Sans,Arial,sans-serif;font-size:12px;color:#111;padding:40px;max-width:900px;margin:0 auto;}
     h1{font-size:20px;font-weight:600;margin:0 0 4px;}.meta{color:#666;font-size:11px;margin-bottom:20px;}
     table{width:100%;border-collapse:collapse;}
     th{background:#f1f5f9;border-bottom:2px solid #2563eb;padding:8px;text-align:left;font-size:11px;font-weight:600;color:#374151;}

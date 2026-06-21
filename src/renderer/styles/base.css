@@ -9,23 +9,38 @@ html[data-scale="large"]       #main-content { zoom: 1.30; }
 /* ══════════════════════════════════════════════════════════════
    ACCESSIBILITY
    ══════════════════════════════════════════════════════════════ */
+
+/* Reduced motion */
 [data-reduced-motion="true"] *,
 [data-reduced-motion="true"] *::before,
 [data-reduced-motion="true"] *::after {
   animation-duration: 0.001ms !important;
   transition-duration: 0.001ms !important;
 }
-[data-high-contrast="true"] {
-  --border:       #6b7a92;
-  --border-light: #8a9ab2;
-  --text:         #d4dff0;
-  --text-dim:     #8a9ab2;
-}
-[data-colorblind="true"] {
+
+/* Colorblind — deuteranopia (red-green, most common) */
+[data-colorblind="deuteranopia"] {
   --accent:   #0077bb;
   --accent-2: #ee7733;
   --red:      #cc3311;
-  --yellow:   #009988;
+  --green:    #009988;
+  --yellow:   #ddcc77;
+}
+
+/* Colorblind — protanopia (red-blind) */
+[data-colorblind="protanopia"] {
+  --accent:   #0077bb;
+  --accent-2: #ee7733;
+  --red:      #882255;
+  --green:    #44bb99;
+  --yellow:   #ddcc77;
+}
+
+/* Focus indicators */
+[data-focus-indicators="true"] *:focus-visible {
+  outline: 2px solid var(--accent) !important;
+  outline-offset: 2px !important;
+  border-radius: var(--radius-sm);
 }
 
 /* ══════════════════════════════════════════════════════════════

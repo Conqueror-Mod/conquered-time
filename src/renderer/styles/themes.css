@@ -1,10 +1,24 @@
-@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap');
 
 /* ══════════════════════════════════════════════════════════════
    THEME TOKENS
    ══════════════════════════════════════════════════════════════ */
 
-/* ── Default: EMBER ── */
+/* ── Shared tokens: identical across all themes ── */
+:root {
+  --mono: 'JetBrains Mono', monospace;
+  --sans: 'DM Sans', system-ui, sans-serif;
+
+  --radius-sm: 4px;
+  --radius:    6px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+
+  --transition: 0.14s ease;
+  --transition-md: 0.22s ease;
+}
+
+/* ── Fallback/base theme: EMBER ── */
 :root,
 [data-theme="ember"] {
   --bg:           #13100c;
@@ -31,9 +45,9 @@
   --blue:         #7aa8d4;
   --blue-dim:     rgba(122,168,212,0.12);
 
-  --text:         #b09878;
+  --text:         #b8a080;
   --text-dim:     #4e3e2c;
-  --text-muted:   #7a6248;
+  --text-muted:   #9a7e60;
   --text-bright:  #e0cca8;
   --text-white:   #f5e8cc;
 
@@ -42,18 +56,6 @@
   --shadow-2: 0 4px 12px rgba(0,0,0,0.45), 0 8px 24px rgba(0,0,0,0.32);
   --shadow-3: 0 12px 40px rgba(0,0,0,0.6), 0 24px 64px rgba(0,0,0,0.38);
   --shadow-inset: inset 0 1px 0 rgba(255,255,255,0.04);
-
-  /* Typography */
-  --mono: 'Share Tech Mono', monospace;
-  --sans: 'Inter', system-ui, sans-serif;
-
-  --radius-sm: 4px;
-  --radius:    6px;
-  --radius-lg: 10px;
-  --radius-xl: 14px;
-
-  --transition: 0.14s ease;
-  --transition-md: 0.22s ease;
 }
 
 /* ── VOID — pushed harder, nav/content contrast emphasized ───────────────── */
@@ -82,27 +84,16 @@
   --blue:         #60a5fa;
   --blue-dim:     rgba(96,165,250,0.12);
 
-  --text:         #7a9ab8;
+  --text:         #88aac8;
   --text-dim:     #1e2d40;
-  --text-muted:   #4a6a88;
-  --text-bright:  #b0cce0;
+  --text-muted:   #607a98;
+  --text-bright:  #c0d8f0;
   --text-white:   #e0f0ff;
 
   --shadow-1: 0 1px 3px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.35);
   --shadow-2: 0 4px 12px rgba(0,0,0,0.55), 0 8px 24px rgba(0,0,0,0.40);
   --shadow-3: 0 12px 40px rgba(0,0,0,0.7), 0 24px 64px rgba(0,0,0,0.45);
   --shadow-inset: inset 0 1px 0 rgba(255,255,255,0.03);
-
-  --mono: 'Share Tech Mono', monospace;
-  --sans: 'Inter', system-ui, sans-serif;
-
-  --radius-sm: 4px;
-  --radius:    6px;
-  --radius-lg: 10px;
-  --radius-xl: 14px;
-
-  --transition: 0.14s ease;
-  --transition-md: 0.22s ease;
 }
 
 /* ── QUARTZ theme (polar opposite of Paper — stark, high contrast) ───────── */
@@ -131,27 +122,16 @@
   --blue:         #2980b9;
   --blue-dim:     rgba(41,128,185,0.10);
 
-  --text:         #495057;
+  --text:         #3d4450;
   --text-dim:     #ced4da;
-  --text-muted:   #868e96;
-  --text-bright:  #212529;
+  --text-muted:   #6c757d;
+  --text-bright:  #141820;
   --text-white:   #1c2128;
 
   --shadow-1: 0 1px 3px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.06);
   --shadow-2: 0 4px 12px rgba(0,0,0,0.10), 0 8px 24px rgba(0,0,0,0.07);
   --shadow-3: 0 12px 40px rgba(0,0,0,0.14), 0 24px 64px rgba(0,0,0,0.09);
   --shadow-inset: inset 0 1px 0 rgba(255,255,255,0.8);
-
-  --mono: 'Share Tech Mono', monospace;
-  --sans: 'Inter', system-ui, sans-serif;
-
-  --radius-sm: 4px;
-  --radius:    6px;
-  --radius-lg: 10px;
-  --radius-xl: 14px;
-
-  --transition: 0.14s ease;
-  --transition-md: 0.22s ease;
 }
 
 /* ── ARCTIC ── */
@@ -180,27 +160,16 @@
   --blue:         #60a5fa;
   --blue-dim:     rgba(96,165,250,0.12);
 
-  --text:         #7a9ab8;
+  --text:         #88aac8;
   --text-dim:     #1e3050;
-  --text-muted:   #4a6a88;
-  --text-bright:  #b0cce0;
+  --text-muted:   #607a98;
+  --text-bright:  #c0d8f0;
   --text-white:   #e8f0ff;
 
   --shadow-1: 0 1px 3px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.35);
   --shadow-2: 0 4px 12px rgba(0,0,0,0.55), 0 8px 24px rgba(0,0,0,0.40);
   --shadow-3: 0 12px 40px rgba(0,0,0,0.7), 0 24px 64px rgba(0,0,0,0.45);
   --shadow-inset: inset 0 1px 0 rgba(255,255,255,0.03);
-
-  --mono: 'Share Tech Mono', monospace;
-  --sans: 'Inter', system-ui, sans-serif;
-
-  --radius-sm: 4px;
-  --radius:    6px;
-  --radius-lg: 10px;
-  --radius-xl: 14px;
-
-  --transition: 0.14s ease;
-  --transition-md: 0.22s ease;
 }
 
 /* ── PAPER ── */
@@ -229,25 +198,14 @@
   --blue:         #1a4480;
   --blue-dim:     rgba(26,68,128,0.10);
 
-  --text:         #5c4f3a;
+  --text:         #4a3e2c;
   --text-dim:     #d4c9b4;
-  --text-muted:   #8c7b62;
-  --text-bright:  #2c2218;
+  --text-muted:   #7a6a52;
+  --text-bright:  #1e1610;
   --text-white:   #1a130a;
 
   --shadow-1: 0 1px 3px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.05);
   --shadow-2: 0 4px 12px rgba(0,0,0,0.10), 0 8px 24px rgba(0,0,0,0.07);
   --shadow-3: 0 12px 40px rgba(0,0,0,0.14), 0 24px 64px rgba(0,0,0,0.09);
   --shadow-inset: inset 0 1px 0 rgba(255,255,255,0.7);
-
-  --mono: 'Share Tech Mono', monospace;
-  --sans: 'Inter', system-ui, sans-serif;
-
-  --radius-sm: 4px;
-  --radius:    6px;
-  --radius-lg: 10px;
-  --radius-xl: 14px;
-
-  --transition: 0.14s ease;
-  --transition-md: 0.22s ease;
 }

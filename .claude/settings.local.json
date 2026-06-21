@@ -2,7 +2,19 @@
   "permissions": {
     "allow": [
       "Bash(git -C \"D:\\\\My Projects\\\\CURRENT-RELEASE\\\\conquered-time\" status)",
-      "Bash(gh auth *)"
+      "Bash(gh auth *)",
+      "Bash(git checkout *)",
+      "Bash(git add *)",
+      "Bash(git commit -m 'chore: default highContrast to true across all themes *)",
+      "Bash(git commit -m 'chore: exclude .claude/settings.local.json from version control *)",
+      "Bash(git push *)",
+      "Bash(gh pr create --title 'chore: exclude .claude/settings.local.json from version control' --body ' *)",
+      "PowerShell(Get-Command gh -ErrorAction SilentlyContinue; \\(Get-Command gh -ErrorAction SilentlyContinue\\).Source; $env:PATH -split \";\" | Select-String -Pattern \"github\" -SimpleMatch)",
+      "Bash(grep -n \"^/\\\\* ══\\\\|^/\\\\* ──\\\\|^/\\\\* ==\" \"D:/My Projects/CURRENT-RELEASE/conquered-time/src/renderer/styles/design-system.css\")",
+      "Bash(grep -n \"^/\\\\* ══\" \"D:/My Projects/CURRENT-RELEASE/conquered-time/src/renderer/styles/design-system.css\")",
+      "Bash(git commit -m ' *)",
+      "Bash(gh pr create --base master --title 'refactor: split design-system.css into focused style modules' --body ' *)",
+      "PowerShell(\\(Get-Command gh -ErrorAction SilentlyContinue\\)?.Source; where.exe gh 2>$null)"
     ]
   }
 }

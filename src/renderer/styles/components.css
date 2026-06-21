@@ -14,10 +14,9 @@
   content: '';
   position: absolute;
   top: 0; left: 0; right: 0;
-  height: 2px;
+  height: 3px;
   background: var(--accent);
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-  opacity: 0.6;
+  opacity: 0.7;
 }
 .hud-panel::after { display: none; }
 
@@ -56,6 +55,7 @@
   flex-direction: column;
   gap: 6px;
   position: relative;
+  overflow: hidden;
   box-shadow: var(--shadow-1), var(--shadow-inset);
   transition: box-shadow var(--transition-md), transform var(--transition-md);
 }
@@ -68,8 +68,7 @@
   content: '';
   position: absolute;
   top: 0; left: 0; right: 0;
-  height: 2px;
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  height: 3px;
   background: var(--accent);
 }
 .stat-chip.violet::before { background: var(--accent-2); }
@@ -82,6 +81,7 @@
   font-weight: 500;
   color: var(--text-muted);
   letter-spacing: 0;
+  white-space: nowrap;
 }
 .stat-value {
   font-family: var(--mono);
@@ -94,6 +94,7 @@
   font-family: var(--sans);
   font-size: 11px;
   color: var(--text-dim);
+  white-space: nowrap;
 }
 
 /* ══════════════════════════════════════════════════════════════
