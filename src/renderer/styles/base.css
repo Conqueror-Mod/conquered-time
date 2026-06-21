@@ -1,0 +1,47 @@
+/* ══════════════════════════════════════════════════════════════
+   SCALE
+   ══════════════════════════════════════════════════════════════ */
+html[data-scale="compact"]     #main-content { zoom: 0.82; }
+html[data-scale="normal"]      #main-content { zoom: 1.00; }
+html[data-scale="comfortable"] #main-content { zoom: 1.14; }
+html[data-scale="large"]       #main-content { zoom: 1.30; }
+
+/* ══════════════════════════════════════════════════════════════
+   ACCESSIBILITY
+   ══════════════════════════════════════════════════════════════ */
+[data-reduced-motion="true"] *,
+[data-reduced-motion="true"] *::before,
+[data-reduced-motion="true"] *::after {
+  animation-duration: 0.001ms !important;
+  transition-duration: 0.001ms !important;
+}
+[data-high-contrast="true"] {
+  --border:       #6b7a92;
+  --border-light: #8a9ab2;
+  --text:         #d4dff0;
+  --text-dim:     #8a9ab2;
+}
+[data-colorblind="true"] {
+  --accent:   #0077bb;
+  --accent-2: #ee7733;
+  --red:      #cc3311;
+  --yellow:   #009988;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   RESET
+   ══════════════════════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-weight: 400;
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  overflow: hidden;
+}

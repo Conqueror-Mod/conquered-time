@@ -1,0 +1,10 @@
+/* ══════════════════════════════════════════════════════════════
+   PRINT
+   ══════════════════════════════════════════════════════════════ */
+@media print {
+  .titlebar, .sidebar, .page-actions { display: none !important; }
+  body { background: #fff; color: #000; overflow: auto; }
+  .main-content { padding: 0; overflow: visible; }
+  .hud-panel { border: 1px solid #ddd; box-shadow: none; }
+  .hud-panel::before { display: none; }
+}
