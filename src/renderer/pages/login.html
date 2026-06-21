@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy"
+  content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; img-src 'self' data:;">
+<title>Conquered Time — Login</title>
+<link rel="stylesheet" href="../styles/design-system.css">
+<script>
+// Apply saved theme immediately before page renders to prevent flash
+(async function() {
+  try {
+    // Read theme from sessionStorage cache (set after first login)
+    const theme = sessionStorage.getItem('ct_theme') || 'slate';
+    const scale = sessionStorage.getItem('ct_scale') || 'normal';
+    document.documentElement.setAttribute('data-theme', theme);
+    document.documentElement.setAttribute('data-scale', scale);
+  } catch(e) {}
+})();
+</script>
+<style>
+  body {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+    background: var(--bg-deep);
+  }
+  .login-titlebar {
+    height: 36px;
+    background: var(--bg-deep);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px;
+    -webkit-app-region: drag;
+    flex-shrink: 0;
+  }
+  .login-titlebar-controls { display: flex; gap: 6px; -webkit-app-region: no-drag; }
+
+  .login-body {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* ── Interactive grid canvas ── */
+  #grid-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    cursor: default;
+    z-index: 1;
+  }
+
+  /* Radial fade over grid */
+  .grid-fade {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 65% 65% at 50% 50%, transparent, var(--bg-deep) 100%);
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  /* Corner accents */
+  .corner { position: absolute; width: 60px; height: 60px; z-index: 3; pointer-events: none; }
+  .corner-tl { top: 20px; left: 20px; border-top: 1px solid var(--accent); border-left: 1px solid var(--accent); }
+  .corner-tr { top: 20px; right: 20px; border-top: 1px solid var(--accent); border-right: 1px solid var(--accent); }
+  .corner-bl { bottom: 20px; left: 20px; border-bottom: 1px solid var(--accent); border-left: 1px solid var(--accent); }
+  .corner-br { bottom: 20px; right: 20px; border-bottom: 1px solid var(--accent); border-right: 1px solid var(--accent); }
+
+  /* ── Login card — always a solid, opaque floating layer above everything ── */
+  .login-card {
+    position: relative;
+    z-index: 4;
+    width: 380px;
+    /* Fully opaque — no background bleed through on any theme */
+    background: var(--surface-1);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-lg);
+    padding: 36px;
+    box-shadow: var(--shadow-3);
+    transition: opacity 0.6s ease, transform 0.6s ease;
+    isolation: isolate;
+  }
+  .login-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  }
+  .login-card.fade-out {
+    opacity: 0;
+    transform: scale(0.96);
+    pointer-events: none;
+  }
+
+  /* Paper login — warm parchment with deep navy vignette */
+  [data-theme="paper"] .login-body { background: #c8b99a; }
+  [data-theme="paper"] .grid-fade {
+    background: radial-gradient(ellipse 65% 65% at 50% 50%, rgba(200,185,154,0.3), #c8b99a 100%);
+  }
+  [data-theme="paper"] .login-card {
+    background: #faf7f0;
+    border-color: #c2b79f;
+    box-shadow: 0 8px 40px rgba(28,21,16,0.30), 0 2px 8px rgba(28,21,16,0.14), 0 0 0 1px rgba(28,21,16,0.06);
+  }
+
+  /* Quartz login — cool grey with charcoal depth */
+  [data-theme="quartz"] .login-body { background: #6c757d; }
+  [data-theme="quartz"] .grid-fade {
+    background: radial-gradient(ellipse 65% 65% at 50% 50%, rgba(108,117,125,0.35), #6c757d 100%);
+  }
+  [data-theme="quartz"] .login-card {
+    background: #ffffff;
+    border-color: #adb5bd;
+    box-shadow: 0 8px 40px rgba(13,15,16,0.35), 0 2px 8px rgba(13,15,16,0.16), 0 0 0 1px rgba(13,15,16,0.06);
+  }
+  /* Light theme corner accents — darker so visible on mid-tone background */
+  [data-theme="paper"] .corner,
+  [data-theme="quartz"] .corner { border-color: rgba(0,0,0,0.25) !important; }
+
+
+  .login-brand { text-align: center; margin-bottom: 28px; }
+  .login-brand-label {
+    font-family: var(--sans); font-size: 11px; font-weight: 500;
+    color: var(--text-muted); margin-bottom: 6px; letter-spacing: 0;
+  }
+  .login-brand-name {
+    font-family: var(--mono); font-size: 22px;
+    color: var(--accent); letter-spacing: 3px; text-shadow: var(--glow-md);
+  }
+  .login-brand-sub {
+    font-family: var(--sans); font-size: 12px; font-weight: 400;
+    color: var(--text-dim); margin-top: 4px; letter-spacing: 0;
+  }
+
+  .login-form { display: flex; flex-direction: column; gap: 16px; }
+  .login-mode-tabs {
+    display: flex; gap: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden; margin-bottom: 4px;
+  }
+  .mode-tab {
+    flex: 1; padding: 8px; background: transparent; border: none;
+    border-radius: 0; color: var(--text-dim); font-family: var(--sans);
+    font-size: 12px; font-weight: 500; cursor: pointer;
+    transition: all var(--transition); text-align: center; letter-spacing: 0;
+  }
+  .mode-tab.active { background: var(--accent-dim); color: var(--accent); }
+  .error-msg {
+    background: var(--red-dim); border: 1px solid var(--red);
+    border-radius: var(--radius); padding: 9px 13px;
+    font-family: var(--sans); font-size: 12px; color: var(--red);
+    display: none;
+  }
+  .attempts-left {
+    font-family: var(--sans); font-size: 12px;
+    color: var(--yellow); text-align: center; display: none;
+  }
+
+  /* ── Lockout ── */
+  .lockout-screen {
+    position: relative; z-index: 4; text-align: center;
+    display: none; flex-direction: column; align-items: center; gap: 20px;
+  }
+  .lockout-icon { font-size: 48px; filter: drop-shadow(0 0 16px var(--red)); }
+  .lockout-title {
+    font-family: var(--sans); font-size: 18px; font-weight: 600;
+    color: var(--red); letter-spacing: -0.01em;
+  }
+  .lockout-timer {
+    font-family: var(--mono); font-size: 36px;
+    color: var(--text-white); letter-spacing: 4px;
+  }
+  .lockout-sub {
+    font-family: var(--sans); font-size: 12px;
+    color: var(--text-dim); font-weight: 400;
+  }
+
+  /* ── QR / setup ── */
+  .qr-wrap {
+    text-align: center; padding: 16px; background: var(--bg);
+    border: 1px solid var(--border); border-radius: var(--radius); display: none;
+  }
+  .qr-wrap img { width: 160px; height: 160px; border-radius: 4px; }
+  .qr-secret { font-family: var(--mono); font-size: 10px; color: var(--accent); letter-spacing: 2px; margin-top: 10px; word-break: break-all; }
+  .recovery-code-display {
+    background: var(--bg); border: 1px solid var(--yellow); border-radius: var(--radius);
+    padding: 14px; font-family: var(--mono); font-size: 14px; color: var(--yellow);
+    letter-spacing: 4px; text-align: center; display: none;
+  }
+
+  /* ── Easter egg overlay ── */
+  #easter-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(8,10,15,0.92);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.5s ease;
+  }
+  #easter-overlay.visible {
+    opacity: 1;
+    pointer-events: all;
+  }
+  .easter-ascii {
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.3;
+    color: var(--accent);
+    text-shadow: 0 0 8px var(--accent-glow);
+    white-space: pre;
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  .easter-msg {
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-muted);
+    animation: blink 1.2s infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* ── Backdoor screen ── */
+  #backdoor-screen {
+    position: absolute;
+    inset: 0;
+    z-index: 8;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-deep);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.5s ease;
+  }
+  #backdoor-screen.visible {
+    opacity: 1;
+    pointer-events: all;
+  }
+  .backdoor-card {
+    width: 360px;
+    background: var(--surface);
+    border: 1px solid var(--red);
+    border-radius: var(--radius-lg);
+    padding: 32px;
+    box-shadow: 0 0 40px rgba(255,75,110,0.15), 0 0 80px rgba(255,75,110,0.06);
+    position: relative;
+  }
+  .backdoor-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--red), transparent);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  }
+  .backdoor-title {
+    font-family: var(--sans); font-size: 14px; font-weight: 600;
+    color: var(--red); text-align: center; margin-bottom: 4px;
+    letter-spacing: -0.01em;
+  }
+  .backdoor-sub {
+    font-family: var(--sans); font-size: 11px; font-weight: 400;
+    color: var(--text-dim); text-align: center; margin-bottom: 24px;
+  }
+  .backdoor-form { display: flex; flex-direction: column; gap: 14px; }
+  .backdoor-form .field-label { color: var(--red) !important; }
+  .backdoor-form input:focus {
+    border-color: var(--red) !important;
+    box-shadow: 0 0 0 2px rgba(255,75,110,0.12) !important;
+  }
+  .btn-backdoor {
+    background: rgba(255,75,110,0.1);
+    border-color: var(--red);
+    color: var(--red);
+    width: 100%;
+    justify-content: center;
+  }
+  .btn-backdoor:hover { background: var(--red); color: #fff; }
+  .btn-dismiss {
+    background: transparent;
+    border-color: var(--border-light);
+    color: var(--text-dim);
+    width: 100%;
+    justify-content: center;
+    margin-top: 6px;
+  }
+  .btn-dismiss:hover { border-color: var(--text-muted); color: var(--text); }
+
+  /* Sequence indicator dots */
+  #seq-indicator {
+    position: absolute;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 6px;
+    z-index: 5;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  #seq-indicator.visible { opacity: 1; }
+  .seq-dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--border-light);
+    transition: all 0.2s;
+  }
+  .seq-dot.lit { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+  .seq-dot.dev-lit { background: var(--red); box-shadow: 0 0 6px var(--red); }
+</style>
+</head>
+<body>
+
+<div class="scanline-overlay"></div>
+
+<!-- Titlebar -->
+<div class="login-titlebar">
+  <span style="font-family:var(--mono);font-size:10px;letter-spacing:3px;color:var(--text-dim);">CONQUERED TIME</span>
+  <div class="login-titlebar-controls">
+    <button class="titlebar-btn" onclick="api.send('win:minimize')">─</button>
+    <button class="titlebar-btn close" onclick="api.send('win:close')">✕</button>
+  </div>
+</div>
+
+<div class="login-body">
+
+  <!-- Interactive grid canvas -->
+  <canvas id="grid-canvas"></canvas>
+  <div class="grid-fade"></div>
+  <div class="corner corner-tl"></div>
+  <div class="corner corner-tr"></div>
+  <div class="corner corner-bl"></div>
+  <div class="corner corner-br"></div>
+
+  <!-- Sequence dots indicator -->
+  <div id="seq-indicator"></div>
+
+  <!-- ── Login Card ── -->
+  <div class="login-card" id="login-card">
+    <div class="login-brand">
+      <div class="login-brand-label">Mission Control</div>
+      <div class="login-brand-name">CONQUERED</div>
+      <div class="login-brand-sub">Time Intelligence System</div>
+    </div>
+
+    <div class="login-mode-tabs" id="mode-tabs">
+      <button class="mode-tab active" onclick="setMode('login')">Login</button>
+      <button class="mode-tab" id="tab-setup" onclick="setMode('setup')">Setup</button>
+      <button class="mode-tab" onclick="setMode('recovery')">Recovery</button>
+    </div>
+
+    <!-- LOGIN -->
+    <div id="form-login" class="login-form">
+      <div class="field-group">
+        <label class="field-label">Username</label>
+        <input type="text" id="login-username" placeholder="Enter username" autocomplete="username">
+      </div>
+      <div class="field-group">
+        <label class="field-label">Password</label>
+        <input type="password" id="login-password" placeholder="Enter password" autocomplete="current-password">
+      </div>
+      <div class="field-group">
+        <label class="field-label">TOTP Code</label>
+        <input type="text" id="login-totp" placeholder="6-digit code" maxlength="6" autocomplete="one-time-code" inputmode="numeric">
+      </div>
+      <div class="error-msg" id="login-error"></div>
+      <div class="attempts-left" id="attempts-warn"></div>
+      <button class="btn-primary" onclick="doLogin()" id="login-btn">⏎ Authenticate</button>
+    </div>
+
+    <!-- SETUP -->
+    <div id="form-setup" class="login-form" style="display:none;">
+      <div class="field-group">
+        <label class="field-label">Choose Username</label>
+        <input type="text" id="setup-username" placeholder="Your username">
+      </div>
+      <div class="field-group">
+        <label class="field-label">Choose Password</label>
+        <input type="password" id="setup-password" placeholder="Strong password">
+      </div>
+      <div class="field-group">
+        <label class="field-label">Confirm Password</label>
+        <input type="password" id="setup-password2" placeholder="Repeat password">
+      </div>
+      <div class="qr-wrap" id="qr-wrap">
+        <div style="font-family:var(--mono);font-size:8px;letter-spacing:2px;color:var(--text-dim);text-transform:uppercase;margin-bottom:10px;">Scan with Google Authenticator</div>
+        <img id="qr-img" src="" alt="QR Code">
+        <div class="qr-secret" id="qr-secret"></div>
+      </div>
+      <button class="btn-neutral" id="gen-totp-btn" onclick="generateTOTP()" style="display:none;">⊕ Generate TOTP QR Code</button>
+      <div class="field-group" id="totp-verify-field" style="display:none;">
+        <label class="field-label">Verify TOTP Code</label>
+        <input type="text" id="setup-totp" placeholder="Enter 6-digit code to confirm" maxlength="6" inputmode="numeric">
+      </div>
+      <div style="display:none;" id="recovery-section">
+        <div style="font-family:var(--mono);font-size:8px;letter-spacing:2px;color:var(--yellow);text-transform:uppercase;margin-bottom:8px;">⚠ Save this recovery code — it cannot be shown again</div>
+        <div class="recovery-code-display" id="recovery-code-display"></div>
+        <div style="font-family:var(--mono);font-size:9px;color:var(--text-muted);margin-top:8px;text-align:center;">Print or write this down before continuing.</div>
+      </div>
+      <div class="error-msg" id="setup-error"></div>
+      <button class="btn-primary" onclick="doSetup()" id="setup-btn">⊕ Create Account</button>
+    </div>
+
+    <!-- RECOVERY -->
+    <div id="form-recovery" class="login-form" style="display:none;">
+      <div style="font-family:var(--mono);font-size:9px;color:var(--text-muted);letter-spacing:1px;margin-bottom:4px;">
+        Enter your username and one-time recovery code to unlock your account.
+      </div>
+      <div class="field-group">
+        <label class="field-label">Username</label>
+        <input type="text" id="rec-username" placeholder="Your username">
+      </div>
+      <div class="field-group">
+        <label class="field-label">Recovery Code</label>
+        <input type="text" id="rec-code" placeholder="XXXX-XXXX-XXXX-XXXX" style="font-family:var(--mono);letter-spacing:2px;">
+      </div>
+      <div class="error-msg" id="rec-error"></div>
+      <button class="btn-primary" onclick="doRecovery()">⊕ Unlock Account</button>
+    </div>
+  </div>
+
+  <!-- ── Lockout Screen ── -->
+  <div class="lockout-screen" id="lockout-screen">
+    <div class="lockout-icon">🔒</div>
+    <div class="lockout-title">Account Locked</div>
+    <div class="lockout-sub">Too many failed attempts</div>
+    <div class="lockout-timer" id="lockout-timer">24:00:00</div>
+    <div class="lockout-sub">Time remaining</div>
+    <button class="btn-neutral" onclick="showRecovery()" style="margin-top:8px;">Use Recovery Code</button>
+  </div>
+
+  <!-- ── Easter Egg Overlay ── -->
+  <div id="easter-overlay">
+    <pre class="easter-ascii" id="easter-ascii"></pre>
+    <div class="easter-msg">— You found it —</div>
+  </div>
+
+  <!-- ── Backdoor Screen ── -->
+  <div id="backdoor-screen">
+    <div class="backdoor-card">
+      <div class="backdoor-title">⚠ Backdoor Access</div>
+      <div class="backdoor-sub">Authorized Personnel Only</div>
+      <div class="backdoor-form">
+        <div class="field-group">
+          <label class="field-label" style="color:var(--red);">Username</label>
+          <input type="text" id="bd-username" placeholder="Username" autocomplete="off">
+        </div>
+        <div class="field-group">
+          <label class="field-label" style="color:var(--red);">Password</label>
+          <input type="password" id="bd-password" placeholder="Password" autocomplete="off">
+        </div>
+        <div class="error-msg" id="bd-error"></div>
+        <button class="btn-backdoor" onclick="doBackdoorLogin()">⏎ Access System</button>
+        <button class="btn-dismiss" onclick="dismissBackdoor()">✕ Dismiss</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div id="toast-container"></div>
+
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════
+//  INTERACTIVE GRID
+// ═══════════════════════════════════════════════════════
+
+const CELL_SIZE  = 40;
+const HOVER_FADE = 0.18;   // seconds to fade out glow
+
+let canvas, ctx, cols, rows;
+let hoverCell   = { c: -1, r: -1 };
+let glowCells   = {};      // key: "c,r" → { alpha, color }
+let animFrame;
+
+// ── Secret sequences ──────────────────────────────────
+// Easter egg: 3-cell sequence
+const EASTER_SEQ = ['3,2', '7,5', '5,8'];
+// Backdoor: 5-cell sequence  
+const BACKDOOR_SEQ = ['2,3', '9,2', '6,6', '3,9', '8,4'];
+
+let currentSeq    = [];
+let seqMode       = null;   // null | 'easter' | 'dev'
+let seqTimeout    = null;
+
+function initGrid() {
+  canvas = document.getElementById('grid-canvas');
+  ctx    = canvas.getContext('2d');
+  resizeGrid();
+  window.addEventListener('resize', resizeGrid);
+
+  canvas.addEventListener('mousemove', onGridHover);
+  canvas.addEventListener('mouseleave', () => { hoverCell = { c: -1, r: -1 }; });
+  canvas.addEventListener('click', onGridClick);
+
+  animateGrid();
+}
+
+function resizeGrid() {
+  canvas.width  = canvas.offsetWidth  * devicePixelRatio;
+  canvas.height = canvas.offsetHeight * devicePixelRatio;
+  canvas.style.width  = canvas.offsetWidth  + 'px';
+  canvas.style.height = canvas.offsetHeight + 'px';
+  ctx.scale(devicePixelRatio, devicePixelRatio);
+  cols = Math.ceil(canvas.offsetWidth  / CELL_SIZE) + 1;
+  rows = Math.ceil(canvas.offsetHeight / CELL_SIZE) + 1;
+}
+
+function onGridHover(e) {
+  const rect = canvas.getBoundingClientRect();
+  const c = Math.floor((e.clientX - rect.left)  / CELL_SIZE);
+  const r = Math.floor((e.clientY - rect.top)   / CELL_SIZE);
+  if (c !== hoverCell.c || r !== hoverCell.r) {
+    hoverCell = { c, r };
+    // Trigger a subtle hover glow
+    const key = `${c},${r}`;
+    if (!glowCells[key]) glowCells[key] = { alpha: 0, color: 'accent', decay: true };
+    glowCells[key].alpha = Math.max(glowCells[key].alpha, 0.25);
+    glowCells[key].decay = true;
+  }
+}
+
+function onGridClick(e) {
+  // Don't register grid clicks if the target is within the login card area
+  const card = document.getElementById('login-card');
+  if (card && card.contains(e.target)) return;
+  const backdoor = document.getElementById('backdoor-screen');
+  if (backdoor && backdoor.classList.contains('visible')) return;
+
+  const rect = canvas.getBoundingClientRect();
+  const c = Math.floor((e.clientX - rect.left)  / CELL_SIZE);
+  const r = Math.floor((e.clientY - rect.top)   / CELL_SIZE);
+  const key = `${c},${r}`;
+
+  // Bright click flash
+  glowCells[key] = { alpha: 0.7, color: 'accent', decay: true };
+
+  // Sequence tracking
+  currentSeq.push(key);
+
+  // Reset timeout — 20 seconds between clicks during testing
+  clearTimeout(seqTimeout);
+  seqTimeout = setTimeout(resetSeq, 20000);
+
+  updateSeqIndicator();
+  checkSequences();
+}
+
+function checkSequences() {
+  const seq = currentSeq;
+
+  // Check easter egg
+  if (seq.length <= EASTER_SEQ.length) {
+    const slice = EASTER_SEQ.slice(0, seq.length);
+    if (seq.every((k, i) => k === slice[i])) {
+      if (seq.length === EASTER_SEQ.length) { triggerEasterEgg(); return; }
+      seqMode = 'easter';
+    } else {
+      if (seqMode === 'easter') resetSeq();
+    }
+  }
+
+  // Check backdoor
+  if (seq.length <= BACKDOOR_SEQ.length) {
+    const slice = BACKDOOR_SEQ.slice(0, seq.length);
+    if (seq.every((k, i) => k === slice[i])) {
+      if (seq.length === BACKDOOR_SEQ.length) { triggerBackdoor(); return; }
+      seqMode = 'dev';
+    } else {
+      if (seqMode === 'dev') resetSeq();
+    }
+  }
+
+  // If longer than both and no match, reset
+  if (seq.length > Math.max(EASTER_SEQ.length, BACKDOOR_SEQ.length)) resetSeq();
+}
+
+function updateSeqIndicator() {
+  const ind = document.getElementById('seq-indicator');
+  const maxLen = seqMode === 'dev' ? BACKDOOR_SEQ.length : EASTER_SEQ.length;
+  ind.innerHTML = Array.from({ length: maxLen }, (_, i) => {
+    const lit = i < currentSeq.length;
+    const cls = lit ? (seqMode === 'dev' ? 'seq-dot dev-lit' : 'seq-dot lit') : 'seq-dot';
+    return `<div class="${cls}"></div>`;
+  }).join('');
+  ind.classList.toggle('visible', currentSeq.length > 0);
+}
+
+function resetSeq() {
+  currentSeq = [];
+  seqMode    = null;
+  clearTimeout(seqTimeout);
+  document.getElementById('seq-indicator').classList.remove('visible');
+}
+
+// ── Debug overlay ─────────────────────────────────────
+let debugMode = false;
+
+// ── Debug overlay toggle (wired in DOMContentLoaded) ──
+
+function drawDebugOverlay() {
+  if (!debugMode) return;
+
+  const labelStyle = (color) => {
+    ctx.fillStyle   = color;
+    ctx.font        = 'bold 9px Share Tech Mono';
+    ctx.textAlign   = 'center';
+    ctx.textBaseline = 'middle';
+  };
+
+  // Easter egg cells — teal
+  EASTER_SEQ.forEach((key, i) => {
+    const [c, r] = key.split(',').map(Number);
+    const x = c * CELL_SIZE;
+    const y = r * CELL_SIZE;
+    ctx.strokeStyle = 'rgba(0,200,160,0.9)';
+    ctx.lineWidth   = 1.5;
+    ctx.strokeRect(x + 1, y + 1, CELL_SIZE - 2, CELL_SIZE - 2);
+    ctx.fillStyle = 'rgba(0,200,160,0.15)';
+    ctx.fillRect(x + 1, y + 1, CELL_SIZE - 2, CELL_SIZE - 2);
+    labelStyle('rgba(0,200,160,1)');
+    ctx.fillText(`E${i + 1}`, x + CELL_SIZE / 2, y + CELL_SIZE / 2);
+  });
+
+  // Backdoor cells — red
+  BACKDOOR_SEQ.forEach((key, i) => {
+    const [c, r] = key.split(',').map(Number);
+    const x = c * CELL_SIZE;
+    const y = r * CELL_SIZE;
+    ctx.strokeStyle = 'rgba(255,75,110,0.9)';
+    ctx.lineWidth   = 1.5;
+    ctx.strokeRect(x + 1, y + 1, CELL_SIZE - 2, CELL_SIZE - 2);
+    ctx.fillStyle = 'rgba(255,75,110,0.15)';
+    ctx.fillRect(x + 1, y + 1, CELL_SIZE - 2, CELL_SIZE - 2);
+    labelStyle('rgba(255,75,110,1)');
+    ctx.fillText(`D${i + 1}`, x + CELL_SIZE / 2, y + CELL_SIZE / 2);
+  });
+
+  // Legend in top-left corner
+  ctx.fillStyle = 'rgba(8,10,15,0.85)';
+  ctx.fillRect(8, 8, 130, 52);
+  ctx.strokeStyle = 'rgba(30,35,48,0.9)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(8, 8, 130, 52);
+
+  ctx.font = '8px Share Tech Mono';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillStyle = 'rgba(0,200,160,0.9)';
+  ctx.fillText('E1→E2→E3  Easter Egg', 14, 16);
+  ctx.fillStyle = 'rgba(255,75,110,0.9)';
+  ctx.fillText('D1→D2→D3→D4→D5  Backdoor', 14, 30);
+  ctx.fillStyle = 'rgba(100,120,140,0.8)';
+  ctx.fillText('Ctrl+Shift+D  Toggle', 14, 44);
+}
+
+function animateGrid() {
+  const W = canvas.offsetWidth;
+  const H = canvas.offsetHeight;
+  ctx.clearRect(0, 0, W, H);
+
+  // Draw grid lines
+  ctx.strokeStyle = 'rgba(30,35,48,0.8)';
+  ctx.lineWidth   = 0.5;
+  for (let c = 0; c <= cols; c++) {
+    ctx.beginPath(); ctx.moveTo(c * CELL_SIZE, 0); ctx.lineTo(c * CELL_SIZE, H); ctx.stroke();
+  }
+  for (let r = 0; r <= rows; r++) {
+    ctx.beginPath(); ctx.moveTo(0, r * CELL_SIZE); ctx.lineTo(W, r * CELL_SIZE); ctx.stroke();
+  }
+
+  // Draw glow cells
+  for (const key of Object.keys(glowCells)) {
+    const g = glowCells[key];
+    if (g.alpha <= 0) { delete glowCells[key]; continue; }
+
+    const [c, r] = key.split(',').map(Number);
+    const x = c * CELL_SIZE;
+    const y = r * CELL_SIZE;
+
+    const color = g.color === 'red'
+      ? `rgba(255,75,110,${g.alpha * 0.18})`
+      : `rgba(0,200,160,${g.alpha * 0.18})`;
+    const border = g.color === 'red'
+      ? `rgba(255,75,110,${g.alpha * 0.6})`
+      : `rgba(0,200,160,${g.alpha * 0.6})`;
+
+    ctx.fillStyle   = color;
+    ctx.fillRect(x + 0.5, y + 0.5, CELL_SIZE - 1, CELL_SIZE - 1);
+    ctx.strokeStyle = border;
+    ctx.lineWidth   = 0.8;
+    ctx.strokeRect(x + 0.5, y + 0.5, CELL_SIZE - 1, CELL_SIZE - 1);
+
+    if (g.decay) g.alpha -= 0.015;
+  }
+
+  drawDebugOverlay();
+  animFrame = requestAnimationFrame(animateGrid);
+}
+
+// ── Flash confirmed cells in sequence ─────────────────
+function flashConfirmed(seq, color) {
+  seq.forEach((key, i) => {
+    setTimeout(() => {
+      glowCells[key] = { alpha: 1.0, color, decay: false };
+      setTimeout(() => {
+        if (glowCells[key]) glowCells[key].decay = true;
+      }, 300);
+    }, i * 120);
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+//  EASTER EGG
+// ═══════════════════════════════════════════════════════
+
+const HOURGLASS_ASCII = `
+        .·:·.
+       /|||||\\
+      / || || \\
+     /  ||·||  \\
+    / · || || · \\
+   |    \\|||/    |
+   |     \\|/     |
+   |      ·      |
+   |    · / ·    |
+   |    /   \\    |
+    \\  / · · \\  /
+     \\/·· ✕ ··\\/
+     /\\ · · · /\\
+    /  \\ · · /  \\
+   / ·  \\ · /  · \\
+  |      \\ /      |
+  |_______|_______|
+       |||||
+        ···
+`;
+
+function triggerEasterEgg() {
+  flashConfirmed(EASTER_SEQ, 'accent');
+  resetSeq();
+
+  const card    = document.getElementById('login-card');
+  const overlay = document.getElementById('easter-overlay');
+  document.getElementById('easter-ascii').textContent = HOURGLASS_ASCII;
+
+  card.classList.add('fade-out');
+  setTimeout(() => {
+    overlay.classList.add('visible');
+    setTimeout(() => {
+      overlay.classList.remove('visible');
+      setTimeout(() => { card.classList.remove('fade-out'); }, 500);
+    }, 3200);
+  }, 600);
+}
+
+// ═══════════════════════════════════════════════════════
+//  BACKDOOR
+// ═══════════════════════════════════════════════════════
+
+function triggerBackdoor() {
+  flashConfirmed(BACKDOOR_SEQ, 'red');
+  // Flash all sequence cells red
+  BACKDOOR_SEQ.forEach(key => {
+    glowCells[key] = { alpha: 1.0, color: 'red', decay: false };
+  });
+  resetSeq();
+
+  const card     = document.getElementById('login-card');
+  const backdoor = document.getElementById('backdoor-screen');
+
+  card.classList.add('fade-out');
+  setTimeout(() => {
+    backdoor.classList.add('visible');
+    document.getElementById('bd-username').focus();
+  }, 600);
+}
+
+function dismissBackdoor() {
+  const card     = document.getElementById('login-card');
+  const backdoor = document.getElementById('backdoor-screen');
+  backdoor.classList.remove('visible');
+  setTimeout(() => { card.classList.remove('fade-out'); }, 100);
+  // Clear red glows
+  BACKDOOR_SEQ.forEach(key => { if (glowCells[key]) glowCells[key].decay = true; });
+}
+
+async function doBackdoorLogin() {
+  const u = document.getElementById('bd-username').value.trim();
+  const p = document.getElementById('bd-password').value;
+  const errEl = document.getElementById('bd-error');
+  errEl.style.display = 'none';
+
+  if (!u || !p) { showErr(errEl, 'Credentials required.'); return; }
+
+  // Backdoor passes '000000' as TOTP — dev_mode flag in DB bypasses it
+  const res = await api.invoke('auth:login', { username: u, password: p, totpCode: '000000' });
+  if (res.ok) {
+    api.send('navigate', 'dashboard');
+  } else if (res.locked) {
+    showErr(errEl, `Account locked. ${res.hoursRemaining}h remaining.`);
+  } else {
+    showErr(errEl, res.error || 'Access denied.');
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  STANDARD AUTH
+// ═══════════════════════════════════════════════════════
+
+let currentMode = 'login';
+let totpSecret  = '';
+let recoveryCode = '';
+let lockoutEnd  = 0;
+let lockoutInterval = null;
+
+window.addEventListener('DOMContentLoaded', async () => {
+  initGrid();
+  const { needsSetup } = await api.invoke('auth:check-setup');
+  if (needsSetup) {
+    document.getElementById('tab-setup').style.display = '';
+    setMode('setup');
+    document.getElementById('gen-totp-btn').style.display = '';
+  } else {
+    document.getElementById('tab-setup').style.display = 'none';
+  }
+  document.getElementById('login-username').focus();
+
+  // Single unified keydown handler
+  document.addEventListener('keydown', e => {
+    // Debug overlay toggle
+    if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+      debugMode = !debugMode;
+      toast(debugMode ? '[ DEBUG ON ]' : '[ DEBUG OFF ]', debugMode ? 'success' : 'warning');
+      return;
+    }
+    // Enter to submit
+    if (e.key === 'Enter') {
+      if (currentMode === 'login')    doLogin();
+      if (currentMode === 'setup')    doSetup();
+      if (currentMode === 'recovery') doRecovery();
+    }
+  });
+});
+
+function setMode(mode) {
+  currentMode = mode;
+  ['login','setup','recovery'].forEach(m => {
+    document.getElementById(`form-${m}`).style.display = m === mode ? 'flex' : 'none';
+  });
+  document.querySelectorAll('.mode-tab').forEach((t, i) => {
+    t.classList.toggle('active', ['login','setup','recovery'][i] === mode);
+  });
+}
+
+function showRecovery() {
+  document.getElementById('lockout-screen').style.display = 'none';
+  document.getElementById('login-card').style.display = 'block';
+  setMode('recovery');
+}
+
+async function generateTOTP() {
+  const { secret, qrUrl } = await api.invoke('totp:generate');
+  totpSecret = secret;
+  document.getElementById('qr-img').src = qrUrl;
+  document.getElementById('qr-secret').textContent = secret;
+  document.getElementById('qr-wrap').style.display = 'block';
+  document.getElementById('gen-totp-btn').style.display = 'none';
+  document.getElementById('totp-verify-field').style.display = 'flex';
+  recoveryCode = generateRecoveryCode();
+  document.getElementById('recovery-code-display').textContent = recoveryCode;
+  document.getElementById('recovery-code-display').style.display = 'block';
+  document.getElementById('recovery-section').style.display = 'block';
+}
+
+function generateRecoveryCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const seg = () => Array.from({length:4}, () => chars[Math.floor(Math.random()*chars.length)]).join('');
+  return `${seg()}-${seg()}-${seg()}-${seg()}`;
+}
+
+async function doSetup() {
+  const u  = document.getElementById('setup-username').value.trim();
+  const p  = document.getElementById('setup-password').value;
+  const p2 = document.getElementById('setup-password2').value;
+  const tc = document.getElementById('setup-totp').value.trim();
+  const errEl = document.getElementById('setup-error');
+  errEl.style.display = 'none';
+  if (!u || !p || !tc || !totpSecret) { showErr(errEl, 'All fields required. Generate TOTP first.'); return; }
+  if (p !== p2)     { showErr(errEl, 'Passwords do not match.'); return; }
+  if (p.length < 8) { showErr(errEl, 'Password must be at least 8 characters.'); return; }
+  if (tc.length !== 6) { showErr(errEl, 'TOTP code must be 6 digits.'); return; }
+  document.getElementById('setup-btn').disabled = true;
+  const res = await api.invoke('auth:setup', { username: u, password: p, totpSecret, totpCode: tc, recoveryCode });
+  document.getElementById('setup-btn').disabled = false;
+  if (res.ok) {
+    toast('Account created. Please log in.', 'success');
+    setMode('login');
+    document.getElementById('login-username').value = u;
+    document.getElementById('tab-setup').style.display = 'none';
+  } else { showErr(errEl, res.error || 'Setup failed.'); }
+}
+
+async function doLogin() {
+  const u  = document.getElementById('login-username').value.trim();
+  const p  = document.getElementById('login-password').value;
+  const tc = document.getElementById('login-totp').value.trim();
+  const errEl = document.getElementById('login-error');
+  errEl.style.display = 'none';
+  if (!u || !p) { showErr(errEl, 'Username and password required.'); return; }
+  document.getElementById('login-btn').disabled = true;
+  const res = await api.invoke('auth:login', { username: u, password: p, totpCode: tc || '000000' });
+  document.getElementById('login-btn').disabled = false;
+  if (res.ok) {
+    api.send('navigate', 'dashboard');
+  } else if (res.locked) {
+    showLockout(res.hoursRemaining);
+  } else {
+    showErr(errEl, res.error || 'Authentication failed.');
+    if (res.attemptsLeft !== undefined) {
+      const w = document.getElementById('attempts-warn');
+      w.textContent = `⚠ ${res.attemptsLeft} attempt${res.attemptsLeft !== 1 ? 's' : ''} remaining before 24h lockout`;
+      w.style.display = 'block';
+    }
+  }
+}
+
+async function doRecovery() {
+  const u = document.getElementById('rec-username').value.trim();
+  const c = document.getElementById('rec-code').value.trim();
+  const errEl = document.getElementById('rec-error');
+  errEl.style.display = 'none';
+  const res = await api.invoke('auth:recover', { username: u, recoveryCode: c });
+  if (res.ok) {
+    toast('Account unlocked. Please log in.', 'success');
+    setMode('login');
+    document.getElementById('login-username').value = u;
+  } else { showErr(errEl, res.error || 'Recovery failed.'); }
+}
+
+function showLockout(hoursRemaining) {
+  document.getElementById('login-card').style.display = 'none';
+  const ls = document.getElementById('lockout-screen');
+  ls.style.display = 'flex';
+  lockoutEnd = Date.now() + (hoursRemaining * 3600000);
+  updateLockoutTimer();
+  lockoutInterval = setInterval(updateLockoutTimer, 1000);
+}
+
+function updateLockoutTimer() {
+  const diff = Math.max(0, lockoutEnd - Date.now());
+  if (diff === 0) {
+    clearInterval(lockoutInterval);
+    document.getElementById('lockout-screen').style.display = 'none';
+    document.getElementById('login-card').style.display = 'block';
+    return;
+  }
+  const h = String(Math.floor(diff / 3600000)).padStart(2,'0');
+  const m = String(Math.floor((diff % 3600000) / 60000)).padStart(2,'0');
+  const s = String(Math.floor((diff % 60000) / 1000)).padStart(2,'0');
+  document.getElementById('lockout-timer').textContent = `${h}:${m}:${s}`;
+}
+
+function showErr(el, msg) { el.textContent = msg; el.style.display = 'block'; }
+
+function toast(msg, type = 'success') {
+  const c = document.getElementById('toast-container');
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  t.textContent = msg;
+  c.appendChild(t);
+  setTimeout(() => t.remove(), 3500);
+}
+
+</script>
+</body>
+</html>

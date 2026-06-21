@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C \"D:\\\\My Projects\\\\CURRENT-RELEASE\\\\conquered-time\" status)",
+      "Bash(gh auth *)"
+    ]
+  }
+}

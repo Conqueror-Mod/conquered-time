@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy"
+  content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; img-src 'self' data:;">
+<title>Conquered Time — Global Log</title>
+<link rel="stylesheet" href="../styles/design-system.css">
+<style>
+  .filter-bar {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 14px 18px;
+    display: flex;
+    gap: 14px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+    box-shadow: var(--shadow-1), var(--shadow-inset);
+  }
+  .filter-field { display: flex; flex-direction: column; gap: 4px; }
+  .filter-field label {
+    font-family: var(--sans);
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .filter-field select,
+  .filter-field input { min-width: 150px; font-size: 12px; }
+
+  /* Summary chips */
+  .summary-chips {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  .summary-chip {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 12px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 130px;
+    box-shadow: var(--shadow-1), var(--shadow-inset);
+  }
+  .chip-label {
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-muted);
+  }
+  .chip-value {
+    font-family: var(--mono);
+    font-size: 20px;
+    color: var(--text-white);
+    letter-spacing: -0.02em;
+  }
+
+  /* Table cells */
+  .log-company {
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--accent);
+  }
+  .log-date {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+  .log-session { font-family: var(--sans); font-size: 12px; color: var(--text); }
+  .log-hours   { font-family: var(--mono); font-size: 13px; color: var(--yellow); text-align: right; white-space: nowrap; }
+  .log-actions { display: flex; gap: 6px; justify-content: flex-end; }
+
+  .btn-xs {
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 500;
+    padding: 4px 10px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    border: 1px solid var(--border-light);
+    background: transparent;
+    color: var(--text-muted);
+    transition: all var(--transition);
+  }
+  .btn-xs:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+
+  /* Expandable detail */
+  .detail-row { display: none; background: var(--surface-2); }
+  .detail-row.open { display: table-row; }
+  .detail-inner { padding: 10px 16px; }
+  .detail-task {
+    display: flex;
+    gap: 14px;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--border);
+    align-items: center;
+  }
+  .detail-task:last-child { border-bottom: none; }
+  .detail-task-label {
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--accent);
+    min-width: 90px;
+  }
+  .detail-task-name { flex: 1; font-family: var(--sans); font-size: 12px; color: var(--text); }
+  .detail-task-time { font-family: var(--mono); font-size: 11px; color: var(--text-muted); min-width: 100px; }
+  .detail-task-dur  { font-family: var(--mono); font-size: 11px; color: var(--yellow); min-width: 60px; text-align: right; }
+
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    font-family: var(--sans);
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+
+  .expand-arrow { color: var(--text-dim); font-size: 10px; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <div class="page-title-block">
+    <div class="page-eyebrow">History</div>
+    <div class="page-title">Global Log</div>
+  </div>
+  <div class="page-actions">
+    <button class="btn-neutral" onclick="exportCSV()">Export CSV</button>
+    <button class="btn-neutral" onclick="exportAllPDF()">Export PDF</button>
+  </div>
+</div>
+
+<!-- Filters -->
+<div class="filter-bar">
+  <div class="filter-field">
+    <label>Company</label>
+    <select id="filter-company" onchange="applyFilters()">
+      <option value="">All Companies</option>
+    </select>
+  </div>
+  <div class="filter-field">
+    <label>From</label>
+    <input type="date" id="filter-from" onchange="applyFilters()">
+  </div>
+  <div class="filter-field">
+    <label>To</label>
+    <input type="date" id="filter-to" onchange="applyFilters()">
+  </div>
+  <div class="filter-field">
+    <label>Quick Range</label>
+    <select id="filter-range" onchange="applyQuickRange()">
+      <option value="">Custom</option>
+      <option value="7">Last 7 days</option>
+      <option value="30">Last 30 days</option>
+      <option value="90">Last 90 days</option>
+      <option value="365">This year</option>
+      <option value="all">All time</option>
+    </select>
+  </div>
+  <button class="btn-neutral" onclick="clearFilters()">Clear</button>
+</div>
+
+<!-- Summary chips -->
+<div class="summary-chips">
+  <div class="summary-chip">
+    <div class="chip-label">Sessions</div>
+    <div class="chip-value" id="chip-sessions">—</div>
+  </div>
+  <div class="summary-chip">
+    <div class="chip-label">Total Hours</div>
+    <div class="chip-value" id="chip-hours">—</div>
+  </div>
+  <div class="summary-chip">
+    <div class="chip-label">Companies</div>
+    <div class="chip-value" id="chip-companies">—</div>
+  </div>
+  <div class="summary-chip">
+    <div class="chip-label">Avg / Session</div>
+    <div class="chip-value" id="chip-avg">—</div>
+  </div>
+</div>
+
+<!-- Log table -->
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th style="width:24px;"></th>
+        <th style="min-width:140px;">Company</th>
+        <th style="min-width:100px;">Date</th>
+        <th>Session</th>
+        <th style="min-width:80px;text-align:right;">Hours</th>
+        <th style="min-width:110px;text-align:right;">Actions</th>
+      </tr>
+    </thead>
+    <tbody id="log-tbody"></tbody>
+  </table>
+</div>
+
+<div style="margin-top:10px;font-family:var(--sans);font-size:11px;color:var(--text-dim);text-align:right;" id="row-count"></div>
+
+<script src="../components/settings.js"></script>
+<script src="../components/shell.js"></script>
+<script>
+  let allEntries=[], companies=[], filtered=[], compMap={};
+
+  window.addEventListener('DOMContentLoaded', async () => {
+    await Shell.init('global-log');
+    await loadData();
+    applyFilters();
+  });
+
+  async function loadData() {
+    companies  = await api.invoke('companies:list') || [];
+    allEntries = await api.invoke('entries:all')    || [];
+    compMap    = {};
+    companies.forEach(c => compMap[c.id] = c);
+    const sel = document.getElementById('filter-company');
+    companies.forEach(co => {
+      const opt=document.createElement('option');
+      opt.value=co.id; opt.textContent=co.name;
+      sel.appendChild(opt);
+    });
+  }
+
+  function applyQuickRange() {
+    const val=document.getElementById('filter-range').value;
+    if (!val||val==='all') {
+      document.getElementById('filter-from').value='';
+      document.getElementById('filter-to').value='';
+    } else {
+      const to=new Date(), from=new Date(Date.now()-parseInt(val)*86400000);
+      document.getElementById('filter-from').value=from.toISOString().slice(0,10);
+      document.getElementById('filter-to').value=to.toISOString().slice(0,10);
+    }
+    applyFilters();
+  }
+
+  function clearFilters() {
+    document.getElementById('filter-company').value='';
+    document.getElementById('filter-from').value='';
+    document.getElementById('filter-to').value='';
+    document.getElementById('filter-range').value='';
+    applyFilters();
+  }
+
+  function applyFilters() {
+    const coId=parseInt(document.getElementById('filter-company').value)||null;
+    const from=document.getElementById('filter-from').value;
+    const to=document.getElementById('filter-to').value;
+    filtered=allEntries.filter(e => {
+      if (coId&&e.company_id!==coId) return false;
+      if (from&&e.log_date<from) return false;
+      if (to&&e.log_date>to) return false;
+      return true;
+    }).sort((a,b)=>b.log_date.localeCompare(a.log_date));
+    renderTable(); renderSummary();
+  }
+
+  function renderSummary() {
+    const totalMins=filtered.reduce((s,e)=>s+e.total_mins,0);
+    const coSet=new Set(filtered.map(e=>e.company_id));
+    const avgMins=filtered.length?totalMins/filtered.length:0;
+    document.getElementById('chip-sessions').textContent=filtered.length;
+    document.getElementById('chip-hours').textContent=fmtH(totalMins);
+    document.getElementById('chip-companies').textContent=coSet.size;
+    document.getElementById('chip-avg').textContent=fmtH(avgMins);
+  }
+
+  function renderTable() {
+    const tbody=document.getElementById('log-tbody');
+    document.getElementById('row-count').textContent=`Showing ${filtered.length} session${filtered.length!==1?'s':''}`;
+    if (filtered.length===0) {
+      tbody.innerHTML=`<tr><td colspan="6"><div class="empty-state">No sessions match the current filters.</div></td></tr>`;
+      return;
+    }
+    tbody.innerHTML=filtered.map((e,idx) => {
+      const co=compMap[e.company_id];
+      const rows=safeParseRows(e.rows_json);
+      const hasDetail=rows.some(r=>r.label||r.name);
+      return `
+        <tr onclick="toggleDetail(${idx})" style="cursor:pointer;">
+          <td><span class="expand-arrow" id="arrow-${idx}">${hasDetail?'▶':''}</span></td>
+          <td class="log-company">${co?.name||'—'}</td>
+          <td class="log-date">${e.log_date}</td>
+          <td class="log-session">${e.session_label||'<span style="color:var(--text-dim);font-style:italic;">No label</span>'}</td>
+          <td class="log-hours">${fmtHFull(e.total_mins)}</td>
+          <td class="log-actions">
+            <button class="btn-xs" onclick="event.stopPropagation();openInTracker(${e.company_id},'${e.log_date}')">Open</button>
+            <button class="btn-xs" onclick="event.stopPropagation();exportSessionPDF(${idx})">PDF</button>
+          </td>
+        </tr>
+        <tr class="detail-row" id="detail-${idx}">
+          <td colspan="6">
+            <div class="detail-inner">
+              ${hasDetail ? rows.filter(r=>r.label||r.name).map(r=>`
+                <div class="detail-task">
+                  <div class="detail-task-label">${r.label||'—'}</div>
+                  <div class="detail-task-name">${r.name||''}${r.desc?' — '+r.desc:''}</div>
+                  <div class="detail-task-time">${r.clock_in||''}${r.clock_in&&r.clock_out?' → ':''}${r.clock_out||''}</div>
+                  <div class="detail-task-dur">${fmtHFull(r.total_mins)}</div>
+                </div>
+              `).join('') : '<span style="color:var(--text-dim);font-size:12px;">No task detail available.</span>'}
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  function toggleDetail(idx) {
+    const row=document.getElementById(`detail-${idx}`);
+    if (!row) return;
+    row.classList.toggle('open');
+    const arrow=document.getElementById(`arrow-${idx}`);
+    if (arrow) arrow.textContent=row.classList.contains('open')?'▼':'▶';
+  }
+
+  function openInTracker(companyId, date) {
+    const co=compMap[companyId];
+    if (!co) return;
+    sessionStorage.setItem('active_company',JSON.stringify(co));
+    sessionStorage.setItem('tracker_date',date);
+    api.send('navigate','tracker');
+  }
+
+  function exportSessionPDF(idx) {
+    const e=filtered[idx];
+    const co=compMap[e.company_id];
+    printTimesheet(co,e.log_date,e.session_label,safeParseRows(e.rows_json),e.total_mins);
+  }
+
+  function exportAllPDF() {
+    if (filtered.length===0) { Shell.toast('No sessions to export.','warning'); return; }
+    const coId=parseInt(document.getElementById('filter-company').value)||null;
+    if (coId) {
+      const co=compMap[coId];
+      const rows=[];
+      filtered.forEach(e => safeParseRows(e.rows_json).forEach(r=>{if(r.label||r.name)rows.push({...r,date:e.log_date});}));
+      printTimesheet(co,`${filtered[filtered.length-1]?.log_date} – ${filtered[0]?.log_date}`,'',rows,filtered.reduce((s,e)=>s+e.total_mins,0));
+    } else Shell.toast('Select a company filter for PDF export.','warning');
+  }
+
+  function printTimesheet(co,dateStr,sessionLabel,rows,totalMins) {
+    const hierParts=co?[co.hier_company,co.hier_project,co.hier_platform,co.name].filter(Boolean).join(' › '):'—';
+    const taskRows=rows.filter(r=>r.label||r.name).map((r,i)=>`<tr>
+      <td>${String(i+1).padStart(2,'0')}</td>
+      <td>${r.label||''}</td><td>${r.name||''}</td>
+      <td>${r.desc||r.description||''}</td>
+      <td>${r.clock_in||''}</td><td>${r.clock_out||''}</td>
+      <td>${fmtHFull(r.total_mins)}</td>
+    </tr>`).join('');
+    const win=window.open('','_blank');
+    win.document.write(`<!DOCTYPE html><html><head><title>Timesheet</title>
+    <style>
+      body{font-family:Inter,Arial,sans-serif;font-size:12px;color:#111;padding:40px;max-width:960px;margin:0 auto;}
+      h1{font-size:20px;font-weight:600;margin:0 0 3px;}
+      .meta{color:#666;font-size:11px;margin-bottom:3px;}
+      .hier{color:#2563eb;font-size:11px;font-weight:500;margin-bottom:20px;}
+      table{width:100%;border-collapse:collapse;margin-top:12px;}
+      th{background:#f1f5f9;border-bottom:2px solid #2563eb;padding:9px 8px;text-align:left;font-size:11px;font-weight:600;color:#374151;}
+      td{padding:8px;border-bottom:1px solid #e5e7eb;font-size:12px;}
+      .total-row{font-weight:600;background:#f9fafb;}
+      .footer{margin-top:32px;color:#9ca3af;font-size:10px;border-top:1px solid #e5e7eb;padding-top:10px;display:flex;justify-content:space-between;}
+    </style></head><body>
+    <h1>${co?.name||'Timesheet'}</h1>
+    <div class="meta">${co?.job_title||''}${sessionLabel?' · '+sessionLabel:''}</div>
+    <div class="hier">${hierParts}</div>
+    <div class="meta">Period: ${dateStr}</div>
+    <table>
+      <thead><tr><th>#</th><th>Label</th><th>Name</th><th>Description</th><th>Clock In</th><th>Clock Out</th><th>Duration</th></tr></thead>
+      <tbody>${taskRows}<tr class="total-row"><td colspan="6" style="text-align:right;">Total</td><td>${fmtHFull(totalMins)}</td></tr></tbody>
+    </table>
+    <div class="footer"><span>Generated by Conquered Time · ${new Date().toLocaleString()}</span><span>CONFIDENTIAL</span></div>
+    </body></html>`);
+    win.document.close(); win.print();
+  }
+
+  function exportCSV() {
+    if (filtered.length===0) { Shell.toast('No data to export.','warning'); return; }
+    const lines=['Company,Date,Session,Task Label,Task Name,Description,Clock In,Clock Out,Duration (mins)'];
+    filtered.forEach(e => {
+      const co=compMap[e.company_id];
+      safeParseRows(e.rows_json).filter(r=>r.label||r.name).forEach(r => {
+        lines.push([`"${co?.name||''}"`,e.log_date,`"${e.session_label||''}"`,
+          `"${r.label||''}"`,`"${r.name||''}"`,`"${r.desc||r.description||''}"`,
+          `"${r.clock_in||''}"`,`"${r.clock_out||''}"`,r.total_mins||0].join(','));
+      });
+    });
+    const blob=new Blob([lines.join('\n')],{type:'text/csv'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url; a.download=`conquered-time-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click(); URL.revokeObjectURL(url);
+    Shell.toast('CSV exported.','success');
+  }
+
+  function safeParseRows(json) { try{return JSON.parse(json)||[];}catch{return[];} }
+  function fmtH(mins)     { return mins?(mins/60).toFixed(1)+'h':'0h'; }
+  function fmtHFull(mins) {
+    if (!mins||mins<=0) return '—';
+    const h=Math.floor(mins/60), m=mins%60;
+    return h>0?`${h}h ${String(m).padStart(2,'0')}m`:`${m}m`;
+  }
+</script>
+</body>
+</html>

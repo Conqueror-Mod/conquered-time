@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy"
+  content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; img-src 'self' data:; blob:;">
+<title>Conquered Time — Reports</title>
+<link rel="stylesheet" href="../styles/design-system.css">
+<style>
+  /* ── Tabs ── */
+  .tab-bar {
+    display: flex;
+    gap: 2px;
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 4px;
+    margin-bottom: 16px;
+    width: fit-content;
+    flex-shrink: 0;
+  }
+  .tab-btn {
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-muted);
+    background: transparent;
+    border: none;
+    border-radius: var(--radius);
+    padding: 7px 20px;
+    cursor: pointer;
+    transition: all var(--transition);
+  }
+  .tab-btn:hover  { color: var(--text-bright); background: var(--surface-2); }
+  .tab-btn.active { color: var(--text-white);  background: var(--accent); }
+
+  /* ── Filter bar ── */
+  .filter-bar {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 14px 18px;
+    display: flex;
+    gap: 14px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+    box-shadow: var(--shadow-1), var(--shadow-inset);
+    flex-shrink: 0;
+  }
+  .filter-field { display: flex; flex-direction: column; gap: 4px; }
+  .filter-field label {
+    font-family: var(--sans);
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .filter-field select, .filter-field input { min-width: 140px; font-size: 12px; }
+
+  /* ── Summary chips ── */
+  .summary-chips {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+    flex-shrink: 0;
+  }
+  .summary-chip {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 12px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 130px;
+    box-shadow: var(--shadow-1), var(--shadow-inset);
+    position: relative;
+  }
+  .summary-chip::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 2px;
+    background: var(--accent);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    opacity: 0.5;
+  }
+  .summary-chip.violet::before { background: var(--accent-2); }
+  .summary-chip.yellow::before { background: var(--yellow); }
+  .summary-chip.green::before  { background: var(--green); }
+  .chip-label {
+    font-family: var(--sans);
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .chip-value {
+    font-family: var(--mono);
+    font-size: 22px;
+    color: var(--text-white);
+    letter-spacing: -0.02em;
+  }
+  .chip-sub { font-family: var(--sans); font-size: 11px; color: var(--text-dim); }
+
+  /* ── Period grid ── */
+  .period-grid {
+    display: grid;
+    grid-template-columns: 1fr 280px;
+    gap: 12px;
+    flex: 1;
+    min-height: 0;
+  }
+
+  /* ── Bar chart ── */
+  .bar-chart-wrap {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 16px 18px;
+    box-shadow: var(--shadow-1), var(--shadow-inset);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 0;
+  }
+  .panel-title {
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-bright);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    flex-shrink: 0;
+  }
+  .bar-svg-wrap { flex: 1; min-height: 0; overflow: hidden; }
+  #bar-svg { width: 100%; height: 100%; display: block; }
+
+  /* ── Label breakdown ── */
+  .breakdown-panel {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 16px 18px;
+    box-shadow: var(--shadow-1), var(--shadow-inset);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-light) transparent;
+  }
+  .label-row { display: flex; flex-direction: column; gap: 4px; }
+  .label-row-hdr { display: flex; justify-content: space-between; align-items: baseline; }
+  .label-name  { font-family: var(--sans);  font-size: 12px; font-weight: 500; color: var(--text-bright); }
+  .label-hours { font-family: var(--mono);  font-size: 12px; color: var(--yellow); }
+  .label-track { height: 4px; background: var(--surface-2); border-radius: 2px; overflow: hidden; }
+  .label-fill  { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.3s ease; }
+  .label-pct   { font-family: var(--mono);  font-size: 10px; color: var(--text-dim); }
+
+  /* ── Company cards ── */
+  .company-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+    gap: 14px;
+    align-content: start;
+  }
+  .company-card {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 16px 18px;
+    box-shadow: var(--shadow-1), var(--shadow-inset);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    position: relative;
+    overflow: hidden;
+  }
+  .company-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 2px;
+    background: var(--accent);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    opacity: 0.6;
+  }
+  .cc-name { font-family: var(--sans); font-size: 14px; font-weight: 600; color: var(--text-white); }
+  .cc-hier { font-family: var(--mono); font-size: 10px; color: var(--text-muted); margin-top: 1px; }
+  .cc-stats { display: flex; gap: 20px; }
+  .cc-stat  { display: flex; flex-direction: column; gap: 2px; }
+  .cc-stat-val {
+    font-family: var(--mono);
+    font-size: 18px;
+    color: var(--yellow);
+  }
+  .cc-stat-lbl {
+    font-family: var(--sans);
+    font-size: 10px;
+    color: var(--text-dim);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .cc-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+  .cc-chip {
+    font-family: var(--sans);
+    font-size: 10px;
+    color: var(--text-muted);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 2px 7px;
+  }
+  .cc-chip span { font-family: var(--mono); color: var(--accent); font-size: 10px; }
+
+  /* ── Audit flags ── */
+  .audit-flag {
+    display: inline-flex;
+    align-items: center;
+    font-family: var(--sans);
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: var(--radius-sm);
+    white-space: nowrap;
+  }
+  .flag-ok    { background: var(--green-dim);  color: var(--green);  border: 1px solid rgba(16,185,129,0.3); }
+  .flag-warn  { background: var(--yellow-dim); color: var(--yellow); border: 1px solid rgba(245,158,11,0.3); }
+  .flag-error { background: var(--red-dim);    color: var(--red);    border: 1px solid rgba(239,68,68,0.3); }
+  .flag-info  { background: var(--blue-dim);   color: var(--blue);   border: 1px solid rgba(96,165,250,0.3); }
+
+  /* ── Tab panels ── */
+  .tab-panel { display: none; flex-direction: column; flex: 1; min-height: 0; }
+  .tab-panel.active { display: flex; }
+
+  .scroll-area {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-light) transparent;
+  }
+
+  .empty-state {
+    font-family: var(--sans);
+    font-size: 13px;
+    color: var(--text-dim);
+    text-align: center;
+    padding: 40px 0;
+  }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <div class="page-title-block">
+    <div class="page-eyebrow">Analytics</div>
+    <div class="page-title">Reports</div>
+  </div>
+  <div class="page-actions">
+    <button class="btn-neutral" id="btn-export-pdf">Export PDF</button>
+    <button class="btn-neutral" id="btn-export-csv" style="display:none;">Export CSV</button>
+  </div>
+</div>
+
+<div class="tab-bar">
+  <button class="tab-btn active" data-tab="period">Period Summary</button>
+  <button class="tab-btn" data-tab="company">Company Breakdown</button>
+  <button class="tab-btn" data-tab="audit">Audit Log</button>
+</div>
+
+<!-- ── Period Summary ── -->
+<div id="tab-period" class="tab-panel active">
+  <div class="filter-bar">
+    <div class="filter-field">
+      <label>From</label>
+      <input type="date" id="period-from">
+    </div>
+    <div class="filter-field">
+      <label>To</label>
+      <input type="date" id="period-to">
+    </div>
+    <div class="filter-field">
+      <label>Company</label>
+      <select id="period-company">
+        <option value="">All Companies</option>
+      </select>
+    </div>
+    <button class="btn-primary" id="btn-apply">Apply</button>
+  </div>
+
+  <div class="summary-chips" id="period-chips"></div>
+
+  <div class="period-grid">
+    <div class="bar-chart-wrap">
+      <div class="panel-title">Daily Hours</div>
+      <div class="bar-svg-wrap" id="bar-svg-wrap">
+        <svg id="bar-svg" xmlns="http://www.w3.org/2000/svg"></svg>
+      </div>
+    </div>
+    <div class="breakdown-panel" id="label-breakdown">
+      <div class="panel-title">Task Breakdown</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Company Breakdown ── -->
+<div id="tab-company" class="tab-panel">
+  <div class="scroll-area" style="padding-bottom:8px;">
+    <div class="company-cards" id="company-cards"></div>
+  </div>
+</div>
+
+<!-- ── Audit Log ── -->
+<div id="tab-audit" class="tab-panel">
+  <div class="table-wrap scroll-area">
+    <table id="audit-table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Company</th>
+          <th>Task Label</th>
+          <th>Task Name</th>
+          <th>Clock In</th>
+          <th>Clock Out</th>
+          <th class="center">Duration</th>
+          <th class="center">Status</th>
+        </tr>
+      </thead>
+      <tbody id="audit-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<script src="../components/settings.js"></script>
+<script src="../components/shell.js"></script>
+<script>
+  let companies = [], allEntries = [], companyMap = {};
+  let currentTab = 'period';
+  let barResizeObserver = null;
+
+  window.addEventListener('DOMContentLoaded', async () => {
+    await Shell.init('reports');
+    const mc = document.getElementById('main-content');
+    if (mc) { mc.style.display = 'flex'; mc.style.flexDirection = 'column'; mc.style.overflow = 'hidden'; }
+
+    await loadData();
+    setupTabs();
+    initPeriodFilter();
+
+    // If navigated here from audit warning, jump straight to audit tab
+    const jumpTab = sessionStorage.getItem('reports_open_tab');
+    if (jumpTab) { sessionStorage.removeItem('reports_open_tab'); switchTab(jumpTab); }
+    renderPeriod();
+    renderCompanyBreakdown();
+    renderAuditLog();
+
+    // Redraw bar chart on resize
+    barResizeObserver = new ResizeObserver(() => { if (currentTab === 'period') drawBarChart(getFilteredEntries()); });
+    const wrap = document.getElementById('bar-svg-wrap');
+    if (wrap) barResizeObserver.observe(wrap);
+  });
+
+  // ── Data ──
+  async function loadData() {
+    [companies, allEntries] = await Promise.all([
+      api.invoke('companies:list'),
+      api.invoke('entries:all')
+    ]);
+    companies  = companies  || [];
+    allEntries = allEntries || [];
+    companyMap = {};
+    companies.forEach(c => { companyMap[Number(c.id)] = c; });
+
+    const sel = document.getElementById('period-company');
+    companies.forEach(c => {
+      const o = document.createElement('option');
+      o.value = c.id; o.textContent = c.name;
+      sel.appendChild(o);
+    });
+  }
+
+  // ── Tabs ──
+  function setupTabs() {
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        currentTab = btn.dataset.tab;
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById(`tab-${currentTab}`).classList.add('active');
+        document.getElementById('btn-export-pdf').style.display = currentTab === 'audit' ? 'none' : '';
+        document.getElementById('btn-export-csv').style.display = currentTab === 'audit' ? ''     : 'none';
+      });
+    });
+    document.getElementById('btn-export-pdf').addEventListener('click', exportPDF);
+    document.getElementById('btn-export-csv').addEventListener('click', exportCSV);
+  }
+
+  // ── Period filter ──
+  function initPeriodFilter() {
+    const to = new Date(), from = new Date();
+    from.setDate(from.getDate() - 29);
+    document.getElementById('period-to').value   = to.toISOString().slice(0,10);
+    document.getElementById('period-from').value = from.toISOString().slice(0,10);
+    document.getElementById('btn-apply').addEventListener('click', renderPeriod);
+  }
+
+  function getFilteredEntries() {
+    const from = document.getElementById('period-from').value;
+    const to   = document.getElementById('period-to').value;
+    const coId = document.getElementById('period-company').value;
+    return allEntries.filter(e => {
+      if (from && e.log_date < from) return false;
+      if (to   && e.log_date > to)   return false;
+      if (coId && String(e.company_id) !== String(coId)) return false;
+      return true;
+    });
+  }
+
+  // ── Helpers ──
+  function fmtH(mins)  { return mins ? (mins/60).toFixed(1)+'h' : '0.0h'; }
+  function fmtM(mins)  {
+    if (!mins || mins <= 0) return '—';
+    const h = Math.floor(mins/60), m = mins%60;
+    return h > 0 ? `${h}h ${String(m).padStart(2,'0')}m` : `${m}m`;
+  }
+
+  // ── Period Summary ──
+  function renderPeriod() {
+    const entries    = getFilteredEntries();
+    const totalMins  = entries.reduce((s,e) => s + (e.total_mins||0), 0);
+    const from       = new Date(document.getElementById('period-from').value);
+    const to         = new Date(document.getElementById('period-to').value);
+    const daySpan    = Math.max(1, Math.round((to-from)/86400000)+1);
+
+    const byCompany = {};
+    entries.forEach(e => { const k = String(e.company_id); byCompany[k] = (byCompany[k]||0)+(e.total_mins||0); });
+    const topEntry  = Object.entries(byCompany).sort((a,b)=>b[1]-a[1])[0];
+    const topCoName = topEntry ? (companyMap[Number(topEntry[0])]?.name || '—') : '—';
+    const topCoMins = topEntry?.[1] || 0;
+
+    document.getElementById('period-chips').innerHTML = `
+      <div class="summary-chip">
+        <div class="chip-label">Total Hours</div>
+        <div class="chip-value">${fmtH(totalMins)}</div>
+        <div class="chip-sub">${entries.length} session${entries.length!==1?'s':''}</div>
+      </div>
+      <div class="summary-chip violet">
+        <div class="chip-label">Avg / Day</div>
+        <div class="chip-value">${fmtH(totalMins/daySpan)}</div>
+        <div class="chip-sub">over ${daySpan} days</div>
+      </div>
+      <div class="summary-chip yellow">
+        <div class="chip-label">Top Company</div>
+        <div class="chip-value" style="font-size:13px;line-height:1.5;">${topCoName}</div>
+        <div class="chip-sub">${fmtH(topCoMins)}</div>
+      </div>
+      <div class="summary-chip green">
+        <div class="chip-label">Active Clients</div>
+        <div class="chip-value">${Object.keys(byCompany).length}</div>
+        <div class="chip-sub">in period</div>
+      </div>
+    `;
+
+    drawBarChart(entries);
+    renderLabelBreakdown(entries, totalMins);
+  }
+
+  function drawBarChart(entries) {
+    const wrap = document.getElementById('bar-svg-wrap');
+    const svg  = document.getElementById('bar-svg');
+    if (!wrap || !svg) return;
+    const W = wrap.clientWidth, H = wrap.clientHeight;
+    if (!W || !H) return;
+
+    const from = new Date(document.getElementById('period-from').value);
+    const to   = new Date(document.getElementById('period-to').value);
+
+    const byDate = {};
+    entries.forEach(e => { byDate[e.log_date] = (byDate[e.log_date]||0)+(e.total_mins||0); });
+
+    const dates = [];
+    const cur = new Date(from);
+    while (cur <= to) { dates.push(cur.toISOString().slice(0,10)); cur.setDate(cur.getDate()+1); }
+
+    const maxMins = Math.max(...dates.map(d => byDate[d]||0), 60);
+    const pL=40, pR=8, pT=8, pB=28;
+    const cW=W-pL-pR, cH=H-pT-pB;
+    const slotW = cW/dates.length;
+    const barW  = Math.max(2, Math.min(slotW-2, 24));
+
+    let out = '';
+
+    // Y-axis grid + labels
+    for (let i=0; i<=4; i++) {
+      const y   = pT + cH - (cH*i/4);
+      const val = ((maxMins/60)*i/4).toFixed(1);
+      out += `<line x1="${pL}" y1="${y.toFixed(1)}" x2="${pL+cW}" y2="${y.toFixed(1)}" stroke="var(--border)" stroke-width="0.5"/>`;
+      out += `<text x="${pL-5}" y="${(y+4).toFixed(1)}" text-anchor="end" fill="var(--text-dim)" font-size="9" font-family="var(--mono)">${val}h</text>`;
+    }
+
+    const today = new Date().toISOString().slice(0,10);
+    const labelStep = dates.length <= 14 ? 1 : dates.length <= 31 ? 7 : Math.ceil(dates.length/8);
+
+    dates.forEach((date, i) => {
+      const mins  = byDate[date]||0;
+      const bH    = mins > 0 ? Math.max(2, (mins/maxMins)*cH) : 0;
+      const x     = pL + i*slotW + (slotW-barW)/2;
+      const y     = pT + cH - bH;
+      const isT   = date === today;
+      const fill  = isT ? 'var(--accent)' : 'var(--accent-dim)';
+      const strk  = mins > 0 ? 'var(--accent)' : 'none';
+      if (mins > 0 || isT) {
+        out += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW}" height="${Math.max(bH,2).toFixed(1)}"
+          fill="${fill}" stroke="${strk}" stroke-width="1" rx="2" opacity="${isT?1:0.7}">
+          <title>${date}: ${fmtM(mins)}</title></rect>`;
+      }
+      if (i % labelStep === 0 || i === dates.length-1) {
+        const lx = x + barW/2;
+        out += `<text x="${lx.toFixed(1)}" y="${(pT+cH+18).toFixed(1)}" text-anchor="middle" fill="var(--text-dim)" font-size="9" font-family="var(--mono)">${date.slice(5)}</text>`;
+      }
+    });
+
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svg.innerHTML = out;
+  }
+
+  function renderLabelBreakdown(entries, totalMins) {
+    const byLabel = {};
+    entries.forEach(e => {
+      try {
+        JSON.parse(e.rows_json||'[]').forEach(r => {
+          if (r.total_mins > 0) { const l=r.label||'Other'; byLabel[l]=(byLabel[l]||0)+r.total_mins; }
+        });
+      } catch {}
+    });
+
+    const sorted = Object.entries(byLabel).sort((a,b)=>b[1]-a[1]);
+    const panel  = document.getElementById('label-breakdown');
+    const maxV   = sorted[0]?.[1] || 1;
+
+    panel.innerHTML = `<div class="panel-title">Task Breakdown</div>
+      ${sorted.length ? sorted.map(([label,mins]) => `
+        <div class="label-row">
+          <div class="label-row-hdr">
+            <span class="label-name">${label}</span>
+            <span class="label-hours">${fmtM(mins)}</span>
+          </div>
+          <div class="label-track"><div class="label-fill" style="width:${Math.round(mins/maxV*100)}%"></div></div>
+          <span class="label-pct">${totalMins ? Math.round(mins/totalMins*100) : 0}% of period</span>
+        </div>`).join('') : '<div class="empty-state">No task data in this period.</div>'}`;
+  }
+
+  // ── Company Breakdown ──
+  function renderCompanyBreakdown() {
+    const cards = document.getElementById('company-cards');
+    if (!companies.length) { cards.innerHTML = '<div class="empty-state">No companies yet.</div>'; return; }
+
+    cards.innerHTML = companies.map(co => {
+      const ces      = allEntries.filter(e => Number(e.company_id) === Number(co.id));
+      const totMins  = ces.reduce((s,e) => s+(e.total_mins||0), 0);
+      const sorted   = [...ces].sort((a,b) => b.log_date.localeCompare(a.log_date));
+      const lastDate = sorted[0]?.log_date || null;
+
+      const byLabel = {};
+      ces.forEach(e => {
+        try { JSON.parse(e.rows_json||'[]').forEach(r => { if (r.total_mins>0) { const l=r.label||'Other'; byLabel[l]=(byLabel[l]||0)+r.total_mins; } }); } catch {}
+      });
+      const chips = Object.entries(byLabel).sort((a,b)=>b[1]-a[1])
+        .map(([l,m]) => `<span class="cc-chip">${l} <span>${fmtM(m)}</span></span>`).join('');
+      const hier = [co.hier_company, co.hier_project, co.hier_platform].filter(Boolean).join(' › ');
+
+      return `<div class="company-card">
+        <div>
+          <div class="cc-name">${co.name}</div>
+          ${hier ? `<div class="cc-hier">${hier}</div>` : ''}
+        </div>
+        <div class="cc-stats">
+          <div class="cc-stat"><div class="cc-stat-val">${fmtH(totMins)}</div><div class="cc-stat-lbl">Total</div></div>
+          <div class="cc-stat"><div class="cc-stat-val">${ces.length}</div><div class="cc-stat-lbl">Sessions</div></div>
+          <div class="cc-stat"><div class="cc-stat-val" style="font-size:13px;">${lastDate ? lastDate.slice(5) : '—'}</div><div class="cc-stat-lbl">Last Active</div></div>
+        </div>
+        ${chips ? `<div class="cc-chips">${chips}</div>` : ''}
+      </div>`;
+    }).join('');
+  }
+
+  // ── Audit Log ──
+  function renderAuditLog() {
+    const tbody = document.getElementById('audit-tbody');
+    const rows  = [];
+
+    allEntries.forEach(e => {
+      const co = companyMap[Number(e.company_id)];
+      try {
+        JSON.parse(e.rows_json||'[]').forEach(r => {
+          if (!r.clock_in && !r.clock_out && !r.label && !r.name) return;
+          rows.push({ date: e.log_date, company: co?.name || `#${e.company_id}`, ...r });
+        });
+      } catch {}
+    });
+
+    rows.sort((a,b) => b.date !== a.date ? b.date.localeCompare(a.date) : (a.clock_in||'').localeCompare(b.clock_in||''));
+
+    if (!rows.length) {
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--text-dim);padding:32px;">No audit entries found.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = rows.map(r => {
+      let flag, cls;
+      if (!r.clock_in)         { flag='⚠ No clock-in';    cls='flag-error'; }
+      else if (!r.clock_out)   { flag='● In progress';     cls='flag-info';  }
+      else if (!r.total_mins)  { flag='⚠ Zero duration';   cls='flag-warn';  }
+      else if (r.total_mins>720){ flag='⚠ Over 12h';       cls='flag-warn';  }
+      else                     { flag='✓ OK';               cls='flag-ok';    }
+
+      return `<tr>
+        <td style="font-family:var(--mono);font-size:11px;color:var(--text-muted);white-space:nowrap;">${r.date}</td>
+        <td style="font-family:var(--sans);font-size:13px;font-weight:500;color:var(--accent);">${r.company}</td>
+        <td style="font-family:var(--sans);font-size:12px;color:var(--text-bright);">${r.label||'—'}</td>
+        <td style="font-family:var(--sans);font-size:12px;color:var(--text);">${r.name||'—'}</td>
+        <td style="font-family:var(--mono);font-size:12px;color:var(--text-muted);">${r.clock_in||'—'}</td>
+        <td style="font-family:var(--mono);font-size:12px;color:var(--text-muted);">${r.clock_out||'—'}</td>
+        <td style="font-family:var(--mono);font-size:12px;color:var(--yellow);text-align:center;">${fmtM(r.total_mins)}</td>
+        <td style="text-align:center;"><span class="audit-flag ${cls}">${flag}</span></td>
+      </tr>`;
+    }).join('');
+  }
+
+  // ── PDF Export ──
+  function exportPDF() {
+    if (currentTab === 'period')  exportPeriodPDF();
+    if (currentTab === 'company') exportCompanyPDF();
+  }
+
+  function exportPeriodPDF() {
+    const entries   = getFilteredEntries();
+    const from      = document.getElementById('period-from').value;
+    const to        = document.getElementById('period-to').value;
+    const coSel     = document.getElementById('period-company');
+    const coLabel   = coSel.value ? coSel.options[coSel.selectedIndex].text : 'All Companies';
+    const totalMins = entries.reduce((s,e) => s+(e.total_mins||0), 0);
+
+    const byDate = {};
+    entries.forEach(e => { byDate[e.log_date]=(byDate[e.log_date]||0)+(e.total_mins||0); });
+    const byLabel = {};
+    entries.forEach(e => { try { JSON.parse(e.rows_json||'[]').forEach(r => { if(r.total_mins>0){const l=r.label||'Other';byLabel[l]=(byLabel[l]||0)+r.total_mins;} }); } catch {} });
+
+    const dateRows  = Object.entries(byDate).sort(([a],[b])=>a.localeCompare(b))
+      .map(([d,m])=>`<tr><td>${d}</td><td style="text-align:right">${fmtM(m)}</td></tr>`).join('');
+    const labelRows = Object.entries(byLabel).sort((a,b)=>b[1]-a[1])
+      .map(([l,m])=>`<tr><td>${l}</td><td style="text-align:right">${fmtM(m)}</td></tr>`).join('');
+
+    const win = window.open('','_blank');
+    win.document.write(`<!DOCTYPE html><html><head><title>Period Report</title>
+    <style>body{font-family:Inter,Arial,sans-serif;font-size:12px;color:#111;padding:40px;max-width:900px;margin:0 auto;}
+    h1{font-size:20px;font-weight:600;margin:0 0 4px;}h2{font-size:13px;font-weight:600;color:#374151;margin:24px 0 8px;border-bottom:1px solid #e5e7eb;padding-bottom:4px;}
+    .meta{color:#666;font-size:11px;margin-bottom:20px;}table{width:100%;border-collapse:collapse;margin-bottom:20px;}
+    th{background:#f1f5f9;border-bottom:2px solid #2563eb;padding:8px;text-align:left;font-size:11px;font-weight:600;color:#374151;}
+    td{padding:7px 8px;border-bottom:1px solid #e5e7eb;}tr.total{font-weight:600;background:#f9fafb;}
+    .footer{margin-top:32px;color:#9ca3af;font-size:10px;border-top:1px solid #e5e7eb;padding-top:10px;display:flex;justify-content:space-between;}</style>
+    </head><body>
+    <h1>Period Report</h1>
+    <div class="meta">${from} → ${to} · ${coLabel} · Total: ${fmtM(totalMins)}</div>
+    <h2>Daily Hours</h2>
+    <table><thead><tr><th>Date</th><th style="text-align:right">Hours</th></tr></thead>
+    <tbody>${dateRows}<tr class="total"><td>Total</td><td style="text-align:right">${fmtM(totalMins)}</td></tr></tbody></table>
+    <h2>Task Label Breakdown</h2>
+    <table><thead><tr><th>Task Label</th><th style="text-align:right">Hours</th></tr></thead>
+    <tbody>${labelRows}</tbody></table>
+    <div class="footer"><span>Generated by Conquered Time · ${new Date().toLocaleString()}</span><span>CONFIDENTIAL</span></div>
+    </body></html>`);
+    win.document.close(); win.print();
+  }
+
+  function exportCompanyPDF() {
+    const grandTotal = allEntries.reduce((s,e)=>s+(e.total_mins||0),0);
+    const rows = companies.map(co => {
+      const ces = allEntries.filter(e=>Number(e.company_id)===Number(co.id));
+      const m   = ces.reduce((s,e)=>s+(e.total_mins||0),0);
+      return `<tr><td>${co.name}</td><td>${ces.length}</td><td style="text-align:right">${fmtM(m)}</td></tr>`;
+    }).join('');
+    const win = window.open('','_blank');
+    win.document.write(`<!DOCTYPE html><html><head><title>Company Report</title>
+    <style>body{font-family:Inter,Arial,sans-serif;font-size:12px;color:#111;padding:40px;max-width:900px;margin:0 auto;}
+    h1{font-size:20px;font-weight:600;margin:0 0 4px;}.meta{color:#666;font-size:11px;margin-bottom:20px;}
+    table{width:100%;border-collapse:collapse;}
+    th{background:#f1f5f9;border-bottom:2px solid #2563eb;padding:8px;text-align:left;font-size:11px;font-weight:600;color:#374151;}
+    td{padding:7px 8px;border-bottom:1px solid #e5e7eb;}tr.total{font-weight:600;background:#f9fafb;}
+    .footer{margin-top:32px;color:#9ca3af;font-size:10px;border-top:1px solid #e5e7eb;padding-top:10px;display:flex;justify-content:space-between;}</style>
+    </head><body>
+    <h1>Company Breakdown</h1>
+    <div class="meta">All time · ${companies.length} companies · Grand total: ${fmtM(grandTotal)}</div>
+    <table><thead><tr><th>Company</th><th>Sessions</th><th style="text-align:right">Total Hours</th></tr></thead>
+    <tbody>${rows}<tr class="total"><td colspan="2">Grand Total</td><td style="text-align:right">${fmtM(grandTotal)}</td></tr></tbody></table>
+    <div class="footer"><span>Generated by Conquered Time · ${new Date().toLocaleString()}</span><span>CONFIDENTIAL</span></div>
+    </body></html>`);
+    win.document.close(); win.print();
+  }
+
+  // ── CSV Export (Audit) ──
+  function exportCSV() {
+    const rows = [];
+    allEntries.forEach(e => {
+      const co = companyMap[Number(e.company_id)];
+      try {
+        JSON.parse(e.rows_json||'[]').forEach(r => {
+          if (!r.clock_in && !r.label && !r.name) return;
+          rows.push([e.log_date, co?.name||`#${e.company_id}`, r.label||'', r.name||'', r.desc||'', r.clock_in||'', r.clock_out||'', r.total_mins||0, fmtM(r.total_mins)]);
+        });
+      } catch {}
+    });
+    const header = ['Date','Company','Task Label','Task Name','Description','Clock In','Clock Out','Minutes','Duration'];
+    const csv    = [header,...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const blob   = new Blob([csv],{type:'text/csv'});
+    const url    = URL.createObjectURL(blob);
+    const a      = document.createElement('a');
+    a.href=url; a.download=`audit-${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+    Shell.toast('Audit log exported.','success');
+  }
+</script>
+</body>
+</html>
