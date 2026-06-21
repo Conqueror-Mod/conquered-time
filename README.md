@@ -1,35 +1,38 @@
 # Conquered Time
 ### Professional Time Intelligence System
 
-> Steam-aesthetic, TOTP-secured, AES-256-GCM encrypted time tracker for remote professionals.
+A secure, locally-encrypted desktop time tracker built for remote professionals managing multiple clients and companies.
 
 ---
 
 ## Features
 
-- **TOTP MFA login** — works with Google Authenticator, no external servers
-- **AES-256-GCM encryption** — all PPI (logins, emails, URLs) encrypted at rest
-- **PBKDF2 key derivation** — encryption key derived from password + TOTP code
-- **3-attempt lockout** — 24-hour lockout with countdown display
+- **TOTP MFA login** — Google Authenticator compatible, no external servers
+- **AES-256-GCM encryption** — all PPI fields encrypted at rest with PBKDF2 key derivation
+- **3-attempt lockout** — 24-hour lockout with live countdown display
 - **Local recovery code** — one-time printable backup key generated at setup
-- **Company spiderweb** — force-graph visualization with click-to-navigate nodes
-- **15-row time tracker** — clock in/out with task labels, per-company sessions
-- **Global log** — filterable history across all companies
-- **PDF export** — formal timesheet format (NavID excluded from printouts)
-- **CSV export** — full data export for spreadsheets
-- **Auto-backup** — dated `.db` copy on every save and app close (last 30 kept)
-- **Electron security** — contextIsolation, nodeIntegration disabled, sandboxed renderers
+- **Company spiderweb** — force-graph visualization of your client network
+- **Dynamic time tracker** — clock in/out with task labels and per-company sessions, auto-grows as needed
+- **Inline editing** — double-click any field to edit; duration recalculates automatically
+- **Global log** — filterable history across all companies with expandable session detail
+- **Reports** — time summaries, label breakdowns, bar charts, and audit log
+- **PDF & CSV export** — clean timesheet format; NavID excluded from all exports
+- **Auto-save & backup** — configurable autosave interval, dated `.db` backups on every save (last 30 kept)
+- **5 themes** — Arctic (default), Void, Slate/Ember, Paper, Quartz
+- **Keyboard navigation** — Ctrl+1-5 to switch modules, arrow keys in sidebar, full modal tab-trapping
+- **Electron security** — contextIsolation enabled, nodeIntegration disabled, sandboxed renderers
 
 ---
 
 ## Tech Stack
 
 - **Electron** v29 (Windows 11 x64)
-- **better-sqlite3** — local encrypted database
+- **sql.js** — pure JS/WASM SQLite, no native compilation required
 - **speakeasy** — TOTP generation and verification
 - **qrcode** — QR code generation for TOTP setup
 - **bcryptjs** — password hashing
 - **electron-builder** — NSIS installer
+- **Node.js v20.11.1** via NVM for Windows (required — v24 breaks Electron prebuilds)
 
 ---
 
@@ -37,42 +40,50 @@
 
 ```
 conquered-time/
+├── push.bat                      # One-click git commit and push
+├── seed-dev.js                   # Dev seed script (bypasses TOTP)
 ├── src/
 │   ├── main/
-│   │   ├── main.js          # Main process: window, IPC, DB, crypto
-│   │   └── preload.js       # Secure contextBridge API whitelist
-│   ├── renderer/
-│   │   ├── pages/
-│   │   │   ├── login.html   # TOTP login, setup wizard, recovery
-│   │   │   ├── dashboard.html
-│   │   │   ├── companies.html  # Spiderweb force graph
-│   │   │   ├── tracker.html    # 15-row time log
-│   │   │   └── global-log.html
-│   │   ├── components/
-│   │   │   └── shell.js     # Shared titlebar, sidebar, toast
-│   │   └── styles/
-│   │       └── design-system.css
-│   └── shared/
+│   │   ├── main.js               # Main process: window, IPC, DB, crypto, TOTP
+│   │   └── preload.js            # Secure contextBridge API whitelist
+│   └── renderer/
+│       ├── pages/
+│       │   ├── login.html        # TOTP login, setup wizard, recovery, easter eggs
+│       │   ├── dashboard.html    # Stats, mini spiderweb, recent activity
+│       │   ├── companies.html    # Full spiderweb force graph, company CRUD
+│       │   ├── tracker.html      # Dynamic time entry table, clock in/out
+│       │   ├── global-log.html   # Cross-company history, CSV/PDF export
+│       │   └── reports.html      # Charts, summaries, audit log
+│       ├── components/
+│       │   ├── shell.js          # Titlebar, sidebar, toast, settings modal, keyboard nav
+│       │   └── settings.js       # Theme, scale, accessibility, time format engine
+│       └── styles/
+│           ├── design-system.css # Entry point — imports all partials
+│           ├── themes.css        # 5 theme token sets + Google Fonts import
+│           ├── base.css          # Scale, accessibility, reset
+│           ├── shell.css         # Titlebar, sidebar, layout
+│           ├── components.css    # Shared UI components
+│           ├── settings-modal.css
+│           ├── login.css
+│           └── print.css
 ├── assets/
-│   └── icon.ico             # App icon (add your own)
-├── build/
+│   └── icon.ico                  # App icon (add before building)
 ├── package.json
 └── README.md
 ```
 
 ---
 
-## Setup & Build
+## Setup
 
 ### Prerequisites
 
-- Node.js 18+ (LTS)
-- Windows 11 x64 (target platform)
+- Node.js v20.11.1 via [NVM for Windows](https://github.com/coreybutler/nvm-windows)
+- Windows 11 x64
 
 ### Install
 
 ```bash
-cd conquered-time
 npm install
 ```
 
@@ -82,7 +93,15 @@ npm install
 npm start
 ```
 
-### Build installer (.exe + NSIS setup wizard)
+### Seed dev database (bypasses TOTP for fast testing)
+
+```bash
+npm run seed
+```
+
+Credentials: `devuser` / `devpass123`
+
+### Build installer
 
 ```bash
 npm run build
@@ -95,22 +114,39 @@ Output: `dist/Conquered Time Setup.exe`
 ## First Run
 
 1. Launch the app
-2. The **Setup** tab will appear automatically on first run
+2. The **Setup** tab appears automatically on first run
 3. Enter a username and strong password
-4. Click **Generate TOTP QR Code** — scan with Google Authenticator
-5. **Write down your recovery code** — this is the only copy
-6. Enter the 6-digit TOTP code to verify, then click **Create Account**
-7. Login with username + password + TOTP code on every subsequent launch
+4. Scan the **TOTP QR code** with Google Authenticator
+5. **Write down your recovery code** — shown once, never again
+6. Enter the 6-digit code to verify and create your account
+7. Every subsequent login requires username + password + TOTP code
+
+---
+
+## Keyboard Shortcuts
+
+| Shortcut | Action |
+|---|---|
+| `Ctrl+1` | Dashboard |
+| `Ctrl+2` | Companies |
+| `Ctrl+3` | Time Tracker |
+| `Ctrl+4` | Reports |
+| `Ctrl+5` | Global Log |
+| `Ctrl+,` | Open Settings |
+| `Ctrl+L` | Lock session |
+| `Escape` | Close modal |
+| `Arrow keys` | Navigate sidebar |
+| `Tab / Shift+Tab` | Cycle focus in modals |
+| `Alt+F4` | Close app (triggers audit check) |
 
 ---
 
 ## Data Location
 
-All data is stored locally at:
 ```
 %APPDATA%\conquered-time\conquered-data\
-  vault.db           ← encrypted SQLite database
-  backups\           ← dated backup copies (last 30)
+  vault.db        - encrypted SQLite database
+  backups\        - dated backup copies (last 30 retained)
 ```
 
 ---
@@ -119,27 +155,26 @@ All data is stored locally at:
 
 ```
 Login: password + TOTP code
-         ↓
+         |
     PBKDF2 (310,000 iterations, SHA-256)
-         ↓
-    32-byte AES-256-GCM key (held in memory only)
-         ↓
-    Decrypts PPI fields on access
-    Cleared on app close / lock
+         |
+    32-byte AES-256-GCM key (memory only)
+         |
+    Decrypts company/entry fields on access
+    Cleared on lock or app close
 ```
 
-- Sensitive fields (platform logins, emails, URLs) encrypted individually
-- NavID never appears on exported PDFs — session display only
-- 3 failed TOTP attempts → 24-hour lockout with countdown
-- Recovery code unlocks account locally (no network required)
-- Auto-backup runs on every save and on app close
+- PPI fields (platform logins, Navigator IDs, URLs) encrypted individually per record
+- NavID never appears on exported PDFs — in-session display only
+- 3 failed TOTP attempts triggers a 24-hour lockout with countdown
+- Recovery code unlocks account locally — no network call required
+- Auto-backup on every save and on close
 
 ---
 
-## Adding an Icon
+## Pushing Changes to GitHub
 
-Place a 256×256 `.ico` file at `assets/icon.ico` before building.
-Free tools: [convertio.co](https://convertio.co) or [icoconvert.com](https://icoconvert.com)
+Double-click `push.bat` in the project root. It will ask what you worked on, then commit and push automatically.
 
 ---
 
