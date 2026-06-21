@@ -39,10 +39,7 @@ echo  (Press Enter for a default timestamp message)
 echo.
 set /p MSG= Commit message:
 
-if "%MSG%"=="" (
-    for /f "tokens=2 delims==" %%I in ('wmic os get localdatetime /value') do set DT=%%I
-    set MSG=Session update - %DT:~0,4%-%DT:~4,2%-%DT:~6,2% %DT:~8,2%:%DT:~10,2%
-)
+if "%MSG%"=="" set MSG=Session update - %DATE% %TIME:~0,5%
 
 echo.
 echo  Staging all changes...
@@ -52,8 +49,10 @@ echo  Committing...
 git commit -m "%MSG%"
 
 echo.
-echo  Pushing to GitHub...
-git push -u origin main
+:: Get current branch name
+for /f %%B in ('git rev-parse --abbrev-ref HEAD') do set BRANCH=%%B
+echo  Pushing branch "%BRANCH%" to GitHub...
+git push -u origin %BRANCH%
 
 if %errorlevel%==0 (
     echo.
