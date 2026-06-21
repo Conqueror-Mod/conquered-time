@@ -4,3 +4,4 @@ dist/
 *.db
 *.db-backup-*
 .env
+.claude/settings.local.json
