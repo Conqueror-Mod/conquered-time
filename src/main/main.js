@@ -88,6 +88,14 @@ async function initDB() {
       duration_secs INTEGER NOT NULL DEFAULT 0,
       created_at    INTEGER NOT NULL DEFAULT (strftime('%s','now'))
     );
+    CREATE TABLE IF NOT EXISTS audit_dismissed (
+      id       INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id  INTEGER NOT NULL,
+      entry_id INTEGER NOT NULL,
+      row_idx  INTEGER NOT NULL,
+      type     TEXT    NOT NULL,
+      UNIQUE(user_id, entry_id, row_idx, type)
+    );
   `);
 
   persistDB();
@@ -181,10 +189,32 @@ function deriveKey(password, salt) {
 }
 
 // ── Window ─────────────────────────────────────────────────────────────────
+function createSplashWindow(theme) {
+  const splash = new BrowserWindow({
+    width: 520, height: 340,
+    frame: false,
+    resizable: false,
+    center: true,
+    alwaysOnTop: true,
+    backgroundColor: '#0a0c12',
+    icon: path.join(__dirname, '../../assets/icon.ico'),
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    }
+  });
+  splash.loadFile(path.join(__dirname, '../renderer/pages/splash.html'), {
+    query: { theme: theme || 'arctic' }
+  });
+  return splash;
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280, height: 800, minWidth: 900, minHeight: 600,
     frame: false,
+    show: false,
     backgroundColor: '#0d0f14',
     icon: path.join(__dirname, '../../assets/icon.ico'),
     webPreferences: {
@@ -247,35 +277,46 @@ function navigate(page) {
   mainWindow.loadFile(path.join(__dirname, `../renderer/pages/${page}.html`));
 }
 
+function getDismissedSet() {
+  if (!sessionUser) return new Set();
+  return new Set(
+    dbAll('SELECT entry_id, row_idx, type FROM audit_dismissed WHERE user_id=?', [sessionUser.id])
+      .map(d => `${d.entry_id}:${d.row_idx}:${d.type}`)
+  );
+}
+
 function countAuditDiscrepancies() {
   if (!sessionUser) return 0;
+  const dismissed = getDismissedSet();
   const entries = dbAll('SELECT rowid as rid, rows_json, total_mins FROM time_entries WHERE user_id=?', [sessionUser.id]);
   let count = 0;
   entries.forEach(e => {
+    const entryId = Number(e.rid);
     try {
-      JSON.parse(e.rows_json || '[]').forEach(r => {
+      JSON.parse(e.rows_json || '[]').forEach((r, idx) => {
         if (!r.clock_in && !r.clock_out && !r.label && !r.name) return;
-        if (!r.clock_in || !r.clock_out || !r.total_mins || r.total_mins > 720) count++;
+        if (!r.clock_in) {
+          if (!dismissed.has(`${entryId}:${idx}:no_clock_in`)) count++;
+        } else if (!r.clock_out) {
+          if (!dismissed.has(`${entryId}:${idx}:no_clock_out`)) count++;
+        } else if (!r.total_mins) {
+          if (!dismissed.has(`${entryId}:${idx}:zero_duration`)) count++;
+        } else if (r.total_mins > 720) {
+          if (!dismissed.has(`${entryId}:${idx}:over_12h`)) count++;
+        }
       });
     } catch {}
 
-    // Break compliance: sessions > 4 hours with no logged break
-    const entryId = Number(e.rid);
     const totalMins = Number(e.total_mins || 0);
     if (totalMins > 240) {
-      const hasBreak = dbGet(
-        'SELECT id FROM task_items WHERE entry_id=? AND user_id=? AND item_type=? LIMIT 1',
-        [entryId, sessionUser.id, 'break']
-      );
-      if (!hasBreak) count++;
+      const hasBreak = dbGet('SELECT id FROM task_items WHERE entry_id=? AND user_id=? AND item_type=? LIMIT 1',
+        [entryId, sessionUser.id, 'break']);
+      if (!hasBreak && !dismissed.has(`${entryId}:-1:missing_break`)) count++;
     }
-    // Lunch compliance: sessions > 6 hours with no logged lunch
     if (totalMins > 360) {
-      const hasLunch = dbGet(
-        'SELECT id FROM task_items WHERE entry_id=? AND user_id=? AND item_type=? LIMIT 1',
-        [entryId, sessionUser.id, 'lunch']
-      );
-      if (!hasLunch) count++;
+      const hasLunch = dbGet('SELECT id FROM task_items WHERE entry_id=? AND user_id=? AND item_type=? LIMIT 1',
+        [entryId, sessionUser.id, 'lunch']);
+      if (!hasLunch && !dismissed.has(`${entryId}:-1:missing_lunch`)) count++;
     }
   });
   return count;
@@ -609,6 +650,108 @@ ipcMain.handle('tasks:recent-labels', () => {
 });
 
 // ── IPC: Settings ──────────────────────────────────────────────────────────
+// ── IPC: Audit dismissed ──────────────────────────────────────────────────
+ipcMain.handle('audit:get-dismissed', () => {
+  if (!sessionUser) return [];
+  return dbAll('SELECT entry_id, row_idx, type FROM audit_dismissed WHERE user_id=?', [sessionUser.id]);
+});
+
+ipcMain.handle('audit:dismiss', (_, { entry_id, row_idx, type }) => {
+  if (!sessionUser) return { ok: false };
+  db.run(
+    'INSERT OR IGNORE INTO audit_dismissed (user_id, entry_id, row_idx, type) VALUES (?,?,?,?)',
+    [sessionUser.id, Number(entry_id), Number(row_idx), type]
+  );
+  persistDB();
+  return { ok: true };
+});
+
+ipcMain.handle('audit:clear-dismissed', () => {
+  if (!sessionUser) return { ok: false };
+  db.run('DELETE FROM audit_dismissed WHERE user_id=?', [sessionUser.id]);
+  persistDB();
+  return { ok: true };
+});
+
+ipcMain.handle('audit:apply-fix', (_, { entry_id, row_idx, fix_type }) => {
+  if (!sessionKey || !sessionUser) return { ok: false };
+  const row = dbGet('SELECT rowid as rid, * FROM time_entries WHERE rowid=? AND user_id=?',
+    [Number(entry_id), sessionUser.id]);
+  if (!row) return { ok: false, error: 'Entry not found' };
+  try {
+    const rows = JSON.parse(row.rows_json || '[]');
+    const r = rows[row_idx];
+    if (!r) return { ok: false, error: 'Row not found' };
+
+    if (fix_type === 'set_clock_out') {
+      // Set clock-out to clock-in + 8h, capped at 23:59
+      if (!r.clock_in) return { ok: false, error: 'No clock-in to base fix on' };
+      const [h, m] = r.clock_in.split(':').map(Number);
+      const outMins = Math.min(h * 60 + m + 480, 23 * 60 + 59);
+      const outH = String(Math.floor(outMins / 60)).padStart(2, '0');
+      const outM = String(outMins % 60).padStart(2, '0');
+      r.clock_out  = `${outH}:${outM}`;
+      r.total_mins = outMins - (h * 60 + m);
+    } else if (fix_type === 'recalc_duration') {
+      if (!r.clock_in || !r.clock_out) return { ok: false, error: 'Need both clock-in and clock-out' };
+      const [ih, im] = r.clock_in.split(':').map(Number);
+      const [oh, om] = r.clock_out.split(':').map(Number);
+      r.total_mins = (oh * 60 + om) - (ih * 60 + im);
+    }
+
+    rows[row_idx] = r;
+    const newJson = JSON.stringify(rows);
+    const newTotal = rows.reduce((s, row) => s + (row.total_mins || 0), 0);
+    db.run('UPDATE time_entries SET rows_json=?, total_mins=?, updated_at=strftime(\'%s\',\'now\') WHERE rowid=? AND user_id=?',
+      [newJson, newTotal, Number(entry_id), sessionUser.id]);
+    persistDB(); performBackup();
+    return { ok: true };
+  } catch (e) { return { ok: false, error: e.message }; }
+});
+
+// ── IPC: Database clear operations ────────────────────────────────────────
+ipcMain.handle('db:clear-timeclock', () => {
+  if (!sessionKey || !sessionUser) return { ok: false };
+  db.run('DELETE FROM task_items WHERE user_id=?', [sessionUser.id]);
+  db.run('DELETE FROM time_entries WHERE user_id=?', [sessionUser.id]);
+  activeEntryId = null;
+  persistDB(); performBackup();
+  return { ok: true };
+});
+
+ipcMain.handle('db:clear-companies', () => {
+  if (!sessionKey || !sessionUser) return { ok: false };
+  db.run('DELETE FROM task_items WHERE user_id=?', [sessionUser.id]);
+  db.run('DELETE FROM time_entries WHERE user_id=?', [sessionUser.id]);
+  db.run('DELETE FROM companies WHERE user_id=?', [sessionUser.id]);
+  activeEntryId = null;
+  persistDB(); performBackup();
+  return { ok: true };
+});
+
+ipcMain.handle('db:clear-full', () => {
+  if (!sessionKey || !sessionUser) return { ok: false };
+  db.run('DELETE FROM task_items');
+  db.run('DELETE FROM time_entries');
+  db.run('DELETE FROM companies');
+  db.run('DELETE FROM app_settings');
+  db.run('DELETE FROM users');
+  activeEntryId = null;
+  sessionKey  = null;
+  sessionUser = null;
+  persistDB();
+  return { ok: true };
+});
+
+ipcMain.handle('app:get-info', () => ({
+  version:         app.getVersion(),
+  electronVersion: process.versions.electron,
+  nodeVersion:     process.versions.node,
+  platform:        process.platform === 'win32' ? 'Windows' :
+                   process.platform === 'darwin' ? 'macOS' : 'Linux',
+  arch:            process.arch,
+}));
+
 ipcMain.handle('settings:get', (_, key) => {
   const row = dbGet('SELECT value FROM app_settings WHERE key=?', [key]);
   return row ? row.value : null;
@@ -622,7 +765,21 @@ ipcMain.handle('settings:set', (_, { key, value }) => {
 // ── App lifecycle ──────────────────────────────────────────────────────────
 app.whenReady().then(async () => {
   await initDB();
-  createWindow();
+
+  // Read saved theme so splash matches the user's preference
+  let savedTheme = 'arctic';
+  try {
+    const row = dbGet("SELECT value FROM app_settings WHERE key='ui_theme'");
+    if (row?.value) savedTheme = row.value;
+  } catch {}
+
+  const splash = createSplashWindow(savedTheme);
+  createWindow(); // creates hidden (show: false)
+
+  setTimeout(() => {
+    if (!splash.isDestroyed()) splash.close();
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.show();
+  }, 3000);
 });
 
 app.on('window-all-closed', () => {

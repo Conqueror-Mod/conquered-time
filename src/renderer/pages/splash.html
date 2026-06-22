@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy"
+  content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; img-src 'self' data:;">
+<title>Conquered Time</title>
+<link rel="stylesheet" href="../styles/design-system.css">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 100%; height: 100%;
+    overflow: hidden;
+    background: var(--bg-deep);
+    color: var(--text);
+    font-family: var(--sans);
+    user-select: none;
+    -webkit-app-region: drag;
+  }
+
+  .splash-root {
+    width: 100%; height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    padding: 40px 48px 36px;
+    position: relative;
+  }
+
+  /* Subtle radial glow behind the icon */
+  .splash-root::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -60%);
+    width: 300px;
+    height: 300px;
+    background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .splash-icon {
+    width: 96px;
+    height: 96px;
+    object-fit: contain;
+    filter: drop-shadow(0 0 18px var(--accent-glow));
+    margin-bottom: 20px;
+    animation: icon-in 0.5s ease both;
+  }
+
+  .splash-wordmark {
+    font-family: var(--mono);
+    font-size: 22px;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-bright);
+    animation: text-in 0.5s ease 0.2s both;
+  }
+
+  .splash-tagline {
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--text-muted);
+    letter-spacing: 0.04em;
+    margin-top: 8px;
+    animation: text-in 0.5s ease 0.35s both;
+  }
+
+  /* Progress bar */
+  .splash-progress-track {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--border);
+    overflow: hidden;
+  }
+
+  .splash-progress-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--accent);
+    animation: progress-fill 3s linear 0.1s forwards;
+    box-shadow: 0 0 8px var(--accent-glow);
+  }
+
+  @keyframes icon-in {
+    from { opacity: 0; transform: translateY(10px) scale(0.92); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  @keyframes text-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes progress-fill {
+    from { width: 0%; }
+    to   { width: 100%; }
+  }
+</style>
+</head>
+<body>
+<script>
+  // Apply theme before render to prevent flash
+  (function() {
+    const params = new URLSearchParams(window.location.search);
+    const theme  = params.get('theme') || 'arctic';
+    document.documentElement.setAttribute('data-theme', theme);
+  })();
+</script>
+
+<div class="splash-root">
+  <img class="splash-icon" src="../../../assets/icon-256.png" alt="Conquered Time icon">
+  <div class="splash-wordmark">Conquered Time</div>
+  <div class="splash-tagline">Take back your time.</div>
+
+  <div class="splash-progress-track">
+    <div class="splash-progress-fill"></div>
+  </div>
+</div>
+</body>
+</html>

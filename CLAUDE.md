@@ -159,17 +159,20 @@ Native `<input type="time">` renders in the OS locale's format (often 12-hour wi
 
 #### Feature Add
 - **Reorder themes in settings** — user wants to control the display order of theme cards in the Settings modal
-- **About module** — dedicated page/modal showing app version, author (Chris Bowles - The Conqueror), co-author (Vincent Vathan), copyright, and build info; copyright string already in `package.json`
-- **App load/splash screen** — branded screen before login showing the galaxy hourglass icon; replaces the bare login flash on startup
-- **Audit: 'Clear Messages' and 'Suggest discrepancy fix'** — UX improvements to the existing audit warning flow; clear resolved audit messages, and surface a suggested fix for each discrepancy type
+- **About module** ✅ — tab in Settings (Steam-style redesign); icon, wordmark, version, credits, changelog, placeholder links
+- **App load/splash screen** ✅ — branded 3-second splash before login with icon, wordmark, tagline, progress bar; theme-aware
+- **Audit: 'Clear Messages' and 'Suggest discrepancy fix'** ✅ — per-row Dismiss/Apply Fix buttons in audit log; dismissed items excluded from close/lock warning count; suggestion text per discrepancy type; Clear All and Show/Hide Dismissed toolbar; `audit_dismissed` table persists state
 - **Auto Backup UI** — the dated `.db` backup system already runs automatically; this is a UI to browse, preview, and restore from those backups ("LOAD DBA ability for locally saved recovery option")
-- **Task Timer & Counter page** — new module; a timer that can be pulled from an active timer log entry. When tasks are added via timer or manual addition on this page, the total task count is appended to the description of the active timeclock row. See also: task timer preview in Time Tracker footer (below)
-- **Task timer preview in Time Tracker footer** — a live summary/preview of the Task Timer & Counter data displayed in the footer zone of the Time Tracker table
+- **Manual database clear** ✅ — three-option wipe in Settings → Data: Time Clock Clear, Companies Clear, Full DB Clear; inline CONFIRM-typed confirmation
+- **Task Timer & Counter page** ✅ — implemented as "Dispatch" module; task timing, break/lunch compliance, description writeback, sidebar live timer, Tracker footer preview
 - **Recovery** — full account recovery flow beyond the current one-time recovery code; includes the LOAD DBA local restore UI
+- **User Profile Icon** — avatar/icon displayed in the sidebar user block and profile screen
+- **User Profile Screen** — dedicated screen for user profile management (username, password change, avatar, account details)
 - **Encrypt time log entries** — time data is treated as PPI (learnable information); open question: encrypt individual time entries the same way company fields are, OR lock all user data behind session encryption on session lock. Needs design decision before implementation.
 - **Reports / Auditing** — larger feature, builds on clock_in/clock_out timestamp data already captured per row; includes charts, label breakdowns, and full audit log
-- **Session Auto Lock/Timeout** — idle-based locking (distinct from the failed-login lockout already built); heartbeat system is already wired
+- **Session Auto Lock/Timeout** ✅ — fully wired: idle timer in main.js, heartbeat IPC, activity listeners in shell.js, settings UI (0/5/15/30/60 min); default corrected to Off
 - **Container/store architecture refactor** — centralized `store.js` + `ipc.js` + `validator.js` layer; deliberately postponed until app stabilized — good candidate now
+- **Settings redesign** ✅ — Steam-style split layout: left nav (Appearance, Time & Display, Data, Security, Accessibility, About), scrollable right panel; 860px modal
 - **Light theme polish** — Paper and Quartz flagged as still feeling "derivative"; functional but not fully realized
 - **Language change / i18n** — lowest priority, most complex; tackle last
 - The North Phoenician cipher-layer concept was discussed in depth but explicitly **deferred to theory** — only the visual grid mechanic is built; the deeper PBKDF2 factor idea remains unbuilt

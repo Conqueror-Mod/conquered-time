@@ -342,13 +342,17 @@ function updateBreakButtons() {
 }
 
 // ── Timer controls ─────────────────────────────────────────────────────────
-function startStopwatch() {
-  timerStart = Date.now();
+function startStopwatch(startedAtMs) {
+  timerStart = startedAtMs || Date.now();
   timerInterval = setInterval(() => {
     const elapsed = Math.floor((Date.now() - timerStart) / 1000);
     document.getElementById('stopwatch').textContent = fmtSecs(elapsed);
     document.getElementById('stopwatch').classList.add('running');
   }, 1000);
+  // Render first tick immediately so the display isn't 00:00 for a second
+  const elapsed = Math.floor((Date.now() - timerStart) / 1000);
+  document.getElementById('stopwatch').textContent = fmtSecs(elapsed);
+  document.getElementById('stopwatch').classList.add('running');
 }
 
 function stopStopwatch() {
@@ -420,11 +424,25 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   // Load tasks and recent labels
   taskItems = await api.invoke('tasks:list', activeEntry.id);
+
   // Detect any in-progress break/lunch
   const inProgressBreak = taskItems.find(t => t.item_type === 'break' && !t.stopped_at);
   const inProgressLunch = taskItems.find(t => t.item_type === 'lunch' && !t.stopped_at);
   if (inProgressBreak) activeBreakId = inProgressBreak.id;
   if (inProgressLunch) activeLunchId = inProgressLunch.id;
+
+  // Resume an in-progress task (user navigated away and returned)
+  const inProgressTask = taskItems.find(t => t.item_type === 'task' && t.started_at && !t.stopped_at);
+  if (inProgressTask) {
+    activeTaskId = inProgressTask.id;
+    document.getElementById('task-label-input').value    = inProgressTask.label;
+    document.getElementById('task-label-input').disabled = true;
+    document.getElementById('btn-start').style.display   = 'none';
+    document.getElementById('btn-stop').style.display    = '';
+    document.getElementById('btn-cancel').style.display  = '';
+    startStopwatch(inProgressTask.started_at);
+    Shell.showSidebarTimer(inProgressTask.started_at);
+  }
 
   renderTaskList();
   renderCompliance();
@@ -455,6 +473,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     });
     activeTaskId = res.id;
     startStopwatch();
+    Shell.showSidebarTimer(timerStart);
 
     document.getElementById('btn-start').style.display  = 'none';
     document.getElementById('btn-stop').style.display   = '';
@@ -489,6 +508,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     activeTaskId = null;
     timerStart = null;
     resetStopwatch();
+    Shell.hideSidebarTimer();
     document.getElementById('task-label-input').value    = '';
     document.getElementById('task-label-input').disabled = false;
     document.getElementById('task-label-input').focus();
@@ -507,6 +527,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     timerStart   = null;
     stopStopwatch();
     resetStopwatch();
+    Shell.hideSidebarTimer();
     document.getElementById('task-label-input').value    = '';
     document.getElementById('task-label-input').disabled = false;
     document.getElementById('btn-start').style.display  = '';

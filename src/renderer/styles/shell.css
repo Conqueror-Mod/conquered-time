@@ -126,7 +126,7 @@
 }
 .nav-icon { width: 18px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; }
 
-.sidebar-spacer { flex: 1; }
+.sidebar-spacer { flex: 1; display: flex; flex-direction: column; justify-content: center; }
 
 .sidebar-user {
   padding: 8px 18px;

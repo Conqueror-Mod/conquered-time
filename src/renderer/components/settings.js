@@ -14,7 +14,7 @@ const Settings = (() => {
     colorblind:       'off',
     focusIndicators:  false,
     timeFormat:       '24h',
-    autoLockMinutes:   15,        // 0 = disabled
+    autoLockMinutes:   0,         // 0 = disabled
     autoSaveInterval:  60,        // seconds; 0 = disabled
   };
 

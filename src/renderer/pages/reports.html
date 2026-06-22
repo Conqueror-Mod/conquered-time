@@ -232,10 +232,46 @@
     border-radius: var(--radius-sm);
     white-space: nowrap;
   }
-  .flag-ok    { background: var(--green-dim);  color: var(--green);  border: 1px solid rgba(16,185,129,0.3); }
-  .flag-warn  { background: var(--yellow-dim); color: var(--yellow); border: 1px solid rgba(245,158,11,0.3); }
-  .flag-error { background: var(--red-dim);    color: var(--red);    border: 1px solid rgba(239,68,68,0.3); }
-  .flag-info  { background: var(--blue-dim);   color: var(--blue);   border: 1px solid rgba(96,165,250,0.3); }
+  .flag-ok        { background: var(--green-dim);  color: var(--green);  border: 1px solid rgba(16,185,129,0.3); }
+  .flag-warn      { background: var(--yellow-dim); color: var(--yellow); border: 1px solid rgba(245,158,11,0.3); }
+  .flag-error     { background: var(--red-dim);    color: var(--red);    border: 1px solid rgba(239,68,68,0.3); }
+  .flag-info      { background: var(--blue-dim);   color: var(--blue);   border: 1px solid rgba(96,165,250,0.3); }
+  .flag-dismissed { background: var(--surface-2);  color: var(--text-dim); border: 1px solid var(--border); opacity: 0.5; }
+
+  .audit-toolbar {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 0 8px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 4px;
+    flex-shrink: 0;
+  }
+  .audit-toolbar-label { font-family: var(--sans); font-size: 12px; color: var(--text-muted); margin-right: auto; }
+  .audit-action-btn {
+    padding: 5px 12px;
+    font-family: var(--sans); font-size: 11px; font-weight: 500;
+    border: 1px solid var(--border-light); border-radius: var(--radius);
+    background: transparent; color: var(--text-muted); cursor: pointer;
+    transition: all var(--transition);
+  }
+  .audit-action-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+  .audit-action-btn.danger:hover { border-color: var(--yellow); color: var(--yellow); background: var(--yellow-dim); }
+  .audit-row-btn {
+    padding: 3px 8px;
+    font-family: var(--sans); font-size: 10px; font-weight: 500;
+    border: 1px solid var(--border-light); border-radius: var(--radius-sm);
+    background: transparent; cursor: pointer; transition: all var(--transition);
+    white-space: nowrap;
+  }
+  .audit-row-btn.dismiss { color: var(--text-dim); }
+  .audit-row-btn.dismiss:hover { border-color: var(--text-muted); color: var(--text-muted); }
+  .audit-row-btn.fix { color: var(--green); border-color: rgba(16,185,129,0.4); }
+  .audit-row-btn.fix:hover { background: var(--green-dim); }
+  .audit-suggest {
+    font-family: var(--sans); font-size: 10px; color: var(--text-muted);
+    font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    max-width: 200px;
+  }
+  tr.audit-dismissed-row td { opacity: 0.4; }
 
   /* ── Tab panels ── */
   .tab-panel { display: none; flex-direction: column; flex: 1; min-height: 0; }
@@ -321,6 +357,11 @@
 
 <!-- ── Audit Log ── -->
 <div id="tab-audit" class="tab-panel">
+  <div class="audit-toolbar">
+    <span class="audit-toolbar-label" id="audit-count-label">Loading…</span>
+    <button class="audit-action-btn" id="btn-toggle-dismissed" onclick="toggleShowDismissed()">Show Dismissed</button>
+    <button class="audit-action-btn danger" id="btn-clear-dismissed" onclick="clearAllDismissed()">Clear All Dismissed</button>
+  </div>
   <div class="table-wrap scroll-area">
     <table id="audit-table">
       <thead>
@@ -328,11 +369,12 @@
           <th>Date</th>
           <th>Company</th>
           <th>Task Label</th>
-          <th>Task Name</th>
           <th>Clock In</th>
           <th>Clock Out</th>
           <th class="center">Duration</th>
           <th class="center">Status</th>
+          <th>Suggestion</th>
+          <th class="center">Actions</th>
         </tr>
       </thead>
       <tbody id="audit-tbody"></tbody>
@@ -346,6 +388,8 @@
   let companies = [], allEntries = [], companyMap = {};
   let currentTab = 'period';
   let barResizeObserver = null;
+  let dismissedSet = new Set();
+  let showDismissed = false;
 
   window.addEventListener('DOMContentLoaded', async () => {
     await Shell.init('reports');
@@ -354,6 +398,10 @@
     if (mc) { mc.style.display = 'flex'; mc.style.flexDirection = 'column'; mc.style.overflow = 'hidden'; }
 
     await loadData();
+    // Load dismissed audit items
+    const dismissedRows = await api.invoke('audit:get-dismissed');
+    dismissedSet = new Set((dismissedRows || []).map(d => `${d.entry_id}:${d.row_idx}:${d.type}`));
+
     setupTabs();
     initPeriodFilter();
 
@@ -596,46 +644,146 @@
   }
 
   // ── Audit Log ──
+  function getAuditType(r) {
+    if (!r.clock_in)          return 'no_clock_in';
+    if (!r.clock_out)         return 'no_clock_out';
+    if (!r.total_mins)        return 'zero_duration';
+    if (r.total_mins > 720)   return 'over_12h';
+    return 'ok';
+  }
+
+  function auditMeta(type, r) {
+    switch(type) {
+      case 'no_clock_in':    return { flag:'⚠ No clock-in',   cls:'flag-error',  suggestion:'Enter a clock-in time in the Time Tracker.',            fix: null };
+      case 'no_clock_out':   return { flag:'● No clock-out',   cls:'flag-error',  suggestion:'Auto-set clock-out to clock-in + 8h.',                  fix: 'set_clock_out' };
+      case 'zero_duration':  return { flag:'⚠ Zero duration',  cls:'flag-warn',   suggestion:'Recalculate duration from clock-in / clock-out.',        fix: (r.clock_in && r.clock_out) ? 'recalc_duration' : null };
+      case 'over_12h':       return { flag:'⚠ Over 12h',       cls:'flag-warn',   suggestion:'Review clock-out — session exceeds 12 hours.',           fix: null };
+      case 'missing_break':  return { flag:'⚠ No break logged', cls:'flag-warn',  suggestion:'Log a break in Dispatch for sessions over 4 hours.',     fix: null };
+      case 'missing_lunch':  return { flag:'⚠ No lunch logged', cls:'flag-warn',  suggestion:'Log a lunch in Dispatch for sessions over 6 hours.',     fix: null };
+      default:               return { flag:'✓ OK',              cls:'flag-ok',     suggestion:'',                                                       fix: null };
+    }
+  }
+
   function renderAuditLog() {
     const tbody = document.getElementById('audit-tbody');
-    const rows  = [];
+    const items = [];
 
     allEntries.forEach(e => {
       const co = companyMap[Number(e.company_id)];
+      const entryId = Number(e.id);
       try {
-        JSON.parse(e.rows_json||'[]').forEach(r => {
+        JSON.parse(e.rows_json||'[]').forEach((r, idx) => {
           if (!r.clock_in && !r.clock_out && !r.label && !r.name) return;
-          rows.push({ date: e.log_date, company: co?.name || `#${e.company_id}`, ...r });
+          const type = getAuditType(r);
+          const dKey = `${entryId}:${idx}:${type}`;
+          items.push({ date: e.log_date, company: co?.name || `#${e.company_id}`, entryId, rowIdx: idx, type, dKey, r });
         });
       } catch {}
+
+      // Entry-level break/lunch flags
+      const totalMins = Number(e.total_mins || 0);
+      if (totalMins > 240) {
+        const bKey = `${entryId}:-1:missing_break`;
+        items.push({ date: e.log_date, company: co?.name || `#${e.company_id}`, entryId, rowIdx: -1, type: 'missing_break', dKey: bKey, r: { clock_in: '—', clock_out: '—', total_mins: totalMins, label: '(session)' } });
+      }
+      if (totalMins > 360) {
+        const lKey = `${entryId}:-1:missing_lunch`;
+        items.push({ date: e.log_date, company: co?.name || `#${e.company_id}`, entryId, rowIdx: -1, type: 'missing_lunch', dKey: lKey, r: { clock_in: '—', clock_out: '—', total_mins: totalMins, label: '(session)' } });
+      }
     });
 
-    rows.sort((a,b) => b.date !== a.date ? b.date.localeCompare(a.date) : (a.clock_in||'').localeCompare(b.clock_in||''));
+    items.sort((a,b) => b.date !== a.date ? b.date.localeCompare(a.date) : (a.r.clock_in||'').localeCompare(b.r.clock_in||''));
 
-    if (!rows.length) {
-      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--text-dim);padding:32px;">No audit entries found.</td></tr>`;
+    const visible = showDismissed ? items : items.filter(i => i.type === 'ok' || !dismissedSet.has(i.dKey));
+    const flagged  = items.filter(i => i.type !== 'ok' && !dismissedSet.has(i.dKey)).length;
+    const totalDismissed = items.filter(i => i.type !== 'ok' && dismissedSet.has(i.dKey)).length;
+
+    // Update toolbar label
+    const label = document.getElementById('audit-count-label');
+    if (label) {
+      label.textContent = flagged
+        ? `${flagged} issue${flagged !== 1 ? 's' : ''} found${totalDismissed ? ` · ${totalDismissed} dismissed` : ''}`
+        : `No issues${totalDismissed ? ` · ${totalDismissed} dismissed` : ''}`;
+      label.style.color = flagged ? 'var(--yellow)' : 'var(--green)';
+    }
+    const clearBtn = document.getElementById('btn-clear-dismissed');
+    if (clearBtn) clearBtn.style.display = totalDismissed ? '' : 'none';
+
+    if (!visible.length) {
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;color:var(--text-dim);padding:32px;">No audit entries found.</td></tr>`;
       return;
     }
 
-    tbody.innerHTML = rows.map(r => {
-      let flag, cls;
-      if (!r.clock_in)         { flag='⚠ No clock-in';    cls='flag-error'; }
-      else if (!r.clock_out)   { flag='● In progress';     cls='flag-info';  }
-      else if (!r.total_mins)  { flag='⚠ Zero duration';   cls='flag-warn';  }
-      else if (r.total_mins>720){ flag='⚠ Over 12h';       cls='flag-warn';  }
-      else                     { flag='✓ OK';               cls='flag-ok';    }
+    tbody.innerHTML = visible.map(({ date, company, entryId, rowIdx, type, dKey, r }) => {
+      const isDismissed = type !== 'ok' && dismissedSet.has(dKey);
+      const { flag, cls, suggestion, fix } = auditMeta(type, r);
+      const rowCls = isDismissed ? ' class="audit-dismissed-row"' : '';
+      const flagCls = isDismissed ? 'flag-dismissed' : cls;
+      const flagText = isDismissed ? '— dismissed' : flag;
 
-      return `<tr>
-        <td style="font-family:var(--mono);font-size:11px;color:var(--text-muted);white-space:nowrap;">${r.date}</td>
-        <td style="font-family:var(--sans);font-size:13px;font-weight:500;color:var(--accent);">${r.company}</td>
+      const actionBtns = type === 'ok' ? '' : isDismissed
+        ? `<button class="audit-row-btn dismiss" onclick="undismissAuditItem('${dKey}','${entryId}','${rowIdx}','${type}')">Restore</button>`
+        : [
+            fix ? `<button class="audit-row-btn fix" onclick="applyAuditFix('${entryId}','${rowIdx}','${fix}','${dKey}')">Apply Fix</button>` : '',
+            `<button class="audit-row-btn dismiss" onclick="dismissAuditItem('${dKey}','${entryId}','${rowIdx}','${type}')">Dismiss</button>`
+          ].filter(Boolean).join(' ');
+
+      return `<tr${rowCls}>
+        <td style="font-family:var(--mono);font-size:11px;color:var(--text-muted);white-space:nowrap;">${date}</td>
+        <td style="font-family:var(--sans);font-size:12px;font-weight:500;color:var(--accent);">${company}</td>
         <td style="font-family:var(--sans);font-size:12px;color:var(--text-bright);">${r.label||'—'}</td>
-        <td style="font-family:var(--sans);font-size:12px;color:var(--text);">${r.name||'—'}</td>
-        <td style="font-family:var(--mono);font-size:12px;color:var(--text-muted);">${r.clock_in||'—'}</td>
-        <td style="font-family:var(--mono);font-size:12px;color:var(--text-muted);">${r.clock_out||'—'}</td>
-        <td style="font-family:var(--mono);font-size:12px;color:var(--yellow);text-align:center;">${fmtM(r.total_mins)}</td>
-        <td style="text-align:center;"><span class="audit-flag ${cls}">${flag}</span></td>
+        <td style="font-family:var(--mono);font-size:11px;color:var(--text-muted);">${r.clock_in||'—'}</td>
+        <td style="font-family:var(--mono);font-size:11px;color:var(--text-muted);">${r.clock_out||'—'}</td>
+        <td style="font-family:var(--mono);font-size:11px;color:var(--yellow);text-align:center;">${r.total_mins ? fmtM(r.total_mins) : '—'}</td>
+        <td style="text-align:center;"><span class="audit-flag ${flagCls}">${flagText}</span></td>
+        <td><span class="audit-suggest" title="${suggestion}">${isDismissed ? '' : suggestion}</span></td>
+        <td style="text-align:center;white-space:nowrap;">${actionBtns}</td>
       </tr>`;
     }).join('');
+  }
+
+  async function dismissAuditItem(dKey, entryId, rowIdx, type) {
+    await api.invoke('audit:dismiss', { entry_id: Number(entryId), row_idx: Number(rowIdx), type });
+    dismissedSet.add(dKey);
+    renderAuditLog();
+  }
+
+  async function undismissAuditItem(dKey, entryId, rowIdx, type) {
+    // No single-item restore IPC needed — just remove from local set and re-persist on clear
+    // For now: clear all dismissed then re-add the ones we still want (simpler UX)
+    dismissedSet.delete(dKey);
+    // Re-add remaining dismissed items to DB (clear + re-insert)
+    await api.invoke('audit:clear-dismissed');
+    for (const key of dismissedSet) {
+      const [eid, ridx, t] = key.split(':');
+      await api.invoke('audit:dismiss', { entry_id: Number(eid), row_idx: Number(ridx), type: t });
+    }
+    renderAuditLog();
+  }
+
+  async function clearAllDismissed() {
+    await api.invoke('audit:clear-dismissed');
+    dismissedSet.clear();
+    renderAuditLog();
+  }
+
+  function toggleShowDismissed() {
+    showDismissed = !showDismissed;
+    const btn = document.getElementById('btn-toggle-dismissed');
+    if (btn) btn.textContent = showDismissed ? 'Hide Dismissed' : 'Show Dismissed';
+    renderAuditLog();
+  }
+
+  async function applyAuditFix(entryId, rowIdx, fixType, dKey) {
+    const res = await api.invoke('audit:apply-fix', { entry_id: Number(entryId), row_idx: Number(rowIdx), fix_type: fixType });
+    if (!res?.ok) { Shell.toast('Fix could not be applied: ' + (res?.error || 'unknown error'), 'error'); return; }
+    // Reload entries so the fix is reflected
+    allEntries = await api.invoke('entries:all') || [];
+    // Auto-dismiss the fixed item
+    await api.invoke('audit:dismiss', { entry_id: Number(entryId), row_idx: Number(rowIdx), type: fixType === 'set_clock_out' ? 'no_clock_out' : 'zero_duration' });
+    dismissedSet.add(dKey);
+    Shell.toast('Fix applied and entry updated.', 'success');
+    renderAuditLog();
   }
 
   // ── PDF Export ──

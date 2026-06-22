@@ -83,131 +83,277 @@ const Shell = (() => {
   }
 
   function buildSettingsModal() {
+    const NAV_ITEMS = [
+      { id: 'appearance',   label: 'Appearance',    icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>' },
+      { id: 'display',      label: 'Time & Display', icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>' },
+      { id: 'data',         label: 'Data',           icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>' },
+      { id: 'security',     label: 'Security',       icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>' },
+      { id: 'accessibility',label: 'Accessibility',  icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>' },
+      { id: 'about',        label: 'About',          icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>' },
+    ];
+
+    const navHTML = NAV_ITEMS.map(n => `
+      <button class="sn-item${n.id === 'appearance' ? ' active' : ''}" data-cat="${n.id}" onclick="switchSettingsCategory('${n.id}')">
+        <span class="sn-icon">${n.icon}</span>
+        <span class="sn-label">${n.label}</span>
+      </button>`).join('');
+
     return `
     <div id="settings-modal" onclick="handleModalBackdrop(event)">
       <div class="settings-modal-box">
+
         <div class="settings-modal-header">
           <div class="settings-modal-title" style="display:flex;align-items:center;gap:8px;">${IC.settings} Settings</div>
           <button class="settings-modal-close" onclick="closeSettingsModal()">✕</button>
         </div>
-        <div class="settings-modal-body">
 
-          <!-- Appearance -->
-          <div class="settings-group">
-            <div class="settings-group-title">Appearance</div>
+        <div class="settings-layout">
 
-            <div class="settings-row">
-              <div class="settings-row-label">Theme</div>
-              <div class="theme-cards" id="theme-cards">
-                <div class="theme-card" data-t="ember"  onclick="applyTheme('ember')">
-                  <div class="theme-swatch" data-t="ember"></div>
-                  <div class="theme-card-name">Ember</div>
-                </div>
-                <div class="theme-card" data-t="void"   onclick="applyTheme('void')">
-                  <div class="theme-swatch" data-t="void"></div>
-                  <div class="theme-card-name">Void</div>
-                </div>
-                <div class="theme-card" data-t="arctic" onclick="applyTheme('arctic')">
-                  <div class="theme-swatch" data-t="arctic"></div>
-                  <div class="theme-card-name">Arctic</div>
-                </div>
-                <div class="theme-card" data-t="paper"  onclick="applyTheme('paper')">
-                  <div class="theme-swatch" data-t="paper"></div>
-                  <div class="theme-card-name">Paper</div>
-                </div>
-                <div class="theme-card" data-t="quartz" onclick="applyTheme('quartz')">
-                  <div class="theme-swatch" data-t="quartz"></div>
-                  <div class="theme-card-name">Quartz</div>
+          <!-- Left nav -->
+          <nav class="settings-nav">${navHTML}</nav>
+
+          <!-- Right content -->
+          <div class="settings-content">
+
+            <!-- ── APPEARANCE ───────────────────────────────── -->
+            <div id="settings-cat-appearance" class="settings-cat-panel">
+              <div class="sc-title">Appearance</div>
+
+              <div class="settings-group">
+                <div class="settings-group-title">Theme</div>
+                <div class="theme-cards" id="theme-cards">
+                  <div class="theme-card" data-t="ember"  onclick="applyTheme('ember')"><div class="theme-swatch" data-t="ember"></div><div class="theme-card-name">Ember</div></div>
+                  <div class="theme-card" data-t="void"   onclick="applyTheme('void')"><div class="theme-swatch" data-t="void"></div><div class="theme-card-name">Void</div></div>
+                  <div class="theme-card" data-t="arctic" onclick="applyTheme('arctic')"><div class="theme-swatch" data-t="arctic"></div><div class="theme-card-name">Arctic</div></div>
+                  <div class="theme-card" data-t="paper"  onclick="applyTheme('paper')"><div class="theme-swatch" data-t="paper"></div><div class="theme-card-name">Paper</div></div>
+                  <div class="theme-card" data-t="quartz" onclick="applyTheme('quartz')"><div class="theme-swatch" data-t="quartz"></div><div class="theme-card-name">Quartz</div></div>
                 </div>
               </div>
-            </div>
-          </div>
 
-          <!-- Scale -->
-          <div class="settings-group">
-            <div class="settings-group-title">Display Scale</div>
-            <div class="settings-row">
-              <div class="settings-row-label">UI Size — affects all elements proportionally</div>
-              <div class="settings-btn-group" id="scale-btns">
-                <button class="s-btn" data-s="compact"     onclick="applyScale('compact')">Compact</button>
-                <button class="s-btn" data-s="normal"      onclick="applyScale('normal')">Normal</button>
-                <button class="s-btn" data-s="comfortable" onclick="applyScale('comfortable')">Comfortable</button>
-                <button class="s-btn" data-s="large"       onclick="applyScale('large')">Large</button>
+              <div class="settings-group">
+                <div class="settings-group-title">UI Scale</div>
+                <div class="settings-row-label">Scales all app content proportionally</div>
+                <div class="settings-btn-group" id="scale-btns" style="margin-top:8px;">
+                  <button class="s-btn" data-s="compact"     onclick="applyScale('compact')">Compact</button>
+                  <button class="s-btn" data-s="normal"      onclick="applyScale('normal')">Normal</button>
+                  <button class="s-btn" data-s="comfortable" onclick="applyScale('comfortable')">Comfortable</button>
+                  <button class="s-btn" data-s="large"       onclick="applyScale('large')">Large</button>
+                </div>
               </div>
             </div>
-          </div>
 
-          <!-- Time Format -->
-          <div class="settings-group">
-            <div class="settings-group-title">Time Format</div>
-            <div class="settings-row">
-              <div class="settings-row-label">Clock display preference</div>
-              <div class="settings-btn-group" id="time-btns">
-                <button class="s-btn" data-tf="24h" onclick="applyTimeFormat('24h')">24-Hour (14:30)</button>
-                <button class="s-btn" data-tf="12h" onclick="applyTimeFormat('12h')">12-Hour (2:30 PM)</button>
-              </div>
-            </div>
-          </div>
+            <!-- ── TIME & DISPLAY ───────────────────────────── -->
+            <div id="settings-cat-display" class="settings-cat-panel" style="display:none;">
+              <div class="sc-title">Time & Display</div>
 
-          <!-- Auto-Save -->
-          <div class="settings-group">
-            <div class="settings-group-title">Data</div>
-            <div class="settings-row">
-              <div class="settings-row-label">Auto-Save interval</div>
-              <div class="settings-btn-group" id="autosave-btns">
-                <button class="s-btn" data-asi="0"  onclick="applyAutoSave(0)">Off</button>
-                <button class="s-btn" data-asi="30" onclick="applyAutoSave(30)">30 sec</button>
-                <button class="s-btn" data-asi="60" onclick="applyAutoSave(60)">1 min</button>
-                <button class="s-btn" data-asi="300" onclick="applyAutoSave(300)">5 min</button>
+              <div class="settings-group">
+                <div class="settings-group-title">Clock Format</div>
+                <div class="settings-row-label">How times are shown throughout the app</div>
+                <div class="settings-btn-group" id="time-btns" style="margin-top:8px;">
+                  <button class="s-btn" data-tf="24h" onclick="applyTimeFormat('24h')">24-Hour (14:30)</button>
+                  <button class="s-btn" data-tf="12h" onclick="applyTimeFormat('12h')">12-Hour (2:30 PM)</button>
+                </div>
               </div>
             </div>
-          </div>
 
-          <!-- Auto-Lock -->
-          <div class="settings-group">
-            <div class="settings-group-title">Security</div>
-            <div class="settings-row">
-              <div class="settings-row-label">Auto-Lock after inactivity</div>
-              <div class="settings-btn-group" id="autolock-btns">
-                <button class="s-btn" data-al="0"  onclick="applyAutoLock(0)">Off</button>
-                <button class="s-btn" data-al="5"  onclick="applyAutoLock(5)">5 min</button>
-                <button class="s-btn" data-al="15" onclick="applyAutoLock(15)">15 min</button>
-                <button class="s-btn" data-al="30" onclick="applyAutoLock(30)">30 min</button>
-                <button class="s-btn" data-al="60" onclick="applyAutoLock(60)">1 hour</button>
-              </div>
-            </div>
-          </div>
+            <!-- ── DATA ─────────────────────────────────────── -->
+            <div id="settings-cat-data" class="settings-cat-panel" style="display:none;">
+              <div class="sc-title">Data</div>
 
-          <!-- Accessibility -->
-          <div class="settings-group">
-            <div class="settings-group-title">Accessibility</div>
-            <div class="toggle-row">
-              <div class="toggle-info">
-                <div class="toggle-label">Reduce Motion</div>
-                <div class="toggle-desc">Disables animations and transitions</div>
+              <div class="settings-group">
+                <div class="settings-group-title">Auto-Save</div>
+                <div class="settings-row-label">How often active sessions are automatically saved</div>
+                <div class="settings-btn-group" id="autosave-btns" style="margin-top:8px;">
+                  <button class="s-btn" data-asi="0"   onclick="applyAutoSave(0)">Off</button>
+                  <button class="s-btn" data-asi="30"  onclick="applyAutoSave(30)">30 sec</button>
+                  <button class="s-btn" data-asi="60"  onclick="applyAutoSave(60)">1 min</button>
+                  <button class="s-btn" data-asi="300" onclick="applyAutoSave(300)">5 min</button>
+                </div>
               </div>
-              <button class="toggle-switch" id="toggle-motion"
-                onclick="applyToggle('reducedMotion', this)"></button>
-            </div>
-            <div class="toggle-row">
-              <div class="toggle-info">
-                <div class="toggle-label">Focus Indicators</div>
-                <div class="toggle-desc">Shows visible outlines for keyboard navigation</div>
-              </div>
-              <button class="toggle-switch" id="toggle-focus"
-                onclick="applyToggle('focusIndicators', this)"></button>
-            </div>
-            <div class="settings-row">
-              <div class="settings-row-label">Colorblind mode</div>
-              <div class="settings-btn-group" id="colorblind-btns">
-                <button class="s-btn" data-cb="off"           onclick="applyColorblind('off')">Off</button>
-                <button class="s-btn" data-cb="deuteranopia"  onclick="applyColorblind('deuteranopia')">Deuteranopia</button>
-                <button class="s-btn" data-cb="protanopia"    onclick="applyColorblind('protanopia')">Protanopia</button>
-              </div>
-            </div>
-          </div>
 
-        </div>
+              <div class="settings-group">
+                <div class="settings-group-title">Database Clear</div>
+                <div class="settings-row-label">Permanently remove data. These actions cannot be undone.</div>
+
+                <div class="dba-cards">
+
+                  <div class="dba-card" id="dba-card-timeclock">
+                    <div class="dba-card-header">
+                      <div>
+                        <div class="dba-card-title">Time Clock Clear</div>
+                        <div class="dba-card-desc">Removes all time entries and Dispatch task records. Companies are kept.</div>
+                      </div>
+                      <button class="dba-trigger-btn" onclick="showDbaConfirm('timeclock')">Clear</button>
+                    </div>
+                    <div class="dba-confirm" id="dba-confirm-timeclock" style="display:none;">
+                      <div class="dba-confirm-warning">⚠ This will permanently delete all time entries and task records for your account.</div>
+                      <div class="dba-confirm-row">
+                        <input class="dba-confirm-input" id="dba-input-timeclock" placeholder='Type CONFIRM to proceed' autocomplete="off">
+                        <button class="dba-confirm-btn danger" onclick="executeDbaClear('timeclock')">Delete</button>
+                        <button class="dba-confirm-btn" onclick="hideDbaConfirm('timeclock')">Cancel</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="dba-card" id="dba-card-companies">
+                    <div class="dba-card-header">
+                      <div>
+                        <div class="dba-card-title">Companies Clear</div>
+                        <div class="dba-card-desc">Removes all companies and their associated time entries and tasks.</div>
+                      </div>
+                      <button class="dba-trigger-btn" onclick="showDbaConfirm('companies')">Clear</button>
+                    </div>
+                    <div class="dba-confirm" id="dba-confirm-companies" style="display:none;">
+                      <div class="dba-confirm-warning">⚠ This will permanently delete all companies, time entries, and task records for your account.</div>
+                      <div class="dba-confirm-row">
+                        <input class="dba-confirm-input" id="dba-input-companies" placeholder='Type CONFIRM to proceed' autocomplete="off">
+                        <button class="dba-confirm-btn danger" onclick="executeDbaClear('companies')">Delete</button>
+                        <button class="dba-confirm-btn" onclick="hideDbaConfirm('companies')">Cancel</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="dba-card dba-card-full" id="dba-card-full">
+                    <div class="dba-card-header">
+                      <div>
+                        <div class="dba-card-title">Full Database Clear</div>
+                        <div class="dba-card-desc">Wipes everything — account, companies, all data. Resets app to first-run state.</div>
+                      </div>
+                      <button class="dba-trigger-btn danger" onclick="showDbaConfirm('full')">Wipe</button>
+                    </div>
+                    <div class="dba-confirm" id="dba-confirm-full" style="display:none;">
+                      <div class="dba-confirm-warning">⚠ DESTRUCTIVE — This permanently deletes your account and all data. You will be logged out and returned to setup.</div>
+                      <div class="dba-confirm-row">
+                        <input class="dba-confirm-input" id="dba-input-full" placeholder='Type CONFIRM to proceed' autocomplete="off">
+                        <button class="dba-confirm-btn danger" onclick="executeDbaClear('full')">Wipe Everything</button>
+                        <button class="dba-confirm-btn" onclick="hideDbaConfirm('full')">Cancel</button>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+
+            <!-- ── SECURITY ──────────────────────────────────── -->
+            <div id="settings-cat-security" class="settings-cat-panel" style="display:none;">
+              <div class="sc-title">Security</div>
+
+              <div class="settings-group">
+                <div class="settings-group-title">Auto-Lock</div>
+                <div class="settings-row-label">Lock the app after a period of inactivity</div>
+                <div class="settings-btn-group" id="autolock-btns" style="margin-top:8px;">
+                  <button class="s-btn" data-al="0"  onclick="applyAutoLock(0)">Off</button>
+                  <button class="s-btn" data-al="5"  onclick="applyAutoLock(5)">5 min</button>
+                  <button class="s-btn" data-al="15" onclick="applyAutoLock(15)">15 min</button>
+                  <button class="s-btn" data-al="30" onclick="applyAutoLock(30)">30 min</button>
+                  <button class="s-btn" data-al="60" onclick="applyAutoLock(60)">1 hour</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- ── ACCESSIBILITY ─────────────────────────────── -->
+            <div id="settings-cat-accessibility" class="settings-cat-panel" style="display:none;">
+              <div class="sc-title">Accessibility</div>
+
+              <div class="settings-group">
+                <div class="settings-group-title">Motion & Focus</div>
+                <div class="toggle-row">
+                  <div class="toggle-info">
+                    <div class="toggle-label">Reduce Motion</div>
+                    <div class="toggle-desc">Disables animations and transitions</div>
+                  </div>
+                  <button class="toggle-switch" id="toggle-motion" onclick="applyToggle('reducedMotion', this)"></button>
+                </div>
+                <div class="toggle-row">
+                  <div class="toggle-info">
+                    <div class="toggle-label">Focus Indicators</div>
+                    <div class="toggle-desc">Shows visible outlines for keyboard navigation</div>
+                  </div>
+                  <button class="toggle-switch" id="toggle-focus" onclick="applyToggle('focusIndicators', this)"></button>
+                </div>
+              </div>
+
+              <div class="settings-group">
+                <div class="settings-group-title">Color Vision</div>
+                <div class="settings-row-label">Adjust colors for color vision deficiencies</div>
+                <div class="settings-btn-group" id="colorblind-btns" style="margin-top:8px;">
+                  <button class="s-btn" data-cb="off"          onclick="applyColorblind('off')">Off</button>
+                  <button class="s-btn" data-cb="deuteranopia" onclick="applyColorblind('deuteranopia')">Deuteranopia</button>
+                  <button class="s-btn" data-cb="protanopia"   onclick="applyColorblind('protanopia')">Protanopia</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- ── ABOUT ─────────────────────────────────────── -->
+            <div id="settings-cat-about" class="settings-cat-panel about-panel" style="display:none;">
+              <div class="sc-title">About</div>
+
+              <div class="about-hero">
+                <img class="about-icon" src="../../../assets/icon-256.png" alt="Conquered Time icon">
+                <div class="about-wordmark">Conquered Time</div>
+                <div class="about-version-badge" id="about-version-badge">v—</div>
+              </div>
+
+              <div class="about-tagline">"Take back your time."</div>
+
+              <div class="about-section">
+                <div class="about-section-title">Build Info</div>
+                <div class="about-build-grid">
+                  <span class="about-build-label">Version</span><span class="about-build-value" id="ab-version">—</span>
+                  <span class="about-build-label">Electron</span><span class="about-build-value" id="ab-electron">—</span>
+                  <span class="about-build-label">Node</span><span class="about-build-value" id="ab-node">—</span>
+                  <span class="about-build-label">Platform</span><span class="about-build-value" id="ab-platform">—</span>
+                </div>
+              </div>
+
+              <div class="about-section">
+                <div class="about-section-title">Credits</div>
+                <div class="about-credit-block">
+                  <div class="about-credit-role">Created by</div>
+                  <div class="about-credit-name">Chris Bowles — The Conqueror</div>
+                </div>
+                <div class="about-credit-block">
+                  <div class="about-credit-role">Co-Author</div>
+                  <div class="about-credit-name">Vincent Vathan</div>
+                </div>
+                <div class="about-copyright">Copyright © 2026 Chris Bowles - The Conqueror. All rights reserved.</div>
+              </div>
+
+              <div class="about-section">
+                <div class="about-section-title">What's New — v1.0</div>
+                <ul class="about-changelog">
+                  <li>Dispatch — task timing, break/lunch compliance, and live session counters</li>
+                  <li>Five themes: Arctic, Void, Ember, Paper, Quartz</li>
+                  <li>AES-256-GCM encrypted company data with PBKDF2 key derivation</li>
+                  <li>TOTP multi-factor authentication with lockout and local recovery</li>
+                  <li>Company hierarchy — Company › Project › Platform › NavID</li>
+                  <li>Dynamic time-entry table with inline editing and per-session totals</li>
+                  <li>Spiderweb company visualizer (force-simulated, theme-aware)</li>
+                  <li>Global Log with CSV and PDF export, Audit discrepancy detection</li>
+                  <li>Branded splash screen and Inter-typography design system</li>
+                </ul>
+              </div>
+
+              <div class="about-section">
+                <div class="about-section-title">Links</div>
+                <div class="about-links">
+                  <button class="about-link-btn" onclick="Shell._openExternal('github')">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+                    GitHub
+                    <span class="about-link-placeholder">Coming soon</span>
+                  </button>
+                  <button class="about-link-btn" onclick="Shell._openExternal('donate')">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+                    Support / Donate
+                    <span class="about-link-placeholder">Coming soon</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+          </div><!-- /settings-content -->
+        </div><!-- /settings-layout -->
       </div>
     </div>`;
   }
@@ -389,6 +535,35 @@ const Shell = (() => {
     return user;
   }
 
+  // ── Sidebar timer controls (callable by any page) ────────────────────────
+  let _sidebarTimerInterval = null;
+
+  function showSidebarTimer(startedAtMs) {
+    const wrapper = document.getElementById('sidebar-task-timer');
+    const display = document.getElementById('sidebar-task-time');
+    if (!wrapper || !display) return;
+    clearInterval(_sidebarTimerInterval);
+    wrapper.style.display = 'flex';
+    function tick() {
+      const secs = Math.floor((Date.now() - startedAtMs) / 1000);
+      const h = Math.floor(secs / 3600);
+      const m = Math.floor((secs % 3600) / 60);
+      const s = secs % 60;
+      display.textContent = h > 0
+        ? `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
+        : `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    }
+    tick();
+    _sidebarTimerInterval = setInterval(tick, 1000);
+  }
+
+  function hideSidebarTimer() {
+    clearInterval(_sidebarTimerInterval);
+    _sidebarTimerInterval = null;
+    const wrapper = document.getElementById('sidebar-task-timer');
+    if (wrapper) wrapper.style.display = 'none';
+  }
+
   function toast(msg, type = 'success', duration = 3500) {
     const container = document.getElementById('toast-container');
     if (!container) return;
@@ -399,7 +574,7 @@ const Shell = (() => {
     setTimeout(() => el.remove(), duration);
   }
 
-  return { init, toast };
+  return { init, toast, showSidebarTimer, hideSidebarTimer };
 })();
 
 // ── Settings modal controls (global scope) ────────────────────────────────────
@@ -413,6 +588,70 @@ function closeSettingsModal() {
   const m = document.getElementById('settings-modal');
   if (m) m.classList.remove('open');
 }
+
+let _aboutInfoLoaded = false;
+async function switchSettingsCategory(cat) {
+  document.querySelectorAll('.sn-item').forEach(b => b.classList.toggle('active', b.dataset.cat === cat));
+  document.querySelectorAll('.settings-cat-panel').forEach(p => p.style.display = 'none');
+  const panel = document.getElementById(`settings-cat-${cat}`);
+  if (panel) panel.style.display = '';
+
+  if (cat === 'about' && !_aboutInfoLoaded) {
+    _aboutInfoLoaded = true;
+    try {
+      const info = await api.invoke('app:get-info');
+      document.getElementById('about-version-badge').textContent = `v${info.version}`;
+      document.getElementById('ab-version').textContent  = info.version;
+      document.getElementById('ab-electron').textContent = info.electronVersion;
+      document.getElementById('ab-node').textContent     = info.nodeVersion;
+      document.getElementById('ab-platform').textContent = `${info.platform} (${info.arch})`;
+    } catch {}
+  }
+}
+
+function showDbaConfirm(type) {
+  // Hide all other confirms first
+  ['timeclock','companies','full'].forEach(t => {
+    if (t !== type) hideDbaConfirm(t);
+  });
+  const el = document.getElementById(`dba-confirm-${type}`);
+  if (el) { el.style.display = ''; document.getElementById(`dba-input-${type}`)?.focus(); }
+}
+
+function hideDbaConfirm(type) {
+  const el = document.getElementById(`dba-confirm-${type}`);
+  if (el) el.style.display = 'none';
+  const inp = document.getElementById(`dba-input-${type}`);
+  if (inp) inp.value = '';
+}
+
+async function executeDbaClear(type) {
+  const inp = document.getElementById(`dba-input-${type}`);
+  if (!inp || inp.value.trim() !== 'CONFIRM') {
+    inp?.classList.add('dba-input-shake');
+    setTimeout(() => inp?.classList.remove('dba-input-shake'), 600);
+    Shell.toast('Type CONFIRM exactly to proceed.', 'error', 3000);
+    return;
+  }
+  const channel = type === 'full' ? 'db:clear-full' : type === 'companies' ? 'db:clear-companies' : 'db:clear-timeclock';
+  try {
+    const res = await api.invoke(channel);
+    if (!res?.ok) { Shell.toast('Clear failed — check console.', 'error'); return; }
+    hideDbaConfirm(type);
+    closeSettingsModal();
+    if (type === 'full') {
+      Shell.toast('Database wiped. Returning to setup…', 'info', 2000);
+      setTimeout(() => api.send('navigate', 'login'), 2000);
+    } else {
+      Shell.toast(type === 'companies' ? 'All companies and time data cleared.' : 'Time clock data cleared.', 'success', 3000);
+      setTimeout(() => location.reload(), 1500);
+    }
+  } catch(e) { Shell.toast('Error: ' + e.message, 'error'); }
+}
+
+Shell._openExternal = function(type) {
+  Shell.toast('Link coming soon — stay tuned!', 'info', 2500);
+};
 
 function handleModalBackdrop(e) {
   if (e.target.id === 'settings-modal') closeSettingsModal();

@@ -10,7 +10,10 @@ const ALLOWED_INVOKE = new Set([
   'companies:list', 'companies:save', 'companies:delete',
   'entries:list', 'entries:save', 'entries:all', 'entries:get-active', 'entries:get',
   'tasks:list', 'tasks:save', 'tasks:delete', 'tasks:recent-labels',
-  'settings:get', 'settings:set'
+  'settings:get', 'settings:set',
+  'app:get-info',
+  'db:clear-timeclock', 'db:clear-companies', 'db:clear-full',
+  'audit:get-dismissed', 'audit:dismiss', 'audit:clear-dismissed', 'audit:apply-fix'
 ]);
 
 const ALLOWED_SEND = new Set([
