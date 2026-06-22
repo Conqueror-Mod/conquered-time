@@ -650,6 +650,58 @@ ipcMain.handle('tasks:recent-labels', () => {
 });
 
 // ── IPC: Settings ──────────────────────────────────────────────────────────
+// ── IPC: Backup library ───────────────────────────────────────────────────
+ipcMain.handle('backup:list', () => {
+  if (!sessionUser) return [];
+  if (!fs.existsSync(BACKUP_DIR)) return [];
+  const files = fs.readdirSync(BACKUP_DIR)
+    .filter(f => f.startsWith('vault-') && f.endsWith('.db'))
+    .sort().reverse();
+  return files.map(f => {
+    const stat = fs.statSync(path.join(BACKUP_DIR, f));
+    const ts = f.replace('vault-', '').replace('.db', '').replace(/T(\d{2})-(\d{2})-(\d{2})/, 'T$1:$2:$3');
+    return { filename: f, timestamp: ts, sizeKB: Math.round(stat.size / 1024) };
+  });
+});
+
+ipcMain.handle('backup:preview', (_, filename) => {
+  if (!sessionUser) return { error: 'No session' };
+  if (!/^vault-[\d\-T]+\.db$/.test(filename)) return { error: 'Invalid filename' };
+  const filepath = path.join(BACKUP_DIR, filename);
+  if (!fs.existsSync(filepath)) return { error: 'File not found' };
+  try {
+    const buf     = fs.readFileSync(filepath);
+    const preview = new SQL.Database(buf);
+    const get1    = (q) => { const r = preview.exec(q); return r[0]?.values[0]?.[0] ?? null; };
+    const username    = get1('SELECT username FROM users LIMIT 1') || 'Unknown';
+    const companyCount = Number(get1('SELECT COUNT(*) FROM companies') || 0);
+    const entryCount   = Number(get1('SELECT COUNT(*) FROM time_entries') || 0);
+    const dateFrom     = get1('SELECT MIN(log_date) FROM time_entries') || '—';
+    const dateTo       = get1('SELECT MAX(log_date) FROM time_entries') || '—';
+    preview.close();
+    return { username, companyCount, entryCount, dateFrom, dateTo };
+  } catch(e) { return { error: e.message }; }
+});
+
+ipcMain.handle('backup:restore', (_, filename) => {
+  if (!sessionUser) return { ok: false, error: 'No session' };
+  if (!/^vault-[\d\-T]+\.db$/.test(filename)) return { ok: false, error: 'Invalid filename' };
+  const filepath = path.join(BACKUP_DIR, filename);
+  if (!fs.existsSync(filepath)) return { ok: false, error: 'File not found' };
+  try {
+    performBackup(); // safety-save current state before overwriting
+    fs.copyFileSync(filepath, DB_FILE);
+    // Reload the DB in memory
+    const buf = fs.readFileSync(DB_FILE);
+    db = new SQL.Database(buf);
+    // Clear session
+    clearIdleTimer();
+    sessionKey = null; sessionUser = null; activeEntryId = null;
+    mainWindow.loadFile(path.join(__dirname, '../renderer/pages/login.html'));
+    return { ok: true };
+  } catch(e) { return { ok: false, error: e.message }; }
+});
+
 // ── IPC: Audit dismissed ──────────────────────────────────────────────────
 ipcMain.handle('audit:get-dismissed', () => {
   if (!sessionUser) return [];

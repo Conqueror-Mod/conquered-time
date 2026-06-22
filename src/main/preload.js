@@ -13,7 +13,8 @@ const ALLOWED_INVOKE = new Set([
   'settings:get', 'settings:set',
   'app:get-info',
   'db:clear-timeclock', 'db:clear-companies', 'db:clear-full',
-  'audit:get-dismissed', 'audit:dismiss', 'audit:clear-dismissed', 'audit:apply-fix'
+  'audit:get-dismissed', 'audit:dismiss', 'audit:clear-dismissed', 'audit:apply-fix',
+  'backup:list', 'backup:preview', 'backup:restore'
 ]);
 
 const ALLOWED_SEND = new Set([

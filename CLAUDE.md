@@ -162,7 +162,7 @@ Native `<input type="time">` renders in the OS locale's format (often 12-hour wi
 - **About module** ✅ — tab in Settings (Steam-style redesign); icon, wordmark, version, credits, changelog, placeholder links
 - **App load/splash screen** ✅ — branded 3-second splash before login with icon, wordmark, tagline, progress bar; theme-aware
 - **Audit: 'Clear Messages' and 'Suggest discrepancy fix'** ✅ — per-row Dismiss/Apply Fix buttons in audit log; dismissed items excluded from close/lock warning count; suggestion text per discrepancy type; Clear All and Show/Hide Dismissed toolbar; `audit_dismissed` table persists state
-- **Auto Backup UI** — the dated `.db` backup system already runs automatically; this is a UI to browse, preview, and restore from those backups ("LOAD DBA ability for locally saved recovery option")
+- **Auto Backup UI** ✅ — Settings → Data → Backup Library; lazy-loaded list of up to 30 auto-backups; accordion preview (account, company count, entry count, date range); CONFIRM-gated restore; current data safety-saved before any restore; logs out to login after restore
 - **Manual database clear** ✅ — three-option wipe in Settings → Data: Time Clock Clear, Companies Clear, Full DB Clear; inline CONFIRM-typed confirmation
 - **Task Timer & Counter page** ✅ — implemented as "Dispatch" module; task timing, break/lunch compliance, description writeback, sidebar live timer, Tracker footer preview
 - **Recovery** — full account recovery flow beyond the current one-time recovery code; includes the LOAD DBA local restore UI

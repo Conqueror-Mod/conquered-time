@@ -11,15 +11,21 @@ A secure, locally-encrypted desktop time tracker built for remote professionals 
 - **AES-256-GCM encryption** — all PPI fields encrypted at rest with PBKDF2 key derivation
 - **3-attempt lockout** — 24-hour lockout with live countdown display
 - **Local recovery code** — one-time printable backup key generated at setup
+- **Splash screen** — branded 3-second startup screen, theme-aware
 - **Company spiderweb** — force-graph visualization of your client network
 - **Dynamic time tracker** — clock in/out with task labels and per-company sessions, auto-grows as needed
 - **Inline editing** — double-click any field to edit; duration recalculates automatically
+- **Dispatch (Task Timer)** — dedicated task timing module with break/lunch compliance, description writeback, and sidebar live timer
 - **Global log** — filterable history across all companies with expandable session detail
-- **Reports** — time summaries, label breakdowns, bar charts, and audit log
+- **Reports & Audit** — time summaries, label breakdowns, audit log with per-row dismiss/fix/suggest actions, dismissed items persisted across sessions
 - **PDF & CSV export** — clean timesheet format; NavID excluded from all exports
 - **Auto-save & backup** — configurable autosave interval, dated `.db` backups on every save (last 30 kept)
-- **5 themes** — Arctic (default), Void, Slate/Ember, Paper, Quartz
-- **Keyboard navigation** — Ctrl+1-5 to switch modules, arrow keys in sidebar, full modal tab-trapping
+- **Backup Library** — browse, preview, and restore from any saved backup directly in Settings; current data safety-saved before any restore
+- **Session auto-lock** — configurable idle timeout (Off / 5 / 15 / 30 / 60 min)
+- **5 themes** — Arctic (default), Void, Slate, Paper, Quartz
+- **Steam-style Settings** — split-panel layout with left category nav (Appearance, Time & Display, Data, Security, Accessibility, About)
+- **Manual DB clear** — three-level wipe (Time Clock, Companies, Full) with typed CONFIRM confirmation
+- **Keyboard navigation** — Ctrl+1–5 to switch modules, Ctrl+, for Settings, full modal tab-trapping
 - **Electron security** — contextIsolation enabled, nodeIntegration disabled, sandboxed renderers
 
 ---
@@ -44,30 +50,32 @@ conquered-time/
 ├── seed-dev.js                   # Dev seed script (bypasses TOTP)
 ├── src/
 │   ├── main/
-│   │   ├── main.js               # Main process: window, IPC, DB, crypto, TOTP
+│   │   ├── main.js               # Main process: window, IPC, DB, crypto, TOTP, backup, audit
 │   │   └── preload.js            # Secure contextBridge API whitelist
 │   └── renderer/
 │       ├── pages/
+│       │   ├── splash.html       # Branded startup splash (3s, theme-aware)
 │       │   ├── login.html        # TOTP login, setup wizard, recovery, easter eggs
 │       │   ├── dashboard.html    # Stats, mini spiderweb, recent activity
 │       │   ├── companies.html    # Full spiderweb force graph, company CRUD
 │       │   ├── tracker.html      # Dynamic time entry table, clock in/out
+│       │   ├── task-timer.html   # Dispatch: task timer, break compliance, live sidebar timer
 │       │   ├── global-log.html   # Cross-company history, CSV/PDF export
-│       │   └── reports.html      # Charts, summaries, audit log
+│       │   └── reports.html      # Audit log with dismiss/fix/suggest, charts, summaries
 │       ├── components/
-│       │   ├── shell.js          # Titlebar, sidebar, toast, settings modal, keyboard nav
-│       │   └── settings.js       # Theme, scale, accessibility, time format engine
+│       │   ├── shell.js          # Titlebar, sidebar, toast, settings modal, backup library
+│       │   └── settings.js       # Theme, scale, accessibility, time format, auto-lock engine
 │       └── styles/
 │           ├── design-system.css # Entry point — imports all partials
 │           ├── themes.css        # 5 theme token sets + Google Fonts import
 │           ├── base.css          # Scale, accessibility, reset
 │           ├── shell.css         # Titlebar, sidebar, layout
 │           ├── components.css    # Shared UI components
-│           ├── settings-modal.css
+│           ├── settings-modal.css # Steam-style split settings, backup library, DB clear
 │           ├── login.css
 │           └── print.css
 ├── assets/
-│   └── icon.ico                  # App icon (add before building)
+│   └── icon.ico                  # App icon
 ├── package.json
 └── README.md
 ```
@@ -113,7 +121,7 @@ Output: `dist/Conquered Time Setup.exe`
 
 ## First Run
 
-1. Launch the app
+1. Launch the app — branded splash screen displays for 3 seconds
 2. The **Setup** tab appears automatically on first run
 3. Enter a username and strong password
 4. Scan the **TOTP QR code** with Google Authenticator
@@ -134,6 +142,7 @@ Output: `dist/Conquered Time Setup.exe`
 | `Ctrl+5` | Global Log |
 | `Ctrl+,` | Open Settings |
 | `Ctrl+L` | Lock session |
+| `F12` | Toggle DevTools |
 | `Escape` | Close modal |
 | `Arrow keys` | Navigate sidebar |
 | `Tab / Shift+Tab` | Cycle focus in modals |
@@ -168,7 +177,8 @@ Login: password + TOTP code
 - NavID never appears on exported PDFs — in-session display only
 - 3 failed TOTP attempts triggers a 24-hour lockout with countdown
 - Recovery code unlocks account locally — no network call required
-- Auto-backup on every save and on close
+- Auto-backup on every save and on close; restore via Settings → Data → Backup Library
+- Session auto-lock on configurable idle timeout
 
 ---
 

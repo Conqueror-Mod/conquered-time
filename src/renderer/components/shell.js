@@ -233,7 +233,16 @@ const Shell = (() => {
 
                 </div>
               </div>
-            </div>
+
+              <div class="settings-group">
+                <div class="settings-group-title">Backup Library</div>
+                <div class="settings-row-label">Restore from a previous automatic backup. Your current data is saved first as a safety checkpoint before any restore.</div>
+                <div id="backup-list-area" style="margin-top:10px;">
+                  <button class="s-btn" onclick="loadBackupList()">Load Backups</button>
+                </div>
+              </div>
+
+            </div><!-- /settings-cat-data -->
 
             <!-- ── SECURITY ──────────────────────────────────── -->
             <div id="settings-cat-security" class="settings-cat-panel" style="display:none;">
@@ -652,6 +661,122 @@ async function executeDbaClear(type) {
 Shell._openExternal = function(type) {
   Shell.toast('Link coming soon — stay tuned!', 'info', 2500);
 };
+
+// ── Backup Library ────────────────────────────────────────────────────────────
+let _backupFiles = []; // cache so indices stay stable
+let _backupPreviewOpen = null; // index of currently expanded preview
+
+async function loadBackupList() {
+  const area = document.getElementById('backup-list-area');
+  if (!area) return;
+  area.innerHTML = '<span style="font-family:var(--sans);font-size:12px;color:var(--text-muted);">Loading…</span>';
+  try {
+    _backupFiles = await api.invoke('backup:list');
+    if (!_backupFiles.length) {
+      area.innerHTML = '<span style="font-family:var(--sans);font-size:12px;color:var(--text-muted);">No backups found. Backups are created automatically on each save and app close.</span>';
+      return;
+    }
+    const rows = _backupFiles.map((b, i) => {
+      const dt = (b.timestamp || '').replace('T', ' ');
+      return `
+        <div class="backup-row" id="brow-${i}" style="flex-shrink:0;">
+          <div class="backup-row-main">
+            <div>
+              <div class="backup-row-ts">${dt}</div>
+              <div class="backup-row-size">${b.sizeKB} KB</div>
+            </div>
+            <button class="backup-preview-btn" data-idx="${i}">Preview</button>
+          </div>
+          <div class="backup-preview-panel" id="bpanel-${i}" style="display:none;"></div>
+        </div>`;
+    }).join('');
+    area.innerHTML = `<div class="backup-list">${rows}</div>`;
+    // Wire preview buttons after innerHTML set
+    area.querySelectorAll('.backup-preview-btn').forEach(btn => {
+      btn.addEventListener('click', () => toggleBackupPreview(Number(btn.dataset.idx)));
+    });
+    _backupPreviewOpen = null;
+  } catch(e) {
+    area.innerHTML = `<span style="font-family:var(--sans);font-size:12px;color:var(--red);">Failed to load backups: ${e.message}</span>`;
+  }
+}
+
+async function toggleBackupPreview(idx) {
+  const panel = document.getElementById(`bpanel-${idx}`);
+  if (!panel) return;
+
+  // Close any other open preview
+  if (_backupPreviewOpen !== null && _backupPreviewOpen !== idx) {
+    const prev = document.getElementById(`bpanel-${_backupPreviewOpen}`);
+    if (prev) prev.style.display = 'none';
+  }
+
+  if (panel.style.display !== 'none') {
+    panel.style.display = 'none';
+    _backupPreviewOpen = null;
+    return;
+  }
+
+  _backupPreviewOpen = idx;
+  panel.style.display = '';
+  panel.innerHTML = '<div style="padding:10px 14px;font-family:var(--sans);font-size:12px;color:var(--text-muted);">Loading preview…</div>';
+
+  const filename = _backupFiles[idx]?.filename;
+  if (!filename) return;
+
+  const info = await api.invoke('backup:preview', filename);
+  if (info.error) {
+    panel.innerHTML = `<div style="padding:10px 14px;font-family:var(--sans);font-size:12px;color:var(--red);">Preview failed: ${info.error}</div>`;
+    return;
+  }
+
+  panel.innerHTML = `
+    <div class="backup-preview-content">
+      <div class="backup-preview-grid">
+        <span class="bp-label">Account</span>   <span class="bp-value">${info.username}</span>
+        <span class="bp-label">Companies</span>  <span class="bp-value">${info.companyCount}</span>
+        <span class="bp-label">Time Entries</span><span class="bp-value">${info.entryCount}</span>
+        <span class="bp-label">Date Range</span> <span class="bp-value">${info.dateFrom} → ${info.dateTo}</span>
+      </div>
+      <div id="brestore-row-${idx}">
+        <button class="backup-restore-btn" onclick="showBackupConfirm(${idx})">Restore This Backup</button>
+      </div>
+      <div class="backup-confirm-area" id="bconfirm-${idx}" style="display:none;">
+        <div class="backup-confirm-warning">⚠ This will replace your live database with this backup and log you out. Your current data is saved as a safety checkpoint first.</div>
+        <div class="backup-confirm-row">
+          <input class="dba-confirm-input" id="binput-${idx}" placeholder="Type CONFIRM to restore" autocomplete="off">
+          <button class="dba-confirm-btn danger" onclick="executeBackupRestore(${idx})">Restore</button>
+          <button class="dba-confirm-btn" onclick="hideBackupConfirm(${idx})">Cancel</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function showBackupConfirm(idx) {
+  const el = document.getElementById(`bconfirm-${idx}`);
+  if (el) { el.style.display = ''; document.getElementById(`binput-${idx}`)?.focus(); }
+}
+function hideBackupConfirm(idx) {
+  const el = document.getElementById(`bconfirm-${idx}`);
+  if (el) el.style.display = 'none';
+  const inp = document.getElementById(`binput-${idx}`);
+  if (inp) inp.value = '';
+}
+
+async function executeBackupRestore(idx) {
+  const inp = document.getElementById(`binput-${idx}`);
+  if (!inp || inp.value.trim() !== 'CONFIRM') {
+    inp?.classList.add('dba-input-shake');
+    setTimeout(() => inp?.classList.remove('dba-input-shake'), 600);
+    Shell.toast('Type CONFIRM exactly to restore.', 'error', 3000);
+    return;
+  }
+  const filename = _backupFiles[idx]?.filename;
+  if (!filename) { Shell.toast('Backup reference lost — reload the list and try again.', 'error'); return; }
+  const res = await api.invoke('backup:restore', filename);
+  if (!res?.ok) { Shell.toast('Restore failed: ' + (res?.error || 'unknown'), 'error'); return; }
+  // main process navigates to login after successful restore
+}
 
 function handleModalBackdrop(e) {
   if (e.target.id === 'settings-modal') closeSettingsModal();
