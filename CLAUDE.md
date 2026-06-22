@@ -156,14 +156,33 @@ Native `<input type="time">` renders in the OS locale's format (often 12-hour wi
 - Dev seed script (`npm run seed`) — wipes DB, creates `devuser`/`devpass123` with `dev_mode=1` (TOTP bypassed), one sample company (RWS/Diamond/multimango hierarchy, fake NavID), one sample time entry. Essential for fast iteration; never ships in production.
 
 ### Explicitly Deferred / On the Roadmap (not yet built)
-From the user's running feature/bug list:
-- **Reports / Auditing** — larger feature, would build on the clock_in/clock_out timestamp data already being captured per row
-- **Session Auto Lock/Timeout** — pairs with existing lockout system but for idle-session locking, not failed-login lockout
-- **Language change / i18n** — flagged as "tackle last," most complex
-- **Recovery / "LOAD DBA ability for locally saved recovery option"** — user wants a way to load/restore from local backup files via UI, beyond the current automatic dated-copy backup-on-save system
-- **Container/store architecture refactor** — discussed at length (see below) but deliberately **postponed** until after the core bug-fixing phase stabilized; worth revisiting now that the app is stable
-- Light themes (Paper, Quartz) were explicitly called out by the user as "still very derivative" / not yet fully realized — functional but flagged for future refinement
-- The North Phoenician cipher-layer concept (see below) was discussed in depth but explicitly **deferred to theory** — the user wanted only the visual hidden-grid-sequence mechanic built now, not the cryptographic layer
+
+#### Feature Add
+- **Reorder themes in settings** — user wants to control the display order of theme cards in the Settings modal
+- **About module** — dedicated page/modal showing app version, author (Chris Bowles - The Conqueror), co-author (Vincent Vathan), copyright, and build info; copyright string already in `package.json`
+- **App load/splash screen** — branded screen before login showing the galaxy hourglass icon; replaces the bare login flash on startup
+- **Audit: 'Clear Messages' and 'Suggest discrepancy fix'** — UX improvements to the existing audit warning flow; clear resolved audit messages, and surface a suggested fix for each discrepancy type
+- **Auto Backup UI** — the dated `.db` backup system already runs automatically; this is a UI to browse, preview, and restore from those backups ("LOAD DBA ability for locally saved recovery option")
+- **Task Timer & Counter page** — new module; a timer that can be pulled from an active timer log entry. When tasks are added via timer or manual addition on this page, the total task count is appended to the description of the active timeclock row. See also: task timer preview in Time Tracker footer (below)
+- **Task timer preview in Time Tracker footer** — a live summary/preview of the Task Timer & Counter data displayed in the footer zone of the Time Tracker table
+- **Recovery** — full account recovery flow beyond the current one-time recovery code; includes the LOAD DBA local restore UI
+- **Encrypt time log entries** — time data is treated as PPI (learnable information); open question: encrypt individual time entries the same way company fields are, OR lock all user data behind session encryption on session lock. Needs design decision before implementation.
+- **Reports / Auditing** — larger feature, builds on clock_in/clock_out timestamp data already captured per row; includes charts, label breakdowns, and full audit log
+- **Session Auto Lock/Timeout** — idle-based locking (distinct from the failed-login lockout already built); heartbeat system is already wired
+- **Container/store architecture refactor** — centralized `store.js` + `ipc.js` + `validator.js` layer; deliberately postponed until app stabilized — good candidate now
+- **Light theme polish** — Paper and Quartz flagged as still feeling "derivative"; functional but not fully realized
+- **Language change / i18n** — lowest priority, most complex; tackle last
+- The North Phoenician cipher-layer concept was discussed in depth but explicitly **deferred to theory** — only the visual grid mechanic is built; the deeper PBKDF2 factor idea remains unbuilt
+
+#### Fun
+- **Redesign ASCII Easter Egg** — the cracked-hourglass ASCII art shown on the login easter egg sequence; user wants it bigger, better, clearer
+- **Rename themes to Final Fantasy names** — replace Arctic/Void/Slate/Paper/Quartz with FF-inspired names
+- **Final Fantasy based theme variants** — explore FF-aesthetic color palettes as additional or replacement themes
+
+#### Final / Release
+- **Package for multi-platform release** — Windows (done), macOS, Linux, iOS, Android, iOS Mobile; icon assets already prepared for Win/Mac/Linux
+- **Beta Keys** — gating mechanism for early access distribution
+- **Contributions / monetization** — Patreon, app purchase, or similar; to be designed once feature set is locked
 
 ---
 

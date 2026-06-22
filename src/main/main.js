@@ -24,6 +24,7 @@ let SQL         = null;   // sql.js module
 let db          = null;   // sql.js Database instance
 let idleTimer    = null;   // auto-lock timeout handle
 let forceClose   = false;  // set true after user confirms close through audit prompt
+let activeEntryId = null;  // rowid of the currently live time_entries row
 
 // ── sql.js init ────────────────────────────────────────────────────────────
 async function initDB() {
@@ -75,6 +76,17 @@ async function initDB() {
     CREATE TABLE IF NOT EXISTS app_settings (
       key   TEXT PRIMARY KEY,
       value TEXT
+    );
+    CREATE TABLE IF NOT EXISTS task_items (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id       INTEGER NOT NULL,
+      entry_id      INTEGER NOT NULL,
+      label         TEXT    NOT NULL,
+      item_type     TEXT    NOT NULL DEFAULT 'task',
+      started_at    INTEGER NOT NULL,
+      stopped_at    INTEGER,
+      duration_secs INTEGER NOT NULL DEFAULT 0,
+      created_at    INTEGER NOT NULL DEFAULT (strftime('%s','now'))
     );
   `);
 
@@ -174,6 +186,7 @@ function createWindow() {
     width: 1280, height: 800, minWidth: 900, minHeight: 600,
     frame: false,
     backgroundColor: '#0d0f14',
+    icon: path.join(__dirname, '../../assets/icon.ico'),
     webPreferences: {
       preload:          path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -236,7 +249,7 @@ function navigate(page) {
 
 function countAuditDiscrepancies() {
   if (!sessionUser) return 0;
-  const entries = dbAll('SELECT rows_json FROM time_entries WHERE user_id=?', [sessionUser.id]);
+  const entries = dbAll('SELECT rowid as rid, rows_json, total_mins FROM time_entries WHERE user_id=?', [sessionUser.id]);
   let count = 0;
   entries.forEach(e => {
     try {
@@ -245,6 +258,25 @@ function countAuditDiscrepancies() {
         if (!r.clock_in || !r.clock_out || !r.total_mins || r.total_mins > 720) count++;
       });
     } catch {}
+
+    // Break compliance: sessions > 4 hours with no logged break
+    const entryId = Number(e.rid);
+    const totalMins = Number(e.total_mins || 0);
+    if (totalMins > 240) {
+      const hasBreak = dbGet(
+        'SELECT id FROM task_items WHERE entry_id=? AND user_id=? AND item_type=? LIMIT 1',
+        [entryId, sessionUser.id, 'break']
+      );
+      if (!hasBreak) count++;
+    }
+    // Lunch compliance: sessions > 6 hours with no logged lunch
+    if (totalMins > 360) {
+      const hasLunch = dbGet(
+        'SELECT id FROM task_items WHERE entry_id=? AND user_id=? AND item_type=? LIMIT 1',
+        [entryId, sessionUser.id, 'lunch']
+      );
+      if (!hasLunch) count++;
+    }
   });
   return count;
 }
@@ -258,7 +290,7 @@ function lockSession(skipAuditCheck = false) {
     }
   }
   clearIdleTimer();
-  sessionKey = null; sessionUser = null;
+  sessionKey = null; sessionUser = null; activeEntryId = null;
   mainWindow.loadFile(path.join(__dirname, '../renderer/pages/login.html'));
 }
 
@@ -438,6 +470,7 @@ ipcMain.handle('entries:save', (_, entry) => {
     if (entry.id) {
       db.run('UPDATE time_entries SET rows_json=?,total_mins=?,session_label=?,updated_at=strftime(\'%s\',\'now\') WHERE rowid=? AND user_id=?',
         [entry.rows_json, entry.total_mins, entry.session_label || '', entry.id, sessionUser.id]);
+      activeEntryId = Number(entry.id);
       persistDB(); performBackup();
       return { ok: true, id: entry.id };
     } else {
@@ -446,6 +479,7 @@ ipcMain.handle('entries:save', (_, entry) => {
       // Get the rowid of the just-inserted row
       const result = db.exec('SELECT MAX(rowid) as rid FROM time_entries WHERE user_id=?', [sessionUser.id]);
       const newId = (result && result[0] && result[0].values[0]) ? Number(result[0].values[0][0]) : null;
+      activeEntryId = newId;
       persistDB(); performBackup();
       return { ok: true, id: newId };
     }
@@ -456,6 +490,122 @@ ipcMain.handle('entries:all', () => {
   if (!sessionKey || !sessionUser) return [];
   return dbAll('SELECT rowid as rid, * FROM time_entries WHERE user_id=? ORDER BY log_date DESC', [sessionUser.id])
     .map(r => ({...r, id: Number(r.rid)}));
+});
+
+ipcMain.handle('entries:get-active', () => {
+  if (!sessionKey || !sessionUser) return null;
+
+  let row = null;
+
+  // Fast path: use in-memory activeEntryId if set
+  if (activeEntryId) {
+    row = dbGet('SELECT rowid as rid, * FROM time_entries WHERE rowid=? AND user_id=?',
+      [activeEntryId, sessionUser.id]);
+  }
+
+  // Fallback: find today's entry that has a clocked-in but not clocked-out row
+  if (!row) {
+    const today = new Date().toISOString().slice(0, 10);
+    const candidates = dbAll(
+      'SELECT rowid as rid, * FROM time_entries WHERE user_id=? AND log_date=? ORDER BY updated_at DESC',
+      [sessionUser.id, today]
+    );
+    for (const c of candidates) {
+      try {
+        const rows = JSON.parse(c.rows_json || '[]');
+        if (rows.some(r => r.clock_in && !r.clock_out)) { row = c; break; }
+      } catch {}
+    }
+    // Also check entries from yesterday in case of overnight sessions
+    if (!row) {
+      const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+      const prev = dbAll(
+        'SELECT rowid as rid, * FROM time_entries WHERE user_id=? AND log_date=? ORDER BY updated_at DESC',
+        [sessionUser.id, yesterday]
+      );
+      for (const c of prev) {
+        try {
+          const rows = JSON.parse(c.rows_json || '[]');
+          if (rows.some(r => r.clock_in && !r.clock_out)) { row = c; break; }
+        } catch {}
+      }
+    }
+    if (row) activeEntryId = Number(row.rid);
+  }
+
+  if (!row) return null;
+
+  let company_name = null;
+  try {
+    const co = dbGet('SELECT rowid as rid, * FROM companies WHERE rowid=? AND user_id=?',
+      [Number(row.company_id), sessionUser.id]);
+    if (co) {
+      const plain = decrypt({ iv: co.data_iv, tag: co.data_tag, data: co.data_enc }, sessionKey);
+      company_name = JSON.parse(plain).name || null;
+    }
+  } catch {}
+  return { ...row, id: Number(row.rid), company_name };
+});
+
+ipcMain.handle('entries:get', (_, id) => {
+  if (!sessionKey || !sessionUser) return null;
+  const row = dbGet('SELECT rowid as rid, * FROM time_entries WHERE rowid=? AND user_id=?',
+    [Number(id), sessionUser.id]);
+  if (!row) return null;
+  return { ...row, id: Number(row.rid) };
+});
+
+// ── IPC: Task items ────────────────────────────────────────────────────────
+ipcMain.handle('tasks:list', (_, entryId) => {
+  if (!sessionKey || !sessionUser) return [];
+  return dbAll(
+    'SELECT rowid as rid, * FROM task_items WHERE entry_id=? AND user_id=? ORDER BY started_at ASC',
+    [Number(entryId), sessionUser.id]
+  ).map(r => ({ ...r, id: Number(r.rid) }));
+});
+
+ipcMain.handle('tasks:save', (_, item) => {
+  if (!sessionKey || !sessionUser) return { ok: false };
+  try {
+    if (item.id) {
+      db.run(
+        'UPDATE task_items SET label=?,item_type=?,stopped_at=?,duration_secs=? WHERE rowid=? AND user_id=?',
+        [item.label, item.item_type || 'task', item.stopped_at ?? null,
+         item.duration_secs || 0, Number(item.id), sessionUser.id]
+      );
+      persistDB();
+      return { ok: true, id: Number(item.id) };
+    } else {
+      db.run(
+        'INSERT INTO task_items (user_id,entry_id,label,item_type,started_at,stopped_at,duration_secs) VALUES (?,?,?,?,?,?,?)',
+        [sessionUser.id, Number(item.entry_id), item.label,
+         item.item_type || 'task', item.started_at, item.stopped_at ?? null, item.duration_secs || 0]
+      );
+      const result = db.exec('SELECT MAX(rowid) as rid FROM task_items WHERE user_id=?', [sessionUser.id]);
+      const newId = (result && result[0] && result[0].values[0]) ? Number(result[0].values[0][0]) : null;
+      persistDB();
+      return { ok: true, id: newId };
+    }
+  } catch (e) { return { ok: false, error: e.message }; }
+});
+
+ipcMain.handle('tasks:delete', (_, id) => {
+  if (!sessionKey || !sessionUser) return { ok: false };
+  db.run('DELETE FROM task_items WHERE rowid=? AND user_id=?', [Number(id), sessionUser.id]);
+  persistDB();
+  return { ok: true };
+});
+
+ipcMain.handle('tasks:recent-labels', () => {
+  if (!sessionKey || !sessionUser) return [];
+  const rows = dbAll(
+    `SELECT label FROM task_items
+     WHERE user_id=? AND item_type='task'
+     GROUP BY label
+     ORDER BY MAX(started_at) DESC LIMIT 10`,
+    [sessionUser.id]
+  );
+  return rows.map(r => r.label);
 });
 
 // ── IPC: Settings ──────────────────────────────────────────────────────────

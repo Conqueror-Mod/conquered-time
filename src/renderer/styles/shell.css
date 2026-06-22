@@ -22,11 +22,11 @@
   width: 210px;
   flex-shrink: 0;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  justify-content: center;
-  gap: 1px;
-  margin-left: -18px;
+  justify-content: flex-start;
+  gap: 8px;
+  margin-left: 0;
   padding-left: 0;
 }
 .titlebar-logo {
@@ -36,14 +36,22 @@
   letter-spacing: 0.12em;
   color: var(--text-muted);
   text-transform: uppercase;
+  white-space: nowrap;
 }
-.titlebar-divider { display: none; }
+.titlebar-divider {
+  display: block;
+  width: 1px;
+  height: 12px;
+  background: var(--border-light);
+  flex-shrink: 0;
+}
 .titlebar-page {
   font-family: var(--sans);
   font-size: 13px;
   font-weight: 600;
   color: var(--text-bright);
   letter-spacing: -0.01em;
+  white-space: nowrap;
 }
 .titlebar-controls {
   display: flex;
@@ -116,7 +124,7 @@
   color: var(--accent);
   font-weight: 500;
 }
-.nav-icon { font-size: 14px; width: 18px; text-align: center; flex-shrink: 0; }
+.nav-icon { width: 18px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; }
 
 .sidebar-spacer { flex: 1; }
 
@@ -240,3 +248,20 @@
   color: #a8c4e8;
 }
 [data-theme="paper"] .nav-item:hover { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.85); }
+
+/* ── Sidebar active-task timer ──────────────────────────────────────────── */
+.sidebar-timer-display {
+  font-family: var(--mono);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  color: var(--accent);
+  line-height: 1;
+}
+.sidebar-timer-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: pulse-dot 1.6s ease-in-out infinite;
+}

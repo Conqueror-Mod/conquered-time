@@ -3,19 +3,43 @@
   "version": "1.0.0",
   "description": "Conquered Time — Professional Time Tracker",
   "main": "src/main/main.js",
+  "author": {
+    "name": "Chris Bowles - The Conqueror",
+    "email": "bowles.s.chris@gmail.com"
+  },
+  "contributors": [
+    {
+      "name": "Vincent Vathan"
+    }
+  ],
+  "license": "UNLICENSED",
+  "private": true,
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
     "seed": "node seed-dev.js",
     "build": "electron-builder --win --x64",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux",
     "pack": "electron-builder --dir"
   },
   "build": {
     "appId": "com.conquered.time",
     "productName": "Conquered Time",
+    "copyright": "Copyright © 2026 Chris Bowles - The Conqueror. All rights reserved.",
     "win": {
       "target": [{ "target": "nsis", "arch": ["x64"] }],
       "icon": "assets/icon.ico"
+    },
+    "mac": {
+      "target": [{ "target": "dmg", "arch": ["x64", "arm64"] }],
+      "icon": "assets/icon.icns",
+      "category": "public.app-category.productivity"
+    },
+    "linux": {
+      "target": [{ "target": "AppImage", "arch": ["x64"] }],
+      "icon": "assets/icon-1024.png",
+      "category": "Office"
     },
     "nsis": {
       "oneClick": false,
@@ -27,19 +51,26 @@
       "createStartMenuShortcut": true,
       "shortcutName": "Conquered Time"
     },
-    "files": ["src/**/*", "assets/**/*", "package.json"],
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
     "extraResources": [],
-    "directories": { "output": "dist" }
+    "directories": {
+      "output": "dist"
+    }
   },
   "dependencies": {
-    "speakeasy": "^2.0.0",
-    "qrcode": "^1.5.3",
-    "sql.js": "^1.10.3",
     "bcryptjs": "^2.4.3",
+    "qrcode": "^1.5.3",
+    "speakeasy": "^2.0.0",
+    "sql.js": "^1.10.3",
     "uuid": "^9.0.0"
   },
   "devDependencies": {
     "electron": "^29.0.0",
-    "electron-builder": "^24.9.1"
+    "electron-builder": "^24.9.1",
+    "sharp": "^0.35.2"
   }
 }
