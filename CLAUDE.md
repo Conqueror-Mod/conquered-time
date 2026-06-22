@@ -125,7 +125,10 @@ An early implementation applied CSS `zoom` to the whole `<body>`, which pushed t
 ### 6. Global log session duplication
 `entries:save` previously didn't return the newly-inserted row's ID to the renderer, so `currentEntryId` stayed `null` and every autosave created a brand-new row instead of updating the existing one (visible as 4x duplicate sessions in the Global Log for what was really one session). **Fixed by:** `entries:save` now returns `{ ok, id }` on insert (via `SELECT MAX(rowid)` immediately after insert, scoped to the user), and `tracker.html`'s `saveSession()` captures that ID into `currentEntryId` after the first save so all subsequent autosaves correctly `UPDATE` instead of `INSERT`.
 
-### 7. Time format must be validated as 24-hour HH:MM internally
+### 7. `flex-shrink:0` is required on items inside a scrollable flex list
+When a flex column container has `max-height` and `overflow-y: auto`, its children shrink to fit the container height by default (`flex-shrink: 1`) **instead of** overflowing and triggering the scrollbar. The result is rows that collapse to near-zero height (just their border) with invisible content — extremely hard to diagnose because inline styles and CSS classes both apply correctly, but the computed height is still near zero. **The fix:** always add `flex-shrink: 0` to list item elements inside any scrollable flex column. This was discovered while building the Backup Library in Settings → Data (2026-06-22) and took significant debugging time including DevTools measurement to identify.
+
+### 8. Time format must be validated as 24-hour HH:MM internally
 Native `<input type="time">` renders in the OS locale's format (often 12-hour with AM/PM on Windows), which created inconsistent stored values. Inline time editing in the tracker uses a plain text input with regex validation (`/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/`) and normalizes to zero-padded 24-hour `HH:MM` before storing — there is also a user-facing 12h/24h **display** preference in Settings, but the stored/internal format is always 24-hour.
 
 ---
@@ -241,9 +244,9 @@ These were real conversations with the user that may resurface — worth knowing
 
 In rough priority order based on the user's own stated roadmap and the last open threads:
 1. Continue refining the two light themes (Paper, Quartz) — user flagged them as still feeling "derivative"
-2. Session Auto Lock/Timeout (idle-based, distinct from the failed-login lockout)
-3. Local backup load/restore UI ("LOAD DBA" feature)
-4. Reports/Auditing feature design + build
+2. Reports/Auditing feature design + build (charts, label breakdowns — the audit log itself is done)
+3. User Profile Icon + User Profile Screen
+4. Full account recovery flow (beyond the one-time recovery code)
 5. Revisit the container/store architecture refactor now that the app is stable, *especially* if any new null-ID-style bugs reappear
 6. Language/i18n — lowest priority, most complex
 

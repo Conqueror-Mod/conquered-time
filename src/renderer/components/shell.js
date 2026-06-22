@@ -11,10 +11,12 @@ const Shell = (() => {
     lock:      `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M8 1.5 L13.5 4 L13.5 9 Q13.5 14 8 15.5 Q2.5 14 2.5 9 L2.5 4 Z"/><circle cx="8" cy="8.5" r="1.8" fill="currentColor" fill-opacity="0.45"/><line x1="8" y1="10.3" x2="8" y2="12.5" stroke-width="1.8"/></svg>`,
     settings:  `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" style="display:block"><line x1="1" y1="4" x2="15" y2="4"/><circle cx="5" cy="4" r="2" fill="currentColor" fill-opacity="0.22"/><line x1="1" y1="8" x2="15" y2="8"/><circle cx="10.5" cy="8" r="2" fill="currentColor" fill-opacity="0.22"/><line x1="1" y1="12" x2="15" y2="12"/><circle cx="6" cy="12" r="2" fill="currentColor" fill-opacity="0.22"/></svg>`,
     tasktimer: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:block"><circle cx="8" cy="9" r="5.5"/><line x1="8" y1="9" x2="8" y2="5.8"/><line x1="8" y1="9" x2="10.2" y2="10.3"/><line x1="6.5" y1="1.5" x2="9.5" y2="1.5"/><line x1="8" y1="1.5" x2="8" y2="3.5"/><line x1="13" y1="5" x2="14" y2="4"/></svg>`,
+    profile:   `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:block"><circle cx="8" cy="5.5" r="2.8"/><path d="M2 14c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/></svg>`,
   };
 
   const NAV = [
     { id: 'dashboard',  icon: IC.dashboard,  label: 'Dashboard'    },
+    { id: 'profile',    icon: IC.profile,    label: 'Profile'      },
     { id: 'companies',  icon: IC.companies,  label: 'Companies'    },
     { id: 'tracker',    icon: IC.tracker,    label: 'Time Tracker' },
     { id: 'task-timer', icon: IC.tasktimer,  label: 'Dispatch'     },
@@ -39,7 +41,7 @@ const Shell = (() => {
     </div>`;
   }
 
-  function buildSidebar(activeId, user) {
+  function buildSidebar(activeId, user, profile) {
     const navItems = NAV.map(n => `
       <a class="nav-item ${n.id === activeId ? 'active' : ''}"
          tabindex="0"
@@ -76,7 +78,13 @@ const Shell = (() => {
       </div>
 
       <div class="sidebar-user">
-        <div class="sidebar-user-name">${user?.username || '—'}</div>
+        <div class="sidebar-user-identity">
+          <div class="sidebar-avatar" id="sidebar-avatar"></div>
+          <div class="sidebar-user-text">
+            <div class="sidebar-user-name">${user?.display_name || user?.username || '—'}</div>
+            ${user?.display_name ? `<div class="sidebar-user-sub">${user.username}</div>` : ''}
+          </div>
+        </div>
         <div class="sidebar-active-badge">Active Session</div>
       </div>
     </div>`;
@@ -85,6 +93,7 @@ const Shell = (() => {
   function buildSettingsModal() {
     const NAV_ITEMS = [
       { id: 'appearance',   label: 'Appearance',    icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>' },
+      { id: 'window',       label: 'Window',         icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 9h20"/><path d="M7 4v5"/></svg>' },
       { id: 'display',      label: 'Time & Display', icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>' },
       { id: 'data',         label: 'Data',           icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>' },
       { id: 'security',     label: 'Security',       icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>' },
@@ -141,6 +150,39 @@ const Shell = (() => {
                 </div>
               </div>
             </div>
+
+            <!-- ── WINDOW ────────────────────────────────────── -->
+            <div id="settings-cat-window" class="settings-cat-panel" style="display:none;">
+              <div class="sc-title">Window</div>
+
+              <div class="settings-group">
+                <div class="settings-group-title">Preferred Display</div>
+                <div class="settings-row-label">Which monitor the app opens on</div>
+                <div id="display-picker" style="margin-top:8px;"></div>
+              </div>
+
+              <div class="settings-group">
+                <div class="settings-group-title">Start Maximized</div>
+                <div class="toggle-row">
+                  <div class="toggle-info">
+                    <div class="toggle-label">Launch maximized</div>
+                    <div class="toggle-desc">Opens the app filling the full display on startup</div>
+                  </div>
+                  <button class="toggle-switch" id="toggle-start-maximized" onclick="applyWinToggle('win_startMaximized', this)"></button>
+                </div>
+              </div>
+
+              <div class="settings-group">
+                <div class="settings-group-title">Remember Last Position</div>
+                <div class="toggle-row">
+                  <div class="toggle-info">
+                    <div class="toggle-label">Restore window position</div>
+                    <div class="toggle-desc">Reopens the app at the same size and position as last time</div>
+                  </div>
+                  <button class="toggle-switch" id="toggle-remember-position" onclick="applyWinToggle('win_rememberPosition', this)"></button>
+                </div>
+              </div>
+            </div><!-- /settings-cat-window -->
 
             <!-- ── TIME & DISPLAY ───────────────────────────── -->
             <div id="settings-cat-display" class="settings-cat-panel" style="display:none;">
@@ -384,13 +426,34 @@ const Shell = (() => {
     </div>`;
   }
 
+  function setSidebarAvatar(profile, displayName, username) {
+    const el = document.getElementById('sidebar-avatar');
+    if (!el) return;
+    const name = displayName || username || '?';
+    const initials = (() => {
+      const parts = name.trim().split(/\s+/);
+      return parts.length >= 2
+        ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+        : name.slice(0, 2).toUpperCase();
+    })();
+    if (profile?.avatar) {
+      el.innerHTML = `<img src="${profile.avatar}" alt="">`;
+    } else {
+      el.textContent = initials;
+    }
+  }
+
   async function init(activePage) {
-    const user = await api.invoke('session:get');
+    const [user, profile] = await Promise.all([
+      api.invoke('session:get'),
+      api.invoke('profile:get').catch(() => null)
+    ]);
     if (!user) { api.send('navigate', 'login'); return; }
     window.__currentUsername = user?.username || 'YOU';
 
     const pageLabels = {
       dashboard:    'Dashboard',
+      profile:      'Profile',
       companies:    'Company Network',
       tracker:      'Time Tracker',
       'task-timer': 'Dispatch',
@@ -403,7 +466,7 @@ const Shell = (() => {
       <div class="app-shell">
         ${buildTitlebar(pageLabels[activePage] || activePage)}
         <div class="app-body">
-          ${buildSidebar(activePage, user)}
+          ${buildSidebar(activePage, user, profile)}
           <div class="main-content" id="main-content">
             ${existingContent}
           </div>
@@ -413,6 +476,8 @@ const Shell = (() => {
       ${buildAuditWarningModal()}
       <div id="toast-container"></div>
     `;
+
+    setSidebarAvatar(profile, user.display_name, user.username);
 
     // Load settings and sync UI
     await Settings.load();
@@ -583,7 +648,7 @@ const Shell = (() => {
     setTimeout(() => el.remove(), duration);
   }
 
-  return { init, toast, showSidebarTimer, hideSidebarTimer };
+  return { init, toast, showSidebarTimer, hideSidebarTimer, setSidebarAvatar };
 })();
 
 // ── Settings modal controls (global scope) ────────────────────────────────────
@@ -599,11 +664,17 @@ function closeSettingsModal() {
 }
 
 let _aboutInfoLoaded = false;
+let _windowSettingsLoaded = false;
 async function switchSettingsCategory(cat) {
   document.querySelectorAll('.sn-item').forEach(b => b.classList.toggle('active', b.dataset.cat === cat));
   document.querySelectorAll('.settings-cat-panel').forEach(p => p.style.display = 'none');
   const panel = document.getElementById(`settings-cat-${cat}`);
   if (panel) panel.style.display = '';
+
+  if (cat === 'window' && !_windowSettingsLoaded) {
+    _windowSettingsLoaded = true;
+    loadDisplayPicker();
+  }
 
   if (cat === 'about' && !_aboutInfoLoaded) {
     _aboutInfoLoaded = true;
@@ -816,10 +887,47 @@ function syncSettingsModal() {
   if (tm) tm.classList.toggle('on', s.reducedMotion);
   if (tf) tf.classList.toggle('on', s.focusIndicators);
 
+
   // Colorblind selector
   document.querySelectorAll('[data-cb]').forEach(b => {
     b.classList.toggle('active', b.dataset.cb === s.colorblind);
   });
+}
+
+async function loadDisplayPicker() {
+  const area = document.getElementById('display-picker');
+  if (!area) return;
+  const [displays, savedDisp, savedMax, savedRemember] = await Promise.all([
+    api.invoke('win:get-displays'),
+    api.invoke('settings:get', 'win_preferredDisplay'),
+    api.invoke('settings:get', 'win_startMaximized'),
+    api.invoke('settings:get', 'win_rememberPosition'),
+  ]);
+  const saved = savedDisp || 'primary';
+  const btns = [
+    `<button class="s-btn${saved === 'primary' ? ' active' : ''}" onclick="applyPreferredDisplay('primary')">Primary Display</button>`
+  ];
+  displays.filter(d => !d.isPrimary).forEach(d => {
+    const id = String(d.id);
+    btns.push(`<button class="s-btn${saved === id ? ' active' : ''}" onclick="applyPreferredDisplay('${id}')">Display ${d.index} — ${d.width}×${d.height}</button>`);
+  });
+  area.innerHTML = `<div class="settings-btn-group">${btns.join('')}</div>`;
+  const tsm = document.getElementById('toggle-start-maximized');
+  const trp = document.getElementById('toggle-remember-position');
+  if (tsm) tsm.classList.toggle('on', savedMax !== 'false'); // default on
+  if (trp) trp.classList.toggle('on', savedRemember === 'true');
+}
+
+async function applyPreferredDisplay(displayId) {
+  await api.invoke('settings:set', { key: 'win_preferredDisplay', value: displayId });
+  await api.invoke('win:move-to-display', displayId);
+  loadDisplayPicker();
+}
+
+async function applyWinToggle(key, btn) {
+  const newVal = !btn.classList.contains('on');
+  await api.invoke('settings:set', { key, value: String(newVal) });
+  btn.classList.toggle('on', newVal);
 }
 
 async function applyTheme(theme) {

@@ -13,8 +13,10 @@ const ALLOWED_INVOKE = new Set([
   'settings:get', 'settings:set',
   'app:get-info',
   'db:clear-timeclock', 'db:clear-companies', 'db:clear-full',
-  'audit:get-dismissed', 'audit:dismiss', 'audit:clear-dismissed', 'audit:apply-fix',
-  'backup:list', 'backup:preview', 'backup:restore'
+  'profile:get', 'profile:save', 'auth:change-password',
+  'audit:get-dismissed', 'audit:dismiss', 'audit:clear-dismissed', 'audit:apply-fix', 'audit:open-wizard',
+  'backup:list', 'backup:preview', 'backup:restore',
+  'win:get-displays', 'win:move-to-display'
 ]);
 
 const ALLOWED_SEND = new Set([
@@ -24,7 +26,7 @@ const ALLOWED_SEND = new Set([
 
 const ALLOWED_RECEIVE = new Set([
   'menu:export-pdf', 'menu:export-csv', 'toast', 'modal:security-info',
-  'audit:close-warning'
+  'audit:close-warning', 'audit:wizard-done'
 ]);
 
 contextBridge.exposeInMainWorld('api', {

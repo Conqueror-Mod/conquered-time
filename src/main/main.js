@@ -1,6 +1,6 @@
 'use strict';
 
-const { app, BrowserWindow, ipcMain, Menu, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, dialog, screen } = require('electron');
 const path   = require('path');
 const fs     = require('fs');
 const crypto = require('crypto');
@@ -98,6 +98,12 @@ async function initDB() {
     );
   `);
 
+  // Profile column migrations — safe to run on every startup
+  try { db.run('ALTER TABLE users ADD COLUMN display_name TEXT'); } catch {}
+  try { db.run('ALTER TABLE users ADD COLUMN profile_enc  TEXT'); } catch {}
+  try { db.run('ALTER TABLE users ADD COLUMN profile_iv   TEXT'); } catch {}
+  try { db.run('ALTER TABLE users ADD COLUMN profile_tag  TEXT'); } catch {}
+
   persistDB();
 }
 
@@ -191,7 +197,7 @@ function deriveKey(password, salt) {
 // ── Window ─────────────────────────────────────────────────────────────────
 function createSplashWindow(theme) {
   const splash = new BrowserWindow({
-    width: 520, height: 340,
+    width: 600, height: 400,
     frame: false,
     resizable: false,
     center: true,
@@ -208,6 +214,33 @@ function createSplashWindow(theme) {
     query: { theme: theme || 'arctic' }
   });
   return splash;
+}
+
+function createAuditWizardWindow(mode, theme) {
+  const wizard = new BrowserWindow({
+    width: 680, height: 520,
+    frame: false,
+    resizable: false,
+    center: true,
+    alwaysOnTop: true,
+    backgroundColor: '#0d0f14',
+    icon: path.join(__dirname, '../../assets/icon.ico'),
+    webPreferences: {
+      preload:          path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration:  false,
+      sandbox:          true,
+    }
+  });
+  wizard.loadFile(path.join(__dirname, '../renderer/pages/audit-wizard.html'), {
+    query: { mode: mode || 'fix', theme: theme || 'arctic' }
+  });
+  wizard.on('closed', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('audit:wizard-done');
+    }
+  });
+  return wizard;
 }
 
 function createWindow() {
@@ -354,6 +387,29 @@ function resetIdleTimer() {
 ipcMain.on('win:minimize', () => mainWindow.minimize());
 ipcMain.on('win:maximize', () => mainWindow.isMaximized() ? mainWindow.unmaximize() : mainWindow.maximize());
 ipcMain.on('win:close',    () => mainWindow.close());
+
+ipcMain.handle('win:get-displays', () => {
+  const primary = screen.getPrimaryDisplay();
+  return screen.getAllDisplays().map((d, i) => ({
+    id:        d.id,
+    index:     i + 1,
+    isPrimary: d.id === primary.id,
+    width:     d.bounds.width,
+    height:    d.bounds.height,
+  }));
+});
+
+ipcMain.handle('win:move-to-display', (_, displayId) => {
+  const displays = screen.getAllDisplays();
+  const target = displayId === 'primary'
+    ? screen.getPrimaryDisplay()
+    : (displays.find(d => d.id === Number(displayId)) || screen.getPrimaryDisplay());
+  // Move window onto the target display first, then maximize so Electron
+  // picks the right display for the maximize operation.
+  mainWindow.setPosition(target.bounds.x + 10, target.bounds.y + 10);
+  mainWindow.maximize();
+  return { ok: true };
+});
 ipcMain.on('navigate',     (_, page) => navigate(page));
 
 // ── IPC: Auth ──────────────────────────────────────────────────────────────
@@ -411,7 +467,7 @@ ipcMain.handle('auth:login', async (_, { username, password, totpCode }) => {
     const salt  = user.key_salt || user.totp_secret;
     sessionKey  = deriveKey(password, salt);
     // Always use rowid — sql.js AUTOINCREMENT id columns return null through our query helper
-    sessionUser = { id: Number(user.rid), username: user.username };
+    sessionUser = { id: Number(user.rid), username: user.username, display_name: user.display_name || null };
     db.run('UPDATE users SET failed_attempts=0, locked_until=NULL WHERE rowid=?', [Number(user.rid)]);
     persistDB();
     resetIdleTimer();
@@ -451,7 +507,7 @@ ipcMain.handle('totp:generate', async () => {
   return { secret: secret.base32, qrUrl };
 });
 
-ipcMain.handle('session:get', () => sessionUser ? { id: sessionUser.id, username: sessionUser.username } : null);
+ipcMain.handle('session:get', () => sessionUser ? { id: sessionUser.id, username: sessionUser.username, display_name: sessionUser.display_name || null } : null);
 ipcMain.handle('session:heartbeat', () => { if (sessionUser) resetIdleTimer(); return null; });
 ipcMain.on('session:request-lock',   () => lockSession(false));
 ipcMain.on('session:confirm-close',  () => { forceClose = true; mainWindow.close(); });
@@ -761,6 +817,79 @@ ipcMain.handle('audit:apply-fix', (_, { entry_id, row_idx, fix_type }) => {
   } catch (e) { return { ok: false, error: e.message }; }
 });
 
+// ── IPC: User Profile ─────────────────────────────────────────────────────
+ipcMain.handle('profile:get', () => {
+  if (!sessionKey || !sessionUser) return null;
+  const user = dbGet('SELECT rowid as rid, * FROM users WHERE rowid=?', [sessionUser.id]);
+  if (!user) return null;
+  let profileData = { full_name: '', email: '', phone: '', job_title: '', avatar: null };
+  if (user.profile_enc && user.profile_iv && user.profile_tag) {
+    try {
+      profileData = JSON.parse(decrypt({ data: user.profile_enc, iv: user.profile_iv, tag: user.profile_tag }, sessionKey));
+    } catch {}
+  }
+  return { display_name: user.display_name || '', ...profileData };
+});
+
+ipcMain.handle('profile:save', (_, { display_name, full_name, email, phone, job_title, avatar }) => {
+  if (!sessionKey || !sessionUser) return { ok: false };
+  try {
+    const blob = encrypt(JSON.stringify({ full_name: full_name || '', email: email || '', phone: phone || '', job_title: job_title || '', avatar: avatar || null }), sessionKey);
+    db.run('UPDATE users SET display_name=?, profile_enc=?, profile_iv=?, profile_tag=? WHERE rowid=?',
+      [display_name || null, blob.data, blob.iv, blob.tag, sessionUser.id]);
+    sessionUser.display_name = display_name || null;
+    persistDB();
+    return { ok: true };
+  } catch(e) { return { ok: false, error: e.message }; }
+});
+
+ipcMain.handle('auth:change-password', async (_, { currentPassword, totpCode, newPassword }) => {
+  if (!sessionKey || !sessionUser) return { ok: false, error: 'No active session.' };
+  const bcrypt    = require('bcryptjs');
+  const speakeasy = require('speakeasy');
+  const user = dbGet('SELECT rowid as rid, * FROM users WHERE rowid=?', [sessionUser.id]);
+  if (!user) return { ok: false, error: 'User not found.' };
+  if (!bcrypt.compareSync(currentPassword, user.password_hash))
+    return { ok: false, error: 'Current password is incorrect.' };
+  const totpOk = user.dev_mode ? true :
+    speakeasy.totp.verify({ secret: user.totp_secret, encoding: 'base32', token: totpCode, window: 1 });
+  if (!totpOk) return { ok: false, error: 'Invalid TOTP code.' };
+
+  const newKey = deriveKey(newPassword, user.key_salt);
+
+  // Re-encrypt all company rows with the new key
+  const companies = dbAll('SELECT rowid as rid, * FROM companies WHERE user_id=?', [sessionUser.id]);
+  for (const co of companies) {
+    try {
+      const plain = decrypt({ data: co.data_enc, iv: co.data_iv, tag: co.data_tag }, sessionKey);
+      const reenc = encrypt(plain, newKey);
+      db.run('UPDATE companies SET data_enc=?, data_iv=?, data_tag=? WHERE rowid=?',
+        [reenc.data, reenc.iv, reenc.tag, Number(co.rid)]);
+    } catch(e) { return { ok: false, error: 'Re-encryption failed: ' + e.message }; }
+  }
+
+  // Re-encrypt profile blob if present
+  if (user.profile_enc && user.profile_iv && user.profile_tag) {
+    try {
+      const plain = decrypt({ data: user.profile_enc, iv: user.profile_iv, tag: user.profile_tag }, sessionKey);
+      const reenc = encrypt(plain, newKey);
+      db.run('UPDATE users SET profile_enc=?, profile_iv=?, profile_tag=? WHERE rowid=?',
+        [reenc.data, reenc.iv, reenc.tag, sessionUser.id]);
+    } catch {}
+  }
+
+  const newHash = bcrypt.hashSync(newPassword, 12);
+  db.run('UPDATE users SET password_hash=? WHERE rowid=?', [newHash, sessionUser.id]);
+  sessionKey = newKey;
+  persistDB(); performBackup();
+  return { ok: true };
+});
+
+ipcMain.handle('audit:open-wizard', (_, { mode, theme } = {}) => {
+  createAuditWizardWindow(mode, theme);
+  return { ok: true };
+});
+
 // ── IPC: Database clear operations ────────────────────────────────────────
 ipcMain.handle('db:clear-timeclock', () => {
   if (!sessionKey || !sessionUser) return { ok: false };
@@ -828,9 +957,41 @@ app.whenReady().then(async () => {
   const splash = createSplashWindow(savedTheme);
   createWindow(); // creates hidden (show: false)
 
+  // Apply window position/size settings before show
+  const rememberPos   = dbGet("SELECT value FROM app_settings WHERE key='win_rememberPosition'")?.value === 'true';
+  const lastBoundsRaw = dbGet("SELECT value FROM app_settings WHERE key='win_lastBounds'")?.value;
+  const prefDisplay   = dbGet("SELECT value FROM app_settings WHERE key='win_preferredDisplay'")?.value || 'primary';
+  // Default to true — only false when user has explicitly toggled it off
+  const startMax      = dbGet("SELECT value FROM app_settings WHERE key='win_startMaximized'")?.value !== 'false';
+
+  if (rememberPos && lastBoundsRaw) {
+    try {
+      const b = JSON.parse(lastBoundsRaw);
+      mainWindow.setBounds({ x: b.x, y: b.y, width: b.width, height: b.height }, false);
+    } catch {}
+  } else if (prefDisplay !== 'primary') {
+    // Move onto the preferred display; always maximize to avoid off-screen issues
+    const target = screen.getAllDisplays().find(d => d.id === Number(prefDisplay)) || screen.getPrimaryDisplay();
+    mainWindow.setPosition(target.bounds.x + 10, target.bounds.y + 10);
+  }
+
+  // Track window bounds when Remember Last Position is enabled
+  function saveWindowBounds() {
+    if (dbGet("SELECT value FROM app_settings WHERE key='win_rememberPosition'")?.value !== 'true') return;
+    const b = mainWindow.getBounds();
+    db.run("INSERT OR REPLACE INTO app_settings (key,value) VALUES ('win_lastBounds',?)", [JSON.stringify(b)]);
+    persistDB();
+  }
+  mainWindow.on('moved',   saveWindowBounds);
+  mainWindow.on('resized', saveWindowBounds);
+
   setTimeout(() => {
     if (!splash.isDestroyed()) splash.close();
-    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.show();
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.show();
+      // Always maximize when preferred display is set, or when startMax is on
+      if (prefDisplay !== 'primary' || startMax) mainWindow.maximize();
+    }
   }, 3000);
 });
 
