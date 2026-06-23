@@ -421,29 +421,36 @@
     }
   }
 
+  const ANIMATED_TYPES = ['image/gif', 'image/apng', 'image/webp'];
+
   function handleAvatarUpload(e) {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = evt => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = 200; canvas.height = 200;
-        const ctx = canvas.getContext('2d');
-        // Center-crop to square
-        const size = Math.min(img.width, img.height);
-        const sx   = (img.width  - size) / 2;
-        const sy   = (img.height - size) / 2;
-        ctx.drawImage(img, sx, sy, size, size, 0, 0, 200, 200);
-        avatarDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+      if (ANIMATED_TYPES.includes(file.type)) {
+        // Preserve animated formats as-is — canvas would kill the animation
+        avatarDataUrl = evt.target.result;
         updateAvatarPreview(avatarDataUrl, '');
         markDirty();
-      };
-      img.src = evt.target.result;
+      } else {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = 200; canvas.height = 200;
+          const ctx = canvas.getContext('2d');
+          const size = Math.min(img.width, img.height);
+          const sx   = (img.width  - size) / 2;
+          const sy   = (img.height - size) / 2;
+          ctx.drawImage(img, sx, sy, size, size, 0, 0, 200, 200);
+          avatarDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          updateAvatarPreview(avatarDataUrl, '');
+          markDirty();
+        };
+        img.src = evt.target.result;
+      }
     };
     reader.readAsDataURL(file);
-    // Reset so same file can be re-selected
     e.target.value = '';
   }
 

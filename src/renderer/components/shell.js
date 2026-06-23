@@ -455,7 +455,15 @@ const Shell = (() => {
         : name.slice(0, 2).toUpperCase();
     })();
     if (profile?.avatar) {
+      const isAnimated = profile.avatar.startsWith('data:image/gif') ||
+                         profile.avatar.startsWith('data:image/apng') ||
+                         profile.avatar.startsWith('data:image/webp');
       el.innerHTML = `<img src="${profile.avatar}" alt="">`;
+      if (isAnimated) {
+        const img = el.querySelector('img');
+        // Restart GIF/APNG from frame 1 on hover (Discord-style idle→animate)
+        img.addEventListener('mouseenter', () => { const s = img.src; img.src = ''; img.src = s; });
+      }
     } else {
       el.textContent = initials;
     }

@@ -169,6 +169,7 @@
   object-fit: cover;
   display: block;
 }
+.sidebar-avatar img[data-animated] { cursor: pointer; }
 .sidebar-user-name {
   font-family: var(--sans);
   font-size: 13px;
