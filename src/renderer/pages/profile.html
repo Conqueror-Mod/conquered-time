@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy"
+  content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; img-src 'self' data:; blob:;">
+<title>Conquered Time — Profile</title>
+<link rel="stylesheet" href="../styles/design-system.css">
+<script>
+  (function(){var t=sessionStorage.getItem('ct_theme');var s=sessionStorage.getItem('ct_scale');if(t)document.documentElement.setAttribute('data-theme',t);if(s)document.documentElement.setAttribute('data-scale',s);document.documentElement.style.visibility='hidden';})();
+</script>
+<style>
+  .profile-layout {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 16px;
+    align-items: start;
+  }
+
+  /* ── Identity card ── */
+  .identity-card {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 28px 20px 24px;
+    box-shadow: var(--shadow-2), var(--shadow-inset);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    position: sticky;
+    top: 0;
+  }
+
+  /* ── Avatar ── */
+  .avatar-wrap {
+    position: relative;
+    cursor: pointer;
+    border-radius: 50%;
+    user-select: none;
+  }
+  .avatar-wrap:hover .avatar-overlay { opacity: 1; }
+  .avatar-circle {
+    width: 100px; height: 100px;
+    border-radius: 50%;
+    border: 2px solid var(--border-light);
+    background: var(--surface-2);
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--sans);
+    font-size: 32px;
+    font-weight: 600;
+    color: var(--accent);
+    transition: border-color var(--transition);
+  }
+  .avatar-wrap:hover .avatar-circle { border-color: var(--accent); }
+  .avatar-circle img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .avatar-overlay {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity var(--transition);
+    pointer-events: none;
+  }
+  .avatar-overlay-label {
+    font-family: var(--sans);
+    font-size: 10px;
+    font-weight: 600;
+    color: #fff;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    text-align: center;
+  }
+  #avatar-file-input { display: none; }
+
+  .identity-display-name {
+    font-family: var(--sans);
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-white);
+    text-align: center;
+    word-break: break-word;
+  }
+  .identity-username-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-bright);
+    background: var(--surface-2);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    padding: 4px 10px;
+  }
+  .identity-username-chip .chip-label {
+    font-family: var(--sans);
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+  }
+
+  /* Suppress browser autofill background blowout */
+  input:-webkit-autofill,
+  input:-webkit-autofill:focus {
+    -webkit-box-shadow: 0 0 0 1000px var(--surface-2) inset !important;
+    -webkit-text-fill-color: var(--text-bright) !important;
+  }
+
+  .identity-field-wrap {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  /* ── Right panel ── */
+  .profile-right {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .profile-panel {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px 22px;
+    box-shadow: var(--shadow-1), var(--shadow-inset);
+  }
+  .panel-title {
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-bright);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 16px;
+  }
+
+  .fields-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px 20px;
+  }
+  .field-group { display: flex; flex-direction: column; gap: 5px; }
+
+  /* ── Change password panel ── */
+  .collapsible-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    user-select: none;
+  }
+  .collapsible-header:hover .panel-title { color: var(--text-white); }
+  .collapsible-chevron {
+    font-size: 10px;
+    color: var(--text-dim);
+    transition: transform var(--transition);
+  }
+  .collapsible-chevron.open { transform: rotate(180deg); }
+  .collapsible-body {
+    display: none;
+    flex-direction: column;
+    gap: 14px;
+    margin-top: 16px;
+  }
+  .collapsible-body.open { display: flex; }
+  .pw-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 20px; }
+  .pw-row-full { grid-column: 1 / -1; }
+
+  .pw-result {
+    font-family: var(--sans);
+    font-size: 12px;
+    padding: 8px 12px;
+    border-radius: var(--radius);
+    display: none;
+  }
+  .pw-result.error   { background: var(--red-dim);   color: var(--red);   border: 1px solid rgba(239,68,68,0.3); }
+  .pw-result.success { background: var(--green-dim); color: var(--green); border: 1px solid rgba(16,185,129,0.3); }
+
+  /* ── Footer ── */
+  .profile-footer {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-top: 4px;
+  }
+  .unsaved-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--yellow);
+    opacity: 0;
+    transition: opacity var(--transition);
+    flex-shrink: 0;
+  }
+  .unsaved-dot.visible { opacity: 1; }
+  .unsaved-label {
+    font-family: var(--sans);
+    font-size: 11px;
+    color: var(--text-muted);
+    opacity: 0;
+    transition: opacity var(--transition);
+  }
+  .unsaved-label.visible { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <div class="page-title-block">
+    <div class="page-eyebrow">Account</div>
+    <div class="page-title">Profile</div>
+  </div>
+</div>
+
+<div class="profile-layout" id="profile-layout">
+
+  <!-- ── Left: Identity card ── -->
+  <div class="identity-card">
+    <div class="avatar-wrap" id="avatar-wrap" title="Click to upload a photo">
+      <div class="avatar-circle" id="avatar-circle">
+        <span id="avatar-initials"></span>
+      </div>
+      <div class="avatar-overlay">
+        <div class="avatar-overlay-label">Change<br>Photo</div>
+      </div>
+    </div>
+    <input type="file" id="avatar-file-input" accept="image/*">
+
+    <div id="identity-display-name-view" class="identity-display-name"></div>
+    <div class="identity-username-chip">
+      <span class="chip-label">Login</span>
+      <span id="identity-username-value">—</span>
+    </div>
+
+    <div class="identity-field-wrap">
+      <div class="field-label">Display Name</div>
+      <input class="form-input" id="field-display-name" type="text" placeholder="How you appear in the app" autocomplete="off">
+    </div>
+  </div>
+
+  <!-- ── Right: panels ── -->
+  <div class="profile-right">
+
+    <!-- Personal Details -->
+    <div class="profile-panel">
+      <div class="panel-title">Personal Details</div>
+      <div class="fields-grid">
+        <div class="field-group">
+          <label class="field-label" for="field-full-name">Full Name</label>
+          <input class="form-input" id="field-full-name" type="text" placeholder="Your legal or preferred name" autocomplete="off">
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="field-job-title">Job Title / Role</label>
+          <input class="form-input" id="field-job-title" type="text" placeholder="e.g. Senior Translator" autocomplete="off">
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="field-email">Email Address</label>
+          <input class="form-input" id="field-email" type="email" placeholder="your@email.com" autocomplete="off">
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="field-phone">Phone Number</label>
+          <input class="form-input" id="field-phone" type="tel" placeholder="+1 (555) 000-0000" autocomplete="off">
+        </div>
+      </div>
+    </div>
+
+    <!-- Change Password -->
+    <div class="profile-panel" id="pw-panel">
+      <div class="collapsible-header" id="pw-toggle">
+        <div class="panel-title" style="margin-bottom:0;">Change Password</div>
+        <span class="collapsible-chevron" id="pw-chevron">▼</span>
+      </div>
+      <div class="collapsible-body" id="pw-body">
+        <div class="pw-row">
+          <div class="field-group">
+            <label class="field-label" for="field-current-pw">Current Password</label>
+            <input class="form-input" id="field-current-pw" type="password" placeholder="••••••••" autocomplete="current-password">
+          </div>
+          <div class="field-group">
+            <label class="field-label" for="field-totp">TOTP Code</label>
+            <input class="form-input" id="field-totp" type="text" placeholder="000000" maxlength="6" autocomplete="one-time-code" style="font-family:var(--mono);letter-spacing:0.2em;">
+          </div>
+          <div class="field-group">
+            <label class="field-label" for="field-new-pw">New Password</label>
+            <input class="form-input" id="field-new-pw" type="password" placeholder="••••••••" autocomplete="new-password">
+          </div>
+          <div class="field-group">
+            <label class="field-label" for="field-confirm-pw">Confirm New Password</label>
+            <input class="form-input" id="field-confirm-pw" type="password" placeholder="••••••••" autocomplete="new-password">
+          </div>
+        </div>
+        <div class="pw-result" id="pw-result"></div>
+        <div>
+          <button class="btn-primary" id="btn-change-password">Change Password</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="profile-footer">
+      <button class="btn-primary" id="btn-save">Save Changes</button>
+      <div class="unsaved-dot" id="unsaved-dot"></div>
+      <div class="unsaved-label" id="unsaved-label">Unsaved changes</div>
+    </div>
+
+  </div>
+</div>
+
+<script src="../components/settings.js"></script>
+<script src="../components/shell.js"></script>
+<script>
+  let avatarDataUrl = null;
+  let dirty = false;
+  let originalValues = {};
+  let session = null;
+
+  window.addEventListener('DOMContentLoaded', async () => {
+    await Shell.init('profile');
+    document.documentElement.style.visibility = '';
+
+    const profile = await api.invoke('profile:get');
+    session = await api.invoke('session:get');
+
+    // Populate identity sidebar
+    const username = session?.username || '—';
+    document.getElementById('identity-username-value').textContent = username;
+
+    const displayName = profile?.display_name || '';
+    document.getElementById('field-display-name').value = displayName;
+    document.getElementById('identity-display-name-view').textContent = displayName || username;
+    updateAvatarPreview(profile?.avatar || null, displayName || username);
+
+    // Populate personal details
+    document.getElementById('field-full-name').value  = profile?.full_name  || '';
+    document.getElementById('field-job-title').value  = profile?.job_title  || '';
+    document.getElementById('field-email').value      = profile?.email      || '';
+    document.getElementById('field-phone').value      = profile?.phone      || '';
+
+    avatarDataUrl = profile?.avatar || null;
+
+    // Snapshot original values for dirty tracking
+    snapshotOriginal();
+
+    // ── Event listeners ──────────────────────────────────────────────────
+    const trackableInputs = [
+      'field-display-name', 'field-full-name', 'field-job-title',
+      'field-email', 'field-phone'
+    ];
+    trackableInputs.forEach(id => {
+      document.getElementById(id).addEventListener('input', () => {
+        markDirty();
+        // Live-update the identity preview from display name
+        if (id === 'field-display-name') {
+          const dn = document.getElementById('field-display-name').value.trim();
+          document.getElementById('identity-display-name-view').textContent = dn || username;
+          updateAvatarInitials(dn || username);
+        }
+      });
+    });
+
+    // Avatar upload
+    document.getElementById('avatar-wrap').addEventListener('click', () => {
+      document.getElementById('avatar-file-input').click();
+    });
+    document.getElementById('avatar-file-input').addEventListener('change', handleAvatarUpload);
+
+    // Save
+    document.getElementById('btn-save').addEventListener('click', saveProfile);
+
+    // Password panel toggle
+    document.getElementById('pw-toggle').addEventListener('click', () => {
+      const body    = document.getElementById('pw-body');
+      const chevron = document.getElementById('pw-chevron');
+      const isOpen  = body.classList.toggle('open');
+      chevron.classList.toggle('open', isOpen);
+    });
+
+    // Change password
+    document.getElementById('btn-change-password').addEventListener('click', changePassword);
+  });
+
+  // ── Avatar helpers ───────────────────────────────────────────────────────
+  function getInitials(name) {
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    return name.slice(0, 2).toUpperCase();
+  }
+
+  function updateAvatarInitials(name) {
+    const circle = document.getElementById('avatar-circle');
+    if (avatarDataUrl) return; // avatar image takes precedence
+    document.getElementById('avatar-initials').textContent = getInitials(name);
+  }
+
+  function updateAvatarPreview(dataUrl, fallbackName) {
+    const circle = document.getElementById('avatar-circle');
+    const initials = document.getElementById('avatar-initials');
+    if (dataUrl) {
+      initials.style.display = 'none';
+      let img = circle.querySelector('img');
+      if (!img) { img = document.createElement('img'); circle.appendChild(img); }
+      img.src = dataUrl;
+    } else {
+      initials.style.display = '';
+      initials.textContent = getInitials(fallbackName || '?');
+      const img = circle.querySelector('img');
+      if (img) img.remove();
+    }
+  }
+
+  function handleAvatarUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = evt => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 200; canvas.height = 200;
+        const ctx = canvas.getContext('2d');
+        // Center-crop to square
+        const size = Math.min(img.width, img.height);
+        const sx   = (img.width  - size) / 2;
+        const sy   = (img.height - size) / 2;
+        ctx.drawImage(img, sx, sy, size, size, 0, 0, 200, 200);
+        avatarDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        updateAvatarPreview(avatarDataUrl, '');
+        markDirty();
+      };
+      img.src = evt.target.result;
+    };
+    reader.readAsDataURL(file);
+    // Reset so same file can be re-selected
+    e.target.value = '';
+  }
+
+  // ── Dirty tracking ───────────────────────────────────────────────────────
+  function snapshotOriginal() {
+    originalValues = {
+      display_name: document.getElementById('field-display-name').value,
+      full_name:    document.getElementById('field-full-name').value,
+      job_title:    document.getElementById('field-job-title').value,
+      email:        document.getElementById('field-email').value,
+      phone:        document.getElementById('field-phone').value,
+      avatar:       avatarDataUrl,
+    };
+    dirty = false;
+    setDirtyUI(false);
+  }
+
+  function markDirty() {
+    dirty = true;
+    setDirtyUI(true);
+  }
+
+  function setDirtyUI(isDirty) {
+    document.getElementById('unsaved-dot').classList.toggle('visible', isDirty);
+    document.getElementById('unsaved-label').classList.toggle('visible', isDirty);
+  }
+
+  // ── Save ─────────────────────────────────────────────────────────────────
+  async function saveProfile() {
+    const payload = {
+      display_name: document.getElementById('field-display-name').value.trim(),
+      full_name:    document.getElementById('field-full-name').value.trim(),
+      job_title:    document.getElementById('field-job-title').value.trim(),
+      email:        document.getElementById('field-email').value.trim(),
+      phone:        document.getElementById('field-phone').value.trim(),
+      avatar:       avatarDataUrl,
+    };
+    const res = await api.invoke('profile:save', payload);
+    if (res?.ok) {
+      Shell.toast('Profile saved.', 'success');
+      Shell.setSidebarAvatar({ avatar: avatarDataUrl }, payload.display_name, session?.username);
+      snapshotOriginal();
+    } else {
+      Shell.toast('Save failed: ' + (res?.error || 'unknown error'), 'error');
+    }
+  }
+
+  // ── Change password ──────────────────────────────────────────────────────
+  async function changePassword() {
+    const result   = document.getElementById('pw-result');
+    const currentPw = document.getElementById('field-current-pw').value;
+    const totp      = document.getElementById('field-totp').value.trim();
+    const newPw     = document.getElementById('field-new-pw').value;
+    const confirmPw = document.getElementById('field-confirm-pw').value;
+
+    result.style.display = 'none';
+
+    if (!currentPw || !totp || !newPw || !confirmPw) {
+      showPwResult('error', 'All fields are required.');
+      return;
+    }
+    if (newPw !== confirmPw) {
+      showPwResult('error', 'New passwords do not match.');
+      return;
+    }
+    if (newPw.length < 8) {
+      showPwResult('error', 'New password must be at least 8 characters.');
+      return;
+    }
+
+    const btn = document.getElementById('btn-change-password');
+    btn.disabled = true;
+    btn.textContent = 'Updating…';
+
+    const res = await api.invoke('auth:change-password', {
+      currentPassword: currentPw,
+      totpCode:        totp,
+      newPassword:     newPw,
+    });
+
+    btn.disabled = false;
+    btn.textContent = 'Change Password';
+
+    if (res?.ok) {
+      showPwResult('success', 'Password changed successfully. All data re-encrypted with your new key.');
+      // Clear fields and collapse panel on success
+      ['field-current-pw', 'field-totp', 'field-new-pw', 'field-confirm-pw'].forEach(id => {
+        document.getElementById(id).value = '';
+      });
+      setTimeout(() => {
+        document.getElementById('pw-body').classList.remove('open');
+        document.getElementById('pw-chevron').classList.remove('open');
+        document.getElementById('pw-result').style.display = 'none';
+      }, 2500);
+    } else {
+      showPwResult('error', res?.error || 'Password change failed.');
+    }
+  }
+
+  function showPwResult(type, msg) {
+    const el = document.getElementById('pw-result');
+    el.className = `pw-result ${type}`;
+    el.textContent = msg;
+    el.style.display = '';
+  }
+</script>
+</body>
+</html>

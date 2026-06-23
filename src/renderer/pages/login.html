@@ -7,15 +7,17 @@
 <title>Conquered Time — Login</title>
 <link rel="stylesheet" href="../styles/design-system.css">
 <script>
-// Apply saved theme immediately before page renders to prevent flash
+// Apply saved theme before page renders to prevent flash
 (async function() {
   try {
-    // Read theme from sessionStorage cache (set after first login)
-    const theme = sessionStorage.getItem('ct_theme') || 'slate';
-    const scale = sessionStorage.getItem('ct_scale') || 'normal';
+    const theme = (await api.invoke('settings:get', 'ui_theme')) || 'arctic';
+    const scale = (await api.invoke('settings:get', 'ui_scale')) || 'normal';
     document.documentElement.setAttribute('data-theme', theme);
     document.documentElement.setAttribute('data-scale', scale);
-  } catch(e) {}
+  } catch(e) {
+    // Fallback if IPC unavailable
+    document.documentElement.setAttribute('data-theme', 'arctic');
+  }
 })();
 </script>
 <style>
@@ -624,7 +626,7 @@ function drawDebugOverlay() {
 
   const labelStyle = (color) => {
     ctx.fillStyle   = color;
-    ctx.font        = 'bold 9px Share Tech Mono';
+    ctx.font        = 'bold 9px JetBrains Mono';
     ctx.textAlign   = 'center';
     ctx.textBaseline = 'middle';
   };
@@ -664,7 +666,7 @@ function drawDebugOverlay() {
   ctx.lineWidth = 1;
   ctx.strokeRect(8, 8, 130, 52);
 
-  ctx.font = '8px Share Tech Mono';
+  ctx.font = '8px JetBrains Mono';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
   ctx.fillStyle = 'rgba(0,200,160,0.9)';

@@ -1,0 +1,13 @@
+<svg width="16" height="16" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="256" cy="256" r="250" fill="#0a0818"/>
+  <circle cx="256" cy="256" r="244" fill="none" stroke="#d4a030" stroke-width="8" opacity="0.85"/>
+  <path d="M110 82 L402 82 L256 256 L402 430 L110 430 L256 256 Z" fill="none" stroke="#b07818" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M110 82 L402 82 L256 256 L402 430 L110 430 L256 256 Z" fill="none" stroke="#f0d060" stroke-width="8"  stroke-linecap="round" stroke-linejoin="round" opacity="0.88"/>
+  <path d="M118 90 L394 90 L256 248 Z" fill="#7c3aed" fill-opacity="0.45"/>
+  <path d="M256 264 L384 422 L128 422 Z" fill="#38bdf8" fill-opacity="0.5"/>
+  <line x1="110" y1="82"  x2="402" y2="82"  stroke="#d4a030" stroke-width="20" stroke-linecap="round"/>
+  <line x1="110" y1="82"  x2="402" y2="82"  stroke="#fff4c0" stroke-width="8"  stroke-linecap="round" opacity="0.9"/>
+  <line x1="110" y1="430" x2="402" y2="430" stroke="#d4a030" stroke-width="20" stroke-linecap="round"/>
+  <line x1="110" y1="430" x2="402" y2="430" stroke="#fff4c0" stroke-width="8"  stroke-linecap="round" opacity="0.9"/>
+  <circle cx="256" cy="256" r="14" fill="#fff4c0" opacity="0.95"/>
+</svg>

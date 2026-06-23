@@ -8,18 +8,26 @@ const ALLOWED_INVOKE = new Set([
   'totp:generate',
   'session:get', 'session:heartbeat',
   'companies:list', 'companies:save', 'companies:delete',
-  'entries:list', 'entries:save', 'entries:all',
-  'settings:get', 'settings:set'
+  'entries:list', 'entries:save', 'entries:all', 'entries:get-active', 'entries:get',
+  'tasks:list', 'tasks:save', 'tasks:delete', 'tasks:recent-labels',
+  'settings:get', 'settings:set',
+  'app:get-info', 'app:check-update',
+  'db:clear-timeclock', 'db:clear-companies', 'db:clear-full',
+  'profile:get', 'profile:save', 'auth:change-password',
+  'audit:get-dismissed', 'audit:dismiss', 'audit:clear-dismissed', 'audit:apply-fix', 'audit:open-wizard',
+  'backup:list', 'backup:preview', 'backup:restore',
+  'win:get-displays', 'win:move-to-display'
 ]);
 
 const ALLOWED_SEND = new Set([
   'win:minimize', 'win:maximize', 'win:close', 'navigate',
-  'session:request-lock', 'session:confirm-close', 'session:confirm-lock'
+  'session:request-lock', 'session:confirm-close', 'session:confirm-lock',
+  'shell:open-external'
 ]);
 
 const ALLOWED_RECEIVE = new Set([
   'menu:export-pdf', 'menu:export-csv', 'toast', 'modal:security-info',
-  'audit:close-warning'
+  'audit:close-warning', 'audit:wizard-done'
 ]);
 
 contextBridge.exposeInMainWorld('api', {

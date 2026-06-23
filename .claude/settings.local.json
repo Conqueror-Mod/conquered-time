@@ -2,7 +2,14 @@
   "permissions": {
     "allow": [
       "Bash(git -C \"D:\\\\My Projects\\\\CURRENT-RELEASE\\\\conquered-time\" status)",
-      "Bash(gh auth *)"
+      "Bash(gh auth *)",
+      "mcp__visualize__read_me",
+      "mcp__visualize__show_widget",
+      "Bash(npm start *)",
+      "Skill(run)",
+      "Skill(run:*)",
+      "Bash(dir \"D:/My Projects/CURRENT-RELEASE/conquered-time/assets/\")",
+      "PowerShell(Copy-Item \"D:\\\\My Projects\\\\CURRENT-RELEASE\\\\conquered-time\\\\assets\\\\icon.picon\" \"D:\\\\My Projects\\\\CURRENT-RELEASE\\\\conquered-time\\\\assets\\\\icon-temp.png\")"
     ]
   }
 }

@@ -1,0 +1,13 @@
+/* ══════════════════════════════════════════════════════════════
+   SCANLINE (login only)
+   ══════════════════════════════════════════════════════════════ */
+.scanline-overlay {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg, transparent, transparent 2px,
+    rgba(0,0,0,0.015) 2px, rgba(0,0,0,0.015) 4px
+  );
+  z-index: 1;
+}

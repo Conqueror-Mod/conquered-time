@@ -6,6 +6,9 @@
   content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; img-src 'self' data:;">
 <title>Conquered Time — Time Tracker</title>
 <link rel="stylesheet" href="../styles/design-system.css">
+<script>
+  (function(){var t=sessionStorage.getItem('ct_theme');var s=sessionStorage.getItem('ct_scale');if(t)document.documentElement.setAttribute('data-theme',t);if(s)document.documentElement.setAttribute('data-scale',s);document.documentElement.style.visibility='hidden';})();
+</script>
 <style>
   .tracker-topbar {
     background: var(--surface-1);
@@ -193,6 +196,22 @@
   <div class="footer-totals">
     <div class="totals">Total logged: <span id="total-time">0h 00m</span></div>
     <div class="breakdown-row" id="breakdown-row"></div>
+    <div id="dispatch-preview" style="display:none;margin-top:6px;border-top:1px solid var(--border);padding-top:6px;">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <span class="breakdown-chip task-count-chip" onclick="api.send('navigate','task-timer')" title="Open Dispatch" style="cursor:pointer;gap:5px;">
+          <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle;"><circle cx="8" cy="9" r="5.5"/><line x1="8" y1="9" x2="8" y2="5.8"/><line x1="8" y1="9" x2="10.2" y2="10.3"/><line x1="6.5" y1="1.5" x2="9.5" y2="1.5"/><line x1="8" y1="1.5" x2="8" y2="3.5"/></svg>
+          <span id="dispatch-count-label">Dispatch</span>
+        </span>
+        <div id="dispatch-task-chips" style="display:flex;gap:5px;flex-wrap:wrap;"></div>
+        <span id="dispatch-break-badge" style="display:none;"></span>
+        <span id="dispatch-lunch-badge" style="display:none;"></span>
+        <span id="dispatch-open-link"
+              onclick="api.send('navigate','task-timer')"
+              style="font-family:var(--sans);font-size:11px;color:var(--accent);cursor:pointer;margin-left:auto;opacity:.8;">
+          Open →
+        </span>
+      </div>
+    </div>
   </div>
   <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;">
     <div class="totals">Entries: <span id="rows-done">0</span> filled · <span id="rows-total">0</span> total</div>
@@ -213,6 +232,7 @@
 
   window.addEventListener('DOMContentLoaded', async () => {
     await Shell.init('tracker');
+    document.documentElement.style.visibility = '';
     await loadCompanies();
 
     document.getElementById('company-select').addEventListener('change', onCompanyChange);
@@ -307,9 +327,65 @@
       document.getElementById('log-notes').value = existing.session_label || '';
       restoreRows(JSON.parse(existing.rows_json || '[]'));
       document.getElementById('session-status').textContent = 'Session loaded';
+      updateTaskChip(existing.id);
     } else {
       currentEntryId = null;
       clearAll(true);
+      updateTaskChip(null);
+    }
+  }
+
+  async function updateTaskChip(entryId) {
+    const preview = document.getElementById('dispatch-preview');
+    if (!preview) return;
+    if (!entryId) { preview.style.display = 'none'; return; }
+
+    const tasks = await api.invoke('tasks:list', entryId);
+    const completed = tasks.filter(t => t.item_type === 'task' && t.stopped_at);
+    const activeBreak = tasks.find(t => t.item_type === 'break' && !t.stopped_at);
+    const activeLunch = tasks.find(t => t.item_type === 'lunch' && !t.stopped_at);
+
+    preview.style.display = 'block';
+
+    // Count label — always show; "Dispatch" when no tasks yet
+    const countLabel = document.getElementById('dispatch-count-label');
+    countLabel.textContent = completed.length > 0
+      ? `${completed.length} task${completed.length === 1 ? '' : 's'}`
+      : 'Dispatch';
+
+    // Per-label breakdown chips
+    const chipsEl = document.getElementById('dispatch-task-chips');
+    if (completed.length > 0) {
+      const counts = {};
+      completed.forEach(t => { counts[t.label] = (counts[t.label] || 0) + 1; });
+      chipsEl.innerHTML = Object.entries(counts)
+        .sort((a, b) => b[1] - a[1])
+        .map(([l, c]) => `<span class="breakdown-chip">${l}<span class="bc-time">${c > 1 ? ' ×' + c : ''}</span></span>`)
+        .join('');
+    } else {
+      chipsEl.innerHTML = '';
+    }
+
+    // Break badge
+    const breakBadge = document.getElementById('dispatch-break-badge');
+    if (activeBreak) {
+      breakBadge.style.display = 'inline-flex';
+      breakBadge.className = 'breakdown-chip';
+      breakBadge.style.color = 'var(--yellow)';
+      breakBadge.textContent = '☕ On break';
+    } else {
+      breakBadge.style.display = 'none';
+    }
+
+    // Lunch badge
+    const lunchBadge = document.getElementById('dispatch-lunch-badge');
+    if (activeLunch) {
+      lunchBadge.style.display = 'inline-flex';
+      lunchBadge.className = 'breakdown-chip';
+      lunchBadge.style.color = 'var(--yellow)';
+      lunchBadge.textContent = '🍽 On lunch';
+    } else {
+      lunchBadge.style.display = 'none';
     }
   }
 
@@ -581,6 +657,7 @@
     const res = await api.invoke('entries:save', entry);
     if (res.ok) {
       if (!currentEntryId && res.id) currentEntryId = res.id;
+      updateTaskChip(currentEntryId);
       if (!silent) Shell.toast('Session saved.', 'success');
       const label = fromTimer ? `Auto-saved at ${nowTime()}` : `Saved at ${nowTime()}`;
       document.getElementById('session-status').textContent = label;
@@ -625,7 +702,7 @@
     const win = window.open('','_blank');
     win.document.write(`<!DOCTYPE html><html><head><title>Timesheet</title>
     <style>
-      body{font-family:Inter,Arial,sans-serif;font-size:12px;color:#111;padding:40px;max-width:960px;margin:0 auto;}
+      body{font-family:DM Sans,Arial,sans-serif;font-size:12px;color:#111;padding:40px;max-width:960px;margin:0 auto;}
       h1{font-size:20px;font-weight:600;margin:0 0 4px;}
       .meta{color:#666;font-size:11px;margin-bottom:4px;}
       .hier{font-size:11px;color:#2563eb;margin-bottom:20px;font-weight:500;}

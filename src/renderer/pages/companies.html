@@ -6,6 +6,9 @@
   content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; img-src 'self' data:;">
 <title>Conquered Time — Companies</title>
 <link rel="stylesheet" href="../styles/design-system.css">
+<script>
+  (function(){var t=sessionStorage.getItem('ct_theme');var s=sessionStorage.getItem('ct_scale');if(t)document.documentElement.setAttribute('data-theme',t);if(s)document.documentElement.setAttribute('data-scale',s);document.documentElement.style.visibility='hidden';})();
+</script>
 <style>
   .web-layout {
     display: grid;
@@ -302,6 +305,7 @@
 
   window.addEventListener('DOMContentLoaded', async () => {
     await Shell.init('companies');
+    document.documentElement.style.visibility = '';
     const mc = document.getElementById('main-content');
     if (mc) { mc.style.display = 'flex'; mc.style.flexDirection = 'column'; mc.style.overflow = 'hidden'; }
     await loadCompanies();
@@ -427,7 +431,7 @@
 
     function initNodes(W,H) {
       const cx=W/2, cy=H/2;
-      const ns = [{ x:cx,y:cy,r:34,label:'YOU',isCenter:true,co:null,fixed:true }];
+      const ns = [{ x:cx,y:cy,r:34,label:(window.__currentUsername || 'YOU'),isCenter:true,co:null,fixed:true }];
       const count = companies.length;
       companies.forEach((co,i) => {
         const a = (Math.PI*2*i/count) - Math.PI/2;
@@ -519,7 +523,7 @@
         drawSphereNode(ctx, n.x, n.y, pR, false, n.label);
         if (n.hours) {
           ctx.fillStyle=c.hours;
-          ctx.font='500 10px Inter, sans-serif';
+          ctx.font='500 10px DM Sans, system-ui, sans-serif';
           ctx.textAlign='center'; ctx.textBaseline='top';
           ctx.fillText(fmtH(n.hours), n.x, n.y+pR+5);
         }
@@ -567,7 +571,7 @@
     hl.addColorStop(0,'rgba(255,255,255,0.14)'); hl.addColorStop(1,'rgba(255,255,255,0)');
     ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fillStyle=hl; ctx.fill();
     ctx.fillStyle=nc.label;
-    ctx.font=`${isCenter?'600 ':'500 '}${isCenter?11:10}px Inter, sans-serif`;
+    ctx.font=`${isCenter?'600 ':'500 '}${isCenter?11:10}px DM Sans, system-ui, sans-serif`;
     ctx.textAlign='center'; ctx.textBaseline='middle';
     ctx.fillText(label,x,y);
   }

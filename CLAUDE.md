@@ -125,7 +125,10 @@ An early implementation applied CSS `zoom` to the whole `<body>`, which pushed t
 ### 6. Global log session duplication
 `entries:save` previously didn't return the newly-inserted row's ID to the renderer, so `currentEntryId` stayed `null` and every autosave created a brand-new row instead of updating the existing one (visible as 4x duplicate sessions in the Global Log for what was really one session). **Fixed by:** `entries:save` now returns `{ ok, id }` on insert (via `SELECT MAX(rowid)` immediately after insert, scoped to the user), and `tracker.html`'s `saveSession()` captures that ID into `currentEntryId` after the first save so all subsequent autosaves correctly `UPDATE` instead of `INSERT`.
 
-### 7. Time format must be validated as 24-hour HH:MM internally
+### 7. `flex-shrink:0` is required on items inside a scrollable flex list
+When a flex column container has `max-height` and `overflow-y: auto`, its children shrink to fit the container height by default (`flex-shrink: 1`) **instead of** overflowing and triggering the scrollbar. The result is rows that collapse to near-zero height (just their border) with invisible content — extremely hard to diagnose because inline styles and CSS classes both apply correctly, but the computed height is still near zero. **The fix:** always add `flex-shrink: 0` to list item elements inside any scrollable flex column. This was discovered while building the Backup Library in Settings → Data (2026-06-22) and took significant debugging time including DevTools measurement to identify.
+
+### 8. Time format must be validated as 24-hour HH:MM internally
 Native `<input type="time">` renders in the OS locale's format (often 12-hour with AM/PM on Windows), which created inconsistent stored values. Inline time editing in the tracker uses a plain text input with regex validation (`/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/`) and normalizes to zero-padded 24-hour `HH:MM` before storing — there is also a user-facing 12h/24h **display** preference in Settings, but the stored/internal format is always 24-hour.
 
 ---
@@ -156,14 +159,36 @@ Native `<input type="time">` renders in the OS locale's format (often 12-hour wi
 - Dev seed script (`npm run seed`) — wipes DB, creates `devuser`/`devpass123` with `dev_mode=1` (TOTP bypassed), one sample company (RWS/Diamond/multimango hierarchy, fake NavID), one sample time entry. Essential for fast iteration; never ships in production.
 
 ### Explicitly Deferred / On the Roadmap (not yet built)
-From the user's running feature/bug list:
-- **Reports / Auditing** — larger feature, would build on the clock_in/clock_out timestamp data already being captured per row
-- **Session Auto Lock/Timeout** — pairs with existing lockout system but for idle-session locking, not failed-login lockout
-- **Language change / i18n** — flagged as "tackle last," most complex
-- **Recovery / "LOAD DBA ability for locally saved recovery option"** — user wants a way to load/restore from local backup files via UI, beyond the current automatic dated-copy backup-on-save system
-- **Container/store architecture refactor** — discussed at length (see below) but deliberately **postponed** until after the core bug-fixing phase stabilized; worth revisiting now that the app is stable
-- Light themes (Paper, Quartz) were explicitly called out by the user as "still very derivative" / not yet fully realized — functional but flagged for future refinement
-- The North Phoenician cipher-layer concept (see below) was discussed in depth but explicitly **deferred to theory** — the user wanted only the visual hidden-grid-sequence mechanic built now, not the cryptographic layer
+
+#### Feature Add
+- **Reorder themes in settings** — user wants to control the display order of theme cards in the Settings modal
+- **About module** ✅ — tab in Settings (Steam-style redesign); icon, wordmark, version, credits, changelog, placeholder links
+- **App load/splash screen** ✅ — branded 3-second splash before login with icon, wordmark, tagline, progress bar; theme-aware
+- **Audit: 'Clear Messages' and 'Suggest discrepancy fix'** ✅ — per-row Dismiss/Apply Fix buttons in audit log; dismissed items excluded from close/lock warning count; suggestion text per discrepancy type; Clear All and Show/Hide Dismissed toolbar; `audit_dismissed` table persists state
+- **Auto Backup UI** ✅ — Settings → Data → Backup Library; lazy-loaded list of up to 30 auto-backups; accordion preview (account, company count, entry count, date range); CONFIRM-gated restore; current data safety-saved before any restore; logs out to login after restore
+- **Manual database clear** ✅ — three-option wipe in Settings → Data: Time Clock Clear, Companies Clear, Full DB Clear; inline CONFIRM-typed confirmation
+- **Task Timer & Counter page** ✅ — implemented as "Dispatch" module; task timing, break/lunch compliance, description writeback, sidebar live timer, Tracker footer preview
+- **Recovery** — full account recovery flow beyond the current one-time recovery code; includes the LOAD DBA local restore UI
+- **User Profile Icon** — avatar/icon displayed in the sidebar user block and profile screen
+- **User Profile Screen** — dedicated screen for user profile management (username, password change, avatar, account details)
+- **Encrypt time log entries** — time data is treated as PPI (learnable information); open question: encrypt individual time entries the same way company fields are, OR lock all user data behind session encryption on session lock. Needs design decision before implementation.
+- **Reports / Auditing** — larger feature, builds on clock_in/clock_out timestamp data already captured per row; includes charts, label breakdowns, and full audit log
+- **Session Auto Lock/Timeout** ✅ — fully wired: idle timer in main.js, heartbeat IPC, activity listeners in shell.js, settings UI (0/5/15/30/60 min); default corrected to Off
+- **Container/store architecture refactor** — centralized `store.js` + `ipc.js` + `validator.js` layer; deliberately postponed until app stabilized — good candidate now
+- **Settings redesign** ✅ — Steam-style split layout: left nav (Appearance, Time & Display, Data, Security, Accessibility, About), scrollable right panel; 860px modal
+- **Light theme polish** — Paper and Quartz flagged as still feeling "derivative"; functional but not fully realized
+- **Language change / i18n** — lowest priority, most complex; tackle last
+- The North Phoenician cipher-layer concept was discussed in depth but explicitly **deferred to theory** — only the visual grid mechanic is built; the deeper PBKDF2 factor idea remains unbuilt
+
+#### Fun
+- **Redesign ASCII Easter Egg** — the cracked-hourglass ASCII art shown on the login easter egg sequence; user wants it bigger, better, clearer
+- **Rename themes to Final Fantasy names** — replace Arctic/Void/Slate/Paper/Quartz with FF-inspired names
+- **Final Fantasy based theme variants** — explore FF-aesthetic color palettes as additional or replacement themes
+
+#### Final / Release
+- **Package for multi-platform release** — Windows (done), macOS, Linux, iOS, Android, iOS Mobile; icon assets already prepared for Win/Mac/Linux
+- **Beta Keys** — gating mechanism for early access distribution
+- **Contributions / monetization** — Patreon, app purchase, or similar; to be designed once feature set is locked
 
 ---
 
@@ -219,9 +244,9 @@ These were real conversations with the user that may resurface — worth knowing
 
 In rough priority order based on the user's own stated roadmap and the last open threads:
 1. Continue refining the two light themes (Paper, Quartz) — user flagged them as still feeling "derivative"
-2. Session Auto Lock/Timeout (idle-based, distinct from the failed-login lockout)
-3. Local backup load/restore UI ("LOAD DBA" feature)
-4. Reports/Auditing feature design + build
+2. Reports/Auditing feature design + build (charts, label breakdowns — the audit log itself is done)
+3. User Profile Icon + User Profile Screen
+4. Full account recovery flow (beyond the one-time recovery code)
 5. Revisit the container/store architecture refactor now that the app is stable, *especially* if any new null-ID-style bugs reappear
 6. Language/i18n — lowest priority, most complex
 

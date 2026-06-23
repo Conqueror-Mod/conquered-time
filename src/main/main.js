@@ -1,6 +1,6 @@
 'use strict';
 
-const { app, BrowserWindow, ipcMain, Menu, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, dialog, screen } = require('electron');
 const path   = require('path');
 const fs     = require('fs');
 const crypto = require('crypto');
@@ -24,6 +24,7 @@ let SQL         = null;   // sql.js module
 let db          = null;   // sql.js Database instance
 let idleTimer    = null;   // auto-lock timeout handle
 let forceClose   = false;  // set true after user confirms close through audit prompt
+let activeEntryId = null;  // rowid of the currently live time_entries row
 
 // ── sql.js init ────────────────────────────────────────────────────────────
 async function initDB() {
@@ -76,7 +77,32 @@ async function initDB() {
       key   TEXT PRIMARY KEY,
       value TEXT
     );
+    CREATE TABLE IF NOT EXISTS task_items (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id       INTEGER NOT NULL,
+      entry_id      INTEGER NOT NULL,
+      label         TEXT    NOT NULL,
+      item_type     TEXT    NOT NULL DEFAULT 'task',
+      started_at    INTEGER NOT NULL,
+      stopped_at    INTEGER,
+      duration_secs INTEGER NOT NULL DEFAULT 0,
+      created_at    INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+    );
+    CREATE TABLE IF NOT EXISTS audit_dismissed (
+      id       INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id  INTEGER NOT NULL,
+      entry_id INTEGER NOT NULL,
+      row_idx  INTEGER NOT NULL,
+      type     TEXT    NOT NULL,
+      UNIQUE(user_id, entry_id, row_idx, type)
+    );
   `);
+
+  // Profile column migrations — safe to run on every startup
+  try { db.run('ALTER TABLE users ADD COLUMN display_name TEXT'); } catch {}
+  try { db.run('ALTER TABLE users ADD COLUMN profile_enc  TEXT'); } catch {}
+  try { db.run('ALTER TABLE users ADD COLUMN profile_iv   TEXT'); } catch {}
+  try { db.run('ALTER TABLE users ADD COLUMN profile_tag  TEXT'); } catch {}
 
   persistDB();
 }
@@ -169,11 +195,61 @@ function deriveKey(password, salt) {
 }
 
 // ── Window ─────────────────────────────────────────────────────────────────
+function createSplashWindow(theme) {
+  const splash = new BrowserWindow({
+    width: 600, height: 400,
+    frame: false,
+    resizable: false,
+    center: true,
+    alwaysOnTop: true,
+    backgroundColor: '#0a0c12',
+    icon: path.join(__dirname, '../../assets/icon.ico'),
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    }
+  });
+  splash.loadFile(path.join(__dirname, '../renderer/pages/splash.html'), {
+    query: { theme: theme || 'arctic' }
+  });
+  return splash;
+}
+
+function createAuditWizardWindow(mode, theme) {
+  const wizard = new BrowserWindow({
+    width: 680, height: 520,
+    frame: false,
+    resizable: false,
+    center: true,
+    alwaysOnTop: true,
+    backgroundColor: '#0d0f14',
+    icon: path.join(__dirname, '../../assets/icon.ico'),
+    webPreferences: {
+      preload:          path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration:  false,
+      sandbox:          true,
+    }
+  });
+  wizard.loadFile(path.join(__dirname, '../renderer/pages/audit-wizard.html'), {
+    query: { mode: mode || 'fix', theme: theme || 'arctic' }
+  });
+  wizard.on('closed', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('audit:wizard-done');
+    }
+  });
+  return wizard;
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280, height: 800, minWidth: 900, minHeight: 600,
     frame: false,
+    show: false,
     backgroundColor: '#0d0f14',
+    icon: path.join(__dirname, '../../assets/icon.ico'),
     webPreferences: {
       preload:          path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -234,17 +310,47 @@ function navigate(page) {
   mainWindow.loadFile(path.join(__dirname, `../renderer/pages/${page}.html`));
 }
 
+function getDismissedSet() {
+  if (!sessionUser) return new Set();
+  return new Set(
+    dbAll('SELECT entry_id, row_idx, type FROM audit_dismissed WHERE user_id=?', [sessionUser.id])
+      .map(d => `${d.entry_id}:${d.row_idx}:${d.type}`)
+  );
+}
+
 function countAuditDiscrepancies() {
   if (!sessionUser) return 0;
-  const entries = dbAll('SELECT rows_json FROM time_entries WHERE user_id=?', [sessionUser.id]);
+  const dismissed = getDismissedSet();
+  const entries = dbAll('SELECT rowid as rid, rows_json, total_mins FROM time_entries WHERE user_id=?', [sessionUser.id]);
   let count = 0;
   entries.forEach(e => {
+    const entryId = Number(e.rid);
     try {
-      JSON.parse(e.rows_json || '[]').forEach(r => {
+      JSON.parse(e.rows_json || '[]').forEach((r, idx) => {
         if (!r.clock_in && !r.clock_out && !r.label && !r.name) return;
-        if (!r.clock_in || !r.clock_out || !r.total_mins || r.total_mins > 720) count++;
+        if (!r.clock_in) {
+          if (!dismissed.has(`${entryId}:${idx}:no_clock_in`)) count++;
+        } else if (!r.clock_out) {
+          if (!dismissed.has(`${entryId}:${idx}:no_clock_out`)) count++;
+        } else if (!r.total_mins) {
+          if (!dismissed.has(`${entryId}:${idx}:zero_duration`)) count++;
+        } else if (r.total_mins > 720) {
+          if (!dismissed.has(`${entryId}:${idx}:over_12h`)) count++;
+        }
       });
     } catch {}
+
+    const totalMins = Number(e.total_mins || 0);
+    if (totalMins > 240) {
+      const hasBreak = dbGet('SELECT id FROM task_items WHERE entry_id=? AND user_id=? AND item_type=? LIMIT 1',
+        [entryId, sessionUser.id, 'break']);
+      if (!hasBreak && !dismissed.has(`${entryId}:-1:missing_break`)) count++;
+    }
+    if (totalMins > 360) {
+      const hasLunch = dbGet('SELECT id FROM task_items WHERE entry_id=? AND user_id=? AND item_type=? LIMIT 1',
+        [entryId, sessionUser.id, 'lunch']);
+      if (!hasLunch && !dismissed.has(`${entryId}:-1:missing_lunch`)) count++;
+    }
   });
   return count;
 }
@@ -258,7 +364,7 @@ function lockSession(skipAuditCheck = false) {
     }
   }
   clearIdleTimer();
-  sessionKey = null; sessionUser = null;
+  sessionKey = null; sessionUser = null; activeEntryId = null;
   mainWindow.loadFile(path.join(__dirname, '../renderer/pages/login.html'));
 }
 
@@ -281,6 +387,35 @@ function resetIdleTimer() {
 ipcMain.on('win:minimize', () => mainWindow.minimize());
 ipcMain.on('win:maximize', () => mainWindow.isMaximized() ? mainWindow.unmaximize() : mainWindow.maximize());
 ipcMain.on('win:close',    () => mainWindow.close());
+ipcMain.on('shell:open-external', (_, url) => {
+  const { shell } = require('electron');
+  // Only allow http/https URLs to prevent protocol abuse
+  if (/^https?:\/\//.test(url)) shell.openExternal(url);
+});
+
+ipcMain.handle('win:get-displays', () => {
+  const primary = screen.getPrimaryDisplay();
+  return screen.getAllDisplays().map((d, i) => ({
+    id:        d.id,
+    index:     i + 1,
+    isPrimary: d.id === primary.id,
+    width:     d.bounds.width,
+    height:    d.bounds.height,
+  }));
+});
+
+ipcMain.handle('win:move-to-display', (_, displayId) => {
+  const displays = screen.getAllDisplays();
+  const target = displayId === 'primary'
+    ? screen.getPrimaryDisplay()
+    : (displays.find(d => d.id === Number(displayId)) || screen.getPrimaryDisplay());
+  // Windows ignores setPosition() on a maximized window — must unmaximize first,
+  // reposition, then re-maximize so Electron targets the correct display.
+  if (mainWindow.isMaximized()) mainWindow.unmaximize();
+  mainWindow.setPosition(target.bounds.x + 10, target.bounds.y + 10);
+  mainWindow.maximize();
+  return { ok: true };
+});
 ipcMain.on('navigate',     (_, page) => navigate(page));
 
 // ── IPC: Auth ──────────────────────────────────────────────────────────────
@@ -338,7 +473,7 @@ ipcMain.handle('auth:login', async (_, { username, password, totpCode }) => {
     const salt  = user.key_salt || user.totp_secret;
     sessionKey  = deriveKey(password, salt);
     // Always use rowid — sql.js AUTOINCREMENT id columns return null through our query helper
-    sessionUser = { id: Number(user.rid), username: user.username };
+    sessionUser = { id: Number(user.rid), username: user.username, display_name: user.display_name || null };
     db.run('UPDATE users SET failed_attempts=0, locked_until=NULL WHERE rowid=?', [Number(user.rid)]);
     persistDB();
     resetIdleTimer();
@@ -378,7 +513,7 @@ ipcMain.handle('totp:generate', async () => {
   return { secret: secret.base32, qrUrl };
 });
 
-ipcMain.handle('session:get', () => sessionUser ? { id: sessionUser.id, username: sessionUser.username } : null);
+ipcMain.handle('session:get', () => sessionUser ? { id: sessionUser.id, username: sessionUser.username, display_name: sessionUser.display_name || null } : null);
 ipcMain.handle('session:heartbeat', () => { if (sessionUser) resetIdleTimer(); return null; });
 ipcMain.on('session:request-lock',   () => lockSession(false));
 ipcMain.on('session:confirm-close',  () => { forceClose = true; mainWindow.close(); });
@@ -438,6 +573,7 @@ ipcMain.handle('entries:save', (_, entry) => {
     if (entry.id) {
       db.run('UPDATE time_entries SET rows_json=?,total_mins=?,session_label=?,updated_at=strftime(\'%s\',\'now\') WHERE rowid=? AND user_id=?',
         [entry.rows_json, entry.total_mins, entry.session_label || '', entry.id, sessionUser.id]);
+      activeEntryId = Number(entry.id);
       persistDB(); performBackup();
       return { ok: true, id: entry.id };
     } else {
@@ -446,6 +582,7 @@ ipcMain.handle('entries:save', (_, entry) => {
       // Get the rowid of the just-inserted row
       const result = db.exec('SELECT MAX(rowid) as rid FROM time_entries WHERE user_id=?', [sessionUser.id]);
       const newId = (result && result[0] && result[0].values[0]) ? Number(result[0].values[0][0]) : null;
+      activeEntryId = newId;
       persistDB(); performBackup();
       return { ok: true, id: newId };
     }
@@ -458,7 +595,381 @@ ipcMain.handle('entries:all', () => {
     .map(r => ({...r, id: Number(r.rid)}));
 });
 
+ipcMain.handle('entries:get-active', () => {
+  if (!sessionKey || !sessionUser) return null;
+
+  let row = null;
+
+  // Fast path: use in-memory activeEntryId if set
+  if (activeEntryId) {
+    row = dbGet('SELECT rowid as rid, * FROM time_entries WHERE rowid=? AND user_id=?',
+      [activeEntryId, sessionUser.id]);
+  }
+
+  // Fallback: find today's entry that has a clocked-in but not clocked-out row
+  if (!row) {
+    const today = new Date().toISOString().slice(0, 10);
+    const candidates = dbAll(
+      'SELECT rowid as rid, * FROM time_entries WHERE user_id=? AND log_date=? ORDER BY updated_at DESC',
+      [sessionUser.id, today]
+    );
+    for (const c of candidates) {
+      try {
+        const rows = JSON.parse(c.rows_json || '[]');
+        if (rows.some(r => r.clock_in && !r.clock_out)) { row = c; break; }
+      } catch {}
+    }
+    // Also check entries from yesterday in case of overnight sessions
+    if (!row) {
+      const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+      const prev = dbAll(
+        'SELECT rowid as rid, * FROM time_entries WHERE user_id=? AND log_date=? ORDER BY updated_at DESC',
+        [sessionUser.id, yesterday]
+      );
+      for (const c of prev) {
+        try {
+          const rows = JSON.parse(c.rows_json || '[]');
+          if (rows.some(r => r.clock_in && !r.clock_out)) { row = c; break; }
+        } catch {}
+      }
+    }
+    if (row) activeEntryId = Number(row.rid);
+  }
+
+  if (!row) return null;
+
+  let company_name = null;
+  try {
+    const co = dbGet('SELECT rowid as rid, * FROM companies WHERE rowid=? AND user_id=?',
+      [Number(row.company_id), sessionUser.id]);
+    if (co) {
+      const plain = decrypt({ iv: co.data_iv, tag: co.data_tag, data: co.data_enc }, sessionKey);
+      company_name = JSON.parse(plain).name || null;
+    }
+  } catch {}
+  return { ...row, id: Number(row.rid), company_name };
+});
+
+ipcMain.handle('entries:get', (_, id) => {
+  if (!sessionKey || !sessionUser) return null;
+  const row = dbGet('SELECT rowid as rid, * FROM time_entries WHERE rowid=? AND user_id=?',
+    [Number(id), sessionUser.id]);
+  if (!row) return null;
+  return { ...row, id: Number(row.rid) };
+});
+
+// ── IPC: Task items ────────────────────────────────────────────────────────
+ipcMain.handle('tasks:list', (_, entryId) => {
+  if (!sessionKey || !sessionUser) return [];
+  return dbAll(
+    'SELECT rowid as rid, * FROM task_items WHERE entry_id=? AND user_id=? ORDER BY started_at ASC',
+    [Number(entryId), sessionUser.id]
+  ).map(r => ({ ...r, id: Number(r.rid) }));
+});
+
+ipcMain.handle('tasks:save', (_, item) => {
+  if (!sessionKey || !sessionUser) return { ok: false };
+  try {
+    if (item.id) {
+      db.run(
+        'UPDATE task_items SET label=?,item_type=?,stopped_at=?,duration_secs=? WHERE rowid=? AND user_id=?',
+        [item.label, item.item_type || 'task', item.stopped_at ?? null,
+         item.duration_secs || 0, Number(item.id), sessionUser.id]
+      );
+      persistDB();
+      return { ok: true, id: Number(item.id) };
+    } else {
+      db.run(
+        'INSERT INTO task_items (user_id,entry_id,label,item_type,started_at,stopped_at,duration_secs) VALUES (?,?,?,?,?,?,?)',
+        [sessionUser.id, Number(item.entry_id), item.label,
+         item.item_type || 'task', item.started_at, item.stopped_at ?? null, item.duration_secs || 0]
+      );
+      const result = db.exec('SELECT MAX(rowid) as rid FROM task_items WHERE user_id=?', [sessionUser.id]);
+      const newId = (result && result[0] && result[0].values[0]) ? Number(result[0].values[0][0]) : null;
+      persistDB();
+      return { ok: true, id: newId };
+    }
+  } catch (e) { return { ok: false, error: e.message }; }
+});
+
+ipcMain.handle('tasks:delete', (_, id) => {
+  if (!sessionKey || !sessionUser) return { ok: false };
+  db.run('DELETE FROM task_items WHERE rowid=? AND user_id=?', [Number(id), sessionUser.id]);
+  persistDB();
+  return { ok: true };
+});
+
+ipcMain.handle('tasks:recent-labels', () => {
+  if (!sessionKey || !sessionUser) return [];
+  const rows = dbAll(
+    `SELECT label FROM task_items
+     WHERE user_id=? AND item_type='task'
+     GROUP BY label
+     ORDER BY MAX(started_at) DESC LIMIT 10`,
+    [sessionUser.id]
+  );
+  return rows.map(r => r.label);
+});
+
 // ── IPC: Settings ──────────────────────────────────────────────────────────
+// ── IPC: Backup library ───────────────────────────────────────────────────
+ipcMain.handle('backup:list', () => {
+  if (!sessionUser) return [];
+  if (!fs.existsSync(BACKUP_DIR)) return [];
+  const files = fs.readdirSync(BACKUP_DIR)
+    .filter(f => f.startsWith('vault-') && f.endsWith('.db'))
+    .sort().reverse();
+  return files.map(f => {
+    const stat = fs.statSync(path.join(BACKUP_DIR, f));
+    const ts = f.replace('vault-', '').replace('.db', '').replace(/T(\d{2})-(\d{2})-(\d{2})/, 'T$1:$2:$3');
+    return { filename: f, timestamp: ts, sizeKB: Math.round(stat.size / 1024) };
+  });
+});
+
+ipcMain.handle('backup:preview', (_, filename) => {
+  if (!sessionUser) return { error: 'No session' };
+  if (!/^vault-[\d\-T]+\.db$/.test(filename)) return { error: 'Invalid filename' };
+  const filepath = path.join(BACKUP_DIR, filename);
+  if (!fs.existsSync(filepath)) return { error: 'File not found' };
+  try {
+    const buf     = fs.readFileSync(filepath);
+    const preview = new SQL.Database(buf);
+    const get1    = (q) => { const r = preview.exec(q); return r[0]?.values[0]?.[0] ?? null; };
+    const username    = get1('SELECT username FROM users LIMIT 1') || 'Unknown';
+    const companyCount = Number(get1('SELECT COUNT(*) FROM companies') || 0);
+    const entryCount   = Number(get1('SELECT COUNT(*) FROM time_entries') || 0);
+    const dateFrom     = get1('SELECT MIN(log_date) FROM time_entries') || '—';
+    const dateTo       = get1('SELECT MAX(log_date) FROM time_entries') || '—';
+    preview.close();
+    return { username, companyCount, entryCount, dateFrom, dateTo };
+  } catch(e) { return { error: e.message }; }
+});
+
+ipcMain.handle('backup:restore', (_, filename) => {
+  if (!sessionUser) return { ok: false, error: 'No session' };
+  if (!/^vault-[\d\-T]+\.db$/.test(filename)) return { ok: false, error: 'Invalid filename' };
+  const filepath = path.join(BACKUP_DIR, filename);
+  if (!fs.existsSync(filepath)) return { ok: false, error: 'File not found' };
+  try {
+    performBackup(); // safety-save current state before overwriting
+    fs.copyFileSync(filepath, DB_FILE);
+    // Reload the DB in memory
+    const buf = fs.readFileSync(DB_FILE);
+    db = new SQL.Database(buf);
+    // Clear session
+    clearIdleTimer();
+    sessionKey = null; sessionUser = null; activeEntryId = null;
+    mainWindow.loadFile(path.join(__dirname, '../renderer/pages/login.html'));
+    return { ok: true };
+  } catch(e) { return { ok: false, error: e.message }; }
+});
+
+// ── IPC: Audit dismissed ──────────────────────────────────────────────────
+ipcMain.handle('audit:get-dismissed', () => {
+  if (!sessionUser) return [];
+  return dbAll('SELECT entry_id, row_idx, type FROM audit_dismissed WHERE user_id=?', [sessionUser.id]);
+});
+
+ipcMain.handle('audit:dismiss', (_, { entry_id, row_idx, type }) => {
+  if (!sessionUser) return { ok: false };
+  db.run(
+    'INSERT OR IGNORE INTO audit_dismissed (user_id, entry_id, row_idx, type) VALUES (?,?,?,?)',
+    [sessionUser.id, Number(entry_id), Number(row_idx), type]
+  );
+  persistDB();
+  return { ok: true };
+});
+
+ipcMain.handle('audit:clear-dismissed', () => {
+  if (!sessionUser) return { ok: false };
+  db.run('DELETE FROM audit_dismissed WHERE user_id=?', [sessionUser.id]);
+  persistDB();
+  return { ok: true };
+});
+
+ipcMain.handle('audit:apply-fix', (_, { entry_id, row_idx, fix_type }) => {
+  if (!sessionKey || !sessionUser) return { ok: false };
+  const row = dbGet('SELECT rowid as rid, * FROM time_entries WHERE rowid=? AND user_id=?',
+    [Number(entry_id), sessionUser.id]);
+  if (!row) return { ok: false, error: 'Entry not found' };
+  try {
+    const rows = JSON.parse(row.rows_json || '[]');
+    const r = rows[row_idx];
+    if (!r) return { ok: false, error: 'Row not found' };
+
+    if (fix_type === 'set_clock_out') {
+      // Set clock-out to clock-in + 8h, capped at 23:59
+      if (!r.clock_in) return { ok: false, error: 'No clock-in to base fix on' };
+      const [h, m] = r.clock_in.split(':').map(Number);
+      const outMins = Math.min(h * 60 + m + 480, 23 * 60 + 59);
+      const outH = String(Math.floor(outMins / 60)).padStart(2, '0');
+      const outM = String(outMins % 60).padStart(2, '0');
+      r.clock_out  = `${outH}:${outM}`;
+      r.total_mins = outMins - (h * 60 + m);
+    } else if (fix_type === 'recalc_duration') {
+      if (!r.clock_in || !r.clock_out) return { ok: false, error: 'Need both clock-in and clock-out' };
+      const [ih, im] = r.clock_in.split(':').map(Number);
+      const [oh, om] = r.clock_out.split(':').map(Number);
+      r.total_mins = (oh * 60 + om) - (ih * 60 + im);
+    }
+
+    rows[row_idx] = r;
+    const newJson = JSON.stringify(rows);
+    const newTotal = rows.reduce((s, row) => s + (row.total_mins || 0), 0);
+    db.run('UPDATE time_entries SET rows_json=?, total_mins=?, updated_at=strftime(\'%s\',\'now\') WHERE rowid=? AND user_id=?',
+      [newJson, newTotal, Number(entry_id), sessionUser.id]);
+    persistDB(); performBackup();
+    return { ok: true };
+  } catch (e) { return { ok: false, error: e.message }; }
+});
+
+// ── IPC: User Profile ─────────────────────────────────────────────────────
+ipcMain.handle('profile:get', () => {
+  if (!sessionKey || !sessionUser) return null;
+  const user = dbGet('SELECT rowid as rid, * FROM users WHERE rowid=?', [sessionUser.id]);
+  if (!user) return null;
+  let profileData = { full_name: '', email: '', phone: '', job_title: '', avatar: null };
+  if (user.profile_enc && user.profile_iv && user.profile_tag) {
+    try {
+      profileData = JSON.parse(decrypt({ data: user.profile_enc, iv: user.profile_iv, tag: user.profile_tag }, sessionKey));
+    } catch {}
+  }
+  return { display_name: user.display_name || '', ...profileData };
+});
+
+ipcMain.handle('profile:save', (_, { display_name, full_name, email, phone, job_title, avatar }) => {
+  if (!sessionKey || !sessionUser) return { ok: false };
+  try {
+    const blob = encrypt(JSON.stringify({ full_name: full_name || '', email: email || '', phone: phone || '', job_title: job_title || '', avatar: avatar || null }), sessionKey);
+    db.run('UPDATE users SET display_name=?, profile_enc=?, profile_iv=?, profile_tag=? WHERE rowid=?',
+      [display_name || null, blob.data, blob.iv, blob.tag, sessionUser.id]);
+    sessionUser.display_name = display_name || null;
+    persistDB();
+    return { ok: true };
+  } catch(e) { return { ok: false, error: e.message }; }
+});
+
+ipcMain.handle('auth:change-password', async (_, { currentPassword, totpCode, newPassword }) => {
+  if (!sessionKey || !sessionUser) return { ok: false, error: 'No active session.' };
+  const bcrypt    = require('bcryptjs');
+  const speakeasy = require('speakeasy');
+  const user = dbGet('SELECT rowid as rid, * FROM users WHERE rowid=?', [sessionUser.id]);
+  if (!user) return { ok: false, error: 'User not found.' };
+  if (!bcrypt.compareSync(currentPassword, user.password_hash))
+    return { ok: false, error: 'Current password is incorrect.' };
+  const totpOk = user.dev_mode ? true :
+    speakeasy.totp.verify({ secret: user.totp_secret, encoding: 'base32', token: totpCode, window: 1 });
+  if (!totpOk) return { ok: false, error: 'Invalid TOTP code.' };
+
+  const newKey = deriveKey(newPassword, user.key_salt);
+
+  // Re-encrypt all company rows with the new key
+  const companies = dbAll('SELECT rowid as rid, * FROM companies WHERE user_id=?', [sessionUser.id]);
+  for (const co of companies) {
+    try {
+      const plain = decrypt({ data: co.data_enc, iv: co.data_iv, tag: co.data_tag }, sessionKey);
+      const reenc = encrypt(plain, newKey);
+      db.run('UPDATE companies SET data_enc=?, data_iv=?, data_tag=? WHERE rowid=?',
+        [reenc.data, reenc.iv, reenc.tag, Number(co.rid)]);
+    } catch(e) { return { ok: false, error: 'Re-encryption failed: ' + e.message }; }
+  }
+
+  // Re-encrypt profile blob if present
+  if (user.profile_enc && user.profile_iv && user.profile_tag) {
+    try {
+      const plain = decrypt({ data: user.profile_enc, iv: user.profile_iv, tag: user.profile_tag }, sessionKey);
+      const reenc = encrypt(plain, newKey);
+      db.run('UPDATE users SET profile_enc=?, profile_iv=?, profile_tag=? WHERE rowid=?',
+        [reenc.data, reenc.iv, reenc.tag, sessionUser.id]);
+    } catch {}
+  }
+
+  const newHash = bcrypt.hashSync(newPassword, 12);
+  db.run('UPDATE users SET password_hash=? WHERE rowid=?', [newHash, sessionUser.id]);
+  sessionKey = newKey;
+  persistDB(); performBackup();
+  return { ok: true };
+});
+
+ipcMain.handle('audit:open-wizard', (_, { mode, theme } = {}) => {
+  createAuditWizardWindow(mode, theme);
+  return { ok: true };
+});
+
+// ── IPC: Database clear operations ────────────────────────────────────────
+ipcMain.handle('db:clear-timeclock', () => {
+  if (!sessionKey || !sessionUser) return { ok: false };
+  db.run('DELETE FROM task_items WHERE user_id=?', [sessionUser.id]);
+  db.run('DELETE FROM time_entries WHERE user_id=?', [sessionUser.id]);
+  activeEntryId = null;
+  persistDB(); performBackup();
+  return { ok: true };
+});
+
+ipcMain.handle('db:clear-companies', () => {
+  if (!sessionKey || !sessionUser) return { ok: false };
+  db.run('DELETE FROM task_items WHERE user_id=?', [sessionUser.id]);
+  db.run('DELETE FROM time_entries WHERE user_id=?', [sessionUser.id]);
+  db.run('DELETE FROM companies WHERE user_id=?', [sessionUser.id]);
+  activeEntryId = null;
+  persistDB(); performBackup();
+  return { ok: true };
+});
+
+ipcMain.handle('db:clear-full', () => {
+  if (!sessionKey || !sessionUser) return { ok: false };
+  db.run('DELETE FROM task_items');
+  db.run('DELETE FROM time_entries');
+  db.run('DELETE FROM companies');
+  db.run('DELETE FROM app_settings');
+  db.run('DELETE FROM users');
+  activeEntryId = null;
+  sessionKey  = null;
+  sessionUser = null;
+  persistDB();
+  return { ok: true };
+});
+
+ipcMain.handle('app:get-info', () => ({
+  version:         app.getVersion(),
+  electronVersion: process.versions.electron,
+  nodeVersion:     process.versions.node,
+  platform:        process.platform === 'win32' ? 'Windows' :
+                   process.platform === 'darwin' ? 'macOS' : 'Linux',
+  arch:            process.arch,
+}));
+
+// Update check URL — point this at the raw version.json in your GitHub repo once published
+const UPDATE_CHECK_URL = 'https://raw.githubusercontent.com/Conqueror-Mod/conquered-time/main/version.json';
+
+ipcMain.handle('app:check-update', () => new Promise((resolve) => {
+  const https = require('https');
+  const current = app.getVersion();
+  const req = https.get(UPDATE_CHECK_URL, { timeout: 8000 }, (res) => {
+    let raw = '';
+    res.on('data', chunk => raw += chunk);
+    res.on('end', () => {
+      try {
+        const data = JSON.parse(raw);
+        const latest = data.version || current;
+        // Simple semver comparison: split on dots, compare each segment numerically
+        const parse = v => v.replace(/[^0-9.]/g, '').split('.').map(Number);
+        const [aMaj, aMin, aPat] = parse(latest);
+        const [bMaj, bMin, bPat] = parse(current);
+        const hasUpdate =
+          aMaj > bMaj ||
+          (aMaj === bMaj && aMin > bMin) ||
+          (aMaj === bMaj && aMin === bMin && aPat > bPat);
+        resolve({ ok: true, current, latest, hasUpdate, downloadUrl: data.downloadUrl || '', notes: data.notes || '' });
+      } catch {
+        resolve({ ok: false, error: 'Invalid response from update server.' });
+      }
+    });
+  });
+  req.on('error', () => resolve({ ok: false, error: 'Could not reach update server. Check your connection.' }));
+  req.on('timeout', () => { req.destroy(); resolve({ ok: false, error: 'Update check timed out.' }); });
+}));
+
 ipcMain.handle('settings:get', (_, key) => {
   const row = dbGet('SELECT value FROM app_settings WHERE key=?', [key]);
   return row ? row.value : null;
@@ -472,7 +983,53 @@ ipcMain.handle('settings:set', (_, { key, value }) => {
 // ── App lifecycle ──────────────────────────────────────────────────────────
 app.whenReady().then(async () => {
   await initDB();
-  createWindow();
+
+  // Read saved theme so splash matches the user's preference
+  let savedTheme = 'arctic';
+  try {
+    const row = dbGet("SELECT value FROM app_settings WHERE key='ui_theme'");
+    if (row?.value) savedTheme = row.value;
+  } catch {}
+
+  const splash = createSplashWindow(savedTheme);
+  createWindow(); // creates hidden (show: false)
+
+  // Apply window position/size settings before show
+  const rememberPos   = dbGet("SELECT value FROM app_settings WHERE key='win_rememberPosition'")?.value === 'true';
+  const lastBoundsRaw = dbGet("SELECT value FROM app_settings WHERE key='win_lastBounds'")?.value;
+  const prefDisplay   = dbGet("SELECT value FROM app_settings WHERE key='win_preferredDisplay'")?.value || 'primary';
+  // Default to true — only false when user has explicitly toggled it off
+  const startMax      = dbGet("SELECT value FROM app_settings WHERE key='win_startMaximized'")?.value !== 'false';
+
+  if (rememberPos && lastBoundsRaw) {
+    try {
+      const b = JSON.parse(lastBoundsRaw);
+      mainWindow.setBounds({ x: b.x, y: b.y, width: b.width, height: b.height }, false);
+    } catch {}
+  } else if (prefDisplay !== 'primary') {
+    // Move onto the preferred display; always maximize to avoid off-screen issues
+    const target = screen.getAllDisplays().find(d => d.id === Number(prefDisplay)) || screen.getPrimaryDisplay();
+    mainWindow.setPosition(target.bounds.x + 10, target.bounds.y + 10);
+  }
+
+  // Track window bounds when Remember Last Position is enabled
+  function saveWindowBounds() {
+    if (dbGet("SELECT value FROM app_settings WHERE key='win_rememberPosition'")?.value !== 'true') return;
+    const b = mainWindow.getBounds();
+    db.run("INSERT OR REPLACE INTO app_settings (key,value) VALUES ('win_lastBounds',?)", [JSON.stringify(b)]);
+    persistDB();
+  }
+  mainWindow.on('moved',   saveWindowBounds);
+  mainWindow.on('resized', saveWindowBounds);
+
+  setTimeout(() => {
+    if (!splash.isDestroyed()) splash.close();
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.show();
+      // Always maximize when preferred display is set, or when startMax is on
+      if (prefDisplay !== 'primary' || startMax) mainWindow.maximize();
+    }
+  }, 3000);
 });
 
 app.on('window-all-closed', () => {

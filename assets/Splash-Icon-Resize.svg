@@ -1,0 +1,137 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bg" cx="40%" cy="35%" r="65%">
+      <stop offset="0%" stop-color="#1a1a3a"/>
+      <stop offset="55%" stop-color="#080818"/>
+      <stop offset="100%" stop-color="#020408"/>
+    </radialGradient>
+    <radialGradient id="rg" cx="30%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#f5d070"/>
+      <stop offset="60%" stop-color="#d4a030"/>
+      <stop offset="100%" stop-color="#8a5e10"/>
+    </radialGradient>
+    <linearGradient id="bar" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%"   stop-color="#8a6010" stop-opacity="0.3"/>
+      <stop offset="20%"  stop-color="#d4a030"/>
+      <stop offset="50%"  stop-color="#fff4c0"/>
+      <stop offset="80%"  stop-color="#d4a030"/>
+      <stop offset="100%" stop-color="#8a6010" stop-opacity="0.3"/>
+    </linearGradient>
+    <filter id="fg" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="waist" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="12" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="nd" x="-150%" y="-150%" width="400%" height="400%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="nb" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="18"/>
+    </filter>
+    <filter id="st" x="-200%" y="-200%" width="500%" height="500%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <clipPath id="hg">
+      <path d="M110 82 L402 82 L256 256 L402 430 L110 430 L256 256 Z"/>
+    </clipPath>
+  </defs>
+
+  <!-- Background -->
+  <circle cx="256" cy="256" r="250" fill="url(#bg)"/>
+  <circle cx="256" cy="256" r="244" fill="none" stroke="url(#rg)" stroke-width="5" opacity="0.9"/>
+  <circle cx="256" cy="256" r="238" fill="none" stroke="#f0c060" stroke-width="1" opacity="0.18"/>
+
+  <!-- Frame lines -->
+  <path d="M110 82 L402 82 L256 256 L402 430 L110 430 L256 256 Z"
+        fill="none" stroke="#c8902a" stroke-width="10"
+        stroke-linecap="round" stroke-linejoin="round"
+        filter="url(#fg)" opacity="0.5"/>
+  <path d="M110 82 L402 82 L256 256 L402 430 L110 430 L256 256 Z"
+        fill="none" stroke="#b07818" stroke-width="9"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M110 82 L402 82 L256 256 L402 430 L110 430 L256 256 Z"
+        fill="none" stroke="#f0d060" stroke-width="4"
+        stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+  <path d="M110 82 L402 82 L256 256 L402 430 L110 430 L256 256 Z"
+        fill="none" stroke="#fff8d0" stroke-width="1.2"
+        stroke-linecap="round" stroke-linejoin="round" opacity="0.55"/>
+  <line x1="110" y1="82"  x2="402" y2="82"  stroke="#b07818" stroke-width="10" stroke-linecap="round" filter="url(#fg)" opacity="0.6"/>
+  <line x1="110" y1="82"  x2="402" y2="82"  stroke="url(#bar)" stroke-width="10" stroke-linecap="round"/>
+  <line x1="110" y1="430" x2="402" y2="430" stroke="#b07818" stroke-width="10" stroke-linecap="round" filter="url(#fg)" opacity="0.6"/>
+  <line x1="110" y1="430" x2="402" y2="430" stroke="url(#bar)" stroke-width="10" stroke-linecap="round"/>
+
+  <!-- Hourglass interior — sand aesthetic -->
+  <g clip-path="url(#hg)">
+    <!-- Upper triangle: sand draining toward waist -->
+    <ellipse cx="256" cy="150" rx="120" ry="70" fill="#7c3aed" opacity="0.10" filter="url(#nb)"/>
+    <ellipse cx="256" cy="235" rx="70"  ry="30" fill="#d4a030" opacity="0.14" filter="url(#nb)"/>
+    <path d="M118 90 L394 90 L256 248 Z" fill="#7c3aed" fill-opacity="0.06"/>
+    <!-- Sand stream lines converging to waist -->
+    <line x1="155" y1="96"  x2="256" y2="252" stroke="#d4a030" stroke-width="1.0" opacity="0.22"/>
+    <line x1="256" y1="90"  x2="256" y2="252" stroke="#f0c060" stroke-width="1.3" opacity="0.28"/>
+    <line x1="357" y1="96"  x2="256" y2="252" stroke="#d4a030" stroke-width="1.0" opacity="0.22"/>
+    <!-- Sand grains — sparse at top -->
+    <circle cx="256" cy="102" r="1.8" fill="white"   opacity="0.65" filter="url(#st)"/>
+    <circle cx="205" cy="114" r="1.4" fill="white"   opacity="0.50" filter="url(#st)"/>
+    <circle cx="307" cy="112" r="1.4" fill="white"   opacity="0.50" filter="url(#st)"/>
+    <circle cx="232" cy="130" r="1.1" fill="#f5d070" opacity="0.50"/>
+    <circle cx="280" cy="128" r="1.1" fill="#f5d070" opacity="0.50"/>
+    <circle cx="185" cy="148" r="1.0" fill="white"   opacity="0.35"/>
+    <circle cx="327" cy="146" r="1.0" fill="white"   opacity="0.35"/>
+    <!-- Sand grains — thickening toward waist -->
+    <circle cx="222" cy="162" r="1.3" fill="#f5d070" opacity="0.58" filter="url(#st)"/>
+    <circle cx="290" cy="160" r="1.3" fill="#f5d070" opacity="0.58" filter="url(#st)"/>
+    <circle cx="256" cy="168" r="1.6" fill="#f5d070" opacity="0.62" filter="url(#st)"/>
+    <circle cx="238" cy="185" r="1.4" fill="#fde68a" opacity="0.68"/>
+    <circle cx="274" cy="183" r="1.4" fill="#fde68a" opacity="0.68"/>
+    <circle cx="256" cy="198" r="1.8" fill="#fde68a" opacity="0.72" filter="url(#st)"/>
+    <circle cx="244" cy="215" r="1.5" fill="#fde68a" opacity="0.78"/>
+    <circle cx="268" cy="213" r="1.5" fill="#fde68a" opacity="0.78"/>
+    <circle cx="256" cy="228" r="2.0" fill="#fde68a" opacity="0.84" filter="url(#st)"/>
+    <circle cx="249" cy="241" r="1.6" fill="#fff4c0" opacity="0.88"/>
+    <circle cx="263" cy="239" r="1.6" fill="#fff4c0" opacity="0.88"/>
+
+    <!-- Lower triangle: sand accumulated at bottom -->
+    <ellipse cx="256" cy="405" rx="105" ry="38" fill="#c8902a" opacity="0.22" filter="url(#nb)"/>
+    <ellipse cx="256" cy="385" rx="75"  ry="28" fill="#f5d070" opacity="0.13" filter="url(#nb)"/>
+    <ellipse cx="256" cy="272" rx="50"  ry="22" fill="#0ea5e9" opacity="0.13" filter="url(#nb)"/>
+    <path d="M256 264 L384 422 L128 422 Z" fill="#0ea5e9" fill-opacity="0.06"/>
+    <!-- Sand grains — sparse near waist (just fallen) -->
+    <circle cx="252" cy="270" r="1.6" fill="#fde68a" opacity="0.80" filter="url(#st)"/>
+    <circle cx="260" cy="276" r="1.3" fill="#fde68a" opacity="0.72"/>
+    <circle cx="246" cy="288" r="1.3" fill="#f5d070" opacity="0.65"/>
+    <circle cx="266" cy="286" r="1.3" fill="#f5d070" opacity="0.65"/>
+    <!-- Sand grains — spreading outward -->
+    <circle cx="228" cy="308" r="1.5" fill="#f5d070" opacity="0.62" filter="url(#st)"/>
+    <circle cx="284" cy="306" r="1.5" fill="#f5d070" opacity="0.62" filter="url(#st)"/>
+    <circle cx="256" cy="314" r="1.7" fill="#fde68a" opacity="0.68" filter="url(#st)"/>
+    <circle cx="240" cy="328" r="1.3" fill="#f5d070" opacity="0.60"/>
+    <circle cx="272" cy="326" r="1.3" fill="#f5d070" opacity="0.60"/>
+    <!-- Sand grains — denser accumulation layer -->
+    <circle cx="212" cy="350" r="1.8" fill="#f5d070" opacity="0.70" filter="url(#st)"/>
+    <circle cx="300" cy="348" r="1.8" fill="#f5d070" opacity="0.70" filter="url(#st)"/>
+    <circle cx="246" cy="356" r="1.5" fill="#fde68a" opacity="0.76"/>
+    <circle cx="266" cy="354" r="1.5" fill="#fde68a" opacity="0.76"/>
+    <circle cx="256" cy="366" r="2.0" fill="#fde68a" opacity="0.80" filter="url(#st)"/>
+    <!-- Sand grains — dense bottom pile -->
+    <circle cx="192" cy="386" r="2.0" fill="#f5d070" opacity="0.82" filter="url(#st)"/>
+    <circle cx="320" cy="384" r="2.0" fill="#f5d070" opacity="0.82" filter="url(#st)"/>
+    <circle cx="232" cy="392" r="1.8" fill="#fde68a" opacity="0.86"/>
+    <circle cx="280" cy="390" r="1.8" fill="#fde68a" opacity="0.86"/>
+    <circle cx="256" cy="397" r="2.4" fill="#fde68a" opacity="0.90" filter="url(#st)"/>
+    <circle cx="214" cy="410" r="1.5" fill="#f5d070" opacity="0.78"/>
+    <circle cx="298" cy="408" r="1.5" fill="#f5d070" opacity="0.78"/>
+    <circle cx="242" cy="416" r="1.2" fill="#fde68a" opacity="0.72"/>
+    <circle cx="270" cy="414" r="1.2" fill="#fde68a" opacity="0.72"/>
+  </g>
+
+  <!-- Waist node -->
+  <circle cx="256" cy="256" r="20" fill="#f0c060" filter="url(#waist)" opacity="0.4"/>
+  <circle cx="256" cy="256" r="6"  fill="#fff4c0" opacity="0.97"/>
+  <circle cx="256" cy="256" r="3"  fill="white"/>
+</svg>

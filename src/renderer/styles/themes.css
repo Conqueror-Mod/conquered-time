@@ -1,0 +1,211 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* ══════════════════════════════════════════════════════════════
+   THEME TOKENS
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── Shared tokens: identical across all themes ── */
+:root {
+  --mono: 'JetBrains Mono', monospace;
+  --sans: 'DM Sans', system-ui, sans-serif;
+
+  --radius-sm: 4px;
+  --radius:    6px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+
+  --transition: 0.14s ease;
+  --transition-md: 0.22s ease;
+}
+
+/* ── Fallback/base theme: EMBER ── */
+:root,
+[data-theme="ember"] {
+  --bg:           #13100c;
+  --bg-deep:      #0d0a07;
+  --surface-0:    #13100c;
+  --surface-1:    #1d1812;
+  --surface-2:    #252018;
+  --surface-3:    #2e281e;
+  --border:       #3c3228;
+  --border-light: #4e4034;
+
+  --accent:       #c8933a;
+  --accent-dim:   rgba(200,147,58,0.12);
+  --accent-glow:  rgba(200,147,58,0.26);
+  --accent-2:     #a05c20;
+  --accent-2-dim: rgba(160,92,32,0.14);
+
+  --red:          #e05252;
+  --red-dim:      rgba(224,82,82,0.12);
+  --yellow:       #d4a843;
+  --yellow-dim:   rgba(212,168,67,0.12);
+  --green:        #5a9e6f;
+  --green-dim:    rgba(90,158,111,0.12);
+  --blue:         #7aa8d4;
+  --blue-dim:     rgba(122,168,212,0.12);
+
+  --text:         #b8a080;
+  --text-dim:     #4e3e2c;
+  --text-muted:   #9a7e60;
+  --text-bright:  #e0cca8;
+  --text-white:   #f5e8cc;
+
+  /* Elevation shadows */
+  --shadow-1: 0 1px 3px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.28);
+  --shadow-2: 0 4px 12px rgba(0,0,0,0.45), 0 8px 24px rgba(0,0,0,0.32);
+  --shadow-3: 0 12px 40px rgba(0,0,0,0.6), 0 24px 64px rgba(0,0,0,0.38);
+  --shadow-inset: inset 0 1px 0 rgba(255,255,255,0.04);
+}
+
+/* ── VOID — pushed harder, nav/content contrast emphasized ───────────────── */
+[data-theme="void"] {
+  --bg:           #0d1018;
+  --bg-deep:      #070910;
+  --surface-0:    #0d1018;
+  --surface-1:    #121620;
+  --surface-2:    #181d2c;
+  --surface-3:    #1e2438;
+  --border:       #1e2d40;
+  --border-light: #28405a;
+
+  --accent:       #00c8a0;
+  --accent-dim:   rgba(0,200,160,0.12);
+  --accent-glow:  rgba(0,200,160,0.30);
+  --accent-2:     #7b5ea7;
+  --accent-2-dim: rgba(123,94,167,0.14);
+
+  --red:          #e05252;
+  --red-dim:      rgba(224,82,82,0.12);
+  --yellow:       #d4a843;
+  --yellow-dim:   rgba(212,168,67,0.12);
+  --green:        #5a9e6f;
+  --green-dim:    rgba(90,158,111,0.12);
+  --blue:         #60a5fa;
+  --blue-dim:     rgba(96,165,250,0.12);
+
+  --text:         #88aac8;
+  --text-dim:     #1e2d40;
+  --text-muted:   #607a98;
+  --text-bright:  #c0d8f0;
+  --text-white:   #e0f0ff;
+
+  --shadow-1: 0 1px 3px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.35);
+  --shadow-2: 0 4px 12px rgba(0,0,0,0.55), 0 8px 24px rgba(0,0,0,0.40);
+  --shadow-3: 0 12px 40px rgba(0,0,0,0.7), 0 24px 64px rgba(0,0,0,0.45);
+  --shadow-inset: inset 0 1px 0 rgba(255,255,255,0.03);
+}
+
+/* ── QUARTZ theme (polar opposite of Paper — stark, high contrast) ───────── */
+[data-theme="quartz"] {
+  --bg:           #f8f9fa;
+  --bg-deep:      #f1f3f5;
+  --surface-0:    #f8f9fa;
+  --surface-1:    #ffffff;
+  --surface-2:    #f1f3f5;
+  --surface-3:    #e9ecef;
+  --border:       #ced4da;
+  --border-light: #dee2e6;
+
+  --accent:       #1c2128;
+  --accent-dim:   rgba(28,33,40,0.07);
+  --accent-glow:  rgba(28,33,40,0.15);
+  --accent-2:     #495057;
+  --accent-2-dim: rgba(73,80,87,0.08);
+
+  --red:          #c0392b;
+  --red-dim:      rgba(192,57,43,0.10);
+  --yellow:       #e67e22;
+  --yellow-dim:   rgba(230,126,34,0.10);
+  --green:        #27ae60;
+  --green-dim:    rgba(39,174,96,0.10);
+  --blue:         #2980b9;
+  --blue-dim:     rgba(41,128,185,0.10);
+
+  --text:         #3d4450;
+  --text-dim:     #ced4da;
+  --text-muted:   #6c757d;
+  --text-bright:  #141820;
+  --text-white:   #1c2128;
+
+  --shadow-1: 0 1px 3px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.06);
+  --shadow-2: 0 4px 12px rgba(0,0,0,0.10), 0 8px 24px rgba(0,0,0,0.07);
+  --shadow-3: 0 12px 40px rgba(0,0,0,0.14), 0 24px 64px rgba(0,0,0,0.09);
+  --shadow-inset: inset 0 1px 0 rgba(255,255,255,0.8);
+}
+
+/* ── ARCTIC ── */
+[data-theme="arctic"] {
+  --bg:           #090f1a;
+  --bg-deep:      #050810;
+  --surface-0:    #090f1a;
+  --surface-1:    #0e1628;
+  --surface-2:    #141e36;
+  --surface-3:    #1a2644;
+  --border:       #1e3050;
+  --border-light: #284468;
+
+  --accent:       #60a5fa;
+  --accent-dim:   rgba(96,165,250,0.12);
+  --accent-glow:  rgba(96,165,250,0.28);
+  --accent-2:     #a78bfa;
+  --accent-2-dim: rgba(167,139,250,0.12);
+
+  --red:          #f87171;
+  --red-dim:      rgba(248,113,113,0.12);
+  --yellow:       #fbbf24;
+  --yellow-dim:   rgba(251,191,36,0.12);
+  --green:        #34d399;
+  --green-dim:    rgba(52,211,153,0.12);
+  --blue:         #60a5fa;
+  --blue-dim:     rgba(96,165,250,0.12);
+
+  --text:         #88aac8;
+  --text-dim:     #1e3050;
+  --text-muted:   #607a98;
+  --text-bright:  #c0d8f0;
+  --text-white:   #e8f0ff;
+
+  --shadow-1: 0 1px 3px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.35);
+  --shadow-2: 0 4px 12px rgba(0,0,0,0.55), 0 8px 24px rgba(0,0,0,0.40);
+  --shadow-3: 0 12px 40px rgba(0,0,0,0.7), 0 24px 64px rgba(0,0,0,0.45);
+  --shadow-inset: inset 0 1px 0 rgba(255,255,255,0.03);
+}
+
+/* ── PAPER ── */
+[data-theme="paper"] {
+  --bg:           #faf7f0;
+  --bg-deep:      #f2ede4;
+  --surface-0:    #faf7f0;
+  --surface-1:    #fdf9f4;
+  --surface-2:    #f5f0e8;
+  --surface-3:    #ede7db;
+  --border:       #d4c9b4;
+  --border-light: #e0d8c8;
+
+  --accent:       #1a4480;
+  --accent-dim:   rgba(26,68,128,0.08);
+  --accent-glow:  rgba(26,68,128,0.18);
+  --accent-2:     #7b3f00;
+  --accent-2-dim: rgba(123,63,0,0.08);
+
+  --red:          #c0392b;
+  --red-dim:      rgba(192,57,43,0.10);
+  --yellow:       #b8860b;
+  --yellow-dim:   rgba(184,134,11,0.10);
+  --green:        #1a6b3c;
+  --green-dim:    rgba(26,107,60,0.10);
+  --blue:         #1a4480;
+  --blue-dim:     rgba(26,68,128,0.10);
+
+  --text:         #4a3e2c;
+  --text-dim:     #d4c9b4;
+  --text-muted:   #7a6a52;
+  --text-bright:  #1e1610;
+  --text-white:   #1a130a;
+
+  --shadow-1: 0 1px 3px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.05);
+  --shadow-2: 0 4px 12px rgba(0,0,0,0.10), 0 8px 24px rgba(0,0,0,0.07);
+  --shadow-3: 0 12px 40px rgba(0,0,0,0.14), 0 24px 64px rgba(0,0,0,0.09);
+  --shadow-inset: inset 0 1px 0 rgba(255,255,255,0.7);
+}

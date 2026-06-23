@@ -1,0 +1,131 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bg" cx="40%" cy="35%" r="65%">
+      <stop offset="0%" stop-color="#1a1a3a"/>
+      <stop offset="55%" stop-color="#080818"/>
+      <stop offset="100%" stop-color="#020408"/>
+    </radialGradient>
+    <radialGradient id="rg" cx="30%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#f5d070"/>
+      <stop offset="60%" stop-color="#d4a030"/>
+      <stop offset="100%" stop-color="#8a5e10"/>
+    </radialGradient>
+    <linearGradient id="bar" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%"   stop-color="#8a6010" stop-opacity="0.3"/>
+      <stop offset="20%"  stop-color="#d4a030"/>
+      <stop offset="50%"  stop-color="#fff4c0"/>
+      <stop offset="80%"  stop-color="#d4a030"/>
+      <stop offset="100%" stop-color="#8a6010" stop-opacity="0.3"/>
+    </linearGradient>
+    <filter id="fg" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="waist" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="12" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="nd" x="-150%" y="-150%" width="400%" height="400%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="nb" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="18"/>
+    </filter>
+    <filter id="st" x="-200%" y="-200%" width="500%" height="500%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <clipPath id="hg">
+      <path d="M110 82 L402 82 L256 256 L402 430 L110 430 L256 256 Z"/>
+    </clipPath>
+  </defs>
+
+  <!-- Background -->
+  <circle cx="256" cy="256" r="250" fill="url(#bg)"/>
+  <circle cx="256" cy="256" r="244" fill="none" stroke="url(#rg)" stroke-width="5" opacity="0.9"/>
+  <circle cx="256" cy="256" r="238" fill="none" stroke="#f0c060" stroke-width="1" opacity="0.18"/>
+
+  <!-- Frame lines — base layer, drawn before galaxy and text -->
+  <path d="M110 82 L402 82 L256 256 L402 430 L110 430 L256 256 Z"
+        fill="none" stroke="#c8902a" stroke-width="10"
+        stroke-linecap="round" stroke-linejoin="round"
+        filter="url(#fg)" opacity="0.5"/>
+  <path d="M110 82 L402 82 L256 256 L402 430 L110 430 L256 256 Z"
+        fill="none" stroke="#b07818" stroke-width="9"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M110 82 L402 82 L256 256 L402 430 L110 430 L256 256 Z"
+        fill="none" stroke="#f0d060" stroke-width="4"
+        stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+  <path d="M110 82 L402 82 L256 256 L402 430 L110 430 L256 256 Z"
+        fill="none" stroke="#fff8d0" stroke-width="1.2"
+        stroke-linecap="round" stroke-linejoin="round" opacity="0.55"/>
+  <line x1="110" y1="82"  x2="402" y2="82"  stroke="#b07818" stroke-width="10" stroke-linecap="round" filter="url(#fg)" opacity="0.6"/>
+  <line x1="110" y1="82"  x2="402" y2="82"  stroke="url(#bar)" stroke-width="10" stroke-linecap="round"/>
+  <line x1="110" y1="430" x2="402" y2="430" stroke="#b07818" stroke-width="10" stroke-linecap="round" filter="url(#fg)" opacity="0.6"/>
+  <line x1="110" y1="430" x2="402" y2="430" stroke="url(#bar)" stroke-width="10" stroke-linecap="round"/>
+
+  <!-- Galaxy interior — clipped to hourglass -->
+  <g clip-path="url(#hg)">
+    <ellipse cx="256" cy="168" rx="130" ry="90" fill="#7c3aed" opacity="0.18" filter="url(#nb)"/>
+    <ellipse cx="218" cy="148" rx="70"  ry="50" fill="#a78bfa" opacity="0.14" filter="url(#nb)"/>
+    <ellipse cx="298" cy="158" rx="60"  ry="40" fill="#ec4899" opacity="0.07" filter="url(#nb)"/>
+    <ellipse cx="256" cy="358" rx="120" ry="70" fill="#0ea5e9"  opacity="0.2"  filter="url(#nb)"/>
+    <ellipse cx="228" cy="378" rx="60"  ry="40" fill="#38bdf8"  opacity="0.15" filter="url(#nb)"/>
+    <path d="M118 90 L394 90 L256 248 Z"   fill="#7c3aed" fill-opacity="0.08"/>
+    <path d="M256 264 L384 422 L128 422 Z" fill="#0ea5e9" fill-opacity="0.1"/>
+    <!-- Stars -->
+    <circle cx="256" cy="100" r="2.8" fill="white" opacity="0.9"  filter="url(#st)"/>
+    <circle cx="200" cy="118" r="1.8" fill="white" opacity="0.75" filter="url(#st)"/>
+    <circle cx="312" cy="120" r="1.8" fill="white" opacity="0.75" filter="url(#st)"/>
+    <circle cx="248" cy="130" r="1.2" fill="white" opacity="0.6"/>
+    <circle cx="270" cy="138" r="1.0" fill="white" opacity="0.5"/>
+    <circle cx="256" cy="290" r="2.5" fill="white"   opacity="0.85" filter="url(#st)"/>
+    <circle cx="210" cy="315" r="2"   fill="#b0d8ff" opacity="0.8"  filter="url(#st)"/>
+    <circle cx="302" cy="310" r="2"   fill="#b0d8ff" opacity="0.8"  filter="url(#st)"/>
+    <circle cx="232" cy="348" r="1.8" fill="white"   opacity="0.65"/>
+    <circle cx="280" cy="342" r="1.8" fill="white"   opacity="0.65"/>
+    <circle cx="256" cy="368" r="1.5" fill="#80c0ff" opacity="0.6"/>
+    <!-- Circuit nodes — upper (violet) -->
+    <line x1="210" y1="145" x2="256" y2="118" stroke="#a78bfa" stroke-width="1.2" opacity="0.45"/>
+    <line x1="256" y1="118" x2="302" y2="145" stroke="#a78bfa" stroke-width="1.2" opacity="0.45"/>
+    <circle cx="256" cy="118" r="5"   fill="#c4b5fd" filter="url(#nd)" opacity="0.9"/>
+    <circle cx="210" cy="145" r="3.5" fill="#a78bfa" filter="url(#nd)" opacity="0.8"/>
+    <circle cx="302" cy="145" r="3.5" fill="#a78bfa" filter="url(#nd)" opacity="0.8"/>
+    <!-- Circuit nodes — lower (blue) -->
+    <line x1="212" y1="318" x2="256" y2="296" stroke="#60a5fa" stroke-width="1.1" opacity="0.38"/>
+    <line x1="256" y1="296" x2="300" y2="318" stroke="#60a5fa" stroke-width="1.1" opacity="0.38"/>
+    <line x1="212" y1="318" x2="234" y2="358" stroke="#60a5fa" stroke-width="0.9" opacity="0.28"/>
+    <line x1="300" y1="318" x2="278" y2="358" stroke="#60a5fa" stroke-width="0.9" opacity="0.28"/>
+    <circle cx="256" cy="296" r="4.5" fill="#60a5fa" opacity="0.6"/>
+    <circle cx="212" cy="318" r="3.5" fill="#4a88d8" opacity="0.55"/>
+    <circle cx="300" cy="318" r="3.5" fill="#4a88d8" opacity="0.55"/>
+    <circle cx="234" cy="358" r="2.5" fill="#38bdf8" opacity="0.45"/>
+    <circle cx="278" cy="358" r="2.5" fill="#38bdf8" opacity="0.45"/>
+  </g>
+
+  <!-- Text — bare elements, no clip, no stroke -->
+  <text x="115" y="290" text-anchor="middle"
+        font-family="system-ui,-apple-system,sans-serif"
+        font-size="126" font-weight="800"
+        fill="#f0c060" fill-opacity="0.86">C</text>
+  <text x="115" y="320" text-anchor="middle"
+        font-family="system-ui,-apple-system,sans-serif"
+        font-size="25" font-weight="600"
+        fill="#f07828" fill-opacity="0.9"
+        letter-spacing="1.5">CONQUERED</text>
+  <text x="397" y="290" text-anchor="middle"
+        font-family="system-ui,-apple-system,sans-serif"
+        font-size="126" font-weight="800"
+        fill="#f0c060" fill-opacity="0.86">T</text>
+  <text x="397" y="320" text-anchor="middle"
+        font-family="system-ui,-apple-system,sans-serif"
+        font-size="25" font-weight="600"
+        fill="#f07828" fill-opacity="0.9"
+        letter-spacing="4">TIME</text>
+
+  <!-- Waist node -->
+  <circle cx="256" cy="256" r="20" fill="#f0c060" filter="url(#waist)" opacity="0.4"/>
+  <circle cx="256" cy="256" r="6"  fill="#fff4c0" opacity="0.97"/>
+  <circle cx="256" cy="256" r="3"  fill="white"/>
+</svg>
