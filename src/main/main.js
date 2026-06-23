@@ -10,11 +10,21 @@ const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) { app.quit(); process.exit(0); }
 
 // ── Data paths ─────────────────────────────────────────────────────────────
-const DATA_DIR   = path.join(app.getPath('userData'), 'conquered-data');
-const DB_FILE    = path.join(DATA_DIR, 'vault.db');
-const BACKUP_DIR = path.join(DATA_DIR, 'backups');
+// --dev flag: uses ./dev-data/dev-vault.db; skips profile selector entirely.
+// Production: each user lives in conquered-data/profiles/<username>/vault.db.
+const IS_DEV        = process.argv.includes('--dev');
+const ROOT_DATA_DIR = IS_DEV
+  ? path.join(__dirname, '..', '..', 'dev-data')
+  : path.join(app.getPath('userData'), 'conquered-data');
+const PROFILES_DIR  = IS_DEV ? null : path.join(ROOT_DATA_DIR, 'profiles');
 
-[DATA_DIR, BACKUP_DIR].forEach(d => { if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); });
+// Mutable — set when a profile is selected via profiles:select (or auto-set in dev)
+let ACTIVE_PROFILE_DIR = IS_DEV ? ROOT_DATA_DIR : null;
+let DB_FILE            = IS_DEV ? path.join(ROOT_DATA_DIR, 'dev-vault.db') : null;
+let BACKUP_DIR         = IS_DEV ? path.join(ROOT_DATA_DIR, 'backups') : null;
+
+fs.mkdirSync(ROOT_DATA_DIR, { recursive: true });
+if (IS_DEV) fs.mkdirSync(BACKUP_DIR, { recursive: true });
 
 // ── In-memory session state ────────────────────────────────────────────────
 let sessionKey  = null;
@@ -26,9 +36,69 @@ let idleTimer    = null;   // auto-lock timeout handle
 let forceClose   = false;  // set true after user confirms close through audit prompt
 let activeEntryId = null;  // rowid of the currently live time_entries row
 
+// ── Profile manifest helpers ───────────────────────────────────────────────
+function writeManifest(profileDir, data) {
+  fs.writeFileSync(path.join(profileDir, 'profile-manifest.json'), JSON.stringify(data, null, 2));
+}
+
+function readManifest(profileDir) {
+  try { return JSON.parse(fs.readFileSync(path.join(profileDir, 'profile-manifest.json'), 'utf8')); }
+  catch { return null; }
+}
+
+// Read a single app_settings value without requiring an active session.
+// In dev mode (db already loaded), reads directly. In prod, peeks into the
+// first available profile's vault to pull startup prefs (theme, window pos).
+function readStartupSetting(key) {
+  if (db) {
+    const row = dbGet('SELECT value FROM app_settings WHERE key=?', [key]);
+    return row?.value ?? null;
+  }
+  if (!PROFILES_DIR || !fs.existsSync(PROFILES_DIR)) return null;
+  const dirs = fs.readdirSync(PROFILES_DIR).filter(
+    n => fs.existsSync(path.join(PROFILES_DIR, n, 'vault.db'))
+  );
+  if (!dirs.length) return null;
+  try {
+    const buf  = fs.readFileSync(path.join(PROFILES_DIR, dirs[0], 'vault.db'));
+    const tmpDb = new SQL.Database(buf);
+    const res   = tmpDb.exec(`SELECT value FROM app_settings WHERE key='${key.replace(/'/g, "''")}'`);
+    tmpDb.close();
+    return res[0]?.values?.[0]?.[0] ?? null;
+  } catch { return null; }
+}
+
+// ── Migration: legacy flat vault.db → profiles/<username>/vault.db ─────────
+function migrateFromLegacyVault() {
+  const legacyDb = path.join(ROOT_DATA_DIR, 'vault.db');
+  if (!fs.existsSync(legacyDb) || fs.existsSync(PROFILES_DIR)) return;
+  try {
+    const buf   = fs.readFileSync(legacyDb);
+    const tmpDb = new SQL.Database(buf);
+    const res   = tmpDb.exec('SELECT username FROM users LIMIT 1');
+    tmpDb.close();
+    if (!res.length || !res[0].values.length) return;
+    const username   = res[0].values[0][0];
+    const profileDir = path.join(PROFILES_DIR, username);
+    fs.mkdirSync(path.join(profileDir, 'backups'), { recursive: true });
+    fs.renameSync(legacyDb, path.join(profileDir, 'vault.db'));
+    writeManifest(profileDir, {
+      username, display_name: username, avatar_thumb_48: null,
+      created_at: Math.floor(Date.now() / 1000),
+      auth_methods: ['password+totp'], key_derivation_version: 'pbkdf2-v1',
+      passkey_credential_id: null
+    });
+  } catch (e) { console.error('[migrate] Legacy vault migration failed:', e.message); }
+}
+
 // ── sql.js init ────────────────────────────────────────────────────────────
-async function initDB() {
-  SQL = await require('sql.js')();
+async function initProfileDB(profileDir) {
+  ACTIVE_PROFILE_DIR = profileDir;
+  DB_FILE   = path.join(profileDir, IS_DEV ? 'dev-vault.db' : 'vault.db');
+  BACKUP_DIR = path.join(profileDir, 'backups');
+  fs.mkdirSync(BACKUP_DIR, { recursive: true });
+
+  if (!SQL) SQL = await require('sql.js')();
 
   if (fs.existsSync(DB_FILE)) {
     const buf = fs.readFileSync(DB_FILE);
@@ -418,8 +488,59 @@ ipcMain.handle('win:move-to-display', (_, displayId) => {
 });
 ipcMain.on('navigate',     (_, page) => navigate(page));
 
+// ── IPC: Profiles ─────────────────────────────────────────────────────────
+ipcMain.handle('profiles:list', () => {
+  if (IS_DEV || !PROFILES_DIR || !fs.existsSync(PROFILES_DIR)) return [];
+  try {
+    return fs.readdirSync(PROFILES_DIR)
+      .filter(name => fs.existsSync(path.join(PROFILES_DIR, name, 'profile-manifest.json')))
+      .map(name => readManifest(path.join(PROFILES_DIR, name)))
+      .filter(Boolean);
+  } catch { return []; }
+});
+
+ipcMain.handle('profiles:select', async (_, { username }) => {
+  if (!username || typeof username !== 'string') return { ok: false, error: 'Invalid username.' };
+  const safeName  = username.replace(/[^a-zA-Z0-9_\-]/g, '');
+  if (!safeName)  return { ok: false, error: 'Invalid username.' };
+  const profileDir = path.join(PROFILES_DIR, safeName);
+  // Guard: if folder + vault + user already exist, reject as duplicate
+  if (fs.existsSync(path.join(profileDir, 'vault.db'))) {
+    const tmpDb = new SQL.Database(fs.readFileSync(path.join(profileDir, 'vault.db')));
+    const res   = tmpDb.exec('SELECT COUNT(*) FROM users');
+    tmpDb.close();
+    const count = res[0]?.values?.[0]?.[0] || 0;
+    if (count > 0 && !fs.existsSync(path.join(profileDir, 'profile-manifest.json'))) {
+      // Existing vault but no manifest — migrated profile, just load it
+    } else if (count > 0) {
+      return { ok: false, error: 'A profile with that username already exists.' };
+    }
+  }
+  await initProfileDB(profileDir);
+  const needsSetup = !dbGet('SELECT 1 FROM users LIMIT 1');
+  return { ok: true, needsSetup };
+});
+
+ipcMain.handle('profiles:load', async (_, { username }) => {
+  if (!username || typeof username !== 'string') return { ok: false, error: 'Invalid username.' };
+  const safeName   = username.replace(/[^a-zA-Z0-9_\-]/g, '');
+  const profileDir = path.join(PROFILES_DIR, safeName);
+  if (!fs.existsSync(path.join(profileDir, 'vault.db')))
+    return { ok: false, error: 'Profile not found.' };
+  await initProfileDB(profileDir);
+  return { ok: true, needsSetup: false };
+});
+
+ipcMain.handle('profiles:deselect', () => {
+  if (db) { db.close(); db = null; }
+  ACTIVE_PROFILE_DIR = null; DB_FILE = null; BACKUP_DIR = null;
+  sessionKey = null; sessionUser = null;
+  return { ok: true };
+});
+
 // ── IPC: Auth ──────────────────────────────────────────────────────────────
 ipcMain.handle('auth:check-setup', () => {
+  if (!db) return { needsSetup: true };
   const row = dbGet('SELECT COUNT(*) as c FROM users');
   return { needsSetup: (row?.c || 0) === 0 };
 });
@@ -439,6 +560,15 @@ ipcMain.handle('auth:setup', async (_, { username, password, totpSecret, totpCod
       [username, passwordHash, totpSecret, recoveryHash, keySalt]
     );
     persistDB();
+    // Write profile manifest so the selector card appears on next launch
+    if (ACTIVE_PROFILE_DIR && !IS_DEV) {
+      writeManifest(ACTIVE_PROFILE_DIR, {
+        username, display_name: username, avatar_thumb_48: null,
+        created_at: Math.floor(Date.now() / 1000),
+        auth_methods: ['password+totp'], key_derivation_version: 'pbkdf2-v1',
+        passkey_credential_id: null
+      });
+    }
     return { ok: true };
   } catch (e) { return { ok: false, error: e.message }; }
 });
@@ -477,6 +607,20 @@ ipcMain.handle('auth:login', async (_, { username, password, totpCode }) => {
     db.run('UPDATE users SET failed_attempts=0, locked_until=NULL WHERE rowid=?', [Number(user.rid)]);
     persistDB();
     resetIdleTimer();
+
+    // Backfill avatar_thumb_48 in manifest if missing (catches avatars saved before this fix)
+    if (ACTIVE_PROFILE_DIR && !IS_DEV) {
+      try {
+        const manifest = readManifest(ACTIVE_PROFILE_DIR);
+        if (manifest && !manifest.avatar_thumb_48 && user.profile_enc && user.profile_iv && user.profile_tag) {
+          const profileData = JSON.parse(decrypt({ data: user.profile_enc, iv: user.profile_iv, tag: user.profile_tag }, sessionKey));
+          if (profileData?.avatar) {
+            writeManifest(ACTIVE_PROFILE_DIR, { ...manifest, avatar_thumb_48: profileData.avatar });
+          }
+        }
+      } catch (e) { console.warn('[login] avatar_thumb backfill failed:', e.message); }
+    }
+
     return { ok: true };
   } catch (e) { return { ok: false, error: e.message }; }
 });
@@ -837,7 +981,7 @@ ipcMain.handle('profile:get', () => {
   return { display_name: user.display_name || '', ...profileData };
 });
 
-ipcMain.handle('profile:save', (_, { display_name, full_name, email, phone, job_title, avatar }) => {
+ipcMain.handle('profile:save', (_, { display_name, full_name, email, phone, job_title, avatar, avatar_thumb_48 }) => {
   if (!sessionKey || !sessionUser) return { ok: false };
   try {
     const blob = encrypt(JSON.stringify({ full_name: full_name || '', email: email || '', phone: phone || '', job_title: job_title || '', avatar: avatar || null }), sessionKey);
@@ -845,6 +989,15 @@ ipcMain.handle('profile:save', (_, { display_name, full_name, email, phone, job_
       [display_name || null, blob.data, blob.iv, blob.tag, sessionUser.id]);
     sessionUser.display_name = display_name || null;
     persistDB();
+    // Keep profile selector card in sync
+    if (ACTIVE_PROFILE_DIR && !IS_DEV) {
+      const existing = readManifest(ACTIVE_PROFILE_DIR) || {};
+      writeManifest(ACTIVE_PROFILE_DIR, {
+        ...existing,
+        display_name: display_name || existing.username || '',
+        avatar_thumb_48: avatar_thumb_48 || existing.avatar_thumb_48 || null
+      });
+    }
     return { ok: true };
   } catch(e) { return { ok: false, error: e.message }; }
 });
@@ -971,10 +1124,12 @@ ipcMain.handle('app:check-update', () => new Promise((resolve) => {
 }));
 
 ipcMain.handle('settings:get', (_, key) => {
+  if (!db) return null;
   const row = dbGet('SELECT value FROM app_settings WHERE key=?', [key]);
   return row ? row.value : null;
 });
 ipcMain.handle('settings:set', (_, { key, value }) => {
+  if (!db) return { ok: false };
   dbRun('INSERT OR REPLACE INTO app_settings (key,value) VALUES (?,?)', [key, String(value)]);
   persistDB();
   return { ok: true };
@@ -982,24 +1137,27 @@ ipcMain.handle('settings:set', (_, { key, value }) => {
 
 // ── App lifecycle ──────────────────────────────────────────────────────────
 app.whenReady().then(async () => {
-  await initDB();
+  // Load the sql.js WASM module once (needed for migration peek reads too)
+  SQL = await require('sql.js')();
 
-  // Read saved theme so splash matches the user's preference
-  let savedTheme = 'arctic';
-  try {
-    const row = dbGet("SELECT value FROM app_settings WHERE key='ui_theme'");
-    if (row?.value) savedTheme = row.value;
-  } catch {}
+  // Prod only: migrate old flat vault.db → profiles/<username>/vault.db
+  if (!IS_DEV) migrateFromLegacyVault();
+
+  // Dev: auto-load the dev profile so the rest of the flow is identical
+  if (IS_DEV) await initProfileDB(ROOT_DATA_DIR);
+
+  // Read saved theme for splash (peeks first available profile if no DB yet)
+  const savedTheme = readStartupSetting('ui_theme') || 'arctic';
 
   const splash = createSplashWindow(savedTheme);
   createWindow(); // creates hidden (show: false)
 
   // Apply window position/size settings before show
-  const rememberPos   = dbGet("SELECT value FROM app_settings WHERE key='win_rememberPosition'")?.value === 'true';
-  const lastBoundsRaw = dbGet("SELECT value FROM app_settings WHERE key='win_lastBounds'")?.value;
-  const prefDisplay   = dbGet("SELECT value FROM app_settings WHERE key='win_preferredDisplay'")?.value || 'primary';
+  const rememberPos   = readStartupSetting('win_rememberPosition') === 'true';
+  const lastBoundsRaw = readStartupSetting('win_lastBounds');
+  const prefDisplay   = readStartupSetting('win_preferredDisplay') || 'primary';
   // Default to true — only false when user has explicitly toggled it off
-  const startMax      = dbGet("SELECT value FROM app_settings WHERE key='win_startMaximized'")?.value !== 'false';
+  const startMax      = readStartupSetting('win_startMaximized') !== 'false';
 
   if (rememberPos && lastBoundsRaw) {
     try {
@@ -1014,6 +1172,7 @@ app.whenReady().then(async () => {
 
   // Track window bounds when Remember Last Position is enabled
   function saveWindowBounds() {
+    if (!db) return;
     if (dbGet("SELECT value FROM app_settings WHERE key='win_rememberPosition'")?.value !== 'true') return;
     const b = mainWindow.getBounds();
     db.run("INSERT OR REPLACE INTO app_settings (key,value) VALUES ('win_lastBounds',?)", [JSON.stringify(b)]);

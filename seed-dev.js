@@ -1,7 +1,8 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════
  *  CONQUERED TIME — Comprehensive Dev Seed Script
- *  Run: npm run seed   (or: node seed-dev.js)
+ *  Run:  npm run seed      → seeds ./dev-data/dev-vault.db (never touches real vault)
+ *        npm run dev       → launches app using dev-vault.db
  *
  *  What this seeds:
  *    • 1 dev user (TOTP bypassed, profile pre-filled)
@@ -26,12 +27,13 @@
 const path   = require('path');
 const fs     = require('fs');
 const crypto = require('crypto');
-const os     = require('os');
 
 // ── Paths ──────────────────────────────────────────────────────────────────
-const APP_NAME   = 'conquered-time';
-const DATA_DIR   = path.join(os.homedir(), 'AppData', 'Roaming', APP_NAME, 'conquered-data');
-const DB_FILE    = path.join(DATA_DIR, 'vault.db');
+// Dev DB lives inside the project at ./dev-data/ — completely separate from
+// the real user vault in AppData. Run the app with `npm run start:dev` to
+// pick this DB up. The real vault.db is never touched by this script.
+const DATA_DIR   = path.join(__dirname, 'dev-data');
+const DB_FILE    = path.join(DATA_DIR, 'dev-vault.db');
 const BACKUP_DIR = path.join(DATA_DIR, 'backups');
 
 // ── Dev credentials ────────────────────────────────────────────────────────
@@ -162,13 +164,8 @@ async function seed() {
   const passwordHash = bcrypt.hashSync(DEV_PASSWORD, 10);
   const recoveryHash = bcrypt.hashSync(DEV_RECOVERY, 10);
 
-  // Avatar: terminal >_ icon — dark navy background, teal prompt glyph
-  const avatarSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-    <rect width="100" height="100" rx="50" fill="#0d1b2a"/>
-    <rect x="8" y="8" width="84" height="84" rx="42" fill="#112240"/>
-    <text x="50" y="62" text-anchor="middle" font-family="monospace,Courier New" font-size="34" font-weight="bold" fill="#00d4aa">&gt;_</text>
-  </svg>`;
-  const avatarDataUrl = `data:image/svg+xml;base64,${Buffer.from(avatarSvg).toString('base64')}`;
+  // Avatar: Ruxin "COLLUSION!" reaction GIF
+  const avatarDataUrl = `data:image/gif;base64,${require('fs').readFileSync(require('path').join(__dirname, 'assets', 'ruxin_dev.gif')).toString('base64')}`;
 
   const profileData = {
     full_name:   'Dev Tester',
@@ -387,6 +384,16 @@ async function seed() {
   const dbData = db.export();
   fs.writeFileSync(DB_FILE, Buffer.from(dbData));
   console.log(`✓ Database written → ${DB_FILE}`);
+
+  // ── Profile manifest ────────────────────────────────────────────────────────
+  const manifest = {
+    username: DEV_USERNAME, display_name: 'Dev Tester', avatar_thumb_48: null,
+    created_at: Math.floor(Date.now() / 1000),
+    auth_methods: ['password+totp'], key_derivation_version: 'pbkdf2-v1',
+    passkey_credential_id: null
+  };
+  fs.writeFileSync(path.join(DATA_DIR, 'profile-manifest.json'), JSON.stringify(manifest, null, 2));
+  console.log(`✓ Profile manifest written → ${path.join(DATA_DIR, 'profile-manifest.json')}`);
 
   // ═══════════════════════════════════════════════════════════════════════════
   //  CREDENTIALS

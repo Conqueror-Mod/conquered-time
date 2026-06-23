@@ -157,6 +157,9 @@ Native `<input type="time">` renders in the OS locale's format (often 12-hour wi
   - 5-cell sequence → styled red "Backdoor Access" screen (username/password only, no TOTP) — intended as a dev-mode convenience, gated by the `dev_mode` DB flag set only by `seed-dev.js`
   - `Ctrl+Shift+D` toggles a debug overlay that labels the exact target cells (E1-E3 teal, D1-D5 red) for development/testing purposes — **should be removed or hidden before any real public/production build**
 - Dev seed script (`npm run seed`) — wipes DB, creates `devuser`/`devpass123` with `dev_mode=1` (TOTP bypassed), one sample company (RWS/Diamond/multimango hierarchy, fake NavID), one sample time entry. Essential for fast iteration; never ships in production.
+- **Multi-user profile container architecture** — each user gets `conquered-data/profiles/<username>/vault.db` + `backups/` + `profile-manifest.json`; dev mode uses isolated `dev-data/dev-vault.db` (unchanged); auto-migration from legacy flat `vault.db` on first launch; passkey future-proofing hooks (`auth_methods`, `key_derivation_version`, `passkey_credential_id`) baked into every manifest. Two-phase IPC login: `profiles:list` (no DB) → `profiles:load` (loads vault) → `auth:login`.
+- **Profile selector login UI** — profile cards (avatar photo or initials, display name, username) + dashed "Add Profile" card; clicking a card shows auth form with profile banner + ← back arrow; ESC on setup form returns to selector; Login tab hidden in Add Profile flow. `avatar_thumb_48` in manifest drives card photos — written on profile save and backfilled from encrypted DB on each login.
+- **View Password toggle** — eye icon in login password field; CSS grid overlay so the SVG sits inside the input's right edge; open/closed icon swap on click; auto-resets to hidden on navigation.
 
 ### Explicitly Deferred / On the Roadmap (not yet built)
 
