@@ -15,6 +15,7 @@ A secure, locally-encrypted desktop time tracker built for remote professionals 
 - **Company spiderweb** — force-graph visualization of your client network
 - **Dynamic time tracker** — clock in/out with task labels and per-company sessions, auto-grows as needed
 - **Inline editing** — double-click any field to edit; duration recalculates automatically
+- **User Profile** — avatar upload with manual crop modal (drag-to-pan, zoom in/out, circular preview); animated formats (GIF, APNG, WebP) preserved with Discord-style hover animation on sidebar
 - **Dispatch (Task Timer)** — dedicated task timing module with break/lunch compliance, description writeback, and sidebar live timer
 - **Global log** — filterable history across all companies with expandable session detail
 - **Reports & Audit** — time summaries, label breakdowns, audit log with per-row dismiss/fix/suggest actions, dismissed items persisted across sessions
