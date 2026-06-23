@@ -409,8 +409,9 @@ ipcMain.handle('win:move-to-display', (_, displayId) => {
   const target = displayId === 'primary'
     ? screen.getPrimaryDisplay()
     : (displays.find(d => d.id === Number(displayId)) || screen.getPrimaryDisplay());
-  // Move window onto the target display first, then maximize so Electron
-  // picks the right display for the maximize operation.
+  // Windows ignores setPosition() on a maximized window — must unmaximize first,
+  // reposition, then re-maximize so Electron targets the correct display.
+  if (mainWindow.isMaximized()) mainWindow.unmaximize();
   mainWindow.setPosition(target.bounds.x + 10, target.bounds.y + 10);
   mainWindow.maximize();
   return { ok: true };

@@ -18,22 +18,58 @@ html[data-scale="large"]       #main-content { zoom: 1.30; }
   transition-duration: 0.001ms !important;
 }
 
-/* Colorblind — deuteranopia (red-green, most common) */
+/* High contrast — increases border and text contrast across all themes */
+[data-high-contrast="true"] {
+  --border:         rgba(255,255,255,0.35);
+  --border-light:   rgba(255,255,255,0.25);
+  --text-dim:       rgba(255,255,255,0.55);
+  --text-muted:     rgba(255,255,255,0.75);
+  --text:           rgba(255,255,255,0.92);
+  --text-bright:    #ffffff;
+}
+[data-high-contrast="true"][data-theme="paper"],
+[data-high-contrast="true"][data-theme="quartz"] {
+  --border:         rgba(0,0,0,0.40);
+  --border-light:   rgba(0,0,0,0.28);
+  --text-dim:       rgba(0,0,0,0.55);
+  --text-muted:     rgba(0,0,0,0.72);
+  --text:           rgba(0,0,0,0.90);
+  --text-bright:    #000000;
+}
+[data-high-contrast="true"] .nav-item,
+[data-high-contrast="true"] .sidebar-section,
+[data-high-contrast="true"] .titlebar {
+  border-color: var(--border);
+}
+[data-high-contrast="true"] .nav-item.active {
+  border-width: 2px;
+  font-weight: 700;
+}
+
+/* Colorblind — deuteranopia (red-green deficiency, most common) */
 [data-colorblind="deuteranopia"] {
-  --accent:   #0077bb;
-  --accent-2: #ee7733;
-  --red:      #cc3311;
-  --green:    #009988;
-  --yellow:   #ddcc77;
+  --accent:      #0077bb;
+  --accent-dim:  rgba(0,119,187,0.15);
+  --accent-2:    #ee7733;
+  --red:         #cc3311;
+  --red-dim:     rgba(204,51,17,0.15);
+  --green:       #009988;
+  --green-dim:   rgba(0,153,136,0.15);
+  --yellow:      #ddcc77;
+  --yellow-dim:  rgba(221,204,119,0.15);
 }
 
 /* Colorblind — protanopia (red-blind) */
 [data-colorblind="protanopia"] {
-  --accent:   #0077bb;
-  --accent-2: #ee7733;
-  --red:      #882255;
-  --green:    #44bb99;
-  --yellow:   #ddcc77;
+  --accent:      #0077bb;
+  --accent-dim:  rgba(0,119,187,0.15);
+  --accent-2:    #ee7733;
+  --red:         #882255;
+  --red-dim:     rgba(136,34,85,0.15);
+  --green:       #44bb99;
+  --green-dim:   rgba(68,187,153,0.15);
+  --yellow:      #ddcc77;
+  --yellow-dim:  rgba(221,204,119,0.15);
 }
 
 /* Focus indicators */

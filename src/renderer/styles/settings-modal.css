@@ -366,7 +366,7 @@
   transition: border-color var(--transition);
 }
 .dba-confirm-input:focus { border-color: var(--accent); }
-.dba-confirm-input::placeholder { color: var(--text-dim); font-family: var(--sans); }
+.dba-confirm-input::placeholder { color: var(--text-muted); font-family: var(--sans); }
 
 @keyframes dba-shake {
   0%, 100% { transform: translateX(0); }

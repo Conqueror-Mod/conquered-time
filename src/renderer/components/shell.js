@@ -318,6 +318,13 @@ const Shell = (() => {
                 </div>
                 <div class="toggle-row">
                   <div class="toggle-info">
+                    <div class="toggle-label">High Contrast</div>
+                    <div class="toggle-desc">Increases border and text contrast across all themes</div>
+                  </div>
+                  <button class="toggle-switch" id="toggle-highcontrast" onclick="applyToggle('highContrast', this)"></button>
+                </div>
+                <div class="toggle-row">
+                  <div class="toggle-info">
                     <div class="toggle-label">Focus Indicators</div>
                     <div class="toggle-desc">Shows visible outlines for keyboard navigation</div>
                   </div>
@@ -928,10 +935,12 @@ function syncSettingsModal() {
   });
 
   // Toggles
-  const tm = document.getElementById('toggle-motion');
-  const tf = document.getElementById('toggle-focus');
-  if (tm) tm.classList.toggle('on', s.reducedMotion);
-  if (tf) tf.classList.toggle('on', s.focusIndicators);
+  const tm  = document.getElementById('toggle-motion');
+  const thc = document.getElementById('toggle-highcontrast');
+  const tf  = document.getElementById('toggle-focus');
+  if (tm)  tm.classList.toggle('on', s.reducedMotion);
+  if (thc) thc.classList.toggle('on', s.highContrast);
+  if (tf)  tf.classList.toggle('on', s.focusIndicators);
 
 
   // Colorblind selector

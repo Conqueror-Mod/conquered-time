@@ -11,6 +11,7 @@ const Settings = (() => {
     theme:            'arctic',   // slate | void | arctic | paper | quartz
     scale:            'normal',
     reducedMotion:    false,
+    highContrast:     false,
     colorblind:       'off',
     focusIndicators:  false,
     timeFormat:       '24h',
@@ -26,6 +27,7 @@ const Settings = (() => {
     root.setAttribute('data-theme',          settings.theme);
     root.setAttribute('data-scale',          settings.scale);
     root.setAttribute('data-reduced-motion',   settings.reducedMotion  ? 'true' : 'false');
+    root.setAttribute('data-high-contrast',    settings.highContrast   ? 'true' : 'false');
     root.setAttribute('data-colorblind',       settings.colorblind  || 'off');
     root.setAttribute('data-focus-indicators', settings.focusIndicators ? 'true' : 'false');
     window.__timeFormat = settings.timeFormat;
@@ -39,7 +41,7 @@ const Settings = (() => {
   // ── Load from DB and apply ─────────────────────────────────────────────────
   async function load() {
     try {
-      const keys = ['theme','scale','reducedMotion','colorblind','focusIndicators','timeFormat','autoLockMinutes','autoSaveInterval'];
+      const keys = ['theme','scale','reducedMotion','highContrast','colorblind','focusIndicators','timeFormat','autoLockMinutes','autoSaveInterval'];
       for (const key of keys) {
         const val = await api.invoke('settings:get', `ui_${key}`);
         if (val !== null && val !== undefined) {

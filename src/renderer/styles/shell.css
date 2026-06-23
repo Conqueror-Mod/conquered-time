@@ -85,6 +85,7 @@
   flex-direction: column;
   padding: 10px 0;
   flex-shrink: 0;
+  overflow: hidden; /* prevent content pushing user block off-screen on bad resize */
 }
 .sidebar-section { padding: 0 10px; margin-bottom: 12px; }
 
@@ -132,6 +133,7 @@
   padding: 8px 18px;
   border-top: 1px solid var(--border);
   text-align: center;
+  flex-shrink: 0; /* always pinned at bottom — never compressed off-screen */
 }
 .sidebar-user-identity {
   display: flex;
