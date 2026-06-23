@@ -11,7 +11,7 @@ const ALLOWED_INVOKE = new Set([
   'entries:list', 'entries:save', 'entries:all', 'entries:get-active', 'entries:get',
   'tasks:list', 'tasks:save', 'tasks:delete', 'tasks:recent-labels',
   'settings:get', 'settings:set',
-  'app:get-info',
+  'app:get-info', 'app:check-update',
   'db:clear-timeclock', 'db:clear-companies', 'db:clear-full',
   'profile:get', 'profile:save', 'auth:change-password',
   'audit:get-dismissed', 'audit:dismiss', 'audit:clear-dismissed', 'audit:apply-fix', 'audit:open-wizard',
@@ -21,7 +21,8 @@ const ALLOWED_INVOKE = new Set([
 
 const ALLOWED_SEND = new Set([
   'win:minimize', 'win:maximize', 'win:close', 'navigate',
-  'session:request-lock', 'session:confirm-close', 'session:confirm-lock'
+  'session:request-lock', 'session:confirm-close', 'session:confirm-lock',
+  'shell:open-external'
 ]);
 
 const ALLOWED_RECEIVE = new Set([

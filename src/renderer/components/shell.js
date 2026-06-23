@@ -387,6 +387,17 @@ const Shell = (() => {
               </div>
 
               <div class="about-section">
+                <div class="about-section-title">Updates</div>
+                <div class="about-update-row">
+                  <button class="about-update-btn" id="about-check-update-btn">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                    Check for Updates
+                  </button>
+                  <span class="about-update-result" id="about-update-result"></span>
+                </div>
+              </div>
+
+              <div class="about-section">
                 <div class="about-section-title">Links</div>
                 <div class="about-links">
                   <button class="about-link-btn" onclick="Shell._openExternal('github')">
@@ -686,6 +697,36 @@ async function switchSettingsCategory(cat) {
       document.getElementById('ab-node').textContent     = info.nodeVersion;
       document.getElementById('ab-platform').textContent = `${info.platform} (${info.arch})`;
     } catch {}
+
+    document.getElementById('about-check-update-btn')?.addEventListener('click', async () => {
+      const btn    = document.getElementById('about-check-update-btn');
+      const result = document.getElementById('about-update-result');
+      btn.disabled = true;
+      result.className = 'about-update-result';
+      result.textContent = 'Checking…';
+      try {
+        const res = await api.invoke('app:check-update');
+        if (!res.ok) {
+          result.className = 'about-update-result update-error';
+          result.textContent = res.error;
+        } else if (res.hasUpdate) {
+          result.className = 'about-update-result update-available';
+          result.innerHTML = `v${res.latest} available — <a class="update-download-link" href="#">Download</a>`;
+          result.querySelector('.update-download-link').addEventListener('click', e => {
+            e.preventDefault();
+            Shell._openUpdateUrl(res.downloadUrl);
+          });
+        } else {
+          result.className = 'about-update-result update-current';
+          result.textContent = `You're up to date (v${res.current}).`;
+        }
+      } catch {
+        result.className = 'about-update-result update-error';
+        result.textContent = 'Update check failed.';
+      } finally {
+        btn.disabled = false;
+      }
+    });
   }
 }
 
@@ -731,6 +772,11 @@ async function executeDbaClear(type) {
 
 Shell._openExternal = function(type) {
   Shell.toast('Link coming soon — stay tuned!', 'info', 2500);
+};
+
+Shell._openUpdateUrl = function(url) {
+  if (!url) { Shell.toast('No download URL configured yet.', 'info', 2500); return; }
+  api.send('shell:open-external', url);
 };
 
 // ── Backup Library ────────────────────────────────────────────────────────────
