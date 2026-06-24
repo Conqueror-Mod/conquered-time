@@ -214,43 +214,49 @@
 }
 
 /* ══════════════════════════════════════════════════════════════
-   RABANASTRE — Desert Capital of Dalmasca (FF12)  [STUB — full redesign pending]
+   RABANASTRE — Desert Capital of Dalmasca (FF12)
    Sun-baked, opulent, ancient. Sandstone, terracotta, desert gold.
    Warm sandy light base, deep teal accents from oasis markets.
+   Conquered and proud. Warmth without softness.
    ══════════════════════════════════════════════════════════════ */
 [data-theme="rabanastre"] {
-  --bg:           #f8f9fa;
-  --bg-deep:      #f1f3f5;
-  --surface-0:    #f8f9fa;
-  --surface-1:    #ffffff;
-  --surface-2:    #f1f3f5;
-  --surface-3:    #e9ecef;
-  --border:       #ced4da;
-  --border-light: #dee2e6;
+  /* Sun-baked sandstone — warm, bright, not yellow */
+  --bg:           #f2ebe0;
+  --bg-deep:      #e8dece;
+  --surface-0:    #f2ebe0;
+  --surface-1:    #f8f2e8;
+  --surface-2:    #e8dec8;
+  --surface-3:    #ddd0b8;
+  --border:       #c0a880;
+  --border-light: #d0bc98;
 
-  --accent:       #1c2128;
-  --accent-dim:   rgba(28,33,40,0.07);
-  --accent-glow:  rgba(28,33,40,0.15);
-  --accent-2:     #495057;
-  --accent-2-dim: rgba(73,80,87,0.08);
+  /* Deep oasis teal — marketplace awnings, Dalmascan jewelry */
+  --accent:       #1e6e78;
+  --accent-dim:   rgba(30,110,120,0.12);
+  --accent-glow:  rgba(30,110,120,0.28);
+  /* Burnt sienna — clay walls at dusk, terracotta rooftops */
+  --accent-2:     #b85828;
+  --accent-2-dim: rgba(184,88,40,0.12);
 
-  --red:          #c0392b;
-  --red-dim:      rgba(192,57,43,0.10);
-  --yellow:       #e67e22;
-  --yellow-dim:   rgba(230,126,34,0.10);
-  --green:        #27ae60;
-  --green-dim:    rgba(39,174,96,0.10);
-  --blue:         #2980b9;
-  --blue-dim:     rgba(41,128,185,0.10);
+  --red:          #b83828;
+  --red-dim:      rgba(184,56,40,0.10);
+  --yellow:       #b88018;
+  --yellow-dim:   rgba(184,128,24,0.10);
+  --green:        #286e40;
+  --green-dim:    rgba(40,110,64,0.10);
+  --blue:         #1e6e78;
+  --blue-dim:     rgba(30,110,120,0.10);
 
-  --text:         #3d4450;
-  --text-dim:     #ced4da;
-  --text-muted:   #6c757d;
-  --text-bright:  #141820;
-  --text-white:   #1c2128;
+  /* Aged manuscript — deep warm charcoal, not cold black */
+  --text:         #3a2c18;
+  --text-dim:     #c0a880;
+  --text-muted:   #6e5030;
+  --text-bright:  #1e1408;
+  --text-white:   #140e04;
 
-  --shadow-1: 0 1px 3px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.06);
-  --shadow-2: 0 4px 12px rgba(0,0,0,0.10), 0 8px 24px rgba(0,0,0,0.07);
-  --shadow-3: 0 12px 40px rgba(0,0,0,0.14), 0 24px 64px rgba(0,0,0,0.09);
-  --shadow-inset: inset 0 1px 0 rgba(255,255,255,0.8);
+  /* Dusty warm tan shadows — desert haze */
+  --shadow-1: 0 1px 4px rgba(100,60,8,0.16), 0 2px 10px rgba(100,60,8,0.10);
+  --shadow-2: 0 4px 16px rgba(100,60,8,0.20), 0 8px 32px rgba(100,60,8,0.13);
+  --shadow-3: 0 12px 40px rgba(100,60,8,0.28), 0 24px 64px rgba(100,60,8,0.18);
+  --shadow-inset: inset 0 1px 0 rgba(255,255,255,0.65);
 }
