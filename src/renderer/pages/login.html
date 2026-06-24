@@ -130,7 +130,19 @@
     box-shadow: 0 8px 48px rgba(0,0,0,0.80), 0 2px 12px rgba(0,0,0,0.60), 0 0 0 1px rgba(200,216,240,0.06);
   }
   /* Mission Control label is invisible at --text-dim on this dark card */
-  [data-theme="nibelheim"] .login-brand-label { color: #3a4560; }
+  [data-theme="nibelheim"] .login-brand-label { color: rgba(255,255,255,0.55); }
+
+  /* Treno login — deep plum night, amber candlelight bleeding through the card */
+  [data-theme="treno"] .login-body { background: #06040a; }
+  [data-theme="treno"] .grid-fade {
+    background: radial-gradient(ellipse 65% 65% at 50% 50%, rgba(14,11,16,0.15), #06040a 100%);
+  }
+  [data-theme="treno"] .login-card {
+    background: #161219;
+    border-color: #3c2e44;
+    box-shadow: 0 8px 48px rgba(8,4,12,0.88), 0 2px 12px rgba(8,4,12,0.65), 0 0 0 1px rgba(200,144,42,0.10);
+  }
+  [data-theme="treno"] .login-brand-label { color: rgba(255,255,255,0.55); }
 
   /* Lindblum login — warm parchment with amber depth */
   [data-theme="lindblum"] .login-body { background: #c8b99a; }
