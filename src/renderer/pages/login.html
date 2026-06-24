@@ -721,13 +721,17 @@ function initGrid() {
 }
 
 function resizeGrid() {
-  canvas.width  = canvas.offsetWidth  * devicePixelRatio;
-  canvas.height = canvas.offsetHeight * devicePixelRatio;
-  canvas.style.width  = canvas.offsetWidth  + 'px';
-  canvas.style.height = canvas.offsetHeight + 'px';
-  ctx.scale(devicePixelRatio, devicePixelRatio);
-  cols = Math.ceil(canvas.offsetWidth  / CELL_SIZE) + 1;
-  rows = Math.ceil(canvas.offsetHeight / CELL_SIZE) + 1;
+  // Read parent dimensions BEFORE touching canvas.width/height, which would change offsetWidth
+  const w = canvas.parentElement ? canvas.parentElement.clientWidth  : window.innerWidth;
+  const h = canvas.parentElement ? canvas.parentElement.clientHeight : window.innerHeight;
+  canvas.width  = w * devicePixelRatio;
+  canvas.height = h * devicePixelRatio;
+  canvas.style.width  = w + 'px';
+  canvas.style.height = h + 'px';
+  // setTransform instead of scale() so repeated resizes don't stack the DPR multiplier
+  ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  cols = Math.ceil(w / CELL_SIZE) + 1;
+  rows = Math.ceil(h / CELL_SIZE) + 1;
 }
 
 function onGridHover(e) {
