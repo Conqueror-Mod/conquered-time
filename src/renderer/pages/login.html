@@ -144,16 +144,19 @@
   }
   [data-theme="treno"] .login-brand-label { color: rgba(255,255,255,0.55); }
 
-  /* Lindblum login — warm parchment with amber depth */
-  [data-theme="lindblum"] .login-body { background: #c8b99a; }
+  /* Lindblum login — deep amber dusk, lamplight bleeds through the card */
+  [data-theme="lindblum"] .login-body { background: #3a2508; }
   [data-theme="lindblum"] .grid-fade {
-    background: radial-gradient(ellipse 65% 65% at 50% 50%, rgba(200,185,154,0.3), #c8b99a 100%);
+    background: radial-gradient(ellipse 70% 60% at 50% 50%, rgba(180,110,20,0.35), #3a2508 100%);
   }
   [data-theme="lindblum"] .login-card {
-    background: #faf7f0;
-    border-color: #c2b79f;
-    box-shadow: 0 8px 40px rgba(28,21,16,0.30), 0 2px 8px rgba(28,21,16,0.14), 0 0 0 1px rgba(28,21,16,0.06);
+    background: #faf6ec;
+    border-color: #c4b090;
+    box-shadow: 0 8px 40px rgba(60,30,8,0.38), 0 2px 8px rgba(60,30,8,0.20), 0 0 0 1px rgba(160,96,24,0.12);
   }
+  [data-theme="lindblum"] .ps-divider { color: var(--text); }
+  [data-theme="lindblum"] .ps-card.add-card { color: var(--text-muted); border-color: var(--border); }
+  [data-theme="lindblum"] .ps-add-icon { border-color: var(--border); }
 
   /* Rabanastre login — sandy stone with warm shadow */
   [data-theme="rabanastre"] .login-body { background: #9aa0a8; }
@@ -928,8 +931,13 @@ function animateGrid() {
   const H = canvas.offsetHeight;
   ctx.clearRect(0, 0, W, H);
 
-  // Draw grid lines
-  ctx.strokeStyle = 'rgba(30,35,48,0.8)';
+  // Draw grid lines — tinted per theme family
+  const th = document.documentElement.getAttribute('data-theme') || 'memoria';
+  ctx.strokeStyle = (th === 'lindblum' || th === 'rabanastre')
+    ? 'rgba(120,70,10,0.35)'
+    : (th === 'treno' || th === 'nibelheim')
+      ? 'rgba(200,190,220,0.12)'
+      : 'rgba(80,80,160,0.18)';
   ctx.lineWidth   = 0.5;
   for (let c = 0; c <= cols; c++) {
     ctx.beginPath(); ctx.moveTo(c * CELL_SIZE, 0); ctx.lineTo(c * CELL_SIZE, H); ctx.stroke();
