@@ -10,13 +10,13 @@
 // Apply saved theme before page renders to prevent flash
 (async function() {
   try {
-    const theme = (await api.invoke('settings:get', 'ui_theme')) || 'arctic';
+    const theme = (await api.invoke('settings:get', 'ui_theme')) || 'memoria';
     const scale = (await api.invoke('settings:get', 'ui_scale')) || 'normal';
     document.documentElement.setAttribute('data-theme', theme);
     document.documentElement.setAttribute('data-scale', scale);
   } catch(e) {
     // Fallback if IPC unavailable
-    document.documentElement.setAttribute('data-theme', 'arctic');
+    document.documentElement.setAttribute('data-theme', 'memoria');
   }
 })();
 </script>
@@ -105,30 +105,46 @@
     pointer-events: none;
   }
 
-  /* Paper login — warm parchment with deep navy vignette */
-  [data-theme="paper"] .login-body { background: #c8b99a; }
-  [data-theme="paper"] .grid-fade {
+  /* Memoria login — cool silver-blue dusk, card floats on crystal */
+  [data-theme="memoria"] .login-body { background: #7c80b0; }
+  [data-theme="memoria"] .grid-fade {
+    background: radial-gradient(ellipse 65% 65% at 50% 50%, rgba(124,128,176,0.28), #7c80b0 100%);
+  }
+  [data-theme="memoria"] .login-card {
+    background: #fafafd;
+    border-color: #c2c6de;
+    box-shadow: 0 8px 40px rgba(30,32,90,0.38), 0 2px 8px rgba(30,32,90,0.18), 0 0 0 1px rgba(30,32,90,0.07);
+  }
+  [data-theme="memoria"] .ps-divider { color: var(--text); }
+  [data-theme="memoria"] .ps-card.add-card { color: var(--text); border-color: var(--border); }
+  [data-theme="memoria"] .ps-add-icon { border-color: var(--border); }
+
+  /* Lindblum login — warm parchment with amber depth */
+  [data-theme="lindblum"] .login-body { background: #c8b99a; }
+  [data-theme="lindblum"] .grid-fade {
     background: radial-gradient(ellipse 65% 65% at 50% 50%, rgba(200,185,154,0.3), #c8b99a 100%);
   }
-  [data-theme="paper"] .login-card {
+  [data-theme="lindblum"] .login-card {
     background: #faf7f0;
     border-color: #c2b79f;
     box-shadow: 0 8px 40px rgba(28,21,16,0.30), 0 2px 8px rgba(28,21,16,0.14), 0 0 0 1px rgba(28,21,16,0.06);
   }
 
-  /* Quartz login — cool grey with charcoal depth */
-  [data-theme="quartz"] .login-body { background: #6c757d; }
-  [data-theme="quartz"] .grid-fade {
-    background: radial-gradient(ellipse 65% 65% at 50% 50%, rgba(108,117,125,0.35), #6c757d 100%);
+  /* Rabanastre login — sandy stone with warm shadow */
+  [data-theme="rabanastre"] .login-body { background: #9aa0a8; }
+  [data-theme="rabanastre"] .grid-fade {
+    background: radial-gradient(ellipse 65% 65% at 50% 50%, rgba(154,160,168,0.35), #9aa0a8 100%);
   }
-  [data-theme="quartz"] .login-card {
+  [data-theme="rabanastre"] .login-card {
     background: #ffffff;
     border-color: #adb5bd;
     box-shadow: 0 8px 40px rgba(13,15,16,0.35), 0 2px 8px rgba(13,15,16,0.16), 0 0 0 1px rgba(13,15,16,0.06);
   }
+
   /* Light theme corner accents — darker so visible on mid-tone background */
-  [data-theme="paper"] .corner,
-  [data-theme="quartz"] .corner { border-color: rgba(0,0,0,0.25) !important; }
+  [data-theme="memoria"] .corner,
+  [data-theme="lindblum"] .corner,
+  [data-theme="rabanastre"] .corner { border-color: rgba(0,0,0,0.25) !important; }
 
 
   .login-brand { text-align: center; margin-bottom: 18px; }

@@ -8,7 +8,7 @@
 const Settings = (() => {
 
   const DEFAULTS = {
-    theme:            'arctic',   // slate | void | arctic | paper | quartz
+    theme:            'memoria',  // memoria | treno | nibelheim | lindblum | rabanastre
     scale:            'normal',
     reducedMotion:    false,
     highContrast:     false,

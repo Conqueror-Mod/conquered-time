@@ -409,11 +409,11 @@
     initPeriodFilter();
 
     document.getElementById('btn-acknowledge-wizard').addEventListener('click', () => {
-      const theme = document.documentElement.getAttribute('data-theme') || 'arctic';
+      const theme = document.documentElement.getAttribute('data-theme') || 'memoria';
       api.invoke('audit:open-wizard', { mode: 'acknowledge', theme });
     });
     document.getElementById('btn-fix-wizard').addEventListener('click', () => {
-      const theme = document.documentElement.getAttribute('data-theme') || 'arctic';
+      const theme = document.documentElement.getAttribute('data-theme') || 'memoria';
       api.invoke('audit:open-wizard', { mode: 'fix', theme });
     });
     api.on('audit:wizard-done', async () => {
