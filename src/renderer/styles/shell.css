@@ -169,6 +169,7 @@
   object-fit: cover;
   display: block;
 }
+.sidebar-avatar img[data-animated] { cursor: pointer; }
 .sidebar-user-name {
   font-family: var(--sans);
   font-size: 13px;
@@ -178,7 +179,7 @@
 .sidebar-user-sub {
   font-family: var(--mono);
   font-size: 10px;
-  color: var(--text-dim);
+  color: var(--text-muted);
   margin-top: 1px;
 }
 .sidebar-user-label {

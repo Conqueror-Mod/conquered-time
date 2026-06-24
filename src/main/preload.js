@@ -4,6 +4,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 // Whitelist of allowed channels — renderer cannot call anything else
 const ALLOWED_INVOKE = new Set([
+  'profiles:list', 'profiles:select', 'profiles:load', 'profiles:deselect',
   'auth:check-setup', 'auth:setup', 'auth:login', 'auth:recover',
   'totp:generate',
   'session:get', 'session:heartbeat',

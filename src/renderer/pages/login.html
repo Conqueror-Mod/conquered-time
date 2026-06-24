@@ -7,17 +7,13 @@
 <title>Conquered Time — Login</title>
 <link rel="stylesheet" href="../styles/design-system.css">
 <script>
-// Apply saved theme before page renders to prevent flash
+// Login always renders in Zanarkand. User's chosen theme activates on dashboard.
+document.documentElement.setAttribute('data-theme', 'zanarkand');
 (async function() {
   try {
-    const theme = (await api.invoke('settings:get', 'ui_theme')) || 'arctic';
     const scale = (await api.invoke('settings:get', 'ui_scale')) || 'normal';
-    document.documentElement.setAttribute('data-theme', theme);
     document.documentElement.setAttribute('data-scale', scale);
-  } catch(e) {
-    // Fallback if IPC unavailable
-    document.documentElement.setAttribute('data-theme', 'arctic');
-  }
+  } catch(e) {}
 })();
 </script>
 <style>
@@ -80,15 +76,16 @@
   .login-card {
     position: relative;
     z-index: 4;
-    width: 380px;
+    width: 360px;
     /* Fully opaque — no background bleed through on any theme */
-    background: var(--surface-1);
-    border: 1px solid var(--border-light);
-    border-radius: var(--radius-lg);
-    padding: 36px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px 28px 24px;
     box-shadow: var(--shadow-3);
     transition: opacity 0.6s ease, transform 0.6s ease;
     isolation: isolate;
+    animation: card-in 0.35s ease both;
   }
   .login-card::before {
     content: '';
@@ -104,60 +101,118 @@
     pointer-events: none;
   }
 
-  /* Paper login — warm parchment with deep navy vignette */
-  [data-theme="paper"] .login-body { background: #c8b99a; }
-  [data-theme="paper"] .grid-fade {
-    background: radial-gradient(ellipse 65% 65% at 50% 50%, rgba(200,185,154,0.3), #c8b99a 100%);
+  /* Memoria login — cool silver-blue dusk, card floats on crystal */
+  [data-theme="memoria"] .login-body { background: #7c80b0; }
+  [data-theme="memoria"] .grid-fade {
+    background: radial-gradient(ellipse 65% 65% at 50% 50%, rgba(124,128,176,0.28), #7c80b0 100%);
   }
-  [data-theme="paper"] .login-card {
-    background: #faf7f0;
-    border-color: #c2b79f;
-    box-shadow: 0 8px 40px rgba(28,21,16,0.30), 0 2px 8px rgba(28,21,16,0.14), 0 0 0 1px rgba(28,21,16,0.06);
+  [data-theme="memoria"] .login-card {
+    background: #fafafd;
+    border-color: #c2c6de;
+    box-shadow: 0 8px 40px rgba(30,32,90,0.38), 0 2px 8px rgba(30,32,90,0.18), 0 0 0 1px rgba(30,32,90,0.07);
   }
+  [data-theme="memoria"] .ps-divider { color: var(--text); }
+  [data-theme="memoria"] .ps-card.add-card { color: var(--text); border-color: var(--border); }
+  [data-theme="memoria"] .ps-add-icon { border-color: var(--border); }
 
-  /* Quartz login — cool grey with charcoal depth */
-  [data-theme="quartz"] .login-body { background: #6c757d; }
-  [data-theme="quartz"] .grid-fade {
-    background: radial-gradient(ellipse 65% 65% at 50% 50%, rgba(108,117,125,0.35), #6c757d 100%);
+  /* Nibelheim login — moonless mountain dark, icy card edge */
+  [data-theme="nibelheim"] .login-body { background: #05060a; }
+  [data-theme="nibelheim"] .grid-fade {
+    background: radial-gradient(ellipse 65% 65% at 50% 50%, rgba(10,12,18,0.2), #05060a 100%);
   }
-  [data-theme="quartz"] .login-card {
-    background: #ffffff;
-    border-color: #adb5bd;
-    box-shadow: 0 8px 40px rgba(13,15,16,0.35), 0 2px 8px rgba(13,15,16,0.16), 0 0 0 1px rgba(13,15,16,0.06);
+  [data-theme="nibelheim"] .login-card {
+    background: #111418;
+    border-color: #2a3040;
+    box-shadow: 0 8px 48px rgba(0,0,0,0.80), 0 2px 12px rgba(0,0,0,0.60), 0 0 0 1px rgba(200,216,240,0.06);
   }
+  /* Mission Control label is invisible at --text-dim on this dark card */
+  [data-theme="nibelheim"] .login-brand-label { color: rgba(255,255,255,0.55); }
+
+  /* Treno login — deep plum night, amber candlelight bleeding through the card */
+  [data-theme="treno"] .login-body { background: #06040a; }
+  [data-theme="treno"] .grid-fade {
+    background: radial-gradient(ellipse 65% 65% at 50% 50%, rgba(14,11,16,0.15), #06040a 100%);
+  }
+  [data-theme="treno"] .login-card {
+    background: #161219;
+    border-color: #3c2e44;
+    box-shadow: 0 8px 48px rgba(8,4,12,0.88), 0 2px 12px rgba(8,4,12,0.65), 0 0 0 1px rgba(200,144,42,0.10);
+  }
+  [data-theme="treno"] .login-brand-label { color: rgba(255,255,255,0.55); }
+
+  /* Zanarkand login — deep ocean black, city lights bleeding up from below */
+  [data-theme="zanarkand"] .login-body { background: #040810; }
+  [data-theme="zanarkand"] .grid-fade {
+    background: radial-gradient(ellipse 70% 60% at 50% 50%, rgba(0,184,204,0.18), #040810 100%);
+  }
+  [data-theme="zanarkand"] .login-card {
+    background: #0e1628;
+    border-color: #1e3058;
+    box-shadow: 0 8px 52px rgba(0,8,24,0.90), 0 2px 14px rgba(0,8,24,0.70), 0 0 0 1px rgba(0,184,204,0.14);
+  }
+  [data-theme="zanarkand"] .login-brand-label { color: rgba(255,255,255,0.55); }
+
+  /* Rabanastre login — desert at noon, bleached stone, teal sky at the horizon */
+  [data-theme="rabanastre"] .login-body { background: #2a4848; }
+  [data-theme="rabanastre"] .grid-fade {
+    background: radial-gradient(ellipse 70% 60% at 50% 50%, rgba(30,110,120,0.30), #2a4848 100%);
+  }
+  [data-theme="rabanastre"] .login-card {
+    background: #f8f2e8;
+    border-color: #c0a880;
+    box-shadow: 0 8px 40px rgba(40,20,4,0.40), 0 2px 8px rgba(40,20,4,0.22), 0 0 0 1px rgba(30,110,120,0.12);
+  }
+  [data-theme="rabanastre"] .ps-divider { color: var(--text); }
+  [data-theme="rabanastre"] .ps-card.add-card { color: var(--text-muted); border-color: var(--border); }
+  [data-theme="rabanastre"] .ps-add-icon { border-color: var(--border); }
+
   /* Light theme corner accents — darker so visible on mid-tone background */
-  [data-theme="paper"] .corner,
-  [data-theme="quartz"] .corner { border-color: rgba(0,0,0,0.25) !important; }
+  [data-theme="memoria"] .corner,
+  [data-theme="rabanastre"] .corner { border-color: rgba(0,0,0,0.25) !important; }
 
 
-  .login-brand { text-align: center; margin-bottom: 28px; }
+  .login-brand { text-align: center; margin-bottom: 18px; }
   .login-brand-label {
-    font-family: var(--sans); font-size: 11px; font-weight: 500;
-    color: var(--text-muted); margin-bottom: 6px; letter-spacing: 0;
+    font-family: var(--mono); font-size: 9px; font-weight: 400;
+    color: var(--text-dim); margin-bottom: 5px; letter-spacing: 3px;
+    text-transform: uppercase;
   }
   .login-brand-name {
-    font-family: var(--mono); font-size: 22px;
-    color: var(--accent); letter-spacing: 3px; text-shadow: var(--glow-md);
+    font-family: var(--mono); font-size: 22px; font-weight: 700;
+    color: var(--text-white); letter-spacing: 0.18em;
+    text-transform: uppercase;
   }
   .login-brand-sub {
-    font-family: var(--sans); font-size: 12px; font-weight: 400;
-    color: var(--text-dim); margin-top: 4px; letter-spacing: 0;
+    font-family: var(--sans); font-size: 11px; font-weight: 400;
+    color: var(--text-muted); margin-top: 5px; letter-spacing: 0.04em;
   }
 
-  .login-form { display: flex; flex-direction: column; gap: 16px; }
+  .login-form { display: flex; flex-direction: column; gap: 13px; }
   .login-mode-tabs {
     display: flex; gap: 0;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    overflow: hidden; margin-bottom: 4px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 6px;
   }
   .mode-tab {
-    flex: 1; padding: 8px; background: transparent; border: none;
-    border-radius: 0; color: var(--text-dim); font-family: var(--sans);
+    flex: 1; padding: 7px 4px 8px; background: transparent; border: none;
+    border-bottom: 2px solid transparent; margin-bottom: -1px;
+    color: var(--text-muted); font-family: var(--sans);
     font-size: 12px; font-weight: 500; cursor: pointer;
     transition: all var(--transition); text-align: center; letter-spacing: 0;
   }
-  .mode-tab.active { background: var(--accent-dim); color: var(--accent); }
+  .mode-tab.active { border-bottom-color: var(--accent); color: var(--accent); }
+
+  .pw-wrap { display: grid; grid-template-columns: 1fr 34px; width: 100%; }
+  .pw-wrap input { grid-column: 1 / -1; grid-row: 1; padding-right: 38px; }
+  .pw-toggle {
+    grid-column: 2; grid-row: 1; z-index: 2;
+    background: transparent; border: none; cursor: pointer;
+    color: var(--text-muted); display: flex; align-items: center; justify-content: center;
+    font-size: 16px; line-height: 1;
+    transition: color var(--transition);
+  }
+  .pw-toggle:hover { color: var(--text-bright); }
+  .pw-toggle svg { pointer-events: none; }
   .error-msg {
     background: var(--red-dim); border: 1px solid var(--red);
     border-radius: var(--radius); padding: 9px 13px;
@@ -328,6 +383,164 @@
   }
   .seq-dot.lit { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
   .seq-dot.dev-lit { background: var(--red); box-shadow: 0 0 6px var(--red); }
+
+  /* ── Profile Selector ──────────────────────────────────── */
+  #profile-selector {
+    display: none;
+    position: relative;
+    z-index: 10;
+    isolation: isolate;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: var(--shadow-3);
+    padding: 28px 28px 24px;
+    width: 360px;
+    animation: card-in 0.35s ease both;
+  }
+  @keyframes card-in {
+    from { opacity: 0; transform: translateY(10px) scale(0.97); }
+    to   { opacity: 1; transform: none; }
+  }
+  .ps-brand {
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  .ps-brand-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 3px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .ps-brand-name {
+    font-family: var(--mono);
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    color: var(--text-white);
+    text-transform: uppercase;
+  }
+  .ps-divider {
+    font-family: var(--sans);
+    font-size: 11px;
+    color: var(--text-muted);
+    text-align: center;
+    margin-bottom: 14px;
+    letter-spacing: 0.04em;
+  }
+  .ps-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+  }
+  .ps-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 7px;
+    padding: 14px 12px 12px;
+    width: 88px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s, transform 0.12s;
+  }
+  .ps-card:hover {
+    border-color: var(--accent);
+    background: var(--bg-panel);
+    transform: translateY(-2px);
+  }
+  .ps-avatar {
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    background: var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--sans);
+    font-size: 17px;
+    font-weight: 600;
+    color: #fff;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .ps-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+  .ps-display-name {
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text);
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+  }
+  .ps-username {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--text-muted);
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+  }
+  .ps-card.add-card {
+    border-style: dashed;
+    color: var(--text-muted);
+    background: transparent;
+  }
+  .ps-card.add-card:hover { color: var(--accent); }
+  .ps-add-icon {
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    border: 2px dashed var(--border-light);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+    color: inherit;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .ps-card.add-card:hover .ps-add-icon { border-color: var(--accent); }
+  .ps-add-label {
+    font-family: var(--sans);
+    font-size: 10px;
+    color: inherit;
+    text-align: center;
+  }
+
+  /* Profile banner above auth form when profile is pre-selected */
+  #profile-banner {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 14px;
+  }
+  #profile-banner.visible { display: flex; }
+  .pb-back {
+    background: none; border: none; cursor: pointer;
+    color: var(--text-muted); font-size: 15px; padding: 0 4px;
+    transition: color 0.15s;
+    flex-shrink: 0;
+  }
+  .pb-back:hover { color: var(--accent); }
+  .pb-avatar {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 600; color: #fff;
+    overflow: hidden; flex-shrink: 0;
+  }
+  .pb-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+  .pb-info { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+  .pb-name { font-size: 12px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pb-user { font-family: var(--mono); font-size: 9px; color: var(--text-muted); }
 </style>
 </head>
 <body>
@@ -356,8 +569,26 @@
   <!-- Sequence dots indicator -->
   <div id="seq-indicator"></div>
 
+  <!-- ── Profile Selector ── -->
+  <div id="profile-selector">
+    <div class="ps-brand">
+      <div class="ps-brand-label">Mission Control</div>
+      <div class="ps-brand-name">CONQUERED</div>
+    </div>
+    <div class="ps-divider">Select a profile to continue</div>
+    <div class="ps-grid" id="ps-grid"></div>
+  </div>
+
   <!-- ── Login Card ── -->
   <div class="login-card" id="login-card">
+    <div id="profile-banner">
+      <button class="pb-back" id="pb-back-btn" title="Back to profiles">&#8592;</button>
+      <div class="pb-avatar" id="pb-avatar"></div>
+      <div class="pb-info">
+        <div class="pb-name" id="pb-display-name"></div>
+        <div class="pb-user" id="pb-username"></div>
+      </div>
+    </div>
     <div class="login-brand">
       <div class="login-brand-label">Mission Control</div>
       <div class="login-brand-name">CONQUERED</div>
@@ -365,7 +596,7 @@
     </div>
 
     <div class="login-mode-tabs" id="mode-tabs">
-      <button class="mode-tab active" onclick="setMode('login')">Login</button>
+      <button class="mode-tab active" id="tab-login" onclick="setMode('login')">Login</button>
       <button class="mode-tab" id="tab-setup" onclick="setMode('setup')">Setup</button>
       <button class="mode-tab" onclick="setMode('recovery')">Recovery</button>
     </div>
@@ -378,7 +609,14 @@
       </div>
       <div class="field-group">
         <label class="field-label">Password</label>
-        <input type="password" id="login-password" placeholder="Enter password" autocomplete="current-password">
+        <div class="pw-wrap">
+          <input type="password" id="login-password" placeholder="Enter password" autocomplete="current-password">
+          <button type="button" class="pw-toggle" id="login-pw-toggle" tabindex="-1" aria-label="Show password">
+            <svg id="login-pw-icon" style="width:16px;height:16px;flex-shrink:0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+            </svg>
+          </button>
+        </div>
       </div>
       <div class="field-group">
         <label class="field-label">TOTP Code</label>
@@ -391,6 +629,9 @@
 
     <!-- SETUP -->
     <div id="form-setup" class="login-form" style="display:none;">
+      <div id="setup-back-row" style="display:none;margin-bottom:2px;">
+        <button class="pb-back" onclick="goBackToSelector()" style="font-size:13px;padding:0;">&#8592; Back to profiles</button>
+      </div>
       <div class="field-group">
         <label class="field-label">Choose Username</label>
         <input type="text" id="setup-username" placeholder="Your username">
@@ -520,13 +761,17 @@ function initGrid() {
 }
 
 function resizeGrid() {
-  canvas.width  = canvas.offsetWidth  * devicePixelRatio;
-  canvas.height = canvas.offsetHeight * devicePixelRatio;
-  canvas.style.width  = canvas.offsetWidth  + 'px';
-  canvas.style.height = canvas.offsetHeight + 'px';
-  ctx.scale(devicePixelRatio, devicePixelRatio);
-  cols = Math.ceil(canvas.offsetWidth  / CELL_SIZE) + 1;
-  rows = Math.ceil(canvas.offsetHeight / CELL_SIZE) + 1;
+  // Read parent dimensions BEFORE touching canvas.width/height, which would change offsetWidth
+  const w = canvas.parentElement ? canvas.parentElement.clientWidth  : window.innerWidth;
+  const h = canvas.parentElement ? canvas.parentElement.clientHeight : window.innerHeight;
+  canvas.width  = w * devicePixelRatio;
+  canvas.height = h * devicePixelRatio;
+  canvas.style.width  = w + 'px';
+  canvas.style.height = h + 'px';
+  // setTransform instead of scale() so repeated resizes don't stack the DPR multiplier
+  ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  cols = Math.ceil(w / CELL_SIZE) + 1;
+  rows = Math.ceil(h / CELL_SIZE) + 1;
 }
 
 function onGridHover(e) {
@@ -682,8 +927,13 @@ function animateGrid() {
   const H = canvas.offsetHeight;
   ctx.clearRect(0, 0, W, H);
 
-  // Draw grid lines
-  ctx.strokeStyle = 'rgba(30,35,48,0.8)';
+  // Draw grid lines — tinted per theme family
+  const th = document.documentElement.getAttribute('data-theme') || 'memoria';
+  ctx.strokeStyle = th === 'rabanastre'
+    ? 'rgba(120,70,10,0.35)'
+    : (th === 'treno' || th === 'nibelheim' || th === 'zanarkand')
+      ? 'rgba(200,190,220,0.10)'
+      : 'rgba(80,80,160,0.18)';
   ctx.lineWidth   = 0.5;
   for (let c = 0; c <= cols; c++) {
     ctx.beginPath(); ctx.moveTo(c * CELL_SIZE, 0); ctx.lineTo(c * CELL_SIZE, H); ctx.stroke();
@@ -837,27 +1087,161 @@ let recoveryCode = '';
 let lockoutEnd  = 0;
 let lockoutInterval = null;
 
+// ── Profile selector state ──────────────────────────────
+let selectedProfile = null;   // { username, display_name, avatar_thumb_48 }
+let profileMode     = false;  // true when profile selector is active (not dev/legacy)
+
+function avatarInitials(name) {
+  return (name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+}
+
+function buildAvatarEl(el, profile, size) {
+  if (profile.avatar_thumb_48) {
+    el.innerHTML = `<img src="${profile.avatar_thumb_48}" alt="">`;
+  } else {
+    el.textContent = avatarInitials(profile.display_name || profile.username);
+  }
+}
+
+async function showProfileSelector() {
+  selectedProfile = null;
+  document.getElementById('login-card').style.display = 'none';
+  document.getElementById('lockout-screen').style.display = 'none';
+
+  const profiles = await api.invoke('profiles:list');
+  const grid = document.getElementById('ps-grid');
+  grid.innerHTML = '';
+
+  profiles.forEach(p => {
+    const card = document.createElement('div');
+    card.className = 'ps-card';
+    card.title = p.username;
+    const av = document.createElement('div');
+    av.className = 'ps-avatar';
+    buildAvatarEl(av, p);
+    const dn = document.createElement('div');
+    dn.className = 'ps-display-name';
+    dn.textContent = p.display_name || p.username;
+    const un = document.createElement('div');
+    un.className = 'ps-username';
+    un.textContent = p.username;
+    card.append(av, dn, un);
+    card.addEventListener('click', () => loadProfile(p));
+    grid.appendChild(card);
+  });
+
+  // Add Profile card
+  const addCard = document.createElement('div');
+  addCard.className = 'ps-card add-card';
+  addCard.title = 'Add new profile';
+  addCard.innerHTML = `<div class="ps-add-icon">+</div><div class="ps-add-label">Add Profile</div>`;
+  addCard.addEventListener('click', startNewProfile);
+  grid.appendChild(addCard);
+
+  document.getElementById('profile-selector').style.display = 'block';
+}
+
+async function loadProfile(profile) {
+  selectedProfile = profile;
+  const res = await api.invoke('profiles:load', { username: profile.username });
+  if (!res.ok) { toast(res.error || 'Could not load profile.', 'error'); return; }
+  showLoginCard(profile);
+}
+
+function showLoginCard(profile) {
+  document.getElementById('profile-selector').style.display = 'none';
+
+  // Show profile banner in place of the username field
+  const banner = document.getElementById('profile-banner');
+  if (profile) {
+    banner.classList.add('visible');
+    document.getElementById('pb-display-name').textContent = profile.display_name || profile.username;
+    document.getElementById('pb-username').textContent = profile.username;
+    const pbAv = document.getElementById('pb-avatar');
+    buildAvatarEl(pbAv, profile);
+    document.getElementById('login-username').closest('.field-group').style.display = 'none';
+  } else {
+    banner.classList.remove('visible');
+    document.getElementById('login-username').closest('.field-group').style.display = '';
+  }
+
+  document.getElementById('login-card').style.display = 'block';
+  document.getElementById('tab-setup').style.display = 'none';
+  setMode('login');
+  document.getElementById('login-password').focus();
+}
+
+async function goBackToSelector() {
+  await api.invoke('profiles:deselect');
+  document.getElementById('login-password').value = '';
+  document.getElementById('login-totp').value = '';
+  document.getElementById('login-error').textContent = '';
+  document.getElementById('setup-back-row').style.display = 'none';
+  document.getElementById('tab-login').style.display = '';
+  showProfileSelector();
+}
+
+function startNewProfile() {
+  selectedProfile = null;
+  profileMode = true;
+  document.getElementById('profile-selector').style.display = 'none';
+  document.getElementById('setup-back-row').style.display = '';
+  document.getElementById('profile-banner').classList.remove('visible');
+  document.getElementById('login-username').closest('.field-group').style.display = '';
+  document.getElementById('login-card').style.display = 'block';
+  document.getElementById('tab-setup').style.display = '';
+  document.getElementById('tab-login').style.display = 'none';
+  setMode('setup');
+  document.getElementById('gen-totp-btn').style.display = '';
+  document.getElementById('setup-username').focus();
+}
+
 window.addEventListener('DOMContentLoaded', async () => {
   initGrid();
-  const { needsSetup } = await api.invoke('auth:check-setup');
-  if (needsSetup) {
-    document.getElementById('tab-setup').style.display = '';
-    setMode('setup');
-    document.getElementById('gen-totp-btn').style.display = '';
+
+  document.getElementById('pb-back-btn').addEventListener('click', goBackToSelector);
+
+  document.getElementById('login-pw-toggle').addEventListener('click', () => {
+    const input = document.getElementById('login-password');
+    const icon  = document.getElementById('login-pw-icon');
+    const show  = input.type === 'password';
+    input.type  = show ? 'text' : 'password';
+    const eyeOpen  = `<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>`;
+    const eyeClosed = `<path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>`;
+    icon.setAttribute('viewBox', '0 0 24 24');
+    icon.innerHTML = show ? eyeClosed : eyeOpen;
+  });
+
+  const profiles = await api.invoke('profiles:list');
+
+  if (profiles.length > 0) {
+    // Production with existing profiles → show selector
+    profileMode = true;
+    await showProfileSelector();
   } else {
-    document.getElementById('tab-setup').style.display = 'none';
+    // No profiles yet (fresh install or dev mode) → legacy flow
+    const { needsSetup } = await api.invoke('auth:check-setup');
+    if (needsSetup) {
+      document.getElementById('tab-setup').style.display = '';
+      setMode('setup');
+      document.getElementById('gen-totp-btn').style.display = '';
+    } else {
+      document.getElementById('tab-setup').style.display = 'none';
+      showLoginCard(null);
+    }
+    document.getElementById('login-username').focus();
   }
-  document.getElementById('login-username').focus();
 
   // Single unified keydown handler
   document.addEventListener('keydown', e => {
-    // Debug overlay toggle
     if (e.ctrlKey && e.shiftKey && e.key === 'D') {
       debugMode = !debugMode;
       toast(debugMode ? '[ DEBUG ON ]' : '[ DEBUG OFF ]', debugMode ? 'success' : 'warning');
       return;
     }
-    // Enter to submit
+    if (e.key === 'Escape' && currentMode === 'setup' && profileMode) {
+      goBackToSelector(); return;
+    }
     if (e.key === 'Enter') {
       if (currentMode === 'login')    doLogin();
       if (currentMode === 'setup')    doSetup();
@@ -914,18 +1298,35 @@ async function doSetup() {
   if (p.length < 8) { showErr(errEl, 'Password must be at least 8 characters.'); return; }
   if (tc.length !== 6) { showErr(errEl, 'TOTP code must be 6 digits.'); return; }
   document.getElementById('setup-btn').disabled = true;
+
+  // In profile mode: create the profile folder before setting up the account
+  if (profileMode) {
+    const sel = await api.invoke('profiles:select', { username: u });
+    if (!sel.ok) {
+      document.getElementById('setup-btn').disabled = false;
+      showErr(errEl, sel.error || 'Could not create profile folder.'); return;
+    }
+  }
+
   const res = await api.invoke('auth:setup', { username: u, password: p, totpSecret, totpCode: tc, recoveryCode });
   document.getElementById('setup-btn').disabled = false;
   if (res.ok) {
     toast('Account created. Please log in.', 'success');
-    setMode('login');
-    document.getElementById('login-username').value = u;
-    document.getElementById('tab-setup').style.display = 'none';
+    // If we came from the profile selector, go back to it (new card will appear)
+    const updatedProfiles = await api.invoke('profiles:list');
+    if (updatedProfiles.length > 0) {
+      await showProfileSelector();
+    } else {
+      setMode('login');
+      document.getElementById('login-username').value = u;
+      document.getElementById('tab-setup').style.display = 'none';
+    }
   } else { showErr(errEl, res.error || 'Setup failed.'); }
 }
 
 async function doLogin() {
-  const u  = document.getElementById('login-username').value.trim();
+  // If a profile is pre-selected, use that username; otherwise read the field
+  const u  = selectedProfile ? selectedProfile.username : document.getElementById('login-username').value.trim();
   const p  = document.getElementById('login-password').value;
   const tc = document.getElementById('login-totp').value.trim();
   const errEl = document.getElementById('login-error');

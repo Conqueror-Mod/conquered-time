@@ -1,7 +1,10 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap');
 
 /* ══════════════════════════════════════════════════════════════
-   THEME TOKENS
+   CONQUERED TIME — Themes
+   Five Final Fantasy city themes.
+   Light: Memoria (default), Lindblum, Rabanastre
+   Dark:  Treno, Nibelheim
    ══════════════════════════════════════════════════════════════ */
 
 /* ── Shared tokens: identical across all themes ── */
@@ -18,194 +21,291 @@
   --transition-md: 0.22s ease;
 }
 
-/* ── Fallback/base theme: EMBER ── */
+/* ══════════════════════════════════════════════════════════════
+   MEMORIA — The Lost City of Dreams (FF9)
+   Ethereal, crystalline, melancholic. A realm of fading memories.
+   Light theme. Soft lavenders, pale violet-white, amethyst accents.
+   Default theme.
+   ══════════════════════════════════════════════════════════════ */
 :root,
-[data-theme="ember"] {
-  --bg:           #13100c;
-  --bg-deep:      #0d0a07;
-  --surface-0:    #13100c;
-  --surface-1:    #1d1812;
-  --surface-2:    #252018;
-  --surface-3:    #2e281e;
-  --border:       #3c3228;
-  --border-light: #4e4034;
+[data-theme="memoria"] {
+  /* Moonlit crystal — cool silver-white base, amethyst accent.
+     Barely perceptible blue tint at a glance; reveals itself on closer inspection. */
+  --bg:           #f2f3f9;
+  --bg-deep:      #e8eaf4;
+  --surface-0:    #f2f3f9;
+  --surface-1:    #fafafd;
+  --surface-2:    #eaedf6;
+  --surface-3:    #dde0ef;
+  --border:       #c2c6de;
+  --border-light: #d4d7eb;
 
-  --accent:       #c8933a;
-  --accent-dim:   rgba(200,147,58,0.12);
-  --accent-glow:  rgba(200,147,58,0.26);
-  --accent-2:     #a05c20;
-  --accent-2-dim: rgba(160,92,32,0.14);
+  --accent:       #6d4ed8;
+  --accent-dim:   rgba(109,78,216,0.11);
+  --accent-glow:  rgba(109,78,216,0.26);
+  --accent-2:     #b44fad;
+  --accent-2-dim: rgba(180,79,173,0.10);
 
-  --red:          #e05252;
-  --red-dim:      rgba(224,82,82,0.12);
-  --yellow:       #d4a843;
-  --yellow-dim:   rgba(212,168,67,0.12);
-  --green:        #5a9e6f;
-  --green-dim:    rgba(90,158,111,0.12);
-  --blue:         #7aa8d4;
-  --blue-dim:     rgba(122,168,212,0.12);
+  --red:          #c0392b;
+  --red-dim:      rgba(192,57,43,0.10);
+  --yellow:       #a07820;
+  --yellow-dim:   rgba(160,120,32,0.10);
+  --green:        #1a6b3c;
+  --green-dim:    rgba(26,107,60,0.10);
+  --blue:         #2563eb;
+  --blue-dim:     rgba(37,99,235,0.10);
 
-  --text:         #b8a080;
-  --text-dim:     #4e3e2c;
-  --text-muted:   #9a7e60;
-  --text-bright:  #e0cca8;
-  --text-white:   #f5e8cc;
+  /* Deep navy-indigo text — reads as sophisticated dark, not overtly purple */
+  --text:         #2c2d55;
+  --text-dim:     #c2c6de;
+  --text-muted:   #5c5e90;
+  --text-bright:  #16163a;
+  --text-white:   #0c0c28;
 
-  /* Elevation shadows */
-  --shadow-1: 0 1px 3px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.28);
-  --shadow-2: 0 4px 12px rgba(0,0,0,0.45), 0 8px 24px rgba(0,0,0,0.32);
-  --shadow-3: 0 12px 40px rgba(0,0,0,0.6), 0 24px 64px rgba(0,0,0,0.38);
+  /* Blue-tinted shadows — depth without warmth on the cool base */
+  --shadow-1: 0 1px 4px rgba(40,44,120,0.13), 0 2px 10px rgba(40,44,120,0.08);
+  --shadow-2: 0 4px 16px rgba(40,44,120,0.17), 0 8px 32px rgba(40,44,120,0.11);
+  --shadow-3: 0 12px 40px rgba(40,44,120,0.24), 0 24px 64px rgba(40,44,120,0.14);
+  --shadow-inset: inset 0 1px 0 rgba(255,255,255,0.90);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   TRENO — City of Nobles (FF9)
+   Dark, elegant, aristocratic. Gas lamps on wet cobblestones.
+   Velvet curtains, gothic spires, amber gold, deep wine-burgundy.
+   Warmth lives only in the light — everything else is shadow.
+   ══════════════════════════════════════════════════════════════ */
+[data-theme="treno"] {
+  /* Warm plum-charcoal — not cold, not brown. The dark between gas lamps. */
+  --bg:           #0e0b10;
+  --bg-deep:      #09070b;
+  --surface-0:    #0e0b10;
+  --surface-1:    #161219;
+  --surface-2:    #1e1922;
+  --surface-3:    #27212c;
+  --border:       #3c2e44;
+  --border-light: #4e3d58;
+
+  /* Amber gold — the color of a gas flame catching on glass */
+  --accent:       #c8902a;
+  --accent-dim:   rgba(200,144,42,0.13);
+  --accent-glow:  rgba(200,144,42,0.32);
+  /* Deep wine-burgundy — velvet, secrets, old money */
+  --accent-2:     #8b3a6e;
+  --accent-2-dim: rgba(139,58,110,0.14);
+
+  --red:          #d45858;
+  --red-dim:      rgba(212,88,88,0.12);
+  --yellow:       #c8982a;
+  --yellow-dim:   rgba(200,152,42,0.12);
+  --green:        #4a9460;
+  --green-dim:    rgba(74,148,96,0.12);
+  --blue:         #6888b8;
+  --blue-dim:     rgba(104,136,184,0.12);
+
+  /* Warm ivory — candlelight on parchment, not clinical white */
+  --text:         #b8a8c2;
+  --text-dim:     #5a4a66;
+  --text-muted:   #c0b0d0;
+  --text-bright:  #ddd0e8;
+  --text-white:   #f0e8f8;
+
+  /* Deep warm shadows — candlelight, not moonlight. Heavy and directional. */
+  --shadow-1: 0 1px 4px rgba(12,6,16,0.58), 0 2px 10px rgba(12,6,16,0.40);
+  --shadow-2: 0 4px 16px rgba(12,6,16,0.65), 0 8px 32px rgba(12,6,16,0.48);
+  --shadow-3: 0 12px 48px rgba(12,6,16,0.82), 0 24px 72px rgba(12,6,16,0.58);
+  --shadow-inset: inset 0 1px 0 rgba(255,255,255,0.05);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   NIBELHEIM — Mountain Village (FF7)
+   Cold, stark, unsettling. Snow and slate under a pale moon.
+   Near-black slate base, icy silver-white accent, zero warmth.
+   Something is slightly wrong. Controlled. Precise.
+   ══════════════════════════════════════════════════════════════ */
+[data-theme="nibelheim"] {
+  /* Cold stone and ash — each surface a shade lighter, like slate layers */
+  --bg:           #0a0c10;
+  --bg-deep:      #050608;
+  --surface-0:    #0a0c10;
+  --surface-1:    #111418;
+  --surface-2:    #181c22;
+  --surface-3:    #20252d;
+  --border:       #2a3040;
+  --border-light: #363e50;
+
+  /* Cold steel blue — mid-tone, works as both text/icon and component fill */
+  --accent:       #5888c8;
+  --accent-dim:   rgba(88,136,200,0.12);
+  --accent-glow:  rgba(88,136,200,0.28);
+  /* Icy silver-white secondary — used for edge highlights and shimmer */
+  --accent-2:     #c8d8f0;
+  --accent-2-dim: rgba(200,216,240,0.10);
+
+  --red:          #e05c5c;
+  --red-dim:      rgba(224,92,92,0.12);
+  --yellow:       #c8a84a;
+  --yellow-dim:   rgba(200,168,74,0.12);
+  --green:        #4a9e7a;
+  --green-dim:    rgba(74,158,122,0.12);
+  --blue:         #5888c8;
+  --blue-dim:     rgba(88,136,200,0.12);
+
+  /* Cool silver — no warmth at any level */
+  --text:         #8a96a8;
+  --text-dim:     #384258;
+  --text-muted:   #606e84;
+  --text-bright:  #c8d4e0;
+  --text-white:   #e8edf4;
+
+  /* Heavy cold black shadows — this theme should feel weighty */
+  --shadow-1: 0 1px 4px rgba(0,0,0,0.60), 0 2px 10px rgba(0,0,0,0.45);
+  --shadow-2: 0 4px 16px rgba(0,0,0,0.65), 0 8px 32px rgba(0,0,0,0.50);
+  --shadow-3: 0 12px 48px rgba(0,0,0,0.80), 0 24px 72px rgba(0,0,0,0.58);
   --shadow-inset: inset 0 1px 0 rgba(255,255,255,0.04);
 }
 
-/* ── VOID — pushed harder, nav/content contrast emphasized ───────────────── */
-[data-theme="void"] {
-  --bg:           #0d1018;
-  --bg-deep:      #070910;
-  --surface-0:    #0d1018;
-  --surface-1:    #121620;
-  --surface-2:    #181d2c;
-  --surface-3:    #1e2438;
-  --border:       #1e2d40;
-  --border-light: #28405a;
-
-  --accent:       #00c8a0;
-  --accent-dim:   rgba(0,200,160,0.12);
-  --accent-glow:  rgba(0,200,160,0.30);
-  --accent-2:     #7b5ea7;
-  --accent-2-dim: rgba(123,94,167,0.14);
-
-  --red:          #e05252;
-  --red-dim:      rgba(224,82,82,0.12);
-  --yellow:       #d4a843;
-  --yellow-dim:   rgba(212,168,67,0.12);
-  --green:        #5a9e6f;
-  --green-dim:    rgba(90,158,111,0.12);
-  --blue:         #60a5fa;
-  --blue-dim:     rgba(96,165,250,0.12);
-
-  --text:         #88aac8;
-  --text-dim:     #1e2d40;
-  --text-muted:   #607a98;
-  --text-bright:  #c0d8f0;
-  --text-white:   #e0f0ff;
-
-  --shadow-1: 0 1px 3px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.35);
-  --shadow-2: 0 4px 12px rgba(0,0,0,0.55), 0 8px 24px rgba(0,0,0,0.40);
-  --shadow-3: 0 12px 40px rgba(0,0,0,0.7), 0 24px 64px rgba(0,0,0,0.45);
-  --shadow-inset: inset 0 1px 0 rgba(255,255,255,0.03);
-}
-
-/* ── QUARTZ theme (polar opposite of Paper — stark, high contrast) ───────── */
-[data-theme="quartz"] {
-  --bg:           #f8f9fa;
-  --bg-deep:      #f1f3f5;
-  --surface-0:    #f8f9fa;
-  --surface-1:    #ffffff;
-  --surface-2:    #f1f3f5;
-  --surface-3:    #e9ecef;
-  --border:       #ced4da;
-  --border-light: #dee2e6;
-
-  --accent:       #1c2128;
-  --accent-dim:   rgba(28,33,40,0.07);
-  --accent-glow:  rgba(28,33,40,0.15);
-  --accent-2:     #495057;
-  --accent-2-dim: rgba(73,80,87,0.08);
-
-  --red:          #c0392b;
-  --red-dim:      rgba(192,57,43,0.10);
-  --yellow:       #e67e22;
-  --yellow-dim:   rgba(230,126,34,0.10);
-  --green:        #27ae60;
-  --green-dim:    rgba(39,174,96,0.10);
-  --blue:         #2980b9;
-  --blue-dim:     rgba(41,128,185,0.10);
-
-  --text:         #3d4450;
-  --text-dim:     #ced4da;
-  --text-muted:   #6c757d;
-  --text-bright:  #141820;
-  --text-white:   #1c2128;
-
-  --shadow-1: 0 1px 3px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.06);
-  --shadow-2: 0 4px 12px rgba(0,0,0,0.10), 0 8px 24px rgba(0,0,0,0.07);
-  --shadow-3: 0 12px 40px rgba(0,0,0,0.14), 0 24px 64px rgba(0,0,0,0.09);
-  --shadow-inset: inset 0 1px 0 rgba(255,255,255,0.8);
-}
-
-/* ── ARCTIC ── */
-[data-theme="arctic"] {
-  --bg:           #090f1a;
-  --bg-deep:      #050810;
-  --surface-0:    #090f1a;
+/* ══════════════════════════════════════════════════════════════
+   ZANARKAND — The Dream City (FF10)
+   A city that only exists in memory. Twilight forever.
+   Bioluminescent towers rising from dark ocean water.
+   Everything glows. Everything is reflected. Everything is already gone.
+   Semi-dark. Deep oceanic base, bioluminescent aqua, twilight violet.
+   ══════════════════════════════════════════════════════════════ */
+[data-theme="zanarkand"] {
+  /* Deep ocean at night — not pitch black, alive with depth */
+  --bg:           #080e18;
+  --bg-deep:      #040810;
+  --surface-0:    #080e18;
   --surface-1:    #0e1628;
-  --surface-2:    #141e36;
-  --surface-3:    #1a2644;
-  --border:       #1e3050;
-  --border-light: #284468;
+  --surface-2:    #141e34;
+  --surface-3:    #1a2640;
+  --border:       #1e3058;
+  --border-light: #284070;
 
-  --accent:       #60a5fa;
-  --accent-dim:   rgba(96,165,250,0.12);
-  --accent-glow:  rgba(96,165,250,0.28);
-  --accent-2:     #a78bfa;
-  --accent-2-dim: rgba(167,139,250,0.12);
+  /* Bioluminescent aqua — the city's own light, rising from the water */
+  --accent:       #00b8cc;
+  --accent-dim:   rgba(0,184,204,0.12);
+  --accent-glow:  rgba(0,184,204,0.35);
+  /* Twilight violet — the sky reflected in every surface */
+  --accent-2:     #7868d0;
+  --accent-2-dim: rgba(120,104,208,0.14);
 
-  --red:          #f87171;
-  --red-dim:      rgba(248,113,113,0.12);
-  --yellow:       #fbbf24;
-  --yellow-dim:   rgba(251,191,36,0.12);
-  --green:        #34d399;
-  --green-dim:    rgba(52,211,153,0.12);
-  --blue:         #60a5fa;
-  --blue-dim:     rgba(96,165,250,0.12);
+  --red:          #e05878;
+  --red-dim:      rgba(224,88,120,0.12);
+  --yellow:       #d0a840;
+  --yellow-dim:   rgba(208,168,64,0.12);
+  --green:        #38c890;
+  --green-dim:    rgba(56,200,144,0.12);
+  --blue:         #00b8cc;
+  --blue-dim:     rgba(0,184,204,0.12);
 
-  --text:         #88aac8;
-  --text-dim:     #1e3050;
-  --text-muted:   #607a98;
-  --text-bright:  #c0d8f0;
-  --text-white:   #e8f0ff;
+  /* Pale moonlight on water — soft, never harsh */
+  --text:         #8ab0c8;
+  --text-dim:     #2e4870;
+  --text-muted:   #6898b8;
+  --text-bright:  #c0d8e8;
+  --text-white:   #e0f0f8;
 
-  --shadow-1: 0 1px 3px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.35);
-  --shadow-2: 0 4px 12px rgba(0,0,0,0.55), 0 8px 24px rgba(0,0,0,0.40);
-  --shadow-3: 0 12px 40px rgba(0,0,0,0.7), 0 24px 64px rgba(0,0,0,0.45);
-  --shadow-inset: inset 0 1px 0 rgba(255,255,255,0.03);
+  /* Deep water shadows with aqua edge glow */
+  --shadow-1: 0 1px 4px rgba(0,8,24,0.65), 0 2px 10px rgba(0,8,24,0.48);
+  --shadow-2: 0 4px 16px rgba(0,8,24,0.70), 0 8px 32px rgba(0,8,24,0.55);
+  --shadow-3: 0 12px 48px rgba(0,8,24,0.85), 0 24px 72px rgba(0,8,24,0.65);
+  --shadow-inset: inset 0 1px 0 rgba(0,184,204,0.10);
 }
 
-/* ── PAPER ── */
-[data-theme="paper"] {
-  --bg:           #faf7f0;
-  --bg-deep:      #f2ede4;
-  --surface-0:    #faf7f0;
-  --surface-1:    #fdf9f4;
-  --surface-2:    #f5f0e8;
-  --surface-3:    #ede7db;
-  --border:       #d4c9b4;
-  --border-light: #e0d8c8;
+/* ══════════════════════════════════════════════════════════════
+   LINDBLUM — Grand City-State (FF9)
+   Industrial capital. Airship docks, brass machinery, amber skies.
+   Aged parchment base, deep amber-bronze accent, verdigris secondary.
+   Wealth earned. Sophisticated, warm, handcrafted.
+   ══════════════════════════════════════════════════════════════ */
+[data-theme="lindblum"] {
+  /* Aged parchment — warm cream, each surface richer than the last */
+  --bg:           #f5f0e4;
+  --bg-deep:      #ece5d4;
+  --surface-0:    #f5f0e4;
+  --surface-1:    #faf6ec;
+  --surface-2:    #ede6d6;
+  --surface-3:    #e2d9c4;
+  --border:       #c4b090;
+  --border-light: #d4c4a4;
 
-  --accent:       #1a4480;
-  --accent-dim:   rgba(26,68,128,0.08);
-  --accent-glow:  rgba(26,68,128,0.18);
-  --accent-2:     #7b3f00;
-  --accent-2-dim: rgba(123,63,0,0.08);
+  /* Deep amber-bronze — Lindblum's lanterns at dusk */
+  --accent:       #a06018;
+  --accent-dim:   rgba(160,96,24,0.12);
+  --accent-glow:  rgba(160,96,24,0.28);
+  /* Verdigris — oxidised brass, copper gone green */
+  --accent-2:     #3a7a6a;
+  --accent-2-dim: rgba(58,122,106,0.12);
 
-  --red:          #c0392b;
-  --red-dim:      rgba(192,57,43,0.10);
-  --yellow:       #b8860b;
-  --yellow-dim:   rgba(184,134,11,0.10);
-  --green:        #1a6b3c;
-  --green-dim:    rgba(26,107,60,0.10);
-  --blue:         #1a4480;
-  --blue-dim:     rgba(26,68,128,0.10);
+  --red:          #b03020;
+  --red-dim:      rgba(176,48,32,0.10);
+  --yellow:       #a07818;
+  --yellow-dim:   rgba(160,120,24,0.10);
+  --green:        #2a6e40;
+  --green-dim:    rgba(42,110,64,0.10);
+  --blue:         #2a5080;
+  --blue-dim:     rgba(42,80,128,0.10);
 
-  --text:         #4a3e2c;
-  --text-dim:     #d4c9b4;
-  --text-muted:   #7a6a52;
-  --text-bright:  #1e1610;
-  --text-white:   #1a130a;
+  /* Ink on parchment — deep warm brown, not black */
+  --text:         #3c2e1a;
+  --text-dim:     #c4b090;
+  --text-muted:   #7a6040;
+  --text-bright:  #1e1608;
+  --text-white:   #120e04;
 
-  --shadow-1: 0 1px 3px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.05);
-  --shadow-2: 0 4px 12px rgba(0,0,0,0.10), 0 8px 24px rgba(0,0,0,0.07);
-  --shadow-3: 0 12px 40px rgba(0,0,0,0.14), 0 24px 64px rgba(0,0,0,0.09);
-  --shadow-inset: inset 0 1px 0 rgba(255,255,255,0.7);
+  /* Sepia-tinted shadows — depth that feels handcrafted */
+  --shadow-1: 0 1px 4px rgba(80,48,8,0.14), 0 2px 10px rgba(80,48,8,0.09);
+  --shadow-2: 0 4px 16px rgba(80,48,8,0.18), 0 8px 32px rgba(80,48,8,0.12);
+  --shadow-3: 0 12px 40px rgba(80,48,8,0.26), 0 24px 64px rgba(80,48,8,0.16);
+  --shadow-inset: inset 0 1px 0 rgba(255,255,255,0.70);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   RABANASTRE — Desert Capital of Dalmasca (FF12)
+   Sun-baked, opulent, ancient. Sandstone, terracotta, desert gold.
+   Warm sandy light base, deep teal accents from oasis markets.
+   Conquered and proud. Warmth without softness.
+   ══════════════════════════════════════════════════════════════ */
+[data-theme="rabanastre"] {
+  /* Sun-baked sandstone — warm, bright, not yellow */
+  --bg:           #f2ebe0;
+  --bg-deep:      #e8dece;
+  --surface-0:    #f2ebe0;
+  --surface-1:    #f8f2e8;
+  --surface-2:    #e8dec8;
+  --surface-3:    #ddd0b8;
+  --border:       #c0a880;
+  --border-light: #d0bc98;
+
+  /* Deep oasis teal — marketplace awnings, Dalmascan jewelry */
+  --accent:       #1e6e78;
+  --accent-dim:   rgba(30,110,120,0.12);
+  --accent-glow:  rgba(30,110,120,0.28);
+  /* Burnt sienna — clay walls at dusk, terracotta rooftops */
+  --accent-2:     #b85828;
+  --accent-2-dim: rgba(184,88,40,0.12);
+
+  --red:          #b83828;
+  --red-dim:      rgba(184,56,40,0.10);
+  --yellow:       #b88018;
+  --yellow-dim:   rgba(184,128,24,0.10);
+  --green:        #286e40;
+  --green-dim:    rgba(40,110,64,0.10);
+  --blue:         #1e6e78;
+  --blue-dim:     rgba(30,110,120,0.10);
+
+  /* Aged manuscript — deep warm charcoal, not cold black */
+  --text:         #3a2c18;
+  --text-dim:     #c0a880;
+  --text-muted:   #6e5030;
+  --text-bright:  #1e1408;
+  --text-white:   #140e04;
+
+  /* Dusty warm tan shadows — desert haze */
+  --shadow-1: 0 1px 4px rgba(100,60,8,0.16), 0 2px 10px rgba(100,60,8,0.10);
+  --shadow-2: 0 4px 16px rgba(100,60,8,0.20), 0 8px 32px rgba(100,60,8,0.13);
+  --shadow-3: 0 12px 40px rgba(100,60,8,0.28), 0 24px 64px rgba(100,60,8,0.18);
+  --shadow-inset: inset 0 1px 0 rgba(255,255,255,0.65);
 }

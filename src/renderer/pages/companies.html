@@ -539,8 +539,8 @@
   }
 
   function getCanvasColors() {
-    const theme = document.documentElement.getAttribute('data-theme') || 'arctic';
-    const isLight = theme === 'paper' || theme === 'quartz';
+    const theme = document.documentElement.getAttribute('data-theme') || 'memoria';
+    const isLight = theme === 'memoria' || theme === 'rabanastre';
     if (isLight) return {
       center: { g1:'rgba(30,58,138,0.95)', g2:'rgba(15,23,80,0.9)', border:'#1d4ed8', label:'#ffffff', glow:'rgba(29,78,216,0.18)' },
       node:   { g1:'rgba(49,46,129,0.95)', g2:'rgba(30,27,90,0.9)', border:'#4338ca', label:'#ffffff' },

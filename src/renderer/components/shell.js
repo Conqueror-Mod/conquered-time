@@ -131,11 +131,11 @@ const Shell = (() => {
               <div class="settings-group">
                 <div class="settings-group-title">Theme</div>
                 <div class="theme-cards" id="theme-cards">
-                  <div class="theme-card" data-t="ember"  onclick="applyTheme('ember')"><div class="theme-swatch" data-t="ember"></div><div class="theme-card-name">Ember</div></div>
-                  <div class="theme-card" data-t="void"   onclick="applyTheme('void')"><div class="theme-swatch" data-t="void"></div><div class="theme-card-name">Void</div></div>
-                  <div class="theme-card" data-t="arctic" onclick="applyTheme('arctic')"><div class="theme-swatch" data-t="arctic"></div><div class="theme-card-name">Arctic</div></div>
-                  <div class="theme-card" data-t="paper"  onclick="applyTheme('paper')"><div class="theme-swatch" data-t="paper"></div><div class="theme-card-name">Paper</div></div>
-                  <div class="theme-card" data-t="quartz" onclick="applyTheme('quartz')"><div class="theme-swatch" data-t="quartz"></div><div class="theme-card-name">Quartz</div></div>
+                  <div class="theme-card" data-t="memoria"    onclick="applyTheme('memoria')"><div class="theme-swatch" data-t="memoria"></div><div class="theme-card-name">Memoria</div></div>
+                  <div class="theme-card" data-t="zanarkand"  onclick="applyTheme('zanarkand')"><div class="theme-swatch" data-t="zanarkand"></div><div class="theme-card-name">Zanarkand</div></div>
+                  <div class="theme-card" data-t="rabanastre" onclick="applyTheme('rabanastre')"><div class="theme-swatch" data-t="rabanastre"></div><div class="theme-card-name">Rabanastre</div></div>
+                  <div class="theme-card" data-t="treno"      onclick="applyTheme('treno')"><div class="theme-swatch" data-t="treno"></div><div class="theme-card-name">Treno</div></div>
+                  <div class="theme-card" data-t="nibelheim"  onclick="applyTheme('nibelheim')"><div class="theme-swatch" data-t="nibelheim"></div><div class="theme-card-name">Nibelheim</div></div>
                 </div>
               </div>
 
@@ -455,7 +455,15 @@ const Shell = (() => {
         : name.slice(0, 2).toUpperCase();
     })();
     if (profile?.avatar) {
+      const isAnimated = profile.avatar.startsWith('data:image/gif') ||
+                         profile.avatar.startsWith('data:image/apng') ||
+                         profile.avatar.startsWith('data:image/webp');
       el.innerHTML = `<img src="${profile.avatar}" alt="">`;
+      if (isAnimated) {
+        const img = el.querySelector('img');
+        // Restart GIF/APNG from frame 1 on hover (Discord-style idle→animate)
+        img.addEventListener('mouseenter', () => { const s = img.src; img.src = ''; img.src = s; });
+      }
     } else {
       el.textContent = initials;
     }

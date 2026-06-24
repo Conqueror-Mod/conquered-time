@@ -9,7 +9,24 @@
       "Skill(run)",
       "Skill(run:*)",
       "Bash(dir \"D:/My Projects/CURRENT-RELEASE/conquered-time/assets/\")",
-      "PowerShell(Copy-Item \"D:\\\\My Projects\\\\CURRENT-RELEASE\\\\conquered-time\\\\assets\\\\icon.picon\" \"D:\\\\My Projects\\\\CURRENT-RELEASE\\\\conquered-time\\\\assets\\\\icon-temp.png\")"
+      "PowerShell(Copy-Item \"D:\\\\My Projects\\\\CURRENT-RELEASE\\\\conquered-time\\\\assets\\\\icon.picon\" \"D:\\\\My Projects\\\\CURRENT-RELEASE\\\\conquered-time\\\\assets\\\\icon-temp.png\")",
+      "Skill(update-config)",
+      "Skill(update-config:*)",
+      "Bash(git branch *)",
+      "Bash(gh pr create --title 'Pre-release feature build: Settings, Audit, Dispatch, Accessibility, Icons' --body ' *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(node seed-dev.js)",
+      "Bash(node -e \"require\\('./src/main/preload.js'\\)\")",
+      "Bash(node -e ' *)",
+      "Bash(gh pr *)",
+      "Bash(git fetch *)",
+      "Bash(node clear-users.js)",
+      "Bash(node -e \"const fs=require\\('fs'\\);const b64=fs.readFileSync\\('D:/My Projects/CURRENT-RELEASE/conquered-time/assets/ruxin_dev.gif'\\).toString\\('base64'\\);console.log\\('data:image/gif;base64,'+b64\\);\")",
+      "Bash(Start-Process npm *)",
+      "Bash(Start-Sleep -Milliseconds 2000)",
+      "PowerShell(Get-ChildItem \"$env:APPDATA\\\\conquered-time\\\\conquered-data\\\\\" | Select-Object Name, LastWriteTime)"
     ]
   }
 }
