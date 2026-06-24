@@ -28,16 +28,38 @@
     "productName": "Conquered Time",
     "copyright": "Copyright © 2026 Chris Bowles - The Conqueror. All rights reserved.",
     "win": {
-      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
       "icon": "assets/icon.ico"
     },
     "mac": {
-      "target": [{ "target": "dmg", "arch": ["x64", "arm64"] }],
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
       "icon": "assets/icon.icns",
       "category": "public.app-category.productivity"
     },
     "linux": {
-      "target": [{ "target": "AppImage", "arch": ["x64"] }],
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
       "icon": "assets/icon-1024.png",
       "category": "Office"
     },
@@ -71,6 +93,7 @@
   "devDependencies": {
     "electron": "^29.0.0",
     "electron-builder": "^24.9.1",
+    "png2icons": "^2.0.1",
     "sharp": "^0.35.2"
   }
 }
