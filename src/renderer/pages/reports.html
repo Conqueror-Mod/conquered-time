@@ -56,7 +56,7 @@
     font-family: var(--sans);
     font-size: 10px;
     font-weight: 600;
-    color: var(--text-dim);
+    color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.06em;
   }
@@ -456,17 +456,23 @@
   }
 
   // ── Tabs ──
+  function switchTab(tab) {
+    currentTab = tab;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    const btn = document.querySelector(`.tab-btn[data-tab="${tab}"]`);
+    if (btn) btn.classList.add('active');
+    const panel = document.getElementById(`tab-${tab}`);
+    if (panel) panel.classList.add('active');
+    const pdfBtn = document.getElementById('btn-export-pdf');
+    const csvBtn = document.getElementById('btn-export-csv');
+    if (pdfBtn) pdfBtn.style.display = tab === 'audit' ? 'none' : '';
+    if (csvBtn) csvBtn.style.display = tab === 'audit' ? '' : 'none';
+  }
+
   function setupTabs() {
     document.querySelectorAll('.tab-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        currentTab = btn.dataset.tab;
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-        btn.classList.add('active');
-        document.getElementById(`tab-${currentTab}`).classList.add('active');
-        document.getElementById('btn-export-pdf').style.display = currentTab === 'audit' ? 'none' : '';
-        document.getElementById('btn-export-csv').style.display = currentTab === 'audit' ? ''     : 'none';
-      });
+      btn.addEventListener('click', () => switchTab(btn.dataset.tab));
     });
     document.getElementById('btn-export-pdf').addEventListener('click', exportPDF);
     document.getElementById('btn-export-csv').addEventListener('click', exportCSV);

@@ -231,11 +231,32 @@
   transition: all var(--transition);
 }
 .theme-card.active .theme-swatch { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-dim); }
+/* Legacy swatches (kept for safety) */
 .theme-swatch[data-t="ember"]  { background: linear-gradient(135deg, #13100c 50%, #c8933a 50%); }
 .theme-swatch[data-t="void"]   { background: linear-gradient(135deg, #0d1018 50%, #00c8a0 50%); }
 .theme-swatch[data-t="arctic"] { background: linear-gradient(135deg, #090f1a 50%, #60a5fa 50%); }
 .theme-swatch[data-t="paper"]  { background: linear-gradient(135deg, #faf7f0 50%, #1a4480 50%); border-color: #d4c9b4; }
 .theme-swatch[data-t="quartz"] { background: linear-gradient(135deg, #f8f9fa 50%, #1c2128 50%); border-color: #ced4da; }
+
+/* FF themes — 3-color conic split: bg · accent · accent-2
+   2-deg feather at each transition eliminates hard-stop aliasing */
+.theme-swatch[data-t="memoria"] {
+  background: conic-gradient(from 90deg, #f2f3f9 0deg 119deg, #6d4ed8 121deg 239deg, #b44fad 241deg 360deg);
+  border-color: #c2c6de;
+}
+.theme-swatch[data-t="zanarkand"] {
+  background: conic-gradient(from 90deg, #080e18 0deg 119deg, #00b8cc 121deg 239deg, #7868d0 241deg 360deg);
+}
+.theme-swatch[data-t="rabanastre"] {
+  background: conic-gradient(from 90deg, #f2ebe0 0deg 119deg, #1e6e78 121deg 239deg, #b85828 241deg 360deg);
+  border-color: #c0a880;
+}
+.theme-swatch[data-t="treno"] {
+  background: conic-gradient(from 90deg, #0e0b10 0deg 119deg, #c8902a 121deg 239deg, #8b3a6e 241deg 360deg);
+}
+.theme-swatch[data-t="nibelheim"] {
+  background: conic-gradient(from 90deg, #0a0c10 0deg 119deg, #5888c8 121deg 239deg, #c8d8f0 241deg 360deg);
+}
 .theme-card-name {
   font-family: var(--sans);
   font-size: 11px;

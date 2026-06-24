@@ -132,7 +132,7 @@ const Shell = (() => {
                 <div class="settings-group-title">Theme</div>
                 <div class="theme-cards" id="theme-cards">
                   <div class="theme-card" data-t="memoria"    onclick="applyTheme('memoria')"><div class="theme-swatch" data-t="memoria"></div><div class="theme-card-name">Memoria</div></div>
-                  <div class="theme-card" data-t="lindblum"   onclick="applyTheme('lindblum')"><div class="theme-swatch" data-t="lindblum"></div><div class="theme-card-name">Lindblum</div></div>
+                  <div class="theme-card" data-t="zanarkand"  onclick="applyTheme('zanarkand')"><div class="theme-swatch" data-t="zanarkand"></div><div class="theme-card-name">Zanarkand</div></div>
                   <div class="theme-card" data-t="rabanastre" onclick="applyTheme('rabanastre')"><div class="theme-swatch" data-t="rabanastre"></div><div class="theme-card-name">Rabanastre</div></div>
                   <div class="theme-card" data-t="treno"      onclick="applyTheme('treno')"><div class="theme-swatch" data-t="treno"></div><div class="theme-card-name">Treno</div></div>
                   <div class="theme-card" data-t="nibelheim"  onclick="applyTheme('nibelheim')"><div class="theme-swatch" data-t="nibelheim"></div><div class="theme-card-name">Nibelheim</div></div>

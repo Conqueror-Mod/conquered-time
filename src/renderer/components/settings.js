@@ -8,7 +8,7 @@
 const Settings = (() => {
 
   const DEFAULTS = {
-    theme:            'memoria',  // memoria | treno | nibelheim | lindblum | rabanastre
+    theme:            'memoria',  // memoria | zanarkand | rabanastre | treno | nibelheim
     scale:            'normal',
     reducedMotion:    false,
     highContrast:     false,

@@ -7,17 +7,13 @@
 <title>Conquered Time — Login</title>
 <link rel="stylesheet" href="../styles/design-system.css">
 <script>
-// Apply saved theme before page renders to prevent flash
+// Login always renders in Zanarkand. User's chosen theme activates on dashboard.
+document.documentElement.setAttribute('data-theme', 'zanarkand');
 (async function() {
   try {
-    const theme = (await api.invoke('settings:get', 'ui_theme')) || 'memoria';
     const scale = (await api.invoke('settings:get', 'ui_scale')) || 'normal';
-    document.documentElement.setAttribute('data-theme', theme);
     document.documentElement.setAttribute('data-scale', scale);
-  } catch(e) {
-    // Fallback if IPC unavailable
-    document.documentElement.setAttribute('data-theme', 'memoria');
-  }
+  } catch(e) {}
 })();
 </script>
 <style>
@@ -144,19 +140,17 @@
   }
   [data-theme="treno"] .login-brand-label { color: rgba(255,255,255,0.55); }
 
-  /* Lindblum login — deep amber dusk, lamplight bleeds through the card */
-  [data-theme="lindblum"] .login-body { background: #3a2508; }
-  [data-theme="lindblum"] .grid-fade {
-    background: radial-gradient(ellipse 70% 60% at 50% 50%, rgba(180,110,20,0.35), #3a2508 100%);
+  /* Zanarkand login — deep ocean black, city lights bleeding up from below */
+  [data-theme="zanarkand"] .login-body { background: #040810; }
+  [data-theme="zanarkand"] .grid-fade {
+    background: radial-gradient(ellipse 70% 60% at 50% 50%, rgba(0,184,204,0.18), #040810 100%);
   }
-  [data-theme="lindblum"] .login-card {
-    background: #faf6ec;
-    border-color: #c4b090;
-    box-shadow: 0 8px 40px rgba(60,30,8,0.38), 0 2px 8px rgba(60,30,8,0.20), 0 0 0 1px rgba(160,96,24,0.12);
+  [data-theme="zanarkand"] .login-card {
+    background: #0e1628;
+    border-color: #1e3058;
+    box-shadow: 0 8px 52px rgba(0,8,24,0.90), 0 2px 14px rgba(0,8,24,0.70), 0 0 0 1px rgba(0,184,204,0.14);
   }
-  [data-theme="lindblum"] .ps-divider { color: var(--text); }
-  [data-theme="lindblum"] .ps-card.add-card { color: var(--text-muted); border-color: var(--border); }
-  [data-theme="lindblum"] .ps-add-icon { border-color: var(--border); }
+  [data-theme="zanarkand"] .login-brand-label { color: rgba(255,255,255,0.55); }
 
   /* Rabanastre login — desert at noon, bleached stone, teal sky at the horizon */
   [data-theme="rabanastre"] .login-body { background: #2a4848; }
@@ -174,7 +168,6 @@
 
   /* Light theme corner accents — darker so visible on mid-tone background */
   [data-theme="memoria"] .corner,
-  [data-theme="lindblum"] .corner,
   [data-theme="rabanastre"] .corner { border-color: rgba(0,0,0,0.25) !important; }
 
 
@@ -936,10 +929,10 @@ function animateGrid() {
 
   // Draw grid lines — tinted per theme family
   const th = document.documentElement.getAttribute('data-theme') || 'memoria';
-  ctx.strokeStyle = (th === 'lindblum' || th === 'rabanastre')
+  ctx.strokeStyle = th === 'rabanastre'
     ? 'rgba(120,70,10,0.35)'
-    : (th === 'treno' || th === 'nibelheim')
-      ? 'rgba(200,190,220,0.12)'
+    : (th === 'treno' || th === 'nibelheim' || th === 'zanarkand')
+      ? 'rgba(200,190,220,0.10)'
       : 'rgba(80,80,160,0.18)';
   ctx.lineWidth   = 0.5;
   for (let c = 0; c <= cols; c++) {

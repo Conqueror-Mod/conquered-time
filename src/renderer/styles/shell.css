@@ -179,7 +179,7 @@
 .sidebar-user-sub {
   font-family: var(--mono);
   font-size: 10px;
-  color: var(--text-dim);
+  color: var(--text-muted);
   margin-top: 1px;
 }
 .sidebar-user-label {
