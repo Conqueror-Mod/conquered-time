@@ -119,6 +119,19 @@
   [data-theme="memoria"] .ps-card.add-card { color: var(--text); border-color: var(--border); }
   [data-theme="memoria"] .ps-add-icon { border-color: var(--border); }
 
+  /* Nibelheim login — moonless mountain dark, icy card edge */
+  [data-theme="nibelheim"] .login-body { background: #05060a; }
+  [data-theme="nibelheim"] .grid-fade {
+    background: radial-gradient(ellipse 65% 65% at 50% 50%, rgba(10,12,18,0.2), #05060a 100%);
+  }
+  [data-theme="nibelheim"] .login-card {
+    background: #111418;
+    border-color: #2a3040;
+    box-shadow: 0 8px 48px rgba(0,0,0,0.80), 0 2px 12px rgba(0,0,0,0.60), 0 0 0 1px rgba(200,216,240,0.06);
+  }
+  /* Mission Control label is invisible at --text-dim on this dark card */
+  [data-theme="nibelheim"] .login-brand-label { color: #3a4560; }
+
   /* Lindblum login — warm parchment with amber depth */
   [data-theme="lindblum"] .login-body { background: #c8b99a; }
   [data-theme="lindblum"] .grid-fade {
