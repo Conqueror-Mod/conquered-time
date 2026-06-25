@@ -630,9 +630,7 @@ function requestWindowsHelloConsent() {
     ].join('; ');
     execFile('powershell.exe', ['-NoProfile', '-Sta', '-Command', ps], { timeout: 60000 }, (err, stdout, stderr) => {
       if (err) { console.error('Windows Hello PS error:', stderr || err.message); resolve('Error'); return; }
-      const result = stdout.trim() || 'Error';
-      console.log('[Windows Hello] UserConsentVerifier result:', JSON.stringify(result));
-      resolve(result);
+      resolve(stdout.trim() || 'Error');
     });
   });
 }
