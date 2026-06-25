@@ -464,17 +464,26 @@ const Shell = (() => {
               </div>
 
               <div class="about-section">
-                <div class="about-section-title">What's New — v3.0</div>
+                <div class="about-section-title">What's New — v3.1</div>
+                <ul class="about-changelog">
+                  <li>Email Reports — send PDF + CSV attachments directly via SMTP from the Reports page</li>
+                  <li>Scheduled Reports — automatic delivery on daily, weekly, monthly, quarterly, or annual cadence</li>
+                  <li>Settings → Reports tab — dedicated home for SMTP config, schedule, and Send Now</li>
+                  <li>Break/lunch compliance overhaul — US federal policy rules, count-based break detection across Dispatch, Audit, and Reports</li>
+                  <li>Company Web overhaul — wider layout, inline detail pane, dynamic physics scaling, solid center node</li>
+                  <li>Settings tab reorder — logical Appearance → Time & Display → Window → Security → Data → Reports flow</li>
+                </ul>
+              </div>
+              <div class="about-section">
+                <div class="about-section-title">v3.0</div>
                 <ul class="about-changelog">
                   <li>Five Final Fantasy themes — Zanarkand, Memoria, Rabanastre, Treno, Nibelheim</li>
                   <li>Multi-user profile architecture — isolated vaults, profile selector, auto-migration</li>
                   <li>Windows Hello / Quick Unlock — DPAPI fast-path, PIN and biometric support</li>
                   <li>Full login screen overhaul — profile cards, avatar backfill, unified branding</li>
-                  <li>Pre-auth settings modal — appearance, window, and accessibility before login</li>
                   <li>Avatar upload with manual crop, zoom, and animated GIF/APNG support</li>
                   <li>User Profile Screen — display name, descriptor fields, password change</li>
                   <li>Session auto-lock with configurable idle timeout</li>
-                  <li>Check for Updates from the About tab</li>
                 </ul>
               </div>
               <div class="about-section">
