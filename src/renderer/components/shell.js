@@ -93,10 +93,11 @@ const Shell = (() => {
   function buildSettingsModal() {
     const NAV_ITEMS = [
       { id: 'appearance',   label: 'Appearance',    icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>' },
-      { id: 'window',       label: 'Window',         icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 9h20"/><path d="M7 4v5"/></svg>' },
       { id: 'display',      label: 'Time & Display', icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>' },
-      { id: 'data',         label: 'Data',           icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>' },
+      { id: 'window',       label: 'Window',         icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 9h20"/><path d="M7 4v5"/></svg>' },
       { id: 'security',     label: 'Security',       icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>' },
+      { id: 'data',         label: 'Data',           icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>' },
+      { id: 'reports',      label: 'Reports',        icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>' },
       { id: 'accessibility',label: 'Accessibility',  icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>' },
       { id: 'about',        label: 'About',          icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>' },
     ];
@@ -285,6 +286,13 @@ const Shell = (() => {
               </div>
 
 
+
+            </div><!-- /settings-cat-data -->
+
+            <!-- ── REPORTS ───────────────────────────────────── -->
+            <div id="settings-cat-reports" class="settings-cat-panel" style="display:none;">
+              <div class="sc-title">Reports</div>
+
               <div class="settings-group" id="sg-email-reports">
                 <div class="settings-group-title">Email Reports</div>
                 <div class="settings-row-label">Configure SMTP to send reports to your inbox as PDF + CSV attachments.</div>
@@ -346,10 +354,14 @@ const Shell = (() => {
                     <input class="sc-input" id="sched-time" type="time" value="08:00" onchange="saveScheduleConfig()">
                   </div>
                 </div>
+                <div style="margin-top:12px;display:flex;gap:8px;align-items:center;">
+                  <button class="s-btn" id="sched-send-now-btn" onclick="sendScheduledNow()">Send Now</button>
+                  <span id="sched-send-status" style="font-size:11px;color:var(--text-muted);"></span>
+                </div>
                 <div id="sched-next-send" style="margin-top:10px;font-size:11px;color:var(--text-muted);"></div>
               </div>
 
-            </div><!-- /settings-cat-data -->
+            </div><!-- /settings-cat-reports -->
 
             <!-- ── SECURITY ──────────────────────────────────── -->
             <div id="settings-cat-security" class="settings-cat-panel" style="display:none;">
@@ -773,9 +785,10 @@ function openSettingsModal() {
 function closeSettingsModal() {
   const m = document.getElementById('settings-modal');
   if (m) m.classList.remove('open');
-  // Reset lazy-load flags so Security/Window tabs refresh on next open
-  _safeStorageLoaded = false;
+  // Reset lazy-load flags so tabs refresh on next open
+  _safeStorageLoaded  = false;
   _windowSettingsLoaded = false;
+  _emailCfgLoaded     = false;
 }
 
 let _aboutInfoLoaded = false;
@@ -787,7 +800,7 @@ async function switchSettingsCategory(cat) {
   const panel = document.getElementById(`settings-cat-${cat}`);
   if (panel) panel.style.display = '';
 
-  if (cat === 'data') loadEmailConfig();
+  if (cat === 'reports') loadEmailConfig();
 
   if (cat === 'window' && !_windowSettingsLoaded) {
     _windowSettingsLoaded = true;
@@ -1093,16 +1106,24 @@ async function loadEmailConfig() {
     const timeEl = document.getElementById('sched-time');
     if (freqEl) freqEl.value = freq;
     if (timeEl) timeEl.value = time;
-    updateNextSendLabel(freq, await api.invoke('settings:get', 'email_schedule_last_sent'));
+    updateNextSendLabel();
   } catch {}
 }
 
-function updateNextSendLabel(freq, lastSent) {
+async function updateNextSendLabel() {
   const el = document.getElementById('sched-next-send');
   if (!el) return;
-  if (!freq || freq === 'off') { el.textContent = ''; return; }
-  if (lastSent) el.textContent = `Last sent: ${new Date(lastSent).toLocaleString()}`;
-  else el.textContent = `First send will fire at the configured time.`;
+  try {
+    const status = await api.invoke('email:get-schedule-status');
+    if (!status || status.freq === 'off') { el.innerHTML = ''; return; }
+    const parts = [];
+    if (status.lastSent) parts.push(`Last sent: <strong>${new Date(status.lastSent).toLocaleString()}</strong>`);
+    if (status.nextSend) parts.push(`Next send: <strong>${new Date(status.nextSend).toLocaleString()}</strong>`);
+    el.innerHTML = parts.join(' &nbsp;·&nbsp; ');
+    if (status.lastError) {
+      el.innerHTML += `<div style="color:var(--error,#e05252);margin-top:6px;">⚠ Last error: ${status.lastError}</div>`;
+    }
+  } catch { el.textContent = ''; }
 }
 
 async function saveEmailConfig() {
@@ -1143,6 +1164,27 @@ async function testEmailConfig() {
   }
 }
 
+async function sendScheduledNow() {
+  const btn      = document.getElementById('sched-send-now-btn');
+  const statusEl = document.getElementById('sched-send-status');
+  if (btn) btn.disabled = true;
+  if (statusEl) { statusEl.textContent = 'Sending…'; statusEl.style.color = 'var(--text-muted)'; }
+  try {
+    const res = await api.invoke('email:send-scheduled-now');
+    if (res.ok) {
+      Shell.toast('Scheduled report sent successfully!', 'success');
+      updateNextSendLabel();
+    } else {
+      if (statusEl) { statusEl.textContent = res.error || 'Send failed.'; statusEl.style.color = 'var(--error,#e05252)'; }
+    }
+  } catch (e) {
+    if (statusEl) { statusEl.textContent = e.message; statusEl.style.color = 'var(--error,#e05252)'; }
+  } finally {
+    if (btn) btn.disabled = false;
+    setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 5000);
+  }
+}
+
 async function saveScheduleConfig() {
   const freq = (document.getElementById('sched-freq') || {}).value || 'off';
   const time = (document.getElementById('sched-time') || {}).value || '08:00';
@@ -1150,8 +1192,8 @@ async function saveScheduleConfig() {
     api.invoke('settings:set', { key: 'email_schedule_freq', value: freq }),
     api.invoke('settings:set', { key: 'email_schedule_time', value: time }),
   ]);
-  const lastSent = await api.invoke('settings:get', 'email_schedule_last_sent');
-  updateNextSendLabel(freq, lastSent);
+  api.invoke('email:trigger-schedule-check');
+  updateNextSendLabel();
   Shell.toast('Schedule saved.', 'success');
 }
 

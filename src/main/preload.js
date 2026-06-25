@@ -19,6 +19,7 @@ const ALLOWED_INVOKE = new Set([
   'audit:get-dismissed', 'audit:dismiss', 'audit:clear-dismissed', 'audit:apply-fix', 'audit:open-wizard',
   'backup:list', 'backup:preview', 'backup:restore',
   'email:save-config', 'email:get-config', 'email:test-smtp', 'email:send-report',
+  'email:send-scheduled-now', 'email:get-schedule-status', 'email:trigger-schedule-check',
   'win:get-displays', 'win:move-to-display'
 ]);
 

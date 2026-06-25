@@ -805,6 +805,9 @@ ipcMain.handle('auth:login', async (_, { username, password, totpCode }) => {
       } catch (e) { console.warn('[login] avatar_thumb backfill failed:', e.message); }
     }
 
+    // Fire scheduled email check shortly after login (session now available)
+    setTimeout(runScheduledEmailCheck, 5000);
+
     return { ok: true };
   } catch (e) { return { ok: false, error: e.message }; }
 });
@@ -1365,8 +1368,12 @@ ipcMain.handle('settings:set', (_, { key, value }) => {
 
 // ── App lifecycle ──────────────────────────────────────────────────────────
 app.whenReady().then(async () => {
-  // Schedule email check fires once on startup and then every hour
-  setInterval(runScheduledEmailCheck, 60 * 60 * 1000);
+  // Schedule email check fires every 5 minutes (catches sub-hour scheduling windows)
+  setInterval(() => runScheduledEmailCheck().then(() => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('toast', 'Scheduled report sent!', 'success');
+  }).catch(e => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('toast', `Scheduled report failed: ${e.message}`, 'error', 8000);
+  }), 5 * 60 * 1000);
 
   // Load the sql.js WASM module once (needed for migration peek reads too)
   SQL = await require('sql.js')();
@@ -1428,11 +1435,16 @@ function generatePDF(htmlContent) {
     const tmp = path.join(app.getPath('temp'), `ct-report-${Date.now()}.html`);
     fs.writeFileSync(tmp, htmlContent, 'utf8');
     const win = new BrowserWindow({ show: false, webPreferences: { contextIsolation: true, nodeIntegration: false } });
-    win.loadURL(`file://${tmp}`);
+    // Use loadFile() — avoids Windows backslash issues with file:// URLs
+    win.loadFile(tmp);
+    const cleanup = () => { try { fs.unlinkSync(tmp); } catch {} };
     win.webContents.once('did-finish-load', () => {
       win.webContents.printToPDF({ printBackground: true, pageSize: 'Letter' })
-        .then(buf => { win.close(); try { fs.unlinkSync(tmp); } catch {} resolve(buf); })
-        .catch(e  => { win.close(); try { fs.unlinkSync(tmp); } catch {} reject(e); });
+        .then(buf => { win.close(); cleanup(); resolve(buf); })
+        .catch(e  => { win.close(); cleanup(); reject(e); });
+    });
+    win.webContents.once('did-fail-load', (_, code, desc) => {
+      win.close(); cleanup(); reject(new Error(`PDF window failed to load: ${desc} (${code})`));
     });
   });
 }
@@ -1514,7 +1526,9 @@ async function doSendReport({ htmlContent, subject, recipients, entriesOverride 
   const cfg = getEmailSmtpConfig();
   if (!cfg.host || !cfg.username || !cfg.password) throw new Error('Email not configured. Open Settings → Data to add SMTP credentials.');
 
-  const toList = (recipients || cfg.defaultTo || '').split(/[,;\s]+/).map(s => s.trim()).filter(Boolean);
+  const toList = Array.isArray(recipients)
+    ? recipients.filter(Boolean)
+    : (recipients || cfg.defaultTo || '').split(/[,;\s]+/).map(s => s.trim()).filter(Boolean);
   if (!toList.length) throw new Error('No recipients specified.');
 
   const entries = entriesOverride || dbAll('SELECT rowid as rid, * FROM time_entries WHERE user_id=? ORDER BY log_date DESC', [sessionUser.id])
@@ -1562,6 +1576,35 @@ ipcMain.handle('email:send-report', async (_, { htmlContent, subject, recipients
   } catch (e) { return { ok: false, error: e.message }; }
 });
 
+ipcMain.handle('email:trigger-schedule-check', async () => {
+  await runScheduledEmailCheck();
+  return { ok: true };
+});
+
+ipcMain.handle('email:send-scheduled-now', async () => {
+  if (!sessionKey || !sessionUser) return { ok: false, error: 'Not logged in.' };
+  try {
+    const result = await runScheduledEmailCheck(true);
+    if (result === false) return { ok: false, error: 'Schedule is set to Off — enable a frequency first.' };
+    return { ok: true };
+  } catch (e) { return { ok: false, error: e.message }; }
+});
+
+ipcMain.handle('email:get-schedule-status', () => {
+  if (!db) return {};
+  const get = k => (dbGet('SELECT value FROM app_settings WHERE key=?', [k]) || {}).value || '';
+  const freq      = get('email_schedule_freq') || 'off';
+  const lastSent  = get('email_schedule_last_sent') || null;
+  const lastError = get('email_schedule_last_error') || null;
+  const sendTime  = get('email_schedule_time') || '08:00';
+  const next      = freq !== 'off' ? computeNextSendDate(freq, lastSent) : null;
+  if (next) {
+    const [sh, sm] = sendTime.split(':').map(Number);
+    next.setHours(sh, sm, 0, 0);
+  }
+  return { freq, lastSent, lastError, nextSend: next ? next.toISOString() : null };
+});
+
 // ── Email schedule check ──────────────────────────────────────────────────
 
 function computeNextSendDate(freq, lastSent) {
@@ -1584,12 +1627,12 @@ function computeNextSendDate(freq, lastSent) {
   return null;
 }
 
-async function runScheduledEmailCheck() {
+async function runScheduledEmailCheck(force = false) {
   if (!db || !sessionKey || !sessionUser) return;
   try {
     const get = k => (dbGet('SELECT value FROM app_settings WHERE key=?', [k]) || {}).value || '';
     const freq = get('email_schedule_freq');
-    if (!freq || freq === 'off') return;
+    if (!freq || freq === 'off') return false;
 
     const lastSent  = get('email_schedule_last_sent') || null;
     const sendTime  = get('email_schedule_time') || '08:00';
@@ -1598,7 +1641,7 @@ async function runScheduledEmailCheck() {
 
     const [sh, sm] = sendTime.split(':').map(Number);
     nextSend.setHours(sh, sm, 0, 0);
-    if (new Date() < nextSend) return;
+    if (!force && new Date() < nextSend) return;
 
     // Time to send — build report covering since lastSent
     const fromDate = lastSent ? lastSent.slice(0, 10) : new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
@@ -1640,8 +1683,9 @@ td{padding:7px 8px;border-bottom:1px solid #e5e7eb;}
 </body></html>`;
 
     const cfg = getEmailSmtpConfig();
+    if (!cfg.host || !cfg.password) throw new Error('SMTP not configured.');
     const toList = (cfg.defaultTo || '').split(/[,;\s]+/).map(s => s.trim()).filter(Boolean);
-    if (!cfg.host || !cfg.password || !toList.length) return;
+    if (!toList.length) throw new Error('No default recipient set. Add one in Settings → Data → Email Reports.');
 
     await doSendReport({
       htmlContent,
@@ -1651,8 +1695,14 @@ td{padding:7px 8px;border-bottom:1px solid #e5e7eb;}
     });
 
     db.run("INSERT OR REPLACE INTO app_settings (key,value) VALUES ('email_schedule_last_sent',?)", [new Date().toISOString()]);
+    db.run("INSERT OR REPLACE INTO app_settings (key,value) VALUES ('email_schedule_last_error','')", []);
     persistDB();
-  } catch (e) { console.error('[schedule-email]', e.message); }
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('toast', 'Scheduled report sent successfully!', 'success');
+  } catch (e) {
+    console.error('[schedule-email]', e.message);
+    if (db) { try { db.run("INSERT OR REPLACE INTO app_settings (key,value) VALUES ('email_schedule_last_error',?)", [e.message]); persistDB(); } catch {} }
+    throw e; // re-throw so IPC handler / interval caller can surface the error
+  }
 }
 
 app.on('window-all-closed', () => {

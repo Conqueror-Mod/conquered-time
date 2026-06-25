@@ -26,7 +26,12 @@
       "Bash(node -e \"const fs=require\\('fs'\\);const b64=fs.readFileSync\\('D:/My Projects/CURRENT-RELEASE/conquered-time/assets/ruxin_dev.gif'\\).toString\\('base64'\\);console.log\\('data:image/gif;base64,'+b64\\);\")",
       "Bash(Start-Process npm *)",
       "Bash(Start-Sleep -Milliseconds 2000)",
-      "PowerShell(Get-ChildItem \"$env:APPDATA\\\\conquered-time\\\\conquered-data\\\\\" | Select-Object Name, LastWriteTime)"
+      "PowerShell(Get-ChildItem \"$env:APPDATA\\\\conquered-time\\\\conquered-data\\\\\" | Select-Object Name, LastWriteTime)",
+      "PowerShell(Get-Process | Where-Object { $_.MainWindowTitle -ne '' } | Select-Object Name, MainWindowTitle | Sort-Object Name)",
+      "Bash(git checkout *)",
+      "Bash(git pull *)",
+      "Bash(git commit -m 'chore: remove Windows Hello debug log *)",
+      "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\('version:', p.version, '\\\\nname:', p.name\\)\")"
     ]
   }
 }
