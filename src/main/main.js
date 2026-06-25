@@ -1137,6 +1137,13 @@ ipcMain.handle('audit:clear-dismissed', () => {
 
 ipcMain.handle('audit:apply-fix', (_, { entry_id, row_idx, fix_type }) => {
   if (!sessionKey || !sessionUser) return { ok: false };
+  // Only these discrepancy types have an automated fix. Everything else
+  // (e.g. missing_break / missing_lunch) is acknowledge-only by design — reject
+  // explicitly so the dismiss-only guarantee can't be bypassed by a forged call.
+  const ALLOWED_FIXES = ['set_clock_out', 'recalc_duration'];
+  if (!ALLOWED_FIXES.includes(fix_type)) {
+    return { ok: false, error: `No automated fix for "${fix_type}" — this discrepancy is acknowledge-only.` };
+  }
   const row = dbGet('SELECT rowid as rid, * FROM time_entries WHERE rowid=? AND user_id=?',
     [Number(entry_id), sessionUser.id]);
   if (!row) return { ok: false, error: 'Entry not found' };
