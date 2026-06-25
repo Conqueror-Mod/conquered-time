@@ -487,17 +487,10 @@ const Shell = (() => {
                 </ul>
               </div>
               <div class="about-section">
-                <div class="about-section-title">v2.20 and earlier</div>
-                <ul class="about-changelog">
-                  <li>Dispatch — task timing, break/lunch compliance, and live session counters</li>
-                  <li>AES-256-GCM encrypted company data with PBKDF2 key derivation</li>
-                  <li>TOTP multi-factor authentication with lockout and local recovery</li>
-                  <li>Company hierarchy — Company › Project › Platform › NavID</li>
-                  <li>Dynamic time-entry table with inline editing and per-session totals</li>
-                  <li>Spiderweb company visualizer (force-simulated, theme-aware)</li>
-                  <li>Global Log with CSV and PDF export, Audit discrepancy detection</li>
-                  <li>Branded splash screen and Inter-typography design system</li>
-                </ul>
+                <div class="about-changelog-more">
+                  Showing the two most recent releases. Older release notes are available on
+                  <button class="about-changelog-link" onclick="Shell._openExternal('github')">GitHub</button>.
+                </div>
               </div>
 
               <div class="about-section">
