@@ -307,74 +307,6 @@
   }
   @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
 
-  /* ── Backdoor screen ── */
-  #backdoor-screen {
-    position: absolute;
-    inset: 0;
-    z-index: 8;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    background: var(--bg-deep);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.5s ease;
-  }
-  #backdoor-screen.visible {
-    opacity: 1;
-    pointer-events: all;
-  }
-  .backdoor-card {
-    width: 360px;
-    background: var(--surface);
-    border: 1px solid var(--red);
-    border-radius: var(--radius-lg);
-    padding: 32px;
-    box-shadow: 0 0 40px rgba(255,75,110,0.15), 0 0 80px rgba(255,75,110,0.06);
-    position: relative;
-  }
-  .backdoor-card::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 2px;
-    background: linear-gradient(90deg, transparent, var(--red), transparent);
-    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-  }
-  .backdoor-title {
-    font-family: var(--sans); font-size: 14px; font-weight: 600;
-    color: var(--red); text-align: center; margin-bottom: 4px;
-    letter-spacing: -0.01em;
-  }
-  .backdoor-sub {
-    font-family: var(--sans); font-size: 11px; font-weight: 400;
-    color: var(--text-dim); text-align: center; margin-bottom: 24px;
-  }
-  .backdoor-form { display: flex; flex-direction: column; gap: 14px; }
-  .backdoor-form .field-label { color: var(--red) !important; }
-  .backdoor-form input:focus {
-    border-color: var(--red) !important;
-    box-shadow: 0 0 0 2px rgba(255,75,110,0.12) !important;
-  }
-  .btn-backdoor {
-    background: rgba(255,75,110,0.1);
-    border-color: var(--red);
-    color: var(--red);
-    width: 100%;
-    justify-content: center;
-  }
-  .btn-backdoor:hover { background: var(--red); color: #fff; }
-  .btn-dismiss {
-    background: transparent;
-    border-color: var(--border-light);
-    color: var(--text-dim);
-    width: 100%;
-    justify-content: center;
-    margin-top: 6px;
-  }
-  .btn-dismiss:hover { border-color: var(--text-muted); color: var(--text); }
-
   /* Sequence indicator dots */
   #seq-indicator {
     position: absolute;
@@ -396,7 +328,6 @@
     transition: all 0.2s;
   }
   .seq-dot.lit { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
-  .seq-dot.dev-lit { background: var(--red); box-shadow: 0 0 6px var(--red); }
 
   /* ── Profile Selector ──────────────────────────────────── */
   #profile-selector {
@@ -764,26 +695,6 @@
     <div class="easter-msg">— you cracked the code —</div>
   </div>
 
-  <!-- ── Backdoor Screen ── -->
-  <div id="backdoor-screen">
-    <div class="backdoor-card">
-      <div class="backdoor-title">⚠ Backdoor Access</div>
-      <div class="backdoor-sub">Authorized Personnel Only</div>
-      <div class="backdoor-form">
-        <div class="field-group">
-          <label class="field-label" style="color:var(--red);">Username</label>
-          <input type="text" id="bd-username" placeholder="Username" autocomplete="off">
-        </div>
-        <div class="field-group">
-          <label class="field-label" style="color:var(--red);">Password</label>
-          <input type="password" id="bd-password" placeholder="Password" autocomplete="off">
-        </div>
-        <div class="error-msg" id="bd-error"></div>
-        <button class="btn-backdoor" onclick="doBackdoorLogin()">⏎ Access System</button>
-        <button class="btn-dismiss" onclick="dismissBackdoor()">✕ Dismiss</button>
-      </div>
-    </div>
-  </div>
 
 </div>
 
@@ -805,13 +716,11 @@ let glowCells   = {};      // key: "c,r" → { alpha, color }
 let animFrame;
 
 // ── Secret sequences ──────────────────────────────────
-// Easter egg: 3-cell sequence
-const EASTER_SEQ = ['17,18', '16,15', '30,13'];
-// Backdoor: 5-cell diagonal V
-const BACKDOOR_SEQ = ['2,2', '4,4', '6,6', '8,4', '10,2'];
+// Easter egg: 3-cell sequence — update these with Ctrl+Shift+D to pick cells
+const EASTER_SEQ = ['10,10', '9,15', '23,13'];
 
-let currentSeq    = [];
-let seqMode       = null;   // null | 'easter' | 'dev'
+let currentSeq = [];
+let seqMode    = null;
 let seqTimeout    = null;
 
 function initGrid() {
@@ -858,8 +767,6 @@ function onGridHover(e) {
 function onGridClick(e) {
   const card = document.getElementById('login-card');
   if (card && card.contains(e.target)) return;
-  const backdoor = document.getElementById('backdoor-screen');
-  if (backdoor && backdoor.classList.contains('visible')) return;
 
   const rect = canvas.getBoundingClientRect();
   const c = Math.floor((e.clientX - rect.left)  / CELL_SIZE);
@@ -867,34 +774,27 @@ function onGridClick(e) {
   const key = `${c},${r}`;
 
   glowCells[key] = { alpha: 0.7, color: 'accent', decay: true };
+  lastClickKey = key;
 
-  const nextIdx = currentSeq.length;
-  const hitsEaster   = key === EASTER_SEQ[nextIdx];
-  const hitsBackdoor = key === BACKDOOR_SEQ[nextIdx];
+  const nextIdx   = currentSeq.length;
+  const hitsEaster = key === EASTER_SEQ[nextIdx];
 
-  if (hitsEaster || hitsBackdoor) {
+  if (hitsEaster) {
     currentSeq.push(key);
-    if (hitsEaster)   seqMode = 'easter';
-    if (hitsBackdoor) seqMode = 'dev';
+    seqMode = 'easter';
     clearTimeout(seqTimeout);
     seqTimeout = setTimeout(resetSeq, 20000);
     updateSeqIndicator();
-    if (seqMode === 'easter' && currentSeq.length === EASTER_SEQ.length) { triggerEasterEgg(); return; }
-    if (seqMode === 'dev'    && currentSeq.length === BACKDOOR_SEQ.length) { triggerBackdoor(); return; }
+    if (currentSeq.length === EASTER_SEQ.length) { triggerEasterEgg(); return; }
   } else if (seqMode !== null) {
-    // Mis-click while in an active sequence — reset
     resetSeq();
   }
-  // Clicks that don't advance any sequence and aren't in one are silently ignored
 }
 
 function updateSeqIndicator() {
   const ind = document.getElementById('seq-indicator');
-  const maxLen = seqMode === 'dev' ? BACKDOOR_SEQ.length : EASTER_SEQ.length;
-  ind.innerHTML = Array.from({ length: maxLen }, (_, i) => {
-    const lit = i < currentSeq.length;
-    const cls = lit ? (seqMode === 'dev' ? 'seq-dot dev-lit' : 'seq-dot lit') : 'seq-dot';
-    return `<div class="${cls}"></div>`;
+  ind.innerHTML = Array.from({ length: EASTER_SEQ.length }, (_, i) => {
+    return `<div class="${i < currentSeq.length ? 'seq-dot lit' : 'seq-dot'}"></div>`;
   }).join('');
   ind.classList.toggle('visible', currentSeq.length > 0);
 }
@@ -907,14 +807,15 @@ function resetSeq() {
 }
 
 // ── Debug overlay ─────────────────────────────────────
-let debugMode = false;
+let debugMode   = false;
+let lastClickKey = null;
 
 // ── Debug overlay toggle (wired in DOMContentLoaded) ──
 
 function drawDebugOverlay() {
   if (!debugMode) return;
 
-  // Label every visible cell with col,row so sequences can be picked
+  // Label every cell with col,row — use Ctrl+Shift+D to find cells for the sequence
   ctx.font = '7px JetBrains Mono';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -930,14 +831,16 @@ function drawDebugOverlay() {
     }
   }
 
-  // Top-left hint
-  ctx.fillStyle = 'rgba(8,10,15,0.85)';
-  ctx.fillRect(8, 8, 160, 22);
+  // Top-left panel
+  ctx.fillStyle = 'rgba(8,10,15,0.88)';
+  ctx.fillRect(8, 8, 240, 40);
   ctx.font = '8px JetBrains Mono';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
   ctx.fillStyle = 'rgba(100,160,200,0.9)';
-  ctx.fillText('Ctrl+Shift+D  toggle grid coords', 14, 14);
+  ctx.fillText('Ctrl+Shift+D  toggle coords', 14, 14);
+  ctx.fillStyle = 'rgba(255,220,80,0.9)';
+  ctx.fillText('Last: ' + (lastClickKey || '—') + '   Seq: [' + currentSeq.join('>') + ']', 14, 26);
 }
 
 function animateGrid() {
@@ -1006,31 +909,32 @@ function flashConfirmed(seq, color) {
 // ═══════════════════════════════════════════════════════
 
 const HOURGLASS_ASCII = `
- +================================+
- |  ·    ·    ·    ·    ·    ·   |
- |    ·    ·    ·    ·    ·    · |
- |  ·    ·    ·    ·    ·    ·   |
- +==+                        +==+
-     \\  ·    ·    ·    ·   /
-      \\    ·    ·    ·    /
-       \\  ·    ·    ·   /
-        \\    ·    ·    /
-         \\  ·    ·   /
-          \\    ·    /
-           \\  ·   /
++==============================+
+|  ·      ·      ·      ·     |
+|    ·      ·      ·      ·   |
+|  ·      ·      ·      ·     |
++==+                      +==+
+    \\                    /
+     \\                  /
+      \\                /
+       \\              /
+        \\            /
+         \\          /
+          \\        /
+           \\      /
             \\    /
              \\  /
               \\/
               /\\
              /  \\
-            / ∷  \\
-           / ∷∷∷  \\
-          / ∷∷∷∷∷  \\
-         / ∷∷∷∷∷∷∷  \\
-        / ∷∷∷∷∷∷∷∷∷  \\
-       / ∷∷∷∷∷∷∷∷∷∷∷  \\
- +==+                    +==+
- +================================+
+            / ∷∷ \\
+           / ∷∷∷∷ \\
+          / ∷∷∷∷∷∷ \\
+         / ∷∷∷∷∷∷∷∷ \\
+        / ∷∷∷∷∷∷∷∷∷∷ \\
+       / ∷∷∷∷∷∷∷∷∷∷∷∷ \\
++==+                      +==+
++==============================+
 `;
 
 function triggerEasterEgg() {
@@ -1049,56 +953,6 @@ function triggerEasterEgg() {
       setTimeout(() => { card.classList.remove('fade-out'); }, 500);
     }, 3200);
   }, 600);
-}
-
-// ═══════════════════════════════════════════════════════
-//  BACKDOOR
-// ═══════════════════════════════════════════════════════
-
-function triggerBackdoor() {
-  flashConfirmed(BACKDOOR_SEQ, 'red');
-  // Flash all sequence cells red
-  BACKDOOR_SEQ.forEach(key => {
-    glowCells[key] = { alpha: 1.0, color: 'red', decay: false };
-  });
-  resetSeq();
-
-  const card     = document.getElementById('login-card');
-  const backdoor = document.getElementById('backdoor-screen');
-
-  card.classList.add('fade-out');
-  setTimeout(() => {
-    backdoor.classList.add('visible');
-    document.getElementById('bd-username').focus();
-  }, 600);
-}
-
-function dismissBackdoor() {
-  const card     = document.getElementById('login-card');
-  const backdoor = document.getElementById('backdoor-screen');
-  backdoor.classList.remove('visible');
-  setTimeout(() => { card.classList.remove('fade-out'); }, 100);
-  // Clear red glows
-  BACKDOOR_SEQ.forEach(key => { if (glowCells[key]) glowCells[key].decay = true; });
-}
-
-async function doBackdoorLogin() {
-  const u = document.getElementById('bd-username').value.trim();
-  const p = document.getElementById('bd-password').value;
-  const errEl = document.getElementById('bd-error');
-  errEl.style.display = 'none';
-
-  if (!u || !p) { showErr(errEl, 'Credentials required.'); return; }
-
-  // Backdoor passes '000000' as TOTP — dev_mode flag in DB bypasses it
-  const res = await api.invoke('auth:login', { username: u, password: p, totpCode: '000000' });
-  if (res.ok) {
-    postLoginNavigate(res);
-  } else if (res.locked) {
-    showErr(errEl, `Account locked. ${res.hoursRemaining}h remaining.`);
-  } else {
-    showErr(errEl, res.error || 'Access denied.');
-  }
 }
 
 // ═══════════════════════════════════════════════════════
