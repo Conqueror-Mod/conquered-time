@@ -290,8 +290,8 @@
   }
   .easter-ascii {
     font-family: var(--mono);
-    font-size: 12px;
-    line-height: 1.3;
+    font-size: 13px;
+    line-height: 1.35;
     color: var(--accent);
     text-shadow: 0 0 8px var(--accent-glow);
     white-space: pre;
@@ -761,7 +761,7 @@
   <!-- ── Easter Egg Overlay ── -->
   <div id="easter-overlay">
     <pre class="easter-ascii" id="easter-ascii"></pre>
-    <div class="easter-msg">— You found it —</div>
+    <div class="easter-msg">— you cracked the code —</div>
   </div>
 
   <!-- ── Backdoor Screen ── -->
@@ -805,10 +805,10 @@ let glowCells   = {};      // key: "c,r" → { alpha, color }
 let animFrame;
 
 // ── Secret sequences ──────────────────────────────────
-// Easter egg: 3-cell sequence
-const EASTER_SEQ = ['3,2', '7,5', '5,8'];
-// Backdoor: 5-cell sequence  
-const BACKDOOR_SEQ = ['2,3', '9,2', '6,6', '3,9', '8,4'];
+// Easter egg: 4-corner square
+const EASTER_SEQ = ['1,1', '10,1', '10,8', '1,8'];
+// Backdoor: 5-cell diagonal V
+const BACKDOOR_SEQ = ['2,2', '4,4', '6,6', '8,4', '10,2'];
 
 let currentSeq    = [];
 let seqMode       = null;   // null | 'easter' | 'dev'
@@ -982,9 +982,9 @@ function drawDebugOverlay() {
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
   ctx.fillStyle = 'rgba(0,200,160,0.9)';
-  ctx.fillText('E1→E2→E3  Easter Egg', 14, 16);
+  ctx.fillText('E1→E2→E3→E4  Easter Egg (square)', 14, 16);
   ctx.fillStyle = 'rgba(255,75,110,0.9)';
-  ctx.fillText('D1→D2→D3→D4→D5  Backdoor', 14, 30);
+  ctx.fillText('D1→D2→D3→D4→D5  Backdoor (V)', 14, 30);
   ctx.fillStyle = 'rgba(100,120,140,0.8)';
   ctx.fillText('Ctrl+Shift+D  Toggle', 14, 44);
 }
@@ -1055,25 +1055,31 @@ function flashConfirmed(seq, color) {
 // ═══════════════════════════════════════════════════════
 
 const HOURGLASS_ASCII = `
-        .·:·.
-       /|||||\\
-      / || || \\
-     /  ||·||  \\
-    / · || || · \\
-   |    \\|||/    |
-   |     \\|/     |
-   |      ·      |
-   |    · / ·    |
-   |    /   \\    |
-    \\  / · · \\  /
-     \\/·· ✕ ··\\/
-     /\\ · · · /\\
-    /  \\ · · /  \\
-   / ·  \\ · /  · \\
-  |      \\ /      |
-  |_______|_______|
-       |||||
-        ···
+  ╔══════════════════════════════╗
+  ║  ·    ·    ·    ·    ·    · ║
+  ║    ·    ·    ·    ·    ·    ║
+  ║  ·    ·    ·    ·    ·    · ║
+  ╚═╗                        ╔═╝
+     ╲  ·    ·    ·    ·    ╱
+      ╲    ·    ·    ·    ╱
+       ╲  ·    ·    ·    ╱
+        ╲    ·    ·    ╱
+         ╲  ·    ·   ╱
+          ╲    ·    ╱⟋
+           ╲  ·   ╱
+            ╲    ╱
+             ╲  ╱
+              ╲╱
+              ╱╲
+             ╱  ╲
+            ╱ ∷  ╲
+           ╱ ∷∷∷  ╲
+          ╱ ∷∷∷∷∷  ╲
+         ╱ ∷∷∷∷∷∷∷  ╲
+        ╱ ∷∷∷∷∷∷∷∷∷  ╲
+       ╱ ∷∷∷∷∷∷∷∷∷∷∷  ╲
+  ╔══╝                   ╚══╗
+  ╚═════════════════════════════╝
 `;
 
 function triggerEasterEgg() {
