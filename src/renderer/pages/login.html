@@ -1136,7 +1136,7 @@ async function doBackdoorLogin() {
   // Backdoor passes '000000' as TOTP — dev_mode flag in DB bypasses it
   const res = await api.invoke('auth:login', { username: u, password: p, totpCode: '000000' });
   if (res.ok) {
-    api.send('navigate', 'dashboard');
+    postLoginNavigate(res);
   } else if (res.locked) {
     showErr(errEl, `Account locked. ${res.hoursRemaining}h remaining.`);
   } else {
@@ -1282,7 +1282,7 @@ async function doSafeLogin() {
   const res = await api.invoke('auth:safe-login');
   if (btn) btn.disabled = false;
   if (res.ok) {
-    api.send('navigate', 'dashboard');
+    postLoginNavigate(res);
   } else if (res.quickUnlock) {
     // Biometric not available — switch to quick unlock password form
     showSafeLoginUI(true);
@@ -1300,7 +1300,7 @@ async function doQuickUnlock() {
   if (!pw) { showErr(errEl, 'Password required.'); return; }
   const res = await api.invoke('auth:quick-unlock', { password: pw });
   if (res.ok) {
-    api.send('navigate', 'dashboard');
+    postLoginNavigate(res);
   } else {
     showErr(errEl, res.error || 'Incorrect password.');
     const inp = document.getElementById('quick-unlock-pw');
@@ -1525,7 +1525,7 @@ async function doLogin() {
   const res = await api.invoke('auth:login', { username: u, password: p, totpCode: tc || '000000' });
   document.getElementById('login-btn').disabled = false;
   if (res.ok) {
-    api.send('navigate', 'dashboard');
+    postLoginNavigate(res);
   } else if (res.locked) {
     showLockout(res.hoursRemaining);
   } else {
@@ -1575,6 +1575,15 @@ function updateLockoutTimer() {
 }
 
 function showErr(el, msg) { el.textContent = msg; el.style.display = 'block'; }
+
+function postLoginNavigate(res) {
+  if (res.needsEmail) {
+    sessionStorage.setItem('require_email', '1');
+    api.send('navigate', 'profile');
+  } else {
+    api.send('navigate', 'dashboard');
+  }
+}
 
 function toast(msg, type = 'success') {
   const c = document.getElementById('toast-container');

@@ -671,7 +671,7 @@ ipcMain.handle('auth:safe-login', async () => {
     db.run('UPDATE users SET failed_attempts=0, locked_until=NULL WHERE rowid=?', [Number(user.rid)]);
     persistDB();
     resetIdleTimer();
-    return { ok: true };
+    return { ok: true, needsEmail: profileEmailMissing() };
   } catch (e) { return { ok: false, error: 'Secure sign-in failed — use password login.' }; }
 });
 
@@ -695,7 +695,7 @@ ipcMain.handle('auth:quick-unlock', async (_, { password }) => {
     db.run('UPDATE users SET failed_attempts=0, locked_until=NULL WHERE rowid=?', [Number(user.rid)]);
     persistDB();
     resetIdleTimer();
-    return { ok: true };
+    return { ok: true, needsEmail: profileEmailMissing() };
   } catch (e) { return { ok: false, error: e.message }; }
 });
 
@@ -808,7 +808,7 @@ ipcMain.handle('auth:login', async (_, { username, password, totpCode }) => {
     // Fire scheduled email check shortly after login (session now available)
     setTimeout(runScheduledEmailCheck, 5000);
 
-    return { ok: true };
+    return { ok: true, needsEmail: profileEmailMissing() };
   } catch (e) { return { ok: false, error: e.message }; }
 });
 
@@ -1170,6 +1170,17 @@ ipcMain.handle('audit:apply-fix', (_, { entry_id, row_idx, fix_type }) => {
     return { ok: true };
   } catch (e) { return { ok: false, error: e.message }; }
 });
+
+// Returns true when the logged-in user has no email saved in their profile blob.
+function profileEmailMissing() {
+  if (!sessionKey || !sessionUser) return false;
+  try {
+    const user = dbGet('SELECT rowid as rid, * FROM users WHERE rowid=?', [sessionUser.id]);
+    if (!user || !user.profile_enc) return true;
+    const data = JSON.parse(decrypt({ data: user.profile_enc, iv: user.profile_iv, tag: user.profile_tag }, sessionKey));
+    return !data?.email?.trim();
+  } catch { return true; }
+}
 
 // ── IPC: User Profile ─────────────────────────────────────────────────────
 ipcMain.handle('profile:get', () => {

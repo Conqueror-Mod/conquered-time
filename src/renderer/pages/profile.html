@@ -313,6 +313,11 @@
 </head>
 <body>
 
+<div id="email-required-banner" style="display:none; background:var(--accent-dim); border-bottom:2px solid var(--accent); padding:10px 20px; font-size:13px; color:var(--text-bright); display:none; align-items:center; gap:10px;">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;color:var(--accent)"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+  <span>An email address is required to use Conquered Time. Please add one below before continuing.</span>
+</div>
+
 <div class="page-header">
   <div class="page-title-block">
     <div class="page-eyebrow">Account</div>
@@ -468,6 +473,26 @@
 
     // Snapshot original values for dirty tracking
     snapshotOriginal();
+
+    // ── Email-required gate ───────────────────────────────────────────────
+    const requireEmail = sessionStorage.getItem('require_email') === '1';
+    if (requireEmail) {
+      const banner = document.getElementById('email-required-banner');
+      if (banner) banner.style.display = 'flex';
+      // Focus email field so user knows exactly where to go
+      setTimeout(() => document.getElementById('field-email')?.focus(), 100);
+      // Block sidebar nav links until email is saved
+      document.addEventListener('click', function emailGate(e) {
+        const navLink = e.target.closest('.nav-item, .sidebar-nav a, [data-page]');
+        if (navLink && !navLink.closest('#profile-layout')) {
+          if (!document.getElementById('field-email')?.value.trim()) {
+            e.stopImmediatePropagation();
+            e.preventDefault();
+            Shell.toast('Add an email address and save your profile before navigating away.', 'error');
+          }
+        }
+      }, true);
+    }
 
     // ── Event listeners ──────────────────────────────────────────────────
     const trackableInputs = [
@@ -739,11 +764,22 @@
       avatar:          avatarDataUrl,
       avatar_thumb_48: await makeThumb48(avatarDataUrl),
     };
+    if (sessionStorage.getItem('require_email') === '1' && !payload.email) {
+      Shell.toast('Email address is required. Please add one before saving.', 'error');
+      document.getElementById('field-email')?.focus();
+      return;
+    }
     const res = await api.invoke('profile:save', payload);
     if (res?.ok) {
       Shell.toast('Profile saved.', 'success');
       Shell.setSidebarAvatar({ avatar: avatarDataUrl }, payload.display_name, session?.username);
       snapshotOriginal();
+      // Email gate satisfied — clear flag and continue to dashboard
+      if (sessionStorage.getItem('require_email') === '1') {
+        sessionStorage.removeItem('require_email');
+        Shell.toast('Email saved. Taking you to the dashboard.', 'success');
+        setTimeout(() => api.send('navigate', 'dashboard'), 800);
+      }
     } else {
       Shell.toast('Save failed: ' + (res?.error || 'unknown error'), 'error');
     }
