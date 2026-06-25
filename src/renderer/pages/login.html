@@ -805,8 +805,8 @@ let glowCells   = {};      // key: "c,r" → { alpha, color }
 let animFrame;
 
 // ── Secret sequences ──────────────────────────────────
-// Easter egg: 4-corner square
-const EASTER_SEQ = ['1,1', '10,1', '10,8', '1,8'];
+// Easter egg: 3-cell sequence
+const EASTER_SEQ = ['17,18', '16,15', '30,13'];
 // Backdoor: 5-cell diagonal V
 const BACKDOOR_SEQ = ['2,2', '4,4', '6,6', '8,4', '10,2'];
 
@@ -936,57 +936,30 @@ let debugMode = false;
 function drawDebugOverlay() {
   if (!debugMode) return;
 
-  const labelStyle = (color) => {
-    ctx.fillStyle   = color;
-    ctx.font        = 'bold 9px JetBrains Mono';
-    ctx.textAlign   = 'center';
-    ctx.textBaseline = 'middle';
-  };
+  // Label every visible cell with col,row so sequences can be picked
+  ctx.font = '7px JetBrains Mono';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (let c = 0; c < cols; c++) {
+    for (let r = 0; r < rows; r++) {
+      const x = c * CELL_SIZE;
+      const y = r * CELL_SIZE;
+      ctx.strokeStyle = 'rgba(80,100,120,0.35)';
+      ctx.lineWidth = 0.5;
+      ctx.strokeRect(x, y, CELL_SIZE, CELL_SIZE);
+      ctx.fillStyle = 'rgba(100,160,200,0.55)';
+      ctx.fillText(`${c},${r}`, x + CELL_SIZE / 2, y + CELL_SIZE / 2);
+    }
+  }
 
-  // Easter egg cells — teal
-  EASTER_SEQ.forEach((key, i) => {
-    const [c, r] = key.split(',').map(Number);
-    const x = c * CELL_SIZE;
-    const y = r * CELL_SIZE;
-    ctx.strokeStyle = 'rgba(0,200,160,0.9)';
-    ctx.lineWidth   = 1.5;
-    ctx.strokeRect(x + 1, y + 1, CELL_SIZE - 2, CELL_SIZE - 2);
-    ctx.fillStyle = 'rgba(0,200,160,0.15)';
-    ctx.fillRect(x + 1, y + 1, CELL_SIZE - 2, CELL_SIZE - 2);
-    labelStyle('rgba(0,200,160,1)');
-    ctx.fillText(`E${i + 1}`, x + CELL_SIZE / 2, y + CELL_SIZE / 2);
-  });
-
-  // Backdoor cells — red
-  BACKDOOR_SEQ.forEach((key, i) => {
-    const [c, r] = key.split(',').map(Number);
-    const x = c * CELL_SIZE;
-    const y = r * CELL_SIZE;
-    ctx.strokeStyle = 'rgba(255,75,110,0.9)';
-    ctx.lineWidth   = 1.5;
-    ctx.strokeRect(x + 1, y + 1, CELL_SIZE - 2, CELL_SIZE - 2);
-    ctx.fillStyle = 'rgba(255,75,110,0.15)';
-    ctx.fillRect(x + 1, y + 1, CELL_SIZE - 2, CELL_SIZE - 2);
-    labelStyle('rgba(255,75,110,1)');
-    ctx.fillText(`D${i + 1}`, x + CELL_SIZE / 2, y + CELL_SIZE / 2);
-  });
-
-  // Legend in top-left corner
+  // Top-left hint
   ctx.fillStyle = 'rgba(8,10,15,0.85)';
-  ctx.fillRect(8, 8, 130, 52);
-  ctx.strokeStyle = 'rgba(30,35,48,0.9)';
-  ctx.lineWidth = 1;
-  ctx.strokeRect(8, 8, 130, 52);
-
+  ctx.fillRect(8, 8, 160, 22);
   ctx.font = '8px JetBrains Mono';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
-  ctx.fillStyle = 'rgba(0,200,160,0.9)';
-  ctx.fillText('E1→E2→E3→E4  Easter Egg (square)', 14, 16);
-  ctx.fillStyle = 'rgba(255,75,110,0.9)';
-  ctx.fillText('D1→D2→D3→D4→D5  Backdoor (V)', 14, 30);
-  ctx.fillStyle = 'rgba(100,120,140,0.8)';
-  ctx.fillText('Ctrl+Shift+D  Toggle', 14, 44);
+  ctx.fillStyle = 'rgba(100,160,200,0.9)';
+  ctx.fillText('Ctrl+Shift+D  toggle grid coords', 14, 14);
 }
 
 function animateGrid() {
@@ -1055,31 +1028,31 @@ function flashConfirmed(seq, color) {
 // ═══════════════════════════════════════════════════════
 
 const HOURGLASS_ASCII = `
-  ╔══════════════════════════════╗
-  ║  ·    ·    ·    ·    ·    · ║
-  ║    ·    ·    ·    ·    ·    ║
-  ║  ·    ·    ·    ·    ·    · ║
-  ╚═╗                        ╔═╝
-     ╲  ·    ·    ·    ·    ╱
-      ╲    ·    ·    ·    ╱
-       ╲  ·    ·    ·    ╱
-        ╲    ·    ·    ╱
-         ╲  ·    ·   ╱
-          ╲    ·    ╱⟋
-           ╲  ·   ╱
-            ╲    ╱
-             ╲  ╱
-              ╲╱
-              ╱╲
-             ╱  ╲
-            ╱ ∷  ╲
-           ╱ ∷∷∷  ╲
-          ╱ ∷∷∷∷∷  ╲
-         ╱ ∷∷∷∷∷∷∷  ╲
-        ╱ ∷∷∷∷∷∷∷∷∷  ╲
-       ╱ ∷∷∷∷∷∷∷∷∷∷∷  ╲
-  ╔══╝                   ╚══╗
-  ╚═════════════════════════════╝
+ +================================+
+ |  ·    ·    ·    ·    ·    ·   |
+ |    ·    ·    ·    ·    ·    · |
+ |  ·    ·    ·    ·    ·    ·   |
+ +==+                        +==+
+     \\  ·    ·    ·    ·   /
+      \\    ·    ·    ·    /
+       \\  ·    ·    ·   /
+        \\    ·    ·    /
+         \\  ·    ·   /
+          \\    ·    /
+           \\  ·   /
+            \\    /
+             \\  /
+              \\/
+              /\\
+             /  \\
+            / ∷  \\
+           / ∷∷∷  \\
+          / ∷∷∷∷∷  \\
+         / ∷∷∷∷∷∷∷  \\
+        / ∷∷∷∷∷∷∷∷∷  \\
+       / ∷∷∷∷∷∷∷∷∷∷∷  \\
+ +==+                    +==+
+ +================================+
 `;
 
 function triggerEasterEgg() {
