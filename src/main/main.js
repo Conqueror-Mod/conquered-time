@@ -1,9 +1,10 @@
 'use strict';
 
-const { app, BrowserWindow, ipcMain, Menu, dialog, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, dialog, screen, safeStorage } = require('electron');
 const path   = require('path');
 const fs     = require('fs');
 const crypto = require('crypto');
+const { execFile } = require('child_process');
 
 // ── Single instance lock ───────────────────────────────────────────────────
 const gotLock = app.requestSingleInstanceLock();
@@ -281,7 +282,7 @@ function createSplashWindow(theme) {
     }
   });
   splash.loadFile(path.join(__dirname, '../renderer/pages/splash.html'), {
-    query: { theme: theme || 'arctic' }
+    query: { theme: theme || 'zanarkand' }
   });
   return splash;
 }
@@ -500,6 +501,8 @@ ipcMain.handle('profiles:list', () => {
 });
 
 ipcMain.handle('profiles:select', async (_, { username }) => {
+  // Dev mode: DB is already initialised at startup — nothing to create.
+  if (IS_DEV) return { ok: true };
   if (!username || typeof username !== 'string') return { ok: false, error: 'Invalid username.' };
   const safeName  = username.replace(/[^a-zA-Z0-9_\-]/g, '');
   if (!safeName)  return { ok: false, error: 'Invalid username.' };
@@ -536,6 +539,180 @@ ipcMain.handle('profiles:deselect', () => {
   ACTIVE_PROFILE_DIR = null; DB_FILE = null; BACKUP_DIR = null;
   sessionKey = null; sessionUser = null;
   return { ok: true };
+});
+
+// Delete the currently-loaded profile after verifying the user's password.
+// Called from the pre-auth settings modal — the profile must already be loaded
+// via profiles:load (vault is open, but no session key yet).
+// Returns { ok, error } — on success the profile directory is removed from disk
+// and the caller should navigate back to login (profile selector).
+ipcMain.handle('profiles:delete', async (_, { password }) => {
+  if (!db) return { ok: false, error: 'No profile loaded.' };
+  try {
+    const bcrypt = require('bcryptjs');
+    const user   = dbGet('SELECT rowid as rid, password_hash FROM users LIMIT 1');
+    if (!user) return { ok: false, error: 'Profile has no account — cannot verify.' };
+    if (!bcrypt.compareSync(password, user.password_hash))
+      return { ok: false, error: 'Incorrect password.' };
+
+    const profileDir = ACTIVE_PROFILE_DIR;
+
+    // Close DB and clear all session state before deleting files
+    db.close(); db = null;
+    ACTIVE_PROFILE_DIR = null; DB_FILE = null; BACKUP_DIR = null;
+    sessionKey = null; sessionUser = null; activeEntryId = null;
+
+    if (profileDir && fs.existsSync(profileDir))
+      fs.rmSync(profileDir, { recursive: true, force: true });
+
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+});
+
+// ── IPC: safeStorage fast-path (Windows Hello bridge) ─────────────────────
+// safe_key.json lives in the profile directory alongside vault.db.
+// It stores the vault sessionKey encrypted with Electron safeStorage (DPAPI
+// on Windows), plus an AES-256-GCM canary to verify the key on decryption.
+// Password + TOTP login is always available as a fallback — these handlers
+// only add / verify / remove the fast-path layer.
+
+const SAFE_KEY_FILENAME = 'safe_key.json';
+function safeKeyPath() { return ACTIVE_PROFILE_DIR ? path.join(ACTIVE_PROFILE_DIR, SAFE_KEY_FILENAME) : null; }
+
+ipcMain.handle('auth:safe-check', () => {
+  const available = safeStorage.isEncryptionAvailable();
+  const skPath    = safeKeyPath();
+  const enrolled  = !!(skPath && fs.existsSync(skPath));
+  return { available, enrolled };
+});
+
+ipcMain.handle('auth:safe-setup', async (_, { password }) => {
+  if (!db) return { ok: false, error: 'No profile loaded.' };
+  if (!safeStorage.isEncryptionAvailable()) return { ok: false, error: 'Secure sign-in is not available on this device.' };
+  try {
+    const bcrypt = require('bcryptjs');
+    const user   = dbGet('SELECT rowid as rid, * FROM users LIMIT 1');
+    if (!user) return { ok: false, error: 'No account found in this profile.' };
+    if (!bcrypt.compareSync(password, user.password_hash)) return { ok: false, error: 'Incorrect password.' };
+
+    const key    = deriveKey(password, user.key_salt || user.totp_secret);
+    const keyHex = key.toString('hex');
+    const encKey = safeStorage.encryptString(keyHex).toString('base64');
+    const canary = encrypt('conquered-time-v1', key); // { data, iv, tag }
+
+    fs.writeFileSync(safeKeyPath(), JSON.stringify({ version: 1, key: encKey, canary }));
+
+    // Record in manifest
+    if (ACTIVE_PROFILE_DIR && !IS_DEV) {
+      const manifest = readManifest(ACTIVE_PROFILE_DIR);
+      if (manifest && !manifest.auth_methods.includes('safestorage')) {
+        manifest.auth_methods.push('safestorage');
+        writeManifest(ACTIVE_PROFILE_DIR, manifest);
+      }
+    }
+    return { ok: true };
+  } catch (e) { return { ok: false, error: e.message }; }
+});
+
+// Triggers the Windows Hello / PIN consent dialog via WinRT UserConsentVerifier.
+// Resolves to true if the user was verified, false if cancelled or not available.
+// Returns 'Verified' | 'Cancelled' | 'NotAvailable' | 'Error'
+function requestWindowsHelloConsent() {
+  return new Promise((resolve) => {
+    const ps = [
+      '[Windows.Security.Credentials.UI.UserConsentVerifier,Windows.Security.Credentials.UI,ContentType=WindowsRuntime] | Out-Null',
+      '$avail = [Windows.Security.Credentials.UI.UserConsentVerifier]::CheckAvailabilityAsync().GetAwaiter().GetResult()',
+      'if ($avail -ne "Available") { Write-Output "NotAvailable"; exit 0 }',
+      '$result = [Windows.Security.Credentials.UI.UserConsentVerifier]::RequestVerificationAsync("Conquered Time — verify your identity").GetAwaiter().GetResult()',
+      'Write-Output $result.ToString()'
+    ].join('; ');
+    execFile('powershell.exe', ['-NoProfile', '-Sta', '-Command', ps], { timeout: 60000 }, (err, stdout, stderr) => {
+      if (err) { console.error('Windows Hello PS error:', stderr || err.message); resolve('Error'); return; }
+      const result = stdout.trim() || 'Error';
+      console.log('[Windows Hello] UserConsentVerifier result:', JSON.stringify(result));
+      resolve(result);
+    });
+  });
+}
+
+ipcMain.handle('auth:safe-login', async () => {
+  if (!db) return { ok: false, error: 'No profile loaded.' };
+  const skPath = safeKeyPath();
+  if (!skPath || !fs.existsSync(skPath)) return { ok: false, error: 'Secure sign-in not enrolled for this profile.' };
+  try {
+    // Show the Windows Hello biometric / PIN prompt before decrypting.
+    // If Hello isn't configured on this device, skip it — DPAPI still protects the key.
+    const helloResult = await requestWindowsHelloConsent();
+    if (helloResult === 'Cancelled') return { ok: false, error: 'Verification cancelled — use password instead.' };
+    if (helloResult === 'NotAvailable' || helloResult === 'Error') return { ok: false, quickUnlock: true };
+
+    const stored = JSON.parse(fs.readFileSync(skPath, 'utf8'));
+    const keyHex = safeStorage.decryptString(Buffer.from(stored.key, 'base64'));
+    const key    = Buffer.from(keyHex, 'hex');
+
+    // Verify the key is correct via the canary
+    const canaryPlain = decrypt(stored.canary, key);
+    if (canaryPlain !== 'conquered-time-v1') return { ok: false, error: 'Secure sign-in key mismatch — use password login.' };
+
+    const user = dbGet('SELECT rowid as rid, * FROM users LIMIT 1');
+    if (!user) return { ok: false, error: 'No account found in this profile.' };
+
+    sessionKey  = key;
+    sessionUser = { id: Number(user.rid), username: user.username, display_name: user.display_name || null };
+    db.run('UPDATE users SET failed_attempts=0, locked_until=NULL WHERE rowid=?', [Number(user.rid)]);
+    persistDB();
+    resetIdleTimer();
+    return { ok: true };
+  } catch (e) { return { ok: false, error: 'Secure sign-in failed — use password login.' }; }
+});
+
+ipcMain.handle('auth:quick-unlock', async (_, { password }) => {
+  if (!db) return { ok: false, error: 'No profile loaded.' };
+  const skPath = safeKeyPath();
+  if (!skPath || !fs.existsSync(skPath)) return { ok: false, error: 'Secure sign-in not enrolled.' };
+  try {
+    const bcrypt = require('bcryptjs');
+    const user   = dbGet('SELECT rowid as rid, * FROM users LIMIT 1');
+    if (!user) return { ok: false, error: 'No account found.' };
+    if (!bcrypt.compareSync(password, user.password_hash)) return { ok: false, error: 'Incorrect password.' };
+    // Password verified — restore session key from safeStorage
+    const stored = JSON.parse(fs.readFileSync(skPath, 'utf8'));
+    const keyHex = safeStorage.decryptString(Buffer.from(stored.key, 'base64'));
+    const key    = Buffer.from(keyHex, 'hex');
+    const canaryPlain = decrypt(stored.canary, key);
+    if (canaryPlain !== 'conquered-time-v1') return { ok: false, error: 'Key mismatch — use full login.' };
+    sessionKey  = key;
+    sessionUser = { id: Number(user.rid), username: user.username, display_name: user.display_name || null };
+    db.run('UPDATE users SET failed_attempts=0, locked_until=NULL WHERE rowid=?', [Number(user.rid)]);
+    persistDB();
+    resetIdleTimer();
+    return { ok: true };
+  } catch (e) { return { ok: false, error: e.message }; }
+});
+
+ipcMain.handle('auth:safe-disable', async (_, { password }) => {
+  if (!db) return { ok: false, error: 'No profile loaded.' };
+  try {
+    const bcrypt = require('bcryptjs');
+    const user   = dbGet('SELECT rowid as rid, password_hash FROM users LIMIT 1');
+    if (!user) return { ok: false, error: 'No account found in this profile.' };
+    if (!bcrypt.compareSync(password, user.password_hash)) return { ok: false, error: 'Incorrect password.' };
+
+    const skPath = safeKeyPath();
+    if (skPath && fs.existsSync(skPath)) fs.unlinkSync(skPath);
+
+    // Remove from manifest
+    if (ACTIVE_PROFILE_DIR && !IS_DEV) {
+      const manifest = readManifest(ACTIVE_PROFILE_DIR);
+      if (manifest) {
+        manifest.auth_methods = manifest.auth_methods.filter(m => m !== 'safestorage');
+        writeManifest(ACTIVE_PROFILE_DIR, manifest);
+      }
+    }
+    return { ok: true };
+  } catch (e) { return { ok: false, error: e.message }; }
 });
 
 // ── IPC: Auth ──────────────────────────────────────────────────────────────
@@ -1050,10 +1227,16 @@ ipcMain.handle('audit:open-wizard', (_, { mode, theme } = {}) => {
 });
 
 // ── IPC: Database clear operations ────────────────────────────────────────
+// Architecture note: each profile has its own vault.db file, so `db` is
+// always scoped to the active user's vault. All DELETEs still use
+// WHERE user_id=? explicitly so the intent is unambiguous and the code
+// stays safe if vault sharing is ever introduced.
+
 ipcMain.handle('db:clear-timeclock', () => {
   if (!sessionKey || !sessionUser) return { ok: false };
-  db.run('DELETE FROM task_items WHERE user_id=?', [sessionUser.id]);
-  db.run('DELETE FROM time_entries WHERE user_id=?', [sessionUser.id]);
+  const uid = sessionUser.id;
+  db.run('DELETE FROM task_items   WHERE user_id=?', [uid]);
+  db.run('DELETE FROM time_entries WHERE user_id=?', [uid]);
   activeEntryId = null;
   persistDB(); performBackup();
   return { ok: true };
@@ -1061,26 +1244,47 @@ ipcMain.handle('db:clear-timeclock', () => {
 
 ipcMain.handle('db:clear-companies', () => {
   if (!sessionKey || !sessionUser) return { ok: false };
-  db.run('DELETE FROM task_items WHERE user_id=?', [sessionUser.id]);
-  db.run('DELETE FROM time_entries WHERE user_id=?', [sessionUser.id]);
-  db.run('DELETE FROM companies WHERE user_id=?', [sessionUser.id]);
+  const uid = sessionUser.id;
+  db.run('DELETE FROM task_items   WHERE user_id=?', [uid]);
+  db.run('DELETE FROM time_entries WHERE user_id=?', [uid]);
+  db.run('DELETE FROM companies    WHERE user_id=?', [uid]);
   activeEntryId = null;
   persistDB(); performBackup();
   return { ok: true };
 });
 
+// Full clear removes the entire profile from disk so the profile selector
+// does not show a ghost card after logout. The profile directory
+// (vault.db + profile-manifest.json + backups/) is deleted, then the
+// renderer is expected to navigate to login, which will show the selector
+// with only surviving profiles.
 ipcMain.handle('db:clear-full', () => {
   if (!sessionKey || !sessionUser) return { ok: false };
-  db.run('DELETE FROM task_items');
-  db.run('DELETE FROM time_entries');
-  db.run('DELETE FROM companies');
-  db.run('DELETE FROM app_settings');
-  db.run('DELETE FROM users');
-  activeEntryId = null;
-  sessionKey  = null;
-  sessionUser = null;
-  persistDB();
-  return { ok: true };
+  const uid        = sessionUser.id;
+  const profileDir = ACTIVE_PROFILE_DIR; // capture before clearing session state
+
+  // Wipe in-memory DB rows first so persistDB() writes a clean file
+  // (belt-and-suspenders: the whole directory is deleted right after)
+  db.run('DELETE FROM task_items      WHERE user_id=?', [uid]);
+  db.run('DELETE FROM time_entries    WHERE user_id=?', [uid]);
+  db.run('DELETE FROM companies       WHERE user_id=?', [uid]);
+  db.run('DELETE FROM audit_dismissed WHERE user_id=?', [uid]);
+  db.run('DELETE FROM app_settings');   // vault-level; no user_id column
+  db.run('DELETE FROM users           WHERE rowid=?',   [uid]); // sessionUser.id is the rowid (see line 606)
+
+  activeEntryId      = null;
+  sessionKey         = null;
+  sessionUser        = null;
+  ACTIVE_PROFILE_DIR = null;
+  DB_FILE            = null;
+  BACKUP_DIR         = null;
+
+  // Delete the profile directory so profiles:list won't surface a ghost card
+  if (!IS_DEV && profileDir && fs.existsSync(profileDir)) {
+    try { fs.rmSync(profileDir, { recursive: true, force: true }); } catch { /* non-fatal */ }
+  }
+
+  return { ok: true }; // no persistDB() — directory is gone
 });
 
 ipcMain.handle('app:get-info', () => ({
@@ -1146,10 +1350,8 @@ app.whenReady().then(async () => {
   // Dev: auto-load the dev profile so the rest of the flow is identical
   if (IS_DEV) await initProfileDB(ROOT_DATA_DIR);
 
-  // Read saved theme for splash (peeks first available profile if no DB yet)
-  const savedTheme = readStartupSetting('ui_theme') || 'arctic';
-
-  const splash = createSplashWindow(savedTheme);
+  // Splash always uses zanarkand — it's a brand moment, not a user preference moment.
+  const splash = createSplashWindow('zanarkand');
   createWindow(); // creates hidden (show: false)
 
   // Apply window position/size settings before show

@@ -131,8 +131,8 @@ const Shell = (() => {
               <div class="settings-group">
                 <div class="settings-group-title">Theme</div>
                 <div class="theme-cards" id="theme-cards">
-                  <div class="theme-card" data-t="memoria"    onclick="applyTheme('memoria')"><div class="theme-swatch" data-t="memoria"></div><div class="theme-card-name">Memoria</div></div>
                   <div class="theme-card" data-t="zanarkand"  onclick="applyTheme('zanarkand')"><div class="theme-swatch" data-t="zanarkand"></div><div class="theme-card-name">Zanarkand</div></div>
+                  <div class="theme-card" data-t="memoria"    onclick="applyTheme('memoria')"><div class="theme-swatch" data-t="memoria"></div><div class="theme-card-name">Memoria</div></div>
                   <div class="theme-card" data-t="rabanastre" onclick="applyTheme('rabanastre')"><div class="theme-swatch" data-t="rabanastre"></div><div class="theme-card-name">Rabanastre</div></div>
                   <div class="theme-card" data-t="treno"      onclick="applyTheme('treno')"><div class="theme-swatch" data-t="treno"></div><div class="theme-card-name">Treno</div></div>
                   <div class="theme-card" data-t="nibelheim"  onclick="applyTheme('nibelheim')"><div class="theme-swatch" data-t="nibelheim"></div><div class="theme-card-name">Nibelheim</div></div>
@@ -299,6 +299,14 @@ const Shell = (() => {
                   <button class="s-btn" data-al="15" onclick="applyAutoLock(15)">15 min</button>
                   <button class="s-btn" data-al="30" onclick="applyAutoLock(30)">30 min</button>
                   <button class="s-btn" data-al="60" onclick="applyAutoLock(60)">1 hour</button>
+                </div>
+              </div>
+
+              <div class="settings-group">
+                <div class="settings-group-title">Windows Hello / Secure Sign-in</div>
+                <div class="settings-row-label">Sign in without your password using your Windows account credentials</div>
+                <div id="safe-storage-status" style="margin-top:12px;">
+                  <div class="settings-row-label" style="color:var(--text-muted)">Checking availability…</div>
                 </div>
               </div>
             </div>
@@ -687,10 +695,14 @@ function openSettingsModal() {
 function closeSettingsModal() {
   const m = document.getElementById('settings-modal');
   if (m) m.classList.remove('open');
+  // Reset lazy-load flags so Security/Window tabs refresh on next open
+  _safeStorageLoaded = false;
+  _windowSettingsLoaded = false;
 }
 
 let _aboutInfoLoaded = false;
 let _windowSettingsLoaded = false;
+let _safeStorageLoaded = false;
 async function switchSettingsCategory(cat) {
   document.querySelectorAll('.sn-item').forEach(b => b.classList.toggle('active', b.dataset.cat === cat));
   document.querySelectorAll('.settings-cat-panel').forEach(p => p.style.display = 'none');
@@ -700,6 +712,11 @@ async function switchSettingsCategory(cat) {
   if (cat === 'window' && !_windowSettingsLoaded) {
     _windowSettingsLoaded = true;
     loadDisplayPicker();
+  }
+
+  if (cat === 'security' && !_safeStorageLoaded) {
+    _safeStorageLoaded = true;
+    loadSafeStorageStatus();
   }
 
   if (cat === 'about' && !_aboutInfoLoaded) {
@@ -776,7 +793,7 @@ async function executeDbaClear(type) {
     hideDbaConfirm(type);
     closeSettingsModal();
     if (type === 'full') {
-      Shell.toast('Database wiped. Returning to setup…', 'info', 2000);
+      Shell.toast('Profile wiped. Returning to profile selector…', 'info', 2000);
       setTimeout(() => api.send('navigate', 'login'), 2000);
     } else {
       Shell.toast(type === 'companies' ? 'All companies and time data cleared.' : 'Time clock data cleared.', 'success', 3000);
@@ -1054,6 +1071,121 @@ function showAuditWarning(count, action) {
     if (action === 'close') api.send('session:confirm-close');
     else                    api.send('session:confirm-lock');
   };
+}
+
+// ── Safe Storage (Windows Hello bridge) ──────────────────────────────────────
+
+async function loadSafeStorageStatus() {
+  const area = document.getElementById('safe-storage-status');
+  if (!area) return;
+  try {
+    const { available, enrolled } = await api.invoke('auth:safe-check');
+
+    if (!available) {
+      area.innerHTML = `<div class="settings-row-label" style="color:var(--text-muted);font-style:italic;">Secure sign-in is not available on this device.</div>`;
+      return;
+    }
+
+    if (enrolled) {
+      area.innerHTML = `
+        <div class="toggle-row" style="align-items:flex-start;gap:12px;">
+          <div class="toggle-info">
+            <div class="toggle-label" style="color:var(--success,#4caf7d);">✓ Enabled</div>
+            <div class="toggle-desc">Sign in without your password using your Windows account</div>
+          </div>
+        </div>
+        <div class="dba-card" style="margin-top:12px;border-color:var(--border);">
+          <div class="dba-card-header">
+            <div>
+              <div class="dba-card-title">Disable Secure Sign-in</div>
+              <div class="dba-card-desc">You will need your password and TOTP to sign in again</div>
+            </div>
+            <button class="dba-trigger-btn danger" onclick="armSafeDisable()">Disable</button>
+          </div>
+          <div id="safe-disable-confirm" style="display:none;padding:0 0 4px;">
+            <div class="dba-confirm-warning" style="margin-bottom:8px;">Enter your password to confirm.</div>
+            <div class="dba-confirm-row">
+              <input type="password" class="dba-confirm-input" id="safe-disable-pw" placeholder="Current password" autocomplete="current-password">
+              <button class="dba-confirm-btn danger" onclick="executeSafeDisable()">Confirm</button>
+              <button class="dba-confirm-btn" onclick="disarmSafeDisable()">Cancel</button>
+            </div>
+            <div class="error-msg" id="safe-disable-err" style="display:none;margin-top:6px;"></div>
+          </div>
+        </div>`;
+    } else {
+      area.innerHTML = `
+        <div class="dba-card" style="border-color:var(--border);">
+          <div class="dba-card-header">
+            <div>
+              <div class="dba-card-title">Enable Secure Sign-in</div>
+              <div class="dba-card-desc">Skip password &amp; TOTP — your Windows account protects the vault</div>
+            </div>
+            <button class="dba-trigger-btn" onclick="armSafeSetup()">Enable</button>
+          </div>
+          <div id="safe-setup-confirm" style="display:none;padding:0 0 4px;">
+            <div class="dba-confirm-warning" style="margin-bottom:8px;">Enter your current password to enroll.</div>
+            <div class="dba-confirm-row">
+              <input type="password" class="dba-confirm-input" id="safe-setup-pw" placeholder="Current password" autocomplete="current-password">
+              <button class="dba-confirm-btn" onclick="executeSafeSetup()">Enroll</button>
+              <button class="dba-confirm-btn" onclick="disarmSafeSetup()">Cancel</button>
+            </div>
+            <div class="error-msg" id="safe-setup-err" style="display:none;margin-top:6px;"></div>
+          </div>
+        </div>`;
+    }
+  } catch (e) {
+    area.innerHTML = `<div class="settings-row-label" style="color:var(--danger,#e05555);">Could not load status: ${e.message}</div>`;
+  }
+}
+
+function armSafeSetup() {
+  document.getElementById('safe-setup-confirm').style.display = 'block';
+  document.getElementById('safe-setup-pw')?.focus();
+}
+function disarmSafeSetup() {
+  document.getElementById('safe-setup-confirm').style.display = 'none';
+  const pw = document.getElementById('safe-setup-pw'); if (pw) pw.value = '';
+  const err = document.getElementById('safe-setup-err'); if (err) err.style.display = 'none';
+}
+async function executeSafeSetup() {
+  const pw  = document.getElementById('safe-setup-pw')?.value || '';
+  const err = document.getElementById('safe-setup-err');
+  if (!pw) { err.textContent = 'Password required.'; err.style.display = 'block'; return; }
+  const res = await api.invoke('auth:safe-setup', { password: pw });
+  if (!res.ok) {
+    err.textContent = res.error || 'Enrollment failed.';
+    err.style.display = 'block';
+    const inp = document.getElementById('safe-setup-pw'); if (inp) { inp.value = ''; inp.focus(); }
+    return;
+  }
+  Shell.toast('Secure sign-in enabled.', 'success');
+  _safeStorageLoaded = false;
+  loadSafeStorageStatus();
+}
+
+function armSafeDisable() {
+  document.getElementById('safe-disable-confirm').style.display = 'block';
+  document.getElementById('safe-disable-pw')?.focus();
+}
+function disarmSafeDisable() {
+  document.getElementById('safe-disable-confirm').style.display = 'none';
+  const pw = document.getElementById('safe-disable-pw'); if (pw) pw.value = '';
+  const err = document.getElementById('safe-disable-err'); if (err) err.style.display = 'none';
+}
+async function executeSafeDisable() {
+  const pw  = document.getElementById('safe-disable-pw')?.value || '';
+  const err = document.getElementById('safe-disable-err');
+  if (!pw) { err.textContent = 'Password required.'; err.style.display = 'block'; return; }
+  const res = await api.invoke('auth:safe-disable', { password: pw });
+  if (!res.ok) {
+    err.textContent = res.error || 'Failed to disable.';
+    err.style.display = 'block';
+    const inp = document.getElementById('safe-disable-pw'); if (inp) { inp.value = ''; inp.focus(); }
+    return;
+  }
+  Shell.toast('Secure sign-in disabled.', 'success');
+  _safeStorageLoaded = false;
+  loadSafeStorageStatus();
 }
 
 async function applyAutoLock(minutes) {
