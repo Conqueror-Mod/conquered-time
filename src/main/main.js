@@ -381,6 +381,13 @@ function navigate(page) {
   mainWindow.loadFile(path.join(__dirname, `../renderer/pages/${page}.html`));
 }
 
+function requiredBreaks(totalMins) {
+  if (totalMins < 210) return 0;  // < 3.5h — no break required
+  if (totalMins < 360) return 1;  // 3.5h–6h — 1 break
+  if (totalMins < 600) return 2;  // 6h–10h  — 2 breaks
+  return 3;                        // 10h+    — 3 breaks
+}
+
 function getDismissedSet() {
   if (!sessionUser) return new Set();
   return new Set(
@@ -412,12 +419,13 @@ function countAuditDiscrepancies() {
     } catch {}
 
     const totalMins = Number(e.total_mins || 0);
-    if (totalMins > 240) {
-      const hasBreak = dbGet('SELECT id FROM task_items WHERE entry_id=? AND user_id=? AND item_type=? LIMIT 1',
-        [entryId, sessionUser.id, 'break']);
-      if (!hasBreak && !dismissed.has(`${entryId}:-1:missing_break`)) count++;
+    const reqBreaks = requiredBreaks(totalMins);
+    if (reqBreaks > 0) {
+      const breakCount = (dbGet('SELECT COUNT(*) as c FROM task_items WHERE entry_id=? AND user_id=? AND item_type=?',
+        [entryId, sessionUser.id, 'break']) || {}).c || 0;
+      if (breakCount < reqBreaks && !dismissed.has(`${entryId}:-1:missing_break`)) count++;
     }
-    if (totalMins > 360) {
+    if (totalMins > 300) {
       const hasLunch = dbGet('SELECT id FROM task_items WHERE entry_id=? AND user_id=? AND item_type=? LIMIT 1',
         [entryId, sessionUser.id, 'lunch']);
       if (!hasLunch && !dismissed.has(`${entryId}:-1:missing_lunch`)) count++;
@@ -1028,6 +1036,23 @@ ipcMain.handle('tasks:recent-labels', () => {
     [sessionUser.id]
   );
   return rows.map(r => r.label);
+});
+
+ipcMain.handle('tasks:summary', () => {
+  if (!sessionKey || !sessionUser) return {};
+  const rows = dbAll(
+    `SELECT entry_id, item_type, COUNT(*) as cnt
+     FROM task_items WHERE user_id=? AND item_type IN ('break','lunch')
+     GROUP BY entry_id, item_type`,
+    [sessionUser.id]
+  );
+  const map = {};
+  (rows || []).forEach(r => {
+    if (!map[r.entry_id]) map[r.entry_id] = { break_count: 0, lunch_count: 0 };
+    if (r.item_type === 'break') map[r.entry_id].break_count = Number(r.cnt);
+    if (r.item_type === 'lunch') map[r.entry_id].lunch_count = Number(r.cnt);
+  });
+  return map;
 });
 
 // ── IPC: Settings ──────────────────────────────────────────────────────────

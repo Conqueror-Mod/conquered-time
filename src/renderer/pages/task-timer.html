@@ -171,8 +171,8 @@ function buildDescString(tasks) {
 
 function checkComplianceStatus(type) {
   // Returns 'ok', 'warn' (approaching), or 'over'
-  const thresholdMs = type === 'break' ? 4 * 3600000 : 6 * 3600000;
-  const warnMs      = type === 'break' ? 3.5 * 3600000 : 5.5 * 3600000;
+  const thresholdMs = type === 'break' ? 2.5 * 3600000 : 5 * 3600000;
+  const warnMs      = type === 'break' ? 2.0 * 3600000 : 4.5 * 3600000;
   const relevant = taskItems.filter(t => t.item_type === type && t.stopped_at);
   const activeItem = taskItems.find(
     t => t.item_type === type && !t.stopped_at
@@ -292,7 +292,7 @@ function renderComplianceFor(type) {
 
   const activeItem = taskItems.find(t => t.item_type === type && !t.stopped_at);
   const relevant   = taskItems.filter(t => t.item_type === type && t.stopped_at);
-  const threshLabel = type === 'break' ? '4h' : '6h';
+  const threshLabel = type === 'break' ? '2.5h' : '5h';
 
   if (activeItem) {
     el.innerHTML = `<svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><circle cx="5" cy="5" r="5"/></svg>
@@ -314,7 +314,7 @@ function renderComplianceFor(type) {
   const lastStop = Math.max(...relevant.map(t => t.stopped_at));
   const elStr = elapsedSinceMs(lastStop);
   if (status === 'over')
-    el.innerHTML = `<svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><circle cx="5" cy="5" r="5"/></svg> ⚠ Break overdue — last ${type} ${elStr} ago`;
+    el.innerHTML = `<svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><circle cx="5" cy="5" r="5"/></svg> ⚠ ${type === 'break' ? 'Break overdue' : 'Lunch overdue'} — last ${type} ${elStr} ago`;
   else
     el.innerHTML = `<svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><circle cx="5" cy="5" r="5"/></svg> Last ${type}: ${elStr} ago ✓`;
 }
@@ -402,11 +402,11 @@ async function complianceTick() {
   const lunchStatus = checkComplianceStatus('lunch');
 
   if (breakStatus === 'over' && !activeBreakId) {
-    Shell.toast('Take a break — you\'ve been working over 4 hours.', 'info', 6000);
+    Shell.toast('Take a break — you\'ve been working over 2 hours.', 'info', 6000);
     await writeDescToEntry();
   }
   if (lunchStatus === 'over' && !activeLunchId) {
-    Shell.toast('Time for lunch — you\'ve been working over 6 hours.', 'info', 6000);
+    Shell.toast('Time for lunch — you\'ve been working over 5 hours.', 'info', 6000);
     await writeDescToEntry();
   }
 }

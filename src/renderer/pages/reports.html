@@ -388,7 +388,7 @@
 <script src="../components/settings.js"></script>
 <script src="../components/shell.js"></script>
 <script>
-  let companies = [], allEntries = [], companyMap = {};
+  let companies = [], allEntries = [], companyMap = {}, taskMap = {};
   let currentTab = 'period';
   let barResizeObserver = null;
   let dismissedSet = new Set();
@@ -417,7 +417,12 @@
       api.invoke('audit:open-wizard', { mode: 'fix', theme });
     });
     api.on('audit:wizard-done', async () => {
-      allEntries = await api.invoke('entries:all') || [];
+      [allEntries, taskMap] = await Promise.all([
+        api.invoke('entries:all'),
+        api.invoke('tasks:summary'),
+      ]);
+      allEntries = allEntries || [];
+      taskMap    = taskMap    || {};
       const dismissedRows = await api.invoke('audit:get-dismissed');
       dismissedSet = new Set((dismissedRows || []).map(d => `${d.entry_id}:${d.row_idx}:${d.type}`));
       renderAuditLog();
@@ -438,12 +443,14 @@
 
   // ── Data ──
   async function loadData() {
-    [companies, allEntries] = await Promise.all([
+    [companies, allEntries, taskMap] = await Promise.all([
       api.invoke('companies:list'),
-      api.invoke('entries:all')
+      api.invoke('entries:all'),
+      api.invoke('tasks:summary'),
     ]);
     companies  = companies  || [];
     allEntries = allEntries || [];
+    taskMap    = taskMap    || {};
     companyMap = {};
     companies.forEach(c => { companyMap[Number(c.id)] = c; });
 
@@ -682,8 +689,8 @@
       case 'no_clock_out':   return { flag:'● No clock-out',   cls:'flag-error',  suggestion:'Auto-set clock-out to clock-in + 8h.',                  fix: 'set_clock_out' };
       case 'zero_duration':  return { flag:'⚠ Zero duration',  cls:'flag-warn',   suggestion:'Recalculate duration from clock-in / clock-out.',        fix: (r.clock_in && r.clock_out) ? 'recalc_duration' : null };
       case 'over_12h':       return { flag:'⚠ Over 12h',       cls:'flag-warn',   suggestion:'Review clock-out — session exceeds 12 hours.',           fix: null };
-      case 'missing_break':  return { flag:'⚠ No break logged', cls:'flag-warn',  suggestion:'Log a break in Dispatch for sessions over 4 hours.',     fix: null };
-      case 'missing_lunch':  return { flag:'⚠ No lunch logged', cls:'flag-warn',  suggestion:'Log a lunch in Dispatch for sessions over 6 hours.',     fix: null };
+      case 'missing_break':  return { flag:'⚠ Break(s) missing', cls:'flag-warn',  suggestion:'US policy requires 1 break per 3.5–6h shift, 2 for 6–10h, 3 for 10h+. Log break(s) in Dispatch.',  fix: null };
+      case 'missing_lunch':  return { flag:'⚠ No lunch logged',  cls:'flag-warn',  suggestion:'A meal break is required after 5 hours worked. Log a lunch in Dispatch.',                              fix: null };
       default:               return { flag:'✓ OK',              cls:'flag-ok',     suggestion:'',                                                       fix: null };
     }
   }
@@ -706,11 +713,13 @@
 
       // Entry-level break/lunch flags
       const totalMins = Number(e.total_mins || 0);
-      if (totalMins > 240) {
+      const tsk       = taskMap[entryId] || { break_count: 0, lunch_count: 0 };
+      const reqBreaks = totalMins < 210 ? 0 : totalMins < 360 ? 1 : totalMins < 600 ? 2 : 3;
+      if (reqBreaks > 0 && tsk.break_count < reqBreaks) {
         const bKey = `${entryId}:-1:missing_break`;
-        items.push({ date: e.log_date, company: co?.name || `#${e.company_id}`, entryId, rowIdx: -1, type: 'missing_break', dKey: bKey, r: { clock_in: '—', clock_out: '—', total_mins: totalMins, label: '(session)' } });
+        items.push({ date: e.log_date, company: co?.name || `#${e.company_id}`, entryId, rowIdx: -1, type: 'missing_break', dKey: bKey, r: { clock_in: '—', clock_out: '—', total_mins: totalMins, label: '(session)', req_breaks: reqBreaks, has_breaks: tsk.break_count } });
       }
-      if (totalMins > 360) {
+      if (totalMins > 300 && tsk.lunch_count < 1) {
         const lKey = `${entryId}:-1:missing_lunch`;
         items.push({ date: e.log_date, company: co?.name || `#${e.company_id}`, entryId, rowIdx: -1, type: 'missing_lunch', dKey: lKey, r: { clock_in: '—', clock_out: '—', total_mins: totalMins, label: '(session)' } });
       }
