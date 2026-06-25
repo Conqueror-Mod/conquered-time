@@ -270,65 +270,6 @@
     letter-spacing: 4px; text-align: center; display: none;
   }
 
-  /* ── Easter egg overlay ── */
-  #easter-overlay {
-    position: absolute;
-    inset: 0;
-    z-index: 10;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    background: rgba(8,10,15,0.92);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.5s ease;
-  }
-  #easter-overlay.visible {
-    opacity: 1;
-    pointer-events: all;
-  }
-  .easter-ascii {
-    font-family: var(--mono);
-    font-size: 13px;
-    line-height: 1.35;
-    color: var(--accent);
-    text-shadow: 0 0 8px var(--accent-glow);
-    white-space: pre;
-    text-align: center;
-    margin-bottom: 20px;
-  }
-  .easter-msg {
-    font-family: var(--sans);
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--text-muted);
-    animation: blink 1.2s infinite;
-  }
-  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
-
-  /* Sequence indicator dots */
-  #seq-indicator {
-    position: absolute;
-    bottom: 28px;
-    left: 50%;
-    transform: translateX(-50%);
-    display: flex;
-    gap: 6px;
-    z-index: 5;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.3s;
-  }
-  #seq-indicator.visible { opacity: 1; }
-  .seq-dot {
-    width: 5px; height: 5px;
-    border-radius: 50%;
-    background: var(--border-light);
-    transition: all 0.2s;
-  }
-  .seq-dot.lit { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
-
   /* ── Profile Selector ──────────────────────────────────── */
   #profile-selector {
     display: none;
@@ -520,9 +461,6 @@
   <div class="corner corner-bl"></div>
   <div class="corner corner-br"></div>
 
-  <!-- Sequence dots indicator -->
-  <div id="seq-indicator"></div>
-
   <!-- ── Profile Selector ── -->
   <div id="profile-selector">
     <div class="ps-brand">
@@ -689,13 +627,6 @@
     <button class="btn-neutral" onclick="showRecovery()" style="margin-top:8px;">Use Recovery Code</button>
   </div>
 
-  <!-- ── Easter Egg Overlay ── -->
-  <div id="easter-overlay">
-    <pre class="easter-ascii" id="easter-ascii"></pre>
-    <div class="easter-msg">— you cracked the code —</div>
-  </div>
-
-
 </div>
 
 <div id="toast-container"></div>
@@ -715,14 +646,6 @@ let hoverCell   = { c: -1, r: -1 };
 let glowCells   = {};      // key: "c,r" → { alpha, color }
 let animFrame;
 
-// ── Secret sequences ──────────────────────────────────
-// Easter egg: 3-cell sequence — update these with Ctrl+Shift+D to pick cells
-const EASTER_SEQ = ['10,10', '9,15', '23,13'];
-
-let currentSeq = [];
-let seqMode    = null;
-let seqTimeout    = null;
-
 function initGrid() {
   canvas = document.getElementById('grid-canvas');
   ctx    = canvas.getContext('2d');
@@ -731,7 +654,6 @@ function initGrid() {
 
   canvas.addEventListener('mousemove', onGridHover);
   canvas.addEventListener('mouseleave', () => { hoverCell = { c: -1, r: -1 }; });
-  canvas.addEventListener('click', onGridClick);
 
   animateGrid();
 }
@@ -762,85 +684,6 @@ function onGridHover(e) {
     glowCells[key].alpha = Math.max(glowCells[key].alpha, 0.25);
     glowCells[key].decay = true;
   }
-}
-
-function onGridClick(e) {
-  const card = document.getElementById('login-card');
-  if (card && card.contains(e.target)) return;
-
-  const rect = canvas.getBoundingClientRect();
-  const c = Math.floor((e.clientX - rect.left)  / CELL_SIZE);
-  const r = Math.floor((e.clientY - rect.top)   / CELL_SIZE);
-  const key = `${c},${r}`;
-
-  glowCells[key] = { alpha: 0.7, color: 'accent', decay: true };
-  lastClickKey = key;
-
-  const nextIdx   = currentSeq.length;
-  const hitsEaster = key === EASTER_SEQ[nextIdx];
-
-  if (hitsEaster) {
-    currentSeq.push(key);
-    seqMode = 'easter';
-    clearTimeout(seqTimeout);
-    seqTimeout = setTimeout(resetSeq, 20000);
-    updateSeqIndicator();
-    if (currentSeq.length === EASTER_SEQ.length) { triggerEasterEgg(); return; }
-  } else if (seqMode !== null) {
-    resetSeq();
-  }
-}
-
-function updateSeqIndicator() {
-  const ind = document.getElementById('seq-indicator');
-  ind.innerHTML = Array.from({ length: EASTER_SEQ.length }, (_, i) => {
-    return `<div class="${i < currentSeq.length ? 'seq-dot lit' : 'seq-dot'}"></div>`;
-  }).join('');
-  ind.classList.toggle('visible', currentSeq.length > 0);
-}
-
-function resetSeq() {
-  currentSeq = [];
-  seqMode    = null;
-  clearTimeout(seqTimeout);
-  document.getElementById('seq-indicator').classList.remove('visible');
-}
-
-// ── Debug overlay ─────────────────────────────────────
-let debugMode   = false;
-let lastClickKey = null;
-
-// ── Debug overlay toggle (wired in DOMContentLoaded) ──
-
-function drawDebugOverlay() {
-  if (!debugMode) return;
-
-  // Label every cell with col,row — use Ctrl+Shift+D to find cells for the sequence
-  ctx.font = '7px JetBrains Mono';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  for (let c = 0; c < cols; c++) {
-    for (let r = 0; r < rows; r++) {
-      const x = c * CELL_SIZE;
-      const y = r * CELL_SIZE;
-      ctx.strokeStyle = 'rgba(80,100,120,0.35)';
-      ctx.lineWidth = 0.5;
-      ctx.strokeRect(x, y, CELL_SIZE, CELL_SIZE);
-      ctx.fillStyle = 'rgba(100,160,200,0.55)';
-      ctx.fillText(`${c},${r}`, x + CELL_SIZE / 2, y + CELL_SIZE / 2);
-    }
-  }
-
-  // Top-left panel
-  ctx.fillStyle = 'rgba(8,10,15,0.88)';
-  ctx.fillRect(8, 8, 240, 40);
-  ctx.font = '8px JetBrains Mono';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'top';
-  ctx.fillStyle = 'rgba(100,160,200,0.9)';
-  ctx.fillText('Ctrl+Shift+D  toggle coords', 14, 14);
-  ctx.fillStyle = 'rgba(255,220,80,0.9)';
-  ctx.fillText('Last: ' + (lastClickKey || '—') + '   Seq: [' + currentSeq.join('>') + ']', 14, 26);
 }
 
 function animateGrid() {
@@ -888,71 +731,7 @@ function animateGrid() {
     if (g.decay) g.alpha -= 0.015;
   }
 
-  drawDebugOverlay();
   animFrame = requestAnimationFrame(animateGrid);
-}
-
-// ── Flash confirmed cells in sequence ─────────────────
-function flashConfirmed(seq, color) {
-  seq.forEach((key, i) => {
-    setTimeout(() => {
-      glowCells[key] = { alpha: 1.0, color, decay: false };
-      setTimeout(() => {
-        if (glowCells[key]) glowCells[key].decay = true;
-      }, 300);
-    }, i * 120);
-  });
-}
-
-// ═══════════════════════════════════════════════════════
-//  EASTER EGG
-// ═══════════════════════════════════════════════════════
-
-const HOURGLASS_ASCII = `
-+==============================+
-|  ·      ·      ·      ·     |
-|    ·      ·      ·      ·   |
-|  ·      ·      ·      ·     |
-+==+                      +==+
-    \\                    /
-     \\                  /
-      \\                /
-       \\              /
-        \\            /
-         \\          /
-          \\        /
-           \\      /
-            \\    /
-             \\  /
-              \\/
-              /\\
-             /  \\
-            / ∷∷ \\
-           / ∷∷∷∷ \\
-          / ∷∷∷∷∷∷ \\
-         / ∷∷∷∷∷∷∷∷ \\
-        / ∷∷∷∷∷∷∷∷∷∷ \\
-       / ∷∷∷∷∷∷∷∷∷∷∷∷ \\
-+==+                      +==+
-+==============================+
-`;
-
-function triggerEasterEgg() {
-  flashConfirmed(EASTER_SEQ, 'accent');
-  resetSeq();
-
-  const card    = document.getElementById('login-card');
-  const overlay = document.getElementById('easter-overlay');
-  document.getElementById('easter-ascii').textContent = HOURGLASS_ASCII;
-
-  card.classList.add('fade-out');
-  setTimeout(() => {
-    overlay.classList.add('visible');
-    setTimeout(() => {
-      overlay.classList.remove('visible');
-      setTimeout(() => { card.classList.remove('fade-out'); }, 500);
-    }, 3200);
-  }, 600);
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1223,11 +1002,6 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   // Single unified keydown handler
   document.addEventListener('keydown', e => {
-    if (e.ctrlKey && e.shiftKey && e.key === 'D') {
-      debugMode = !debugMode;
-      toast(debugMode ? '[ DEBUG ON ]' : '[ DEBUG OFF ]', debugMode ? 'success' : 'warning');
-      return;
-    }
     if (e.key === 'Escape') {
       // If safe-login UI is visible, fall through to normal form rather than going back
       const safeSection = document.getElementById('safe-login-section');
