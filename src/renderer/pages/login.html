@@ -883,31 +883,30 @@ function onGridClick(e) {
 
 function checkSequences() {
   const seq = currentSeq;
+  const key = seq[seq.length - 1];
 
-  // Check easter egg
-  if (seq.length <= EASTER_SEQ.length) {
+  // If no sequence is active yet, only the first element of a known sequence starts tracking
+  if (seqMode === null) {
+    if (key === EASTER_SEQ[0])   { seqMode = 'easter'; }
+    else if (key === BACKDOOR_SEQ[0]) { seqMode = 'dev'; }
+    else { resetSeq(); return; }
+  }
+
+  if (seqMode === 'easter') {
     const slice = EASTER_SEQ.slice(0, seq.length);
     if (seq.every((k, i) => k === slice[i])) {
-      if (seq.length === EASTER_SEQ.length) { triggerEasterEgg(); return; }
-      seqMode = 'easter';
+      if (seq.length === EASTER_SEQ.length) triggerEasterEgg();
     } else {
-      if (seqMode === 'easter') resetSeq();
+      resetSeq();
     }
-  }
-
-  // Check backdoor
-  if (seq.length <= BACKDOOR_SEQ.length) {
+  } else if (seqMode === 'dev') {
     const slice = BACKDOOR_SEQ.slice(0, seq.length);
     if (seq.every((k, i) => k === slice[i])) {
-      if (seq.length === BACKDOOR_SEQ.length) { triggerBackdoor(); return; }
-      seqMode = 'dev';
+      if (seq.length === BACKDOOR_SEQ.length) triggerBackdoor();
     } else {
-      if (seqMode === 'dev') resetSeq();
+      resetSeq();
     }
   }
-
-  // If longer than both and no match, reset
-  if (seq.length > Math.max(EASTER_SEQ.length, BACKDOOR_SEQ.length)) resetSeq();
 }
 
 function updateSeqIndicator() {
