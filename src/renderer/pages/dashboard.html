@@ -283,8 +283,10 @@
       const mx = e.clientX - rect.left, my = e.clientY - rect.top;
       const W = wrap.clientWidth, H = wrap.clientHeight;
       const cx = W/2, cy = H/2;
-      const radius = Math.min(W,H) * 0.36;
-      const step = (Math.PI*2) / companies.length;
+      const count = companies.length;
+      const ringFrac = count <= 2 ? 0.30 : count <= 4 ? 0.34 : count <= 7 ? 0.38 : 0.42;
+      const radius = Math.min(W, H) * ringFrac;
+      const step = (Math.PI*2) / count;
       companies.forEach((co,i) => {
         const a = step*i - Math.PI/2;
         const nx = cx + Math.cos(a)*radius, ny = cy + Math.sin(a)*radius;
@@ -332,8 +334,11 @@
         return;
       }
 
-      const radius = Math.min(W,H) * 0.36;
-      const step = (Math.PI*2) / companies.length;
+      const count = companies.length;
+      const nodeR    = Math.max(11, Math.round(20 - count * 0.7));
+      const ringFrac = count <= 2 ? 0.30 : count <= 4 ? 0.34 : count <= 7 ? 0.38 : 0.42;
+      const radius   = Math.min(W, H) * ringFrac;
+      const step = (Math.PI*2) / count;
 
       // Edges
       companies.forEach((co,i) => {
@@ -349,7 +354,7 @@
       companies.forEach((co,i) => {
         const a = step*i - Math.PI/2;
         const nx = cx + Math.cos(a)*radius, ny = cy + Math.sin(a)*radius;
-        drawSphereNode(ctx, nx, ny, 20, false, pulse, (co.name||'?').slice(0,7));
+        drawSphereNode(ctx, nx, ny, nodeR, false, pulse, (co.name||'?').slice(0,7));
       });
 
       // Center node on top
@@ -370,9 +375,9 @@
       grid:'rgba(0,0,0,0.06)', hours:'#92400e'
     };
     return {
-      center: { g1:'rgba(96,165,250,0.25)', g2:'rgba(30,64,175,0.15)', border:'#3b82f6', label:'#93c5fd', glow:'rgba(59,130,246,0.07)' },
+      center: { base:'#0f2060', g1:'rgba(80,130,255,1)', g2:'rgba(25,55,175,1)', border:'#3b82f6', label:'#bfdbfe', glow:'rgba(59,130,246,0.12)' },
       node:   { g1:'rgba(129,140,248,0.22)', g2:'rgba(67,56,202,0.14)', border:'#6366f1', label:'#e0e7ff' },
-      edge1:'rgba(59,130,246,0.45)', edge2:'rgba(99,102,241,0.08)',
+      edge1:'rgba(59,130,246,0.5)', edge2:'rgba(99,102,241,0.08)',
       grid:'rgba(255,255,255,0.025)', hours:'rgba(245,158,11,0.9)'
     };
   }
@@ -384,10 +389,14 @@
 
     if (isCenter) {
       ctx.beginPath(); ctx.arc(x,y,pR+10,0,Math.PI*2);
-      ctx.fillStyle = nc.glow || 'rgba(59,130,246,0.07)'; ctx.fill();
+      ctx.fillStyle = nc.glow || 'rgba(59,130,246,0.12)'; ctx.fill();
+      if (nc.base) {
+        ctx.beginPath(); ctx.arc(x,y,pR,0,Math.PI*2);
+        ctx.fillStyle = nc.base; ctx.fill();
+      }
     }
     const grad = ctx.createRadialGradient(x-pR*0.3,y-pR*0.3,pR*0.1,x,y,pR);
-    grad.addColorStop(0, nc.g1); grad.addColorStop(0.6, nc.g2); grad.addColorStop(1,'rgba(0,0,0,0.35)');
+    grad.addColorStop(0, nc.g1); grad.addColorStop(0.6, nc.g2); grad.addColorStop(1, isCenter ? 'rgba(8,18,70,1)' : 'rgba(0,0,0,0.35)');
     ctx.beginPath(); ctx.arc(x,y,pR,0,Math.PI*2);
     ctx.fillStyle=grad; ctx.fill();
     ctx.strokeStyle=nc.border; ctx.lineWidth=isCenter?2:1.5; ctx.stroke();

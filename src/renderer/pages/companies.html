@@ -12,11 +12,14 @@
 <style>
   .web-layout {
     display: grid;
-    grid-template-columns: 1fr 300px;
+    grid-template-columns: 1fr 400px;
     gap: 16px;
     flex: 1;
     min-height: 0;
+    overflow: hidden;
   }
+
+  /* Canvas */
   #spiderweb-wrap {
     position: relative;
     background: var(--surface-1);
@@ -44,14 +47,42 @@
     display: block; cursor: default;
   }
 
-  /* Side panel */
-  .company-panel { display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
+  /* Right panel — flex column with list + detail */
+  .company-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .company-list-panel {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    transition: max-height 0.25s ease;
+  }
+  .company-panel.detail-open .company-list-panel {
+    flex: 0 0 auto;
+    max-height: 38%;
+  }
+  .company-list-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
 
+  /* List items — 2-line cards */
   .company-list-item {
+    flex-shrink: 0;
     background: var(--surface-1);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
-    padding: 11px 14px;
+    padding: 10px 14px;
     cursor: pointer;
     transition: all var(--transition);
     display: flex;
@@ -59,28 +90,140 @@
     gap: 10px;
     box-shadow: var(--shadow-1);
   }
-  .company-list-item:hover  { border-color: var(--accent); background: var(--surface-2); box-shadow: var(--shadow-2); }
+  .company-list-item:hover    { border-color: var(--accent); background: var(--surface-2); box-shadow: var(--shadow-2); }
   .company-list-item.selected { border-color: var(--accent); background: var(--accent-dim); }
-
   .company-dot {
-    width: 8px; height: 8px;
+    width: 9px; height: 9px;
     border-radius: 50%;
     background: var(--accent);
     box-shadow: 0 0 6px var(--accent-glow);
     flex-shrink: 0;
+    margin-top: 2px;
+    align-self: flex-start;
   }
+  .company-info { flex: 1; min-width: 0; }
   .company-name {
-    font-family: var(--sans);
     font-size: 13px;
     font-weight: 500;
     color: var(--text-bright);
-    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .company-sub {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .company-hours {
     font-family: var(--mono);
     font-size: 11px;
     color: var(--yellow);
+    flex-shrink: 0;
+    align-self: flex-start;
+    margin-top: 2px;
   }
+
+  /* Detail pane */
+  .company-detail-panel {
+    display: none;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .company-panel.detail-open .company-detail-panel { display: flex; }
+  .detail-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .detail-header-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .detail-company-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-bright);
+    line-height: 1.3;
+  }
+  .detail-close-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 16px;
+    padding: 0 2px;
+    line-height: 1;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .detail-close-btn:hover { color: var(--text-bright); }
+  .detail-breadcrumb {
+    font-size: 11px;
+    color: var(--accent);
+    font-family: var(--mono);
+    margin-top: 2px;
+  }
+  .detail-stats {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .det-chip {
+    font-size: 11px;
+    font-weight: 500;
+    padding: 3px 10px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+  .det-chip.accent { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+  .det-chip.green  { border-color: var(--green,#22c55e); color: var(--green,#22c55e); background: var(--green-dim,rgba(34,197,94,0.1)); }
+  .det-chip.yellow { border-color: var(--yellow); color: var(--yellow); background: rgba(245,158,11,0.08); }
+  .detail-field-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 16px;
+  }
+  .det-field { display: flex; flex-direction: column; gap: 2px; }
+  .det-field-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
+  .det-field-value { font-size: 12px; color: var(--text-bright); word-break: break-word; }
+  .det-field-value.empty { color: var(--text-dim); font-style: italic; }
+  .det-field.span-2 { grid-column: span 2; }
+  .detail-notes-block { display: none; flex-direction: column; gap: 4px; }
+  .detail-notes-block.has-notes { display: flex; }
+  .det-notes-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
+  .det-notes-text {
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.6;
+    max-height: 64px;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+  }
+  .detail-divider { height: 1px; background: var(--border); }
+  .detail-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .detail-actions .btn-primary  { flex: 1; min-width: 80px; }
+  .detail-actions .btn-neutral  { flex: 1; min-width: 80px; }
+  .detail-actions .btn-danger   { flex: 0 0 auto; }
 
   /* Modal grid */
   .modal-grid {
@@ -91,7 +234,6 @@
   .modal-grid .span-2 { grid-column: span 2; }
   .section-divider {
     grid-column: span 2;
-    font-family: var(--sans);
     font-size: 11px;
     font-weight: 600;
     color: var(--text-muted);
@@ -101,12 +243,7 @@
     padding-bottom: 8px;
     margin-top: 6px;
   }
-  .ppi-note {
-    font-family: var(--sans);
-    font-size: 11px;
-    color: var(--accent);
-    font-weight: 400;
-  }
+  .ppi-note { font-size: 11px; color: var(--accent); font-weight: 400; }
 
   /* Node tooltip */
   #node-tooltip {
@@ -115,16 +252,16 @@
     border: 1px solid var(--border-light);
     border-radius: var(--radius-lg);
     padding: 10px 14px;
-    font-family: var(--sans);
     font-size: 12px;
     color: var(--text-bright);
     pointer-events: none;
     z-index: 10;
     display: none;
     box-shadow: var(--shadow-2);
-    max-width: 200px;
+    max-width: 220px;
   }
   .tooltip-name   { font-weight: 600; color: var(--text-white); margin-bottom: 3px; }
+  .tooltip-hier   { font-size: 11px; color: var(--accent); margin-bottom: 2px; font-family: var(--mono); }
   .tooltip-detail { font-size: 11px; color: var(--text-muted); }
 
   /* Context menu */
@@ -141,7 +278,6 @@
   }
   .ctx-item {
     padding: 8px 12px;
-    font-family: var(--sans);
     font-size: 13px;
     font-weight: 400;
     color: var(--text-bright);
@@ -149,8 +285,8 @@
     border-radius: var(--radius);
     transition: all var(--transition);
   }
-  .ctx-item:hover       { background: var(--accent-dim); color: var(--accent); }
-  .ctx-item.danger      { color: var(--red); }
+  .ctx-item:hover        { background: var(--accent-dim); color: var(--accent); }
+  .ctx-item.danger       { color: var(--red); }
   .ctx-item.danger:hover { background: var(--red-dim); }
   .ctx-divider { height: 1px; background: var(--border); margin: 4px 0; }
 </style>
@@ -171,7 +307,8 @@
   <div id="spiderweb-wrap">
     <canvas id="web-canvas"></canvas>
     <div id="node-tooltip">
-      <div class="tooltip-name"  id="tt-name"></div>
+      <div class="tooltip-name"   id="tt-name"></div>
+      <div class="tooltip-hier"   id="tt-hier"></div>
       <div class="tooltip-detail" id="tt-detail"></div>
     </div>
     <div id="ctx-menu">
@@ -182,26 +319,58 @@
     </div>
   </div>
 
-  <div class="company-panel">
-    <div class="hud-panel" style="flex:1;display:flex;flex-direction:column;">
+  <div class="company-panel" id="company-panel">
+
+    <!-- Company list -->
+    <div class="hud-panel company-list-panel">
       <div class="hud-panel-header">
         <div class="hud-panel-title">Companies</div>
         <span style="font-family:var(--mono);font-size:12px;color:var(--text-dim);" id="company-count">0</span>
       </div>
-      <div class="hud-panel-body" style="padding:10px;overflow-y:auto;flex:1;">
-        <div id="company-list">
-          <div style="font-size:12px;color:var(--text-dim);text-align:center;padding:24px 0;">
-            No companies yet. Add one to begin.
-          </div>
+      <div class="company-list-scroll" id="company-list">
+        <div style="font-size:12px;color:var(--text-dim);text-align:center;padding:24px 0;">
+          No companies yet. Add one to begin.
         </div>
       </div>
     </div>
+
+    <!-- Detail pane — shown on selection -->
+    <div class="hud-panel company-detail-panel" id="company-detail">
+      <div class="hud-panel-header">
+        <div class="hud-panel-title" id="det-panel-title">Details</div>
+        <button class="detail-close-btn" onclick="closeDetail()">✕</button>
+      </div>
+      <div class="detail-body">
+        <div>
+          <div class="detail-header-row">
+            <div>
+              <div class="detail-company-name" id="det-name">—</div>
+              <div class="detail-breadcrumb"   id="det-breadcrumb"></div>
+            </div>
+          </div>
+        </div>
+        <div class="detail-stats" id="det-stats"></div>
+        <div class="detail-divider"></div>
+        <div class="detail-field-grid" id="det-fields"></div>
+        <div class="detail-notes-block" id="det-notes-block">
+          <div class="det-notes-label">Notes</div>
+          <div class="det-notes-text" id="det-notes-text"></div>
+        </div>
+        <div class="detail-divider"></div>
+        <div class="detail-actions">
+          <button class="btn-primary"  id="det-edit-btn">Edit</button>
+          <button class="btn-neutral"  id="det-tracker-btn">Open Tracker</button>
+          <button class="btn-danger"   id="det-delete-btn">Delete</button>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
 
 <!-- Company Modal -->
 <div class="modal-overlay" id="company-modal" style="display:none;">
-  <div class="modal-box" style="width:600px;">
+  <div class="modal-box" style="width:620px;">
     <div class="modal-title" id="modal-title">Add Company</div>
 
     <div class="modal-grid">
@@ -261,10 +430,7 @@
         <input type="date" id="f-date-end">
       </div>
 
-      <div class="section-divider">
-        Platform Data
-        <span class="ppi-note"> — encrypted at rest</span>
-      </div>
+      <div class="section-divider">Platform Data <span class="ppi-note"> — encrypted at rest</span></div>
 
       <div class="field-group span-2">
         <label class="field-label">Company Login / Username</label>
@@ -300,7 +466,7 @@
 <script src="../components/shell.js"></script>
 <script>
   let companies = [], entries = [], nodes = [];
-  let editingId = null, ctxTarget = null;
+  let editingId = null, selectedId = null, ctxTarget = null;
   let animFrame = null, resizeObserver = null;
 
   window.addEventListener('DOMContentLoaded', async () => {
@@ -310,6 +476,16 @@
     if (mc) { mc.style.display = 'flex'; mc.style.flexDirection = 'column'; mc.style.overflow = 'hidden'; }
     await loadCompanies();
     drawWeb();
+
+    document.getElementById('det-edit-btn').addEventListener('click', () => {
+      const co = companies.find(c => c.id === selectedId);
+      if (co) openModal(co);
+    });
+    document.getElementById('det-tracker-btn').addEventListener('click', () => {
+      const co = companies.find(c => c.id === selectedId);
+      if (co) { sessionStorage.setItem('active_company', JSON.stringify(co)); api.send('navigate', 'tracker'); }
+    });
+    document.getElementById('det-delete-btn').addEventListener('click', () => deleteSelected());
   });
 
   async function loadCompanies() {
@@ -317,6 +493,16 @@
     entries   = await api.invoke('entries:all')    || [];
     renderList();
     document.getElementById('company-count').textContent = companies.length;
+    if (selectedId) {
+      const co = companies.find(c => c.id === selectedId);
+      if (co) renderDetail(co); else closeDetail();
+    }
+  }
+
+  function compMinsMap() {
+    const m = {};
+    entries.forEach(e => { m[e.company_id] = (m[e.company_id] || 0) + e.total_mins; });
+    return m;
   }
 
   function renderList() {
@@ -325,23 +511,93 @@
       el.innerHTML = `<div style="font-size:12px;color:var(--text-dim);text-align:center;padding:24px 0;">No companies yet.<br>Add one to begin.</div>`;
       return;
     }
-    const compMins = {};
-    entries.forEach(e => { compMins[e.company_id] = (compMins[e.company_id]||0) + e.total_mins; });
-    el.innerHTML = companies.map(co => `
-      <div class="company-list-item" onclick="selectCompany(${co.id})" data-id="${co.id}">
-        <div class="company-dot"></div>
-        <div class="company-name">${co.name || '—'}</div>
-        <div class="company-hours">${fmtH(compMins[co.id]||0)}</div>
-      </div>
-    `).join('');
+    const mins = compMinsMap();
+    el.innerHTML = companies.map(co => {
+      const hier = [co.hier_project, co.hier_platform].filter(Boolean).join(' › ');
+      const sub  = hier || co.job_title || co.work_type || '';
+      const sel  = co.id === selectedId ? ' selected' : '';
+      return `
+        <div class="company-list-item${sel}" onclick="selectCompany(${co.id})" data-id="${co.id}">
+          <div class="company-dot"></div>
+          <div class="company-info">
+            <div class="company-name">${co.name || '—'}</div>
+            ${sub ? `<div class="company-sub">${sub}</div>` : ''}
+          </div>
+          <div class="company-hours">${fmtH(mins[co.id] || 0)}</div>
+        </div>`;
+    }).join('');
   }
 
   function selectCompany(id) {
+    selectedId = id;
     document.querySelectorAll('.company-list-item').forEach(el =>
       el.classList.toggle('selected', parseInt(el.dataset.id) === id)
     );
     const co = companies.find(c => c.id === id);
-    if (co) openModal(co);
+    if (co) renderDetail(co);
+  }
+
+  function renderDetail(co) {
+    const mins  = compMinsMap();
+    const hours = mins[co.id] || 0;
+
+    document.getElementById('det-panel-title').textContent = 'Details';
+    document.getElementById('det-name').textContent = co.name || '—';
+
+    const hierParts = [co.hier_company, co.hier_project, co.hier_platform].filter(Boolean);
+    document.getElementById('det-breadcrumb').textContent = hierParts.join(' › ');
+
+    const isActive = !co.date_end;
+    let statsHtml = '';
+    statsHtml += `<div class="det-chip yellow">${fmtH(hours)} logged</div>`;
+    if (co.pay_rate) statsHtml += `<div class="det-chip accent">$${parseFloat(co.pay_rate).toFixed(2)}/hr</div>`;
+    statsHtml += `<div class="det-chip ${isActive ? 'green' : ''}">${isActive ? 'Active' : 'Ended'}</div>`;
+    if (co.work_type) statsHtml += `<div class="det-chip">${co.work_type}</div>`;
+    document.getElementById('det-stats').innerHTML = statsHtml;
+
+    const fv = (v) => v
+      ? `<span class="det-field-value">${v}</span>`
+      : `<span class="det-field-value empty">—</span>`;
+
+    document.getElementById('det-fields').innerHTML = `
+      <div class="det-field">
+        <div class="det-field-label">Job Title</div>
+        ${fv(co.job_title)}
+      </div>
+      <div class="det-field">
+        <div class="det-field-label">Location</div>
+        ${fv(co.location)}
+      </div>
+      <div class="det-field">
+        <div class="det-field-label">Started</div>
+        ${fv(co.date_start)}
+      </div>
+      <div class="det-field">
+        <div class="det-field-label">Ended</div>
+        ${fv(co.date_end || (isActive ? 'Present' : null))}
+      </div>
+      ${co.supervisors ? `
+      <div class="det-field span-2">
+        <div class="det-field-label">Supervisors</div>
+        ${fv(co.supervisors)}
+      </div>` : ''}
+    `;
+
+    const notesBlock = document.getElementById('det-notes-block');
+    if (co.notes) {
+      notesBlock.classList.add('has-notes');
+      document.getElementById('det-notes-text').textContent = co.notes;
+    } else {
+      notesBlock.classList.remove('has-notes');
+    }
+
+    document.getElementById('company-panel').classList.add('detail-open');
+  }
+
+  function closeDetail() {
+    selectedId = null;
+    document.getElementById('company-panel').classList.remove('detail-open');
+    document.querySelectorAll('.company-list-item').forEach(el => el.classList.remove('selected'));
   }
 
   // ── Modal ──
@@ -350,17 +606,24 @@
     document.getElementById('modal-title').textContent = co ? 'Edit Company' : 'Add Company';
     document.getElementById('delete-btn').style.display = co ? '' : 'none';
     const fields = {
-      'f-hier-company': co?.hier_company||'', 'f-hier-project': co?.hier_project||'',
-      'f-hier-platform': co?.hier_platform||'', 'f-navid': co?.nav_id||'',
-      'f-name': co?.name===co?.hier_company ? '' : (co?.name||''),
-      'f-title': co?.job_title||'', 'f-work-type': co?.work_type||'',
-      'f-location': co?.location||'', 'f-payrate': co?.pay_rate||'',
-      'f-date-start': co?.date_start||'', 'f-date-end': co?.date_end||'',
-      'f-login': co?.platform_login||'', 'f-email': co?.platform_email||'',
-      'f-url': co?.platform_url||'', 'f-supervisors': co?.supervisors||'',
-      'f-notes': co?.notes||'',
+      'f-hier-company':  co?.hier_company  || '',
+      'f-hier-project':  co?.hier_project  || '',
+      'f-hier-platform': co?.hier_platform || '',
+      'f-navid':         co?.nav_id        || '',
+      'f-name':          co?.name === co?.hier_company ? '' : (co?.name || ''),
+      'f-title':         co?.job_title     || '',
+      'f-work-type':     co?.work_type     || '',
+      'f-location':      co?.location      || '',
+      'f-payrate':       co?.pay_rate      || '',
+      'f-date-start':    co?.date_start    || '',
+      'f-date-end':      co?.date_end      || '',
+      'f-login':         co?.platform_login  || '',
+      'f-email':         co?.platform_email  || '',
+      'f-url':           co?.platform_url    || '',
+      'f-supervisors':   co?.supervisors     || '',
+      'f-notes':         co?.notes           || '',
     };
-    Object.entries(fields).forEach(([id,val]) => { const el = document.getElementById(id); if(el) el.value = val; });
+    Object.entries(fields).forEach(([id, val]) => { const el = document.getElementById(id); if (el) el.value = val; });
     document.getElementById('company-modal').style.display = 'flex';
   }
 
@@ -374,12 +637,12 @@
     if (!hierCompany) { Shell.toast('Company field is required.', 'error'); return; }
     const alias = document.getElementById('f-name').value.trim();
     const data = {
-      id: editingId,
-      name: alias || hierCompany,
+      id:              editingId,
+      name:            alias || hierCompany,
       job_title:       document.getElementById('f-title').value.trim(),
       work_type:       document.getElementById('f-work-type').value,
       location:        document.getElementById('f-location').value.trim(),
-      pay_rate:        parseFloat(document.getElementById('f-payrate').value)||0,
+      pay_rate:        parseFloat(document.getElementById('f-payrate').value) || 0,
       date_start:      document.getElementById('f-date-start').value,
       date_end:        document.getElementById('f-date-end').value,
       hier_company:    hierCompany,
@@ -395,27 +658,47 @@
     const res = await api.invoke('companies:save', data);
     if (res.ok) {
       Shell.toast(editingId ? 'Company updated.' : 'Company added.', 'success');
-      closeModal(); await loadCompanies(); drawWeb();
-    } else Shell.toast(res.error||'Save failed.', 'error');
+      closeModal();
+      await loadCompanies();
+      drawWeb();
+    } else {
+      Shell.toast(res.error || 'Save failed.', 'error');
+    }
   }
 
   async function deleteCompany() {
     if (!editingId || !confirm('Delete this company and all its time entries?')) return;
     await api.invoke('companies:delete', editingId);
     Shell.toast('Company deleted.', 'warning');
-    closeModal(); await loadCompanies(); drawWeb();
+    if (selectedId === editingId) closeDetail();
+    closeModal();
+    await loadCompanies();
+    drawWeb();
+  }
+
+  async function deleteSelected() {
+    if (!selectedId || !confirm('Delete this company and all its time entries?')) return;
+    await api.invoke('companies:delete', selectedId);
+    Shell.toast('Company deleted.', 'warning');
+    closeDetail();
+    await loadCompanies();
+    drawWeb();
   }
 
   // ── Context menu ──
-  function showCtx(x,y,co) { ctxTarget=co; const m=document.getElementById('ctx-menu'); m.style.left=x+'px'; m.style.top=y+'px'; m.style.display='block'; }
-  function hideCtx() { document.getElementById('ctx-menu').style.display='none'; }
+  function showCtx(x, y, co) { ctxTarget = co; const m = document.getElementById('ctx-menu'); m.style.left = x + 'px'; m.style.top = y + 'px'; m.style.display = 'block'; }
+  function hideCtx() { document.getElementById('ctx-menu').style.display = 'none'; }
   document.addEventListener('click', hideCtx);
-  function ctxOpenTracker() { if(!ctxTarget) return; sessionStorage.setItem('active_company',JSON.stringify(ctxTarget)); api.send('navigate','tracker'); }
-  function ctxEditCompany() { if(ctxTarget) openModal(ctxTarget); }
+  function ctxOpenTracker() { if (!ctxTarget) return; sessionStorage.setItem('active_company', JSON.stringify(ctxTarget)); api.send('navigate', 'tracker'); }
+  function ctxEditCompany() { if (ctxTarget) openModal(ctxTarget); }
   async function ctxDeleteCompany() {
-    if(!ctxTarget||!confirm(`Delete ${ctxTarget.name}?`)) return;
+    if (!ctxTarget || !confirm(`Delete ${ctxTarget.name}?`)) return;
     await api.invoke('companies:delete', ctxTarget.id);
-    Shell.toast('Company deleted.','warning'); ctxTarget=null; await loadCompanies(); drawWeb();
+    Shell.toast('Company deleted.', 'warning');
+    if (selectedId === ctxTarget.id) closeDetail();
+    ctxTarget = null;
+    await loadCompanies();
+    drawWeb();
   }
 
   // ── Spiderweb ──
@@ -426,179 +709,221 @@
     if (animFrame) cancelAnimationFrame(animFrame);
     if (resizeObserver) resizeObserver.disconnect();
 
-    const compMins = {};
-    entries.forEach(e => { compMins[e.company_id]=(compMins[e.company_id]||0)+e.total_mins; });
+    const mins = compMinsMap();
 
-    function initNodes(W,H) {
-      const cx=W/2, cy=H/2;
-      const ns = [{ x:cx,y:cy,r:34,label:(window.__currentUsername || 'YOU'),isCenter:true,co:null,fixed:true }];
+    function initNodes(W, H) {
+      const cx = W / 2, cy = H / 2;
       const count = companies.length;
-      companies.forEach((co,i) => {
-        const a = (Math.PI*2*i/count) - Math.PI/2;
-        const d = Math.min(W,H)*0.34;
-        ns.push({ x:cx+Math.cos(a)*d, y:cy+Math.sin(a)*d, vx:0,vy:0, r:24,
-          label:(co.name||'?').slice(0,10), isCenter:false, co, hours:compMins[co.id]||0 });
+
+      // All physics/visual params scale with company count
+      const nodeR    = count === 0 ? 28 : Math.max(16, Math.round(32 - count * 1.2));
+      const ringFrac = count <= 1  ? 0.36 : count <= 3 ? 0.38 : count <= 6 ? 0.43 : 0.47;
+      const LINK     = count <= 1  ? 270  : count <= 3 ? 240  : count <= 6 ? 245  : 275;
+      const REPEL    = count <= 1  ? 500  : count <= 3 ? 3500 : count <= 6 ? 6500 : 9500;
+      const steps    = count <= 2  ? 60   : count <= 5 ? 160  : 260;
+
+      const ns = [{ x: cx, y: cy, r: 36, label: (window.__currentUsername || 'YOU'), isCenter: true, co: null, fixed: true }];
+      companies.forEach((co, i) => {
+        const a = (Math.PI * 2 * i / count) - Math.PI / 2;
+        const d = Math.min(W, H) * ringFrac;
+        ns.push({
+          x: cx + Math.cos(a) * d,
+          y: cy + Math.sin(a) * d,
+          vx: 0, vy: 0,
+          r: nodeR,
+          label:    (co.name || '?').slice(0, 12),
+          sublabel: co.hier_project ? co.hier_project.slice(0, 10) : '',
+          isCenter: false,
+          co,
+          hours: mins[co.id] || 0,
+        });
       });
-      for (let s=0;s<80;s++) forceStep(ns,cx,cy,W,H);
+      for (let s = 0; s < steps; s++) forceStep(ns, cx, cy, W, H, LINK, REPEL);
       return ns;
     }
 
     function resizeCanvas() {
-      const W=wrap.clientWidth, H=wrap.clientHeight;
-      canvas.width=W*devicePixelRatio; canvas.height=H*devicePixelRatio;
-      canvas.style.width=W+'px'; canvas.style.height=H+'px';
-      ctx.setTransform(1,0,0,1,0,0); ctx.scale(devicePixelRatio,devicePixelRatio);
-      nodes = initNodes(W,H);
+      const W = wrap.clientWidth, H = wrap.clientHeight;
+      canvas.width  = W * devicePixelRatio;
+      canvas.height = H * devicePixelRatio;
+      canvas.style.width  = W + 'px';
+      canvas.style.height = H + 'px';
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.scale(devicePixelRatio, devicePixelRatio);
+      nodes = initNodes(W, H);
     }
     resizeCanvas();
 
     resizeObserver = new ResizeObserver(() => {
-      if(animFrame) cancelAnimationFrame(animFrame);
-      ctx.setTransform(1,0,0,1,0,0); resizeCanvas(); startRender();
+      if (animFrame) cancelAnimationFrame(animFrame);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      resizeCanvas();
+      startRender();
     });
     resizeObserver.observe(wrap);
     startRender();
 
-    // Mouse events
     canvas.addEventListener('mousemove', e => {
-      const rect=canvas.getBoundingClientRect();
-      const mx=e.clientX-rect.left, my=e.clientY-rect.top;
-      const tt=document.getElementById('node-tooltip');
-      let hit=false;
+      const rect = canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+      const tt = document.getElementById('node-tooltip');
+      let hit = false;
       nodes.slice(1).forEach(n => {
-        if (Math.hypot(mx-n.x,my-n.y) < n.r+8) {
-          tt.style.left=(e.clientX-wrap.getBoundingClientRect().left+14)+'px';
-          tt.style.top=(e.clientY-wrap.getBoundingClientRect().top-10)+'px';
-          tt.style.display='block';
-          document.getElementById('tt-name').textContent=n.co.name;
-          document.getElementById('tt-detail').textContent=[n.co.job_title,n.co.location,n.hours?fmtH(n.hours)+' logged':''].filter(Boolean).join(' · ');
-          canvas.style.cursor='pointer'; hit=true;
+        if (Math.hypot(mx - n.x, my - n.y) < n.r + 10) {
+          const wr = wrap.getBoundingClientRect();
+          tt.style.left = (e.clientX - wr.left + 16) + 'px';
+          tt.style.top  = (e.clientY - wr.top  - 12) + 'px';
+          tt.style.display = 'block';
+          document.getElementById('tt-name').textContent = n.co.name;
+          const hierParts = [n.co.hier_company, n.co.hier_project, n.co.hier_platform].filter(Boolean);
+          document.getElementById('tt-hier').textContent   = hierParts.length > 1 ? hierParts.join(' › ') : '';
+          document.getElementById('tt-detail').textContent = [
+            n.co.job_title,
+            n.co.location,
+            n.hours ? fmtH(n.hours) + ' logged' : '',
+          ].filter(Boolean).join(' · ');
+          canvas.style.cursor = 'pointer';
+          hit = true;
         }
       });
-      if (!hit) { tt.style.display='none'; canvas.style.cursor='default'; }
+      if (!hit) { tt.style.display = 'none'; canvas.style.cursor = 'default'; }
     });
 
     canvas.addEventListener('click', e => {
-      const rect=canvas.getBoundingClientRect();
-      const mx=e.clientX-rect.left, my=e.clientY-rect.top;
+      const rect = canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left, my = e.clientY - rect.top;
       nodes.slice(1).forEach(n => {
-        if (Math.hypot(mx-n.x,my-n.y)<n.r+8) {
-          const wr=wrap.getBoundingClientRect();
-          showCtx(e.clientX-wr.left, e.clientY-wr.top, n.co);
+        if (Math.hypot(mx - n.x, my - n.y) < n.r + 10) {
+          const wr = wrap.getBoundingClientRect();
+          showCtx(e.clientX - wr.left, e.clientY - wr.top, n.co);
         }
       });
     });
   }
 
-    function startRender() {
-    const canvas=document.getElementById('web-canvas');
-    const wrap=document.getElementById('spiderweb-wrap');
-    const ctx=canvas.getContext('2d');
-    let pulse=0;
+  function startRender() {
+    const canvas = document.getElementById('web-canvas');
+    const wrap   = document.getElementById('spiderweb-wrap');
+    const ctx    = canvas.getContext('2d');
+    let pulse = 0;
 
     function render() {
-      const W=canvas.offsetWidth, H=canvas.offsetHeight;
-      const cx=W/2, cy=H/2;
-      const c=getCanvasColors();
-      nodes[0].x=cx; nodes[0].y=cy;
-      pulse+=0.025;
-      ctx.clearRect(0,0,W,H);
+      const W = canvas.offsetWidth, H = canvas.offsetHeight;
+      const cx = W / 2, cy = H / 2;
+      const c = getCanvasColors();
+      nodes[0].x = cx; nodes[0].y = cy;
+      pulse += 0.025;
+      ctx.clearRect(0, 0, W, H);
 
       // Grid
-      ctx.strokeStyle=c.grid; ctx.lineWidth=0.5;
-      for(let gx=0;gx<W;gx+=40){ctx.beginPath();ctx.moveTo(gx,0);ctx.lineTo(gx,H);ctx.stroke();}
-      for(let gy=0;gy<H;gy+=40){ctx.beginPath();ctx.moveTo(0,gy);ctx.lineTo(W,gy);ctx.stroke();}
+      ctx.strokeStyle = c.grid; ctx.lineWidth = 0.5;
+      for (let gx = 0; gx < W; gx += 40) { ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, H); ctx.stroke(); }
+      for (let gy = 0; gy < H; gy += 40) { ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke(); }
 
       // Edges
       nodes.slice(1).forEach(n => {
-        const grad=ctx.createLinearGradient(cx,cy,n.x,n.y);
-        grad.addColorStop(0,c.edge1); grad.addColorStop(1,c.edge2);
-        ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(n.x,n.y);
-        ctx.strokeStyle=grad; ctx.lineWidth=1.5; ctx.stroke();
+        const grad = ctx.createLinearGradient(cx, cy, n.x, n.y);
+        grad.addColorStop(0, c.edge1); grad.addColorStop(1, c.edge2);
+        ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(n.x, n.y);
+        ctx.strokeStyle = grad; ctx.lineWidth = 2; ctx.stroke();
       });
 
       // Company nodes
       nodes.slice(1).forEach(n => {
-        const pR = n.r;
-        drawSphereNode(ctx, n.x, n.y, pR, false, n.label);
+        drawSphereNode(ctx, n.x, n.y, n.r, false, n.label, n.sublabel);
         if (n.hours) {
-          ctx.fillStyle=c.hours;
-          ctx.font='500 10px DM Sans, system-ui, sans-serif';
-          ctx.textAlign='center'; ctx.textBaseline='top';
-          ctx.fillText(fmtH(n.hours), n.x, n.y+pR+5);
+          ctx.fillStyle = c.hours;
+          ctx.font = '500 10px DM Sans, system-ui, sans-serif';
+          ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+          ctx.fillText(fmtH(n.hours), n.x, n.y + n.r + 6);
         }
       });
 
-      // Center node on top — pulsing
-      const pR = nodes[0].r + 4*Math.sin(pulse);
-      drawSphereNode(ctx, nodes[0].x, nodes[0].y, pR, true, nodes[0].label);
+      // Center node — pulsing
+      const pR = nodes[0].r + 4 * Math.sin(pulse);
+      drawSphereNode(ctx, nodes[0].x, nodes[0].y, pR, true, nodes[0].label, '');
 
-      animFrame=requestAnimationFrame(render);
+      animFrame = requestAnimationFrame(render);
     }
-    animFrame=requestAnimationFrame(render);
+    animFrame = requestAnimationFrame(render);
   }
 
   function getCanvasColors() {
     const theme = document.documentElement.getAttribute('data-theme') || 'memoria';
     const isLight = theme === 'memoria' || theme === 'rabanastre';
     if (isLight) return {
-      center: { g1:'rgba(30,58,138,0.95)', g2:'rgba(15,23,80,0.9)', border:'#1d4ed8', label:'#ffffff', glow:'rgba(29,78,216,0.18)' },
-      node:   { g1:'rgba(49,46,129,0.95)', g2:'rgba(30,27,90,0.9)', border:'#4338ca', label:'#ffffff' },
-      edge1:'rgba(29,78,216,0.7)', edge2:'rgba(67,56,202,0.15)',
-      grid:'rgba(0,0,0,0.05)', hours:'#92400e'
+      center: { g1: 'rgba(30,58,138,0.95)', g2: 'rgba(15,23,80,0.9)', border: '#1d4ed8', label: '#ffffff', sublabel: 'rgba(255,255,255,0.7)', glow: 'rgba(29,78,216,0.18)' },
+      node:   { g1: 'rgba(49,46,129,0.95)', g2: 'rgba(30,27,90,0.9)', border: '#4338ca', label: '#ffffff', sublabel: 'rgba(255,255,255,0.65)' },
+      edge1: 'rgba(29,78,216,0.7)', edge2: 'rgba(67,56,202,0.15)',
+      grid: 'rgba(0,0,0,0.05)', hours: '#92400e',
     };
     return {
-      center: { g1:'rgba(96,165,250,0.25)', g2:'rgba(30,64,175,0.15)', border:'#3b82f6', label:'#93c5fd', glow:'rgba(59,130,246,0.07)' },
-      node:   { g1:'rgba(129,140,248,0.22)', g2:'rgba(67,56,202,0.14)', border:'#6366f1', label:'#e0e7ff' },
-      edge1:'rgba(59,130,246,0.45)', edge2:'rgba(99,102,241,0.08)',
-      grid:'rgba(255,255,255,0.025)', hours:'rgba(245,158,11,0.9)'
+      center: { base: '#0f2060', g1: 'rgba(80,130,255,1)', g2: 'rgba(25,55,175,1)', border: '#3b82f6', label: '#bfdbfe', sublabel: 'rgba(191,219,254,0.7)', glow: 'rgba(59,130,246,0.12)' },
+      node:   { g1: 'rgba(129,140,248,0.22)', g2: 'rgba(67,56,202,0.14)', border: '#6366f1', label: '#e0e7ff', sublabel: 'rgba(224,231,255,0.55)' },
+      edge1: 'rgba(59,130,246,0.5)', edge2: 'rgba(99,102,241,0.08)',
+      grid: 'rgba(255,255,255,0.025)', hours: 'rgba(245,158,11,0.9)',
     };
   }
 
-  function drawSphereNode(ctx, x, y, r, isCenter, label) {
+  function drawSphereNode(ctx, x, y, r, isCenter, label, sublabel) {
     const c  = getCanvasColors();
     const nc = isCenter ? c.center : c.node;
     if (isCenter) {
-      ctx.beginPath(); ctx.arc(x,y,r+12,0,Math.PI*2);
+      ctx.beginPath(); ctx.arc(x, y, r + 12, 0, Math.PI * 2);
       ctx.fillStyle = nc.glow; ctx.fill();
     }
-    const grad = ctx.createRadialGradient(x-r*0.3,y-r*0.3,r*0.1,x,y,r);
-    grad.addColorStop(0,nc.g1); grad.addColorStop(0.6,nc.g2); grad.addColorStop(1,'rgba(0,0,0,0.35)');
-    ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2);
-    ctx.fillStyle=grad; ctx.fill();
-    ctx.strokeStyle=nc.border; ctx.lineWidth=isCenter?2:1.5; ctx.stroke();
-    const hl=ctx.createRadialGradient(x-r*0.35,y-r*0.35,0,x-r*0.35,y-r*0.35,r*0.6);
-    hl.addColorStop(0,'rgba(255,255,255,0.14)'); hl.addColorStop(1,'rgba(255,255,255,0)');
-    ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fillStyle=hl; ctx.fill();
-    ctx.fillStyle=nc.label;
-    ctx.font=`${isCenter?'600 ':'500 '}${isCenter?11:10}px DM Sans, system-ui, sans-serif`;
-    ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.fillText(label,x,y);
+    if (isCenter && nc.base) {
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fillStyle = nc.base; ctx.fill();
+    }
+    const grad = ctx.createRadialGradient(x - r * 0.3, y - r * 0.3, r * 0.1, x, y, r);
+    grad.addColorStop(0, nc.g1); grad.addColorStop(0.6, nc.g2); grad.addColorStop(1, isCenter ? 'rgba(8,18,70,1)' : 'rgba(0,0,0,0.35)');
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fillStyle = grad; ctx.fill();
+    ctx.strokeStyle = nc.border; ctx.lineWidth = isCenter ? 2 : 1.5; ctx.stroke();
+    const hl = ctx.createRadialGradient(x - r * 0.35, y - r * 0.35, 0, x - r * 0.35, y - r * 0.35, r * 0.6);
+    hl.addColorStop(0, 'rgba(255,255,255,0.16)'); hl.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = hl; ctx.fill();
+
+    if (sublabel) {
+      ctx.fillStyle = nc.label;
+      ctx.font = `${isCenter ? '600 ' : '500 '}${isCenter ? 11 : 10}px DM Sans, system-ui, sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(label, x, y - 5);
+      ctx.fillStyle = nc.sublabel;
+      ctx.font = '400 9px DM Sans, system-ui, sans-serif';
+      ctx.fillText(sublabel, x, y + 6);
+    } else {
+      ctx.fillStyle = nc.label;
+      ctx.font = `${isCenter ? '600 ' : '500 '}${isCenter ? 11 : 10}px DM Sans, system-ui, sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(label, x, y);
+    }
   }
 
-  function forceStep(nodes,cx,cy,W,H) {
-    const LINK=160, REPEL=1800, DAMP=0.7;
-    nodes.slice(1).forEach((a,i) => {
-      const dx=cx-a.x, dy=cy-a.y, d=Math.hypot(dx,dy)||1;
-      const pull=(d-LINK)*0.01;
-      a.vx+=(dx/d)*pull; a.vy+=(dy/d)*pull;
-      nodes.slice(1).forEach((b,j) => {
-        if(i===j) return;
-        const rx=a.x-b.x, ry=a.y-b.y, rd=Math.hypot(rx,ry)||1;
-        const f=REPEL/(rd*rd);
-        a.vx+=(rx/rd)*f; a.vy+=(ry/rd)*f;
+  function forceStep(nodes, cx, cy, W, H, LINK, REPEL) {
+    const DAMP = 0.65;
+    nodes.slice(1).forEach((a, i) => {
+      const dx = cx - a.x, dy = cy - a.y, d = Math.hypot(dx, dy) || 1;
+      const pull = (d - LINK) * 0.01;
+      a.vx += (dx / d) * pull; a.vy += (dy / d) * pull;
+      nodes.slice(1).forEach((b, j) => {
+        if (i === j) return;
+        const rx = a.x - b.x, ry = a.y - b.y, rd = Math.hypot(rx, ry) || 1;
+        const f = REPEL / (rd * rd);
+        a.vx += (rx / rd) * f; a.vy += (ry / rd) * f;
       });
-      a.vx*=DAMP; a.vy*=DAMP;
-      a.x+=a.vx; a.y+=a.vy;
-      a.x=Math.max(40,Math.min(W-40,a.x));
-      a.y=Math.max(40,Math.min(H-40,a.y));
+      a.vx *= DAMP; a.vy *= DAMP;
+      a.x += a.vx; a.y += a.vy;
+      a.x = Math.max(50, Math.min(W - 50, a.x));
+      a.y = Math.max(50, Math.min(H - 50, a.y));
     });
   }
 
-  function fmtH(mins) { return mins ? (mins/60).toFixed(1)+'h' : '0h'; }
+  function fmtH(mins) { return mins ? (mins / 60).toFixed(1) + 'h' : '0h'; }
 
-  document.getElementById('company-modal').addEventListener('click', function(e) {
-    if (e.target===this) closeModal();
+  document.getElementById('company-modal').addEventListener('click', function (e) {
+    if (e.target === this) closeModal();
   });
 </script>
 </body>
