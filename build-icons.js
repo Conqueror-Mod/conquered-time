@@ -33,10 +33,6 @@ async function main() {
   fs.writeFileSync(path.join(ASSETS, 'icon.icns'), icns);
   console.log('  ✓ icon.icns');
 
-  // Also update Splash-Icon-Main.png (used by splash screen)
-  await sharp(SRC).resize(200, 200).png().toFile(path.join(ASSETS, 'Splash-Icon-Main.png'));
-  console.log('  ✓ Splash-Icon-Main.png');
-
   console.log('\nAll icons rebuilt.');
 }
 
