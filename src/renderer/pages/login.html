@@ -7,13 +7,22 @@
 <title>Conquered Time — Login</title>
 <link rel="stylesheet" href="../styles/design-system.css">
 <script>
-// Login always renders in Zanarkand. User's chosen theme activates on dashboard.
-document.documentElement.setAttribute('data-theme', 'zanarkand');
-(async function() {
-  try {
-    const scale = (await api.invoke('settings:get', 'ui_scale')) || 'normal';
-    document.documentElement.setAttribute('data-scale', scale);
-  } catch(e) {}
+// Apply pre-auth preferences from localStorage before first paint.
+// Defaults to zanarkand/normal if the user has never changed them here.
+(function() {
+  const theme = localStorage.getItem('ct_pa_theme') || 'zanarkand';
+  const scale = localStorage.getItem('ct_pa_scale') || 'normal';
+  const rm    = localStorage.getItem('ct_pa_reducedMotion')  || 'false';
+  const hc    = localStorage.getItem('ct_pa_highContrast')   || 'false';
+  const cb    = localStorage.getItem('ct_pa_colorblind')     || 'off';
+  const fi    = localStorage.getItem('ct_pa_focusIndicators')|| 'false';
+  const root  = document.documentElement;
+  root.setAttribute('data-theme',           theme);
+  root.setAttribute('data-scale',           scale);
+  root.setAttribute('data-reduced-motion',  rm);
+  root.setAttribute('data-high-contrast',   hc);
+  root.setAttribute('data-colorblind',      cb);
+  root.setAttribute('data-focus-indicators',fi);
 })();
 </script>
 <style>
@@ -77,15 +86,15 @@ document.documentElement.setAttribute('data-theme', 'zanarkand');
     position: relative;
     z-index: 4;
     width: 360px;
-    /* Fully opaque — no background bleed through on any theme */
-    background: var(--panel);
+    background: var(--bg-deep);
     border: 1px solid var(--border);
     border-radius: 12px;
     padding: 28px 28px 24px;
-    box-shadow: var(--shadow-3);
+    box-shadow: var(--shadow-3), 0 0 0 1px rgba(200,216,240,0.05);
     transition: opacity 0.6s ease, transform 0.6s ease;
     isolation: isolate;
     animation: card-in 0.35s ease both;
+    overflow: hidden;
   }
   .login-card::before {
     content: '';
@@ -146,11 +155,16 @@ document.documentElement.setAttribute('data-theme', 'zanarkand');
     background: radial-gradient(ellipse 70% 60% at 50% 50%, rgba(0,184,204,0.18), #040810 100%);
   }
   [data-theme="zanarkand"] .login-card {
-    background: #0e1628;
+    background: #040810;
     border-color: #1e3058;
     box-shadow: 0 8px 52px rgba(0,8,24,0.90), 0 2px 14px rgba(0,8,24,0.70), 0 0 0 1px rgba(0,184,204,0.14);
   }
   [data-theme="zanarkand"] .login-brand-label { color: rgba(255,255,255,0.55); }
+  [data-theme="zanarkand"] #profile-selector {
+    background: #040810;
+    border-color: #1e3058;
+    box-shadow: 0 8px 52px rgba(0,8,24,0.90), 0 2px 14px rgba(0,8,24,0.70), 0 0 0 1px rgba(0,184,204,0.14);
+  }
 
   /* Rabanastre login — desert at noon, bleached stone, teal sky at the horizon */
   [data-theme="rabanastre"] .login-body { background: #2a4848; }
@@ -393,10 +407,19 @@ document.documentElement.setAttribute('data-theme', 'zanarkand');
     background: var(--panel);
     border: 1px solid var(--border);
     border-radius: 12px;
-    box-shadow: var(--shadow-3);
+    box-shadow: var(--shadow-3), 0 0 0 1px rgba(200,216,240,0.05);
     padding: 28px 28px 24px;
-    width: 360px;
+    width: 420px;
     animation: card-in 0.35s ease both;
+    overflow: hidden;
+  }
+  #profile-selector::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    border-radius: 12px 12px 0 0;
   }
   @keyframes card-in {
     from { opacity: 0; transform: translateY(10px) scale(0.97); }
@@ -574,6 +597,7 @@ document.documentElement.setAttribute('data-theme', 'zanarkand');
     <div class="ps-brand">
       <div class="ps-brand-label">Mission Control</div>
       <div class="ps-brand-name">CONQUERED</div>
+      <div class="login-brand-sub">Time Intelligence System</div>
     </div>
     <div class="ps-divider">Select a profile to continue</div>
     <div class="ps-grid" id="ps-grid"></div>
@@ -603,6 +627,35 @@ document.documentElement.setAttribute('data-theme', 'zanarkand');
 
     <!-- LOGIN -->
     <div id="form-login" class="login-form">
+
+      <!-- safeStorage fast-path — shown only when enrolled, hides password/TOTP -->
+      <div id="safe-login-section" style="display:none;flex-direction:column;align-items:center;gap:12px;padding:8px 0 4px;">
+        <!-- Windows Hello biometric button (shown when biometric available) -->
+        <button class="btn-primary" id="safe-login-btn" onclick="doSafeLogin()" style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          Sign in with Windows
+        </button>
+        <!-- Quick unlock form (shown when biometric unavailable) -->
+        <div id="quick-unlock-section" style="display:none;flex-direction:column;gap:10px;width:100%;">
+          <div class="field-group" style="margin:0;">
+            <label class="field-label">Quick Unlock</label>
+            <div class="pw-wrap">
+              <input type="password" id="quick-unlock-pw" placeholder="Enter your app password" autocomplete="current-password">
+              <button type="button" class="pw-toggle" id="quick-unlock-toggle" tabindex="-1" aria-label="Show password">
+                <svg id="quick-unlock-icon" style="width:16px;height:16px;flex-shrink:0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div class="error-msg" id="quick-unlock-error"></div>
+          <button class="btn-primary" onclick="doQuickUnlock()" style="width:100%;">⊕ Unlock</button>
+        </div>
+        <button class="mode-tab" style="background:none;border:none;font-size:12px;color:var(--text-muted);cursor:pointer;padding:0;" onclick="hideSafeLoginUI();document.getElementById('login-password').focus();">
+          Use full login instead →
+        </button>
+      </div>
+
       <div class="field-group">
         <label class="field-label">Username</label>
         <input type="text" id="login-username" placeholder="Enter username" autocomplete="username">
@@ -638,18 +691,32 @@ document.documentElement.setAttribute('data-theme', 'zanarkand');
       </div>
       <div class="field-group">
         <label class="field-label">Choose Password</label>
-        <input type="password" id="setup-password" placeholder="Strong password">
+        <div class="pw-wrap">
+          <input type="password" id="setup-password" placeholder="Strong password" autocomplete="new-password">
+          <button type="button" class="pw-toggle" id="setup-pw-toggle" tabindex="-1" aria-label="Show password">
+            <svg id="setup-pw-icon" style="width:16px;height:16px;flex-shrink:0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+            </svg>
+          </button>
+        </div>
       </div>
       <div class="field-group">
         <label class="field-label">Confirm Password</label>
-        <input type="password" id="setup-password2" placeholder="Repeat password">
+        <div class="pw-wrap">
+          <input type="password" id="setup-password2" placeholder="Repeat password" autocomplete="new-password">
+          <button type="button" class="pw-toggle" id="setup-pw2-toggle" tabindex="-1" aria-label="Show password">
+            <svg id="setup-pw2-icon" style="width:16px;height:16px;flex-shrink:0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+            </svg>
+          </button>
+        </div>
       </div>
       <div class="qr-wrap" id="qr-wrap">
         <div style="font-family:var(--mono);font-size:8px;letter-spacing:2px;color:var(--text-dim);text-transform:uppercase;margin-bottom:10px;">Scan with Google Authenticator</div>
         <img id="qr-img" src="" alt="QR Code">
         <div class="qr-secret" id="qr-secret"></div>
+        <button type="button" class="btn-neutral" id="gen-totp-btn" onclick="generateTOTP()" style="margin-top:10px;font-size:11px;padding:6px 12px;">↺ Refresh QR</button>
       </div>
-      <button class="btn-neutral" id="gen-totp-btn" onclick="generateTOTP()" style="display:none;">⊕ Generate TOTP QR Code</button>
       <div class="field-group" id="totp-verify-field" style="display:none;">
         <label class="field-label">Verify TOTP Code</label>
         <input type="text" id="setup-totp" placeholder="Enter 6-digit code to confirm" maxlength="6" inputmode="numeric">
@@ -1148,7 +1215,7 @@ async function loadProfile(profile) {
   showLoginCard(profile);
 }
 
-function showLoginCard(profile) {
+async function showLoginCard(profile) {
   document.getElementById('profile-selector').style.display = 'none';
 
   // Show profile banner in place of the username field
@@ -1168,7 +1235,77 @@ function showLoginCard(profile) {
   document.getElementById('login-card').style.display = 'block';
   document.getElementById('tab-setup').style.display = 'none';
   setMode('login');
+
+  // Check for safeStorage fast-path enrollment
+  hideSafeLoginUI();
+  if (profile) {
+    try {
+      const safe = await api.invoke('auth:safe-check');
+      if (safe.available && safe.enrolled) {
+        showSafeLoginUI();
+        document.getElementById('safe-login-btn')?.focus();
+        return;
+      }
+    } catch {}
+  }
   document.getElementById('login-password').focus();
+}
+
+function showSafeLoginUI(quickUnlock = false) {
+  document.getElementById('safe-login-section').style.display = 'flex';
+  document.getElementById('login-password').closest('.field-group').style.display = 'none';
+  document.getElementById('login-totp').closest('.field-group').style.display = 'none';
+  document.getElementById('login-btn').style.display = 'none';
+  if (quickUnlock) {
+    document.getElementById('safe-login-btn').style.display = 'none';
+    document.getElementById('quick-unlock-section').style.display = 'flex';
+    document.getElementById('quick-unlock-pw').focus();
+  } else {
+    document.getElementById('safe-login-btn').style.display = '';
+    document.getElementById('quick-unlock-section').style.display = 'none';
+    document.getElementById('safe-login-btn').focus();
+  }
+}
+
+function hideSafeLoginUI() {
+  document.getElementById('safe-login-section').style.display = 'none';
+  document.getElementById('login-password').closest('.field-group').style.display = '';
+  document.getElementById('login-totp').closest('.field-group').style.display = '';
+  document.getElementById('login-btn').style.display = '';
+  const qpw = document.getElementById('quick-unlock-pw');
+  if (qpw) qpw.value = '';
+}
+
+async function doSafeLogin() {
+  const btn = document.getElementById('safe-login-btn');
+  if (btn) btn.disabled = true;
+  const res = await api.invoke('auth:safe-login');
+  if (btn) btn.disabled = false;
+  if (res.ok) {
+    api.send('navigate', 'dashboard');
+  } else if (res.quickUnlock) {
+    // Biometric not available — switch to quick unlock password form
+    showSafeLoginUI(true);
+  } else {
+    hideSafeLoginUI();
+    document.getElementById('login-password').focus();
+    const errEl = document.getElementById('login-error');
+    showErr(errEl, res.error || 'Secure sign-in failed. Enter your password.');
+  }
+}
+
+async function doQuickUnlock() {
+  const pw    = document.getElementById('quick-unlock-pw')?.value || '';
+  const errEl = document.getElementById('quick-unlock-error');
+  if (!pw) { showErr(errEl, 'Password required.'); return; }
+  const res = await api.invoke('auth:quick-unlock', { password: pw });
+  if (res.ok) {
+    api.send('navigate', 'dashboard');
+  } else {
+    showErr(errEl, res.error || 'Incorrect password.');
+    const inp = document.getElementById('quick-unlock-pw');
+    if (inp) { inp.value = ''; inp.focus(); }
+  }
 }
 
 async function goBackToSelector() {
@@ -1200,6 +1337,47 @@ window.addEventListener('DOMContentLoaded', async () => {
   initGrid();
 
   document.getElementById('pb-back-btn').addEventListener('click', goBackToSelector);
+
+  // Quick unlock password toggle
+  document.getElementById('quick-unlock-toggle').addEventListener('click', () => {
+    const input = document.getElementById('quick-unlock-pw');
+    const icon  = document.getElementById('quick-unlock-icon');
+    const show  = input.type === 'password';
+    input.type  = show ? 'text' : 'password';
+    const eyeOpen   = `<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>`;
+    const eyeClosed = `<path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>`;
+    icon.setAttribute('viewBox', '0 0 24 24');
+    icon.innerHTML = show ? eyeClosed : eyeOpen;
+  });
+  document.getElementById('quick-unlock-pw').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); doQuickUnlock(); }
+  });
+
+  // Setup form password toggles
+  [['setup-pw-toggle', 'setup-password', 'setup-pw-icon'],
+   ['setup-pw2-toggle', 'setup-password2', 'setup-pw2-icon']].forEach(([btnId, inputId, iconId]) => {
+    document.getElementById(btnId).addEventListener('click', () => {
+      const input = document.getElementById(inputId);
+      const icon  = document.getElementById(iconId);
+      const show  = input.type === 'password';
+      input.type  = show ? 'text' : 'password';
+      const eyeOpen   = `<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>`;
+      const eyeClosed = `<path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>`;
+      icon.setAttribute('viewBox', '0 0 24 24');
+      icon.innerHTML = show ? eyeClosed : eyeOpen;
+    });
+  });
+
+  // Setup form field navigation — Enter advances through fields in order
+  document.getElementById('setup-username').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); document.getElementById('setup-password').focus(); }
+  });
+  document.getElementById('setup-password').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); document.getElementById('setup-password2').focus(); }
+  });
+  document.getElementById('setup-password2').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); document.getElementById('setup-totp').focus(); }
+  });
 
   document.getElementById('login-pw-toggle').addEventListener('click', () => {
     const input = document.getElementById('login-password');
@@ -1239,12 +1417,21 @@ window.addEventListener('DOMContentLoaded', async () => {
       toast(debugMode ? '[ DEBUG ON ]' : '[ DEBUG OFF ]', debugMode ? 'success' : 'warning');
       return;
     }
-    if (e.key === 'Escape' && currentMode === 'setup' && profileMode) {
-      goBackToSelector(); return;
+    if (e.key === 'Escape') {
+      // If safe-login UI is visible, fall through to normal form rather than going back
+      const safeSection = document.getElementById('safe-login-section');
+      if (safeSection && safeSection.style.display !== 'none') {
+        hideSafeLoginUI(); document.getElementById('login-password').focus(); return;
+      }
+      if (currentMode === 'setup' && profileMode) { goBackToSelector(); return; }
     }
     if (e.key === 'Enter') {
       if (currentMode === 'login')    doLogin();
-      if (currentMode === 'setup')    doSetup();
+      // Skip global doSetup() if focus is on a field that has its own Enter handler
+      if (currentMode === 'setup') {
+        const nav = ['setup-username', 'setup-password', 'setup-password2'];
+        if (!nav.includes(document.activeElement?.id)) doSetup();
+      }
       if (currentMode === 'recovery') doRecovery();
     }
   });
@@ -1258,6 +1445,8 @@ function setMode(mode) {
   document.querySelectorAll('.mode-tab').forEach((t, i) => {
     t.classList.toggle('active', ['login','setup','recovery'][i] === mode);
   });
+  // Auto-generate QR the first time setup mode is shown
+  if (mode === 'setup' && !totpSecret) generateTOTP();
 }
 
 function showRecovery() {
@@ -1272,8 +1461,8 @@ async function generateTOTP() {
   document.getElementById('qr-img').src = qrUrl;
   document.getElementById('qr-secret').textContent = secret;
   document.getElementById('qr-wrap').style.display = 'block';
-  document.getElementById('gen-totp-btn').style.display = 'none';
   document.getElementById('totp-verify-field').style.display = 'flex';
+  document.getElementById('setup-totp').focus();
   recoveryCode = generateRecoveryCode();
   document.getElementById('recovery-code-display').textContent = recoveryCode;
   document.getElementById('recovery-code-display').style.display = 'block';
@@ -1299,13 +1488,13 @@ async function doSetup() {
   if (tc.length !== 6) { showErr(errEl, 'TOTP code must be 6 digits.'); return; }
   document.getElementById('setup-btn').disabled = true;
 
-  // In profile mode: create the profile folder before setting up the account
-  if (profileMode) {
-    const sel = await api.invoke('profiles:select', { username: u });
-    if (!sel.ok) {
-      document.getElementById('setup-btn').disabled = false;
-      showErr(errEl, sel.error || 'Could not create profile folder.'); return;
-    }
+  // Always call profiles:select — creates the profile folder and initialises the DB.
+  // In dev mode the IPC is a no-op (DB already loaded). Required even when there
+  // are no existing profiles yet, because profileMode is false in that case.
+  const sel = await api.invoke('profiles:select', { username: u });
+  if (!sel.ok) {
+    document.getElementById('setup-btn').disabled = false;
+    showErr(errEl, sel.error || 'Could not create profile folder.'); return;
   }
 
   const res = await api.invoke('auth:setup', { username: u, password: p, totpSecret, totpCode: tc, recoveryCode });
@@ -1396,6 +1585,550 @@ function toast(msg, type = 'success') {
   setTimeout(() => t.remove(), 3500);
 }
 
+</script>
+
+<!-- ── Pre-Auth Settings Gear Button ── -->
+<button id="preauth-gear-btn" title="Settings" onclick="openPreauthSettings()">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="3"/>
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+  </svg>
+  Settings
+</button>
+
+<!-- ── Pre-Auth Settings Modal ── -->
+<div id="preauth-settings-modal" style="display:none;" onclick="handlePreauthBackdrop(event)">
+  <div class="settings-modal-box">
+
+    <div class="settings-modal-header">
+      <div class="settings-modal-title" style="display:flex;align-items:center;gap:8px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Settings
+      </div>
+      <button class="settings-modal-close" onclick="closePreauthSettings()">✕</button>
+    </div>
+
+    <div class="settings-layout">
+
+      <!-- Left nav -->
+      <nav class="settings-nav">
+        <button class="sn-item active" data-cat="appearance"    onclick="paSwitchTab('appearance')">
+          <span class="sn-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg></span>
+          <span class="sn-label">Appearance</span>
+        </button>
+        <button class="sn-item" data-cat="window" onclick="paSwitchTab('window')">
+          <span class="sn-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 9h20"/><path d="M7 4v5"/></svg></span>
+          <span class="sn-label">Window</span>
+        </button>
+        <button class="sn-item" data-cat="data" onclick="paSwitchTab('data')">
+          <span class="sn-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg></span>
+          <span class="sn-label">Data</span>
+        </button>
+        <button class="sn-item" data-cat="accessibility" onclick="paSwitchTab('accessibility')">
+          <span class="sn-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg></span>
+          <span class="sn-label">Accessibility</span>
+        </button>
+        <button class="sn-item" data-cat="about" onclick="paSwitchTab('about')">
+          <span class="sn-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg></span>
+          <span class="sn-label">About</span>
+        </button>
+      </nav>
+
+      <!-- Right content -->
+      <div class="settings-content">
+
+        <!-- APPEARANCE -->
+        <div id="pa-cat-appearance" class="settings-cat-panel">
+          <div class="sc-title">Appearance</div>
+          <div class="settings-group">
+            <div class="settings-group-title">Theme</div>
+            <div class="theme-cards" id="pa-theme-cards">
+              <div class="theme-card" data-t="zanarkand"  onclick="paApplyTheme('zanarkand')"><div class="theme-swatch" data-t="zanarkand"></div><div class="theme-card-name">Zanarkand</div></div>
+              <div class="theme-card" data-t="memoria"    onclick="paApplyTheme('memoria')"><div class="theme-swatch" data-t="memoria"></div><div class="theme-card-name">Memoria</div></div>
+              <div class="theme-card" data-t="rabanastre" onclick="paApplyTheme('rabanastre')"><div class="theme-swatch" data-t="rabanastre"></div><div class="theme-card-name">Rabanastre</div></div>
+              <div class="theme-card" data-t="treno"      onclick="paApplyTheme('treno')"><div class="theme-swatch" data-t="treno"></div><div class="theme-card-name">Treno</div></div>
+              <div class="theme-card" data-t="nibelheim"  onclick="paApplyTheme('nibelheim')"><div class="theme-swatch" data-t="nibelheim"></div><div class="theme-card-name">Nibelheim</div></div>
+            </div>
+          </div>
+          <div class="settings-group">
+            <div class="settings-group-title">UI Scale</div>
+            <div class="settings-row-label">Scales all app content proportionally</div>
+            <div class="settings-btn-group" id="pa-scale-btns" style="margin-top:8px;">
+              <button class="s-btn" data-s="compact"     onclick="paApplyScale('compact')">Compact</button>
+              <button class="s-btn" data-s="normal"      onclick="paApplyScale('normal')">Normal</button>
+              <button class="s-btn" data-s="comfortable" onclick="paApplyScale('comfortable')">Comfortable</button>
+              <button class="s-btn" data-s="large"       onclick="paApplyScale('large')">Large</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- WINDOW -->
+        <div id="pa-cat-window" class="settings-cat-panel" style="display:none;">
+          <div class="sc-title">Window</div>
+          <div class="settings-group">
+            <div class="settings-group-title">Preferred Display</div>
+            <div class="settings-row-label">Which monitor the app opens on</div>
+            <div id="pa-display-picker" style="margin-top:8px;"></div>
+          </div>
+          <div class="settings-group">
+            <div class="settings-group-title">Start Maximized</div>
+            <div class="toggle-row">
+              <div class="toggle-info">
+                <div class="toggle-label">Launch maximized</div>
+                <div class="toggle-desc">Opens the app filling the full display on startup</div>
+              </div>
+              <button class="toggle-switch" id="pa-toggle-start-maximized" onclick="paApplyWinToggle('win_startMaximized', this)"></button>
+            </div>
+          </div>
+          <div class="settings-group">
+            <div class="settings-group-title">Remember Last Position</div>
+            <div class="toggle-row">
+              <div class="toggle-info">
+                <div class="toggle-label">Restore window position</div>
+                <div class="toggle-desc">Reopens the app at the same size and position as last time</div>
+              </div>
+              <button class="toggle-switch" id="pa-toggle-remember-position" onclick="paApplyWinToggle('win_rememberPosition', this)"></button>
+            </div>
+          </div>
+        </div>
+
+        <!-- DATA -->
+        <div id="pa-cat-data" class="settings-cat-panel" style="display:none;">
+          <div class="sc-title">Data</div>
+          <div class="settings-group">
+            <div class="settings-group-title">Delete User</div>
+            <div class="settings-row-label">Permanently removes the selected profile and all its data from this device.</div>
+            <div id="pa-delete-user-area" style="margin-top:12px;"></div>
+          </div>
+        </div>
+
+        <!-- ACCESSIBILITY -->
+        <div id="pa-cat-accessibility" class="settings-cat-panel" style="display:none;">
+          <div class="sc-title">Accessibility</div>
+          <div class="settings-group">
+            <div class="settings-group-title">Motion & Focus</div>
+            <div class="toggle-row">
+              <div class="toggle-info">
+                <div class="toggle-label">Reduce Motion</div>
+                <div class="toggle-desc">Disables animations and transitions</div>
+              </div>
+              <button class="toggle-switch" id="pa-toggle-motion" onclick="paApplyToggle('reducedMotion', this)"></button>
+            </div>
+            <div class="toggle-row">
+              <div class="toggle-info">
+                <div class="toggle-label">High Contrast</div>
+                <div class="toggle-desc">Increases border and text contrast across all themes</div>
+              </div>
+              <button class="toggle-switch" id="pa-toggle-highcontrast" onclick="paApplyToggle('highContrast', this)"></button>
+            </div>
+            <div class="toggle-row">
+              <div class="toggle-info">
+                <div class="toggle-label">Focus Indicators</div>
+                <div class="toggle-desc">Shows visible outlines for keyboard navigation</div>
+              </div>
+              <button class="toggle-switch" id="pa-toggle-focus" onclick="paApplyToggle('focusIndicators', this)"></button>
+            </div>
+          </div>
+          <div class="settings-group">
+            <div class="settings-group-title">Color Vision</div>
+            <div class="settings-row-label">Adjust colors for color vision deficiencies</div>
+            <div class="settings-btn-group" id="pa-colorblind-btns" style="margin-top:8px;">
+              <button class="s-btn" data-cb="off"          onclick="paApplyColorblind('off')">Off</button>
+              <button class="s-btn" data-cb="deuteranopia" onclick="paApplyColorblind('deuteranopia')">Deuteranopia</button>
+              <button class="s-btn" data-cb="protanopia"   onclick="paApplyColorblind('protanopia')">Protanopia</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ABOUT -->
+        <div id="pa-cat-about" class="settings-cat-panel about-panel" style="display:none;">
+          <div class="sc-title">About</div>
+          <div class="about-hero">
+            <img class="about-icon" src="../../../assets/icon-256.png" alt="Conquered Time icon">
+            <div class="about-wordmark">Conquered Time</div>
+            <div class="about-version-badge" id="pa-about-version-badge">v—</div>
+          </div>
+          <div class="about-tagline">"Take back your time."</div>
+          <div class="about-section">
+            <div class="about-section-title">Build Info</div>
+            <div class="about-build-grid">
+              <span class="about-build-label">Version</span><span class="about-build-value" id="pa-ab-version">—</span>
+              <span class="about-build-label">Electron</span><span class="about-build-value" id="pa-ab-electron">—</span>
+              <span class="about-build-label">Node</span><span class="about-build-value" id="pa-ab-node">—</span>
+              <span class="about-build-label">Platform</span><span class="about-build-value" id="pa-ab-platform">—</span>
+            </div>
+          </div>
+          <div class="about-section">
+            <div class="about-section-title">Credits</div>
+            <div class="about-credit-block">
+              <div class="about-credit-role">Created by</div>
+              <div class="about-credit-name">Chris Bowles — The Conqueror</div>
+            </div>
+            <div class="about-credit-block">
+              <div class="about-credit-role">Co-Author</div>
+              <div class="about-credit-name">Vincent Vathan</div>
+            </div>
+            <div class="about-copyright">Copyright © 2026 Chris Bowles - The Conqueror. All rights reserved.</div>
+          </div>
+          <div class="about-section">
+            <div class="about-section-title">What's New — v1.0</div>
+            <ul class="about-changelog">
+              <li>Dispatch — task timing, break/lunch compliance, and live session counters</li>
+              <li>Five themes: Memoria, Zanarkand, Rabanastre, Treno, Nibelheim</li>
+              <li>AES-256-GCM encrypted company data with PBKDF2 key derivation</li>
+              <li>TOTP multi-factor authentication with lockout and local recovery</li>
+              <li>Company hierarchy — Company › Project › Platform › NavID</li>
+              <li>Dynamic time-entry table with inline editing and per-session totals</li>
+              <li>Spiderweb company visualizer (force-simulated, theme-aware)</li>
+              <li>Global Log with CSV and PDF export, Audit discrepancy detection</li>
+              <li>Branded splash screen and Inter-typography design system</li>
+            </ul>
+          </div>
+        </div>
+
+      </div><!-- /settings-content -->
+    </div><!-- /settings-layout -->
+  </div><!-- /settings-modal-box -->
+</div><!-- /preauth-settings-modal -->
+
+<style>
+  #preauth-gear-btn {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    z-index: 90;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 24px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text-muted);
+    font-family: var(--font-ui);
+    font-size: 16px;
+    cursor: pointer;
+    -webkit-app-region: no-drag;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  #preauth-gear-btn:hover {
+    background: var(--bg-raised);
+    color: var(--text-primary);
+    border-color: var(--accent);
+  }
+  #preauth-settings-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    background: rgba(0,0,0,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    -webkit-app-region: no-drag;
+  }
+  /* Delete User card — reuses dba-card styles from design-system.css */
+  .pa-no-profile-msg {
+    color: var(--text-muted);
+    font-size: 13px;
+    padding: 16px;
+    background: var(--bg-deep);
+    border-radius: 8px;
+    border: 1px dashed var(--border);
+    text-align: center;
+  }
+  .pa-delete-card {
+    background: var(--bg-deep);
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .pa-delete-card.armed { border-color: var(--danger, #e05555); }
+  .pa-delete-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    gap: 12px;
+  }
+  .pa-delete-profile {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .pa-delete-avatar {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 600;
+    color: #fff;
+    overflow: hidden; flex-shrink: 0;
+  }
+  .pa-delete-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .pa-delete-name { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+  .pa-delete-user { font-size: 12px; color: var(--text-muted); margin-top: 1px; }
+  .pa-delete-confirm {
+    padding: 0 16px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .pa-delete-warning {
+    font-size: 12px;
+    color: var(--danger, #e05555);
+    background: color-mix(in srgb, var(--danger, #e05555) 10%, transparent);
+    border-radius: 6px;
+    padding: 8px 10px;
+  }
+  .pa-delete-pw-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .pa-delete-pw-row input {
+    flex: 1;
+    padding: 8px 10px;
+    background: var(--bg-input, var(--bg-panel));
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-family: var(--font-ui);
+  }
+  .pa-delete-pw-row input:focus { outline: none; border-color: var(--accent); }
+</style>
+
+<script>
+// ── Pre-Auth Settings ────────────────────────────────────────────────────────
+// Settings are persisted to localStorage (no vault loaded at this stage).
+// Keys prefixed ct_pa_. When the user logs in, vault settings take precedence.
+
+// Snapshot of selectedProfile at the moment the modal is opened.
+// Avoids cross-script-block let-scoping ambiguity with the main login script.
+let _paOpenedWithProfile = null;
+
+const PA_KEYS = {
+  theme: 'ct_pa_theme', scale: 'ct_pa_scale',
+  reducedMotion: 'ct_pa_reducedMotion', highContrast: 'ct_pa_highContrast',
+  colorblind: 'ct_pa_colorblind', focusIndicators: 'ct_pa_focusIndicators',
+  winStartMaximized: 'ct_pa_winStartMaximized', winRememberPosition: 'ct_pa_winRememberPosition',
+};
+
+function paGet(key) { return localStorage.getItem(PA_KEYS[key]); }
+function paSet(key, val) { localStorage.setItem(PA_KEYS[key], String(val)); }
+
+function openPreauthSettings() {
+  // Capture profile state now — selectedProfile lives in the main script block
+  // and may not be reliably readable later across script-block boundaries.
+  try { _paOpenedWithProfile = selectedProfile || null; } catch { _paOpenedWithProfile = null; }
+  document.getElementById('preauth-settings-modal').style.display = 'flex';
+  paSyncModal();
+}
+function closePreauthSettings() {
+  document.getElementById('preauth-settings-modal').style.display = 'none';
+}
+function handlePreauthBackdrop(e) {
+  if (e.target === document.getElementById('preauth-settings-modal')) closePreauthSettings();
+}
+
+function paSwitchTab(cat) {
+  ['appearance','window','data','accessibility','about'].forEach(c => {
+    document.getElementById(`pa-cat-${c}`).style.display = c === cat ? 'block' : 'none';
+  });
+  document.querySelectorAll('#preauth-settings-modal .sn-item').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.cat === cat);
+  });
+  if (cat === 'about') paLoadAbout();
+  if (cat === 'window') paLoadDisplayPicker();
+  if (cat === 'data') paRenderDeleteUser();
+}
+
+function paSyncModal() {
+  const root    = document.documentElement;
+  const theme   = root.getAttribute('data-theme') || 'zanarkand';
+  const scale   = root.getAttribute('data-scale') || 'normal';
+  const rm      = root.getAttribute('data-reduced-motion')   === 'true';
+  const hc      = root.getAttribute('data-high-contrast')    === 'true';
+  const cb      = root.getAttribute('data-colorblind')       || 'off';
+  const fi      = root.getAttribute('data-focus-indicators') === 'true';
+
+  // Theme cards
+  document.querySelectorAll('#pa-theme-cards .theme-card').forEach(c =>
+    c.classList.toggle('active', c.dataset.t === theme));
+  // Scale buttons
+  document.querySelectorAll('#pa-scale-btns .s-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.s === scale));
+  // Accessibility toggles
+  const setTog = (id, on) => document.getElementById(id)?.classList.toggle('on', on);
+  setTog('pa-toggle-motion',       rm);
+  setTog('pa-toggle-highcontrast', hc);
+  setTog('pa-toggle-focus',        fi);
+  document.querySelectorAll('#pa-colorblind-btns .s-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.cb === cb));
+}
+
+// ── Appearance ───────────────────────────────────────────────────────────────
+function paApplyTheme(theme) {
+  paSet('theme', theme);
+  document.documentElement.setAttribute('data-theme', theme);
+  document.querySelectorAll('#pa-theme-cards .theme-card').forEach(c =>
+    c.classList.toggle('active', c.dataset.t === theme));
+}
+
+function paApplyScale(scale) {
+  paSet('scale', scale);
+  document.documentElement.setAttribute('data-scale', scale);
+  document.querySelectorAll('#pa-scale-btns .s-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.s === scale));
+}
+
+// ── Accessibility ─────────────────────────────────────────────────────────────
+function paApplyToggle(key, btn) {
+  const on = !btn.classList.contains('on');
+  paSet(key, on);
+  btn.classList.toggle('on', on);
+  const attrMap = {
+    reducedMotion:   'data-reduced-motion',
+    highContrast:    'data-high-contrast',
+    focusIndicators: 'data-focus-indicators',
+  };
+  if (attrMap[key]) document.documentElement.setAttribute(attrMap[key], String(on));
+}
+
+function paApplyColorblind(val) {
+  paSet('colorblind', val);
+  document.documentElement.setAttribute('data-colorblind', val);
+  document.querySelectorAll('#pa-colorblind-btns .s-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.cb === val));
+}
+
+// ── Window ───────────────────────────────────────────────────────────────────
+async function paLoadDisplayPicker() {
+  const area = document.getElementById('pa-display-picker');
+  if (!area) return;
+  try {
+    const [displays, savedDisp, savedMax, savedRemember] = await Promise.all([
+      api.invoke('win:get-displays'),
+      Promise.resolve(paGet('winPreferredDisplay')),
+      Promise.resolve(paGet('winStartMaximized')),
+      Promise.resolve(paGet('winRememberPosition')),
+    ]);
+    const saved = savedDisp || 'primary';
+    const btns  = [
+      `<button class="s-btn${saved === 'primary' ? ' active' : ''}" onclick="paApplyPreferredDisplay('primary')">Primary Display</button>`,
+      ...(displays || []).filter(d => !d.isPrimary).map(d =>
+        `<button class="s-btn${saved === String(d.id) ? ' active' : ''}" onclick="paApplyPreferredDisplay('${d.id}')">Display ${d.index}</button>`)
+    ];
+    area.innerHTML = `<div class="settings-btn-group">${btns.join('')}</div>`;
+    const tsm = document.getElementById('pa-toggle-start-maximized');
+    const trp = document.getElementById('pa-toggle-remember-position');
+    if (tsm) tsm.classList.toggle('on', savedMax === 'true');
+    if (trp) trp.classList.toggle('on', savedRemember === 'true');
+  } catch(e) {
+    area.innerHTML = `<div class="settings-row-label" style="color:var(--text-muted)">Display info unavailable.</div>`;
+  }
+}
+
+async function paApplyPreferredDisplay(displayId) {
+  paSet('winPreferredDisplay', displayId);
+  try { await api.invoke('win:move-to-display', displayId); } catch {}
+  paLoadDisplayPicker();
+}
+
+function paApplyWinToggle(key, btn) {
+  const on  = !btn.classList.contains('on');
+  const lsKey = key === 'win_startMaximized' ? 'winStartMaximized' : 'winRememberPosition';
+  paSet(lsKey, on);
+  btn.classList.toggle('on', on);
+}
+
+// ── About ─────────────────────────────────────────────────────────────────────
+async function paLoadAbout() {
+  try {
+    const info = await api.invoke('app:get-info');
+    if (!info) return;
+    const v = `v${info.version}`;
+    const badge = document.getElementById('pa-about-version-badge');
+    if (badge) badge.textContent = v;
+    const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    set('pa-ab-version',  v);
+    set('pa-ab-electron', info.electronVersion);
+    set('pa-ab-node',     info.nodeVersion);
+    set('pa-ab-platform', info.platform);
+  } catch {}
+}
+
+// ── Data — Delete User ────────────────────────────────────────────────────────
+function paRenderDeleteUser() {
+  const area = document.getElementById('pa-delete-user-area');
+  if (!area) return;
+
+  if (!_paOpenedWithProfile) {
+    area.innerHTML = `<div class="pa-no-profile-msg">Select a profile on the login screen first,<br>then open Settings to delete it.</div>`;
+    return;
+  }
+
+  const p   = _paOpenedWithProfile;
+  const initials = (p.display_name || p.username || '?').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+  const avatarHTML = p.avatar_thumb_48
+    ? `<img src="${p.avatar_thumb_48}" alt="">`
+    : initials;
+
+  area.innerHTML = `
+    <div class="pa-delete-card" id="pa-del-card">
+      <div class="pa-delete-header">
+        <div class="pa-delete-profile">
+          <div class="pa-delete-avatar">${avatarHTML}</div>
+          <div>
+            <div class="pa-delete-name">${p.display_name || p.username}</div>
+            <div class="pa-delete-user">${p.username}</div>
+          </div>
+        </div>
+        <button class="dba-trigger-btn danger" onclick="paArmDelete()">Delete</button>
+      </div>
+      <div class="pa-delete-confirm" id="pa-del-confirm" style="display:none;">
+        <div class="pa-delete-warning">⚠ This permanently deletes this profile and all its data. This cannot be undone.</div>
+        <div class="pa-delete-pw-row">
+          <input type="password" id="pa-del-pw" placeholder="Enter password to confirm" autocomplete="current-password">
+          <button class="dba-confirm-btn danger" onclick="paExecuteDelete()">Delete Profile</button>
+          <button class="dba-confirm-btn" onclick="paDisarmDelete()">Cancel</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function paArmDelete() {
+  document.getElementById('pa-del-card')?.classList.add('armed');
+  document.getElementById('pa-del-confirm').style.display = 'flex';
+  document.getElementById('pa-del-pw')?.focus();
+}
+function paDisarmDelete() {
+  document.getElementById('pa-del-card')?.classList.remove('armed');
+  document.getElementById('pa-del-confirm').style.display = 'none';
+  const pw = document.getElementById('pa-del-pw');
+  if (pw) pw.value = '';
+}
+
+async function paExecuteDelete() {
+  const pw = document.getElementById('pa-del-pw')?.value || '';
+  if (!pw) { toast('Enter your password to confirm deletion.', 'error'); return; }
+  const res = await api.invoke('profiles:delete', { password: pw });
+  if (!res?.ok) {
+    toast(res?.error || 'Deletion failed.', 'error');
+    const inp = document.getElementById('pa-del-pw');
+    if (inp) { inp.value = ''; inp.focus(); }
+    return;
+  }
+  closePreauthSettings();
+  toast('Profile deleted.', 'success');
+  setTimeout(() => api.send('navigate', 'login'), 1200);
+}
+
+// Close on Escape
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && document.getElementById('preauth-settings-modal').style.display !== 'none')
+    closePreauthSettings();
+});
 </script>
 </body>
 </html>
