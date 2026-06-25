@@ -856,7 +856,6 @@ function onGridHover(e) {
 }
 
 function onGridClick(e) {
-  // Don't register grid clicks if the target is within the login card area
   const card = document.getElementById('login-card');
   if (card && card.contains(e.target)) return;
   const backdoor = document.getElementById('backdoor-screen');
@@ -867,46 +866,26 @@ function onGridClick(e) {
   const r = Math.floor((e.clientY - rect.top)   / CELL_SIZE);
   const key = `${c},${r}`;
 
-  // Bright click flash
   glowCells[key] = { alpha: 0.7, color: 'accent', decay: true };
 
-  // Sequence tracking
-  currentSeq.push(key);
+  const nextIdx = currentSeq.length;
+  const hitsEaster   = key === EASTER_SEQ[nextIdx];
+  const hitsBackdoor = key === BACKDOOR_SEQ[nextIdx];
 
-  // Reset timeout — 20 seconds between clicks during testing
-  clearTimeout(seqTimeout);
-  seqTimeout = setTimeout(resetSeq, 20000);
-
-  updateSeqIndicator();
-  checkSequences();
-}
-
-function checkSequences() {
-  const seq = currentSeq;
-  const key = seq[seq.length - 1];
-
-  // If no sequence is active yet, only the first element of a known sequence starts tracking
-  if (seqMode === null) {
-    if (key === EASTER_SEQ[0])   { seqMode = 'easter'; }
-    else if (key === BACKDOOR_SEQ[0]) { seqMode = 'dev'; }
-    else { resetSeq(); return; }
+  if (hitsEaster || hitsBackdoor) {
+    currentSeq.push(key);
+    if (hitsEaster)   seqMode = 'easter';
+    if (hitsBackdoor) seqMode = 'dev';
+    clearTimeout(seqTimeout);
+    seqTimeout = setTimeout(resetSeq, 20000);
+    updateSeqIndicator();
+    if (seqMode === 'easter' && currentSeq.length === EASTER_SEQ.length) { triggerEasterEgg(); return; }
+    if (seqMode === 'dev'    && currentSeq.length === BACKDOOR_SEQ.length) { triggerBackdoor(); return; }
+  } else if (seqMode !== null) {
+    // Mis-click while in an active sequence — reset
+    resetSeq();
   }
-
-  if (seqMode === 'easter') {
-    const slice = EASTER_SEQ.slice(0, seq.length);
-    if (seq.every((k, i) => k === slice[i])) {
-      if (seq.length === EASTER_SEQ.length) triggerEasterEgg();
-    } else {
-      resetSeq();
-    }
-  } else if (seqMode === 'dev') {
-    const slice = BACKDOOR_SEQ.slice(0, seq.length);
-    if (seq.every((k, i) => k === slice[i])) {
-      if (seq.length === BACKDOOR_SEQ.length) triggerBackdoor();
-    } else {
-      resetSeq();
-    }
-  }
+  // Clicks that don't advance any sequence and aren't in one are silently ignored
 }
 
 function updateSeqIndicator() {
