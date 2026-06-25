@@ -284,6 +284,71 @@ const Shell = (() => {
                 </div>
               </div>
 
+
+              <div class="settings-group" id="sg-email-reports">
+                <div class="settings-group-title">Email Reports</div>
+                <div class="settings-row-label">Configure SMTP to send reports to your inbox as PDF + CSV attachments.</div>
+                <div style="margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;" id="email-cfg-grid">
+                  <div>
+                    <div class="settings-row-label" style="margin-bottom:4px;">SMTP Host</div>
+                    <input class="sc-input" id="email-host" type="text" placeholder="smtp.gmail.com" autocomplete="off">
+                  </div>
+                  <div>
+                    <div class="settings-row-label" style="margin-bottom:4px;">Port</div>
+                    <input class="sc-input" id="email-port" type="number" placeholder="587" style="width:100%">
+                  </div>
+                  <div>
+                    <div class="settings-row-label" style="margin-bottom:4px;">Username / Email</div>
+                    <input class="sc-input" id="email-user" type="text" placeholder="you@example.com" autocomplete="off">
+                  </div>
+                  <div>
+                    <div class="settings-row-label" style="margin-bottom:4px;">Password / App Password</div>
+                    <div style="position:relative;">
+                      <input class="sc-input" id="email-pass" type="password" placeholder="•••••••••" autocomplete="new-password" style="padding-right:36px;width:100%;">
+                      <button id="email-pass-toggle" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:0;color:var(--text-muted);" title="Show/hide">
+                        <svg id="email-eye-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <div class="settings-row-label" style="margin-bottom:4px;">From Name (optional)</div>
+                    <input class="sc-input" id="email-from-name" type="text" placeholder="Conquered Time" autocomplete="off">
+                  </div>
+                  <div>
+                    <div class="settings-row-label" style="margin-bottom:4px;">Default Recipient(s)</div>
+                    <input class="sc-input" id="email-default-to" type="text" placeholder="you@work.com" autocomplete="off">
+                  </div>
+                </div>
+                <div style="margin-top:14px;display:flex;gap:8px;align-items:center;">
+                  <button class="s-btn s-btn-primary" id="email-save-btn" onclick="saveEmailConfig()">Save Config</button>
+                  <button class="s-btn" id="email-test-btn" onclick="testEmailConfig()">Test SMTP</button>
+                  <span id="email-status-text" style="font-size:11px;color:var(--text-muted);margin-left:4px;"></span>
+                </div>
+              </div>
+
+              <div class="settings-group" id="sg-scheduled-reports">
+                <div class="settings-group-title">Scheduled Reports</div>
+                <div class="settings-row-label">Automatically email reports on a recurring schedule using the SMTP config above.</div>
+                <div style="margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;">
+                  <div>
+                    <div class="settings-row-label" style="margin-bottom:4px;">Frequency</div>
+                    <select class="sc-input" id="sched-freq" onchange="saveScheduleConfig()">
+                      <option value="off">Off</option>
+                      <option value="daily">Daily</option>
+                      <option value="weekly">Weekly (Monday)</option>
+                      <option value="monthly">Monthly (1st)</option>
+                      <option value="quarterly">Quarterly</option>
+                      <option value="annually">Annually</option>
+                    </select>
+                  </div>
+                  <div>
+                    <div class="settings-row-label" style="margin-bottom:4px;">Send At</div>
+                    <input class="sc-input" id="sched-time" type="time" value="08:00" onchange="saveScheduleConfig()">
+                  </div>
+                </div>
+                <div id="sched-next-send" style="margin-top:10px;font-size:11px;color:var(--text-muted);"></div>
+              </div>
+
             </div><!-- /settings-cat-data -->
 
             <!-- ── SECURITY ──────────────────────────────────── -->
@@ -722,6 +787,8 @@ async function switchSettingsCategory(cat) {
   const panel = document.getElementById(`settings-cat-${cat}`);
   if (panel) panel.style.display = '';
 
+  if (cat === 'data') loadEmailConfig();
+
   if (cat === 'window' && !_windowSettingsLoaded) {
     _windowSettingsLoaded = true;
     loadDisplayPicker();
@@ -985,6 +1052,107 @@ function syncSettingsModal() {
   document.querySelectorAll('[data-cb]').forEach(b => {
     b.classList.toggle('active', b.dataset.cb === s.colorblind);
   });
+}
+
+// ── Email config ─────────────────────────────────────────────────────────────
+
+let _emailCfgLoaded = false;
+
+async function loadEmailConfig() {
+  if (_emailCfgLoaded) return;
+  _emailCfgLoaded = true;
+  try {
+    const cfg = await api.invoke('email:get-config');
+    if (!cfg) return;
+    const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
+    set('email-host',       cfg.host);
+    set('email-port',       cfg.port || '587');
+    set('email-user',       cfg.username);
+    set('email-from-name',  cfg.fromName);
+    set('email-default-to', cfg.defaultTo);
+    const passEl = document.getElementById('email-pass');
+    if (passEl && cfg.hasPassword) passEl.placeholder = '••••••••• (saved)';
+
+    // Eye toggle for password field
+    const toggle = document.getElementById('email-pass-toggle');
+    const icon   = document.getElementById('email-eye-icon');
+    if (toggle && passEl) {
+      toggle.addEventListener('click', () => {
+        const show = passEl.type === 'password';
+        passEl.type = show ? 'text' : 'password';
+        icon.innerHTML = show
+          ? '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/>'
+          : '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+      });
+    }
+
+    // Schedule fields
+    const freq = await api.invoke('settings:get', 'email_schedule_freq') || 'off';
+    const time = await api.invoke('settings:get', 'email_schedule_time') || '08:00';
+    const freqEl = document.getElementById('sched-freq');
+    const timeEl = document.getElementById('sched-time');
+    if (freqEl) freqEl.value = freq;
+    if (timeEl) timeEl.value = time;
+    updateNextSendLabel(freq, await api.invoke('settings:get', 'email_schedule_last_sent'));
+  } catch {}
+}
+
+function updateNextSendLabel(freq, lastSent) {
+  const el = document.getElementById('sched-next-send');
+  if (!el) return;
+  if (!freq || freq === 'off') { el.textContent = ''; return; }
+  if (lastSent) el.textContent = `Last sent: ${new Date(lastSent).toLocaleString()}`;
+  else el.textContent = `First send will fire at the configured time.`;
+}
+
+async function saveEmailConfig() {
+  const get = id => (document.getElementById(id) || {}).value || '';
+  const password = get('email-pass');
+  const statusEl = document.getElementById('email-status-text');
+  if (statusEl) statusEl.textContent = 'Saving…';
+  try {
+    const res = await api.invoke('email:save-config', {
+      host:       get('email-host'),
+      port:       parseInt(get('email-port') || '587', 10),
+      username:   get('email-user'),
+      password:   password || undefined,
+      fromName:   get('email-from-name'),
+      defaultTo:  get('email-default-to'),
+    });
+    if (statusEl) statusEl.textContent = '';
+    Shell.toast(res.ok ? 'Email config saved.' : `Save failed: ${res.error}`, res.ok ? 'success' : 'error');
+  } catch (e) {
+    if (statusEl) statusEl.textContent = '';
+    Shell.toast(`Error: ${e.message}`, 'error');
+  }
+}
+
+async function testEmailConfig() {
+  const btn      = document.getElementById('email-test-btn');
+  const statusEl = document.getElementById('email-status-text');
+  if (btn) btn.disabled = true;
+  if (statusEl) statusEl.textContent = 'Testing…';
+  try {
+    const res = await api.invoke('email:test-smtp');
+    Shell.toast(res.ok ? 'SMTP connection successful!' : `SMTP test failed: ${res.error}`, res.ok ? 'success' : 'error');
+  } catch (e) {
+    Shell.toast(`Error: ${e.message}`, 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+    if (statusEl) statusEl.textContent = '';
+  }
+}
+
+async function saveScheduleConfig() {
+  const freq = (document.getElementById('sched-freq') || {}).value || 'off';
+  const time = (document.getElementById('sched-time') || {}).value || '08:00';
+  await Promise.all([
+    api.invoke('settings:set', { key: 'email_schedule_freq', value: freq }),
+    api.invoke('settings:set', { key: 'email_schedule_time', value: time }),
+  ]);
+  const lastSent = await api.invoke('settings:get', 'email_schedule_last_sent');
+  updateNextSendLabel(freq, lastSent);
+  Shell.toast('Schedule saved.', 'success');
 }
 
 async function loadDisplayPicker() {

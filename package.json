@@ -85,6 +85,7 @@
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
+    "nodemailer": "^9.0.1",
     "qrcode": "^1.5.3",
     "speakeasy": "^2.0.0",
     "sql.js": "^1.10.3",

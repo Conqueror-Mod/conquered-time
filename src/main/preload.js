@@ -18,6 +18,7 @@ const ALLOWED_INVOKE = new Set([
   'profile:get', 'profile:save', 'auth:change-password',
   'audit:get-dismissed', 'audit:dismiss', 'audit:clear-dismissed', 'audit:apply-fix', 'audit:open-wizard',
   'backup:list', 'backup:preview', 'backup:restore',
+  'email:save-config', 'email:get-config', 'email:test-smtp', 'email:send-report',
   'win:get-displays', 'win:move-to-display'
 ]);
 
