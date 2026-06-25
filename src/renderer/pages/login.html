@@ -1011,7 +1011,13 @@ window.addEventListener('DOMContentLoaded', async () => {
       if (currentMode === 'setup' && profileMode) { goBackToSelector(); return; }
     }
     if (e.key === 'Enter') {
-      if (currentMode === 'login')    doLogin();
+      if (currentMode === 'login') {
+        // Quick Unlock / safe-login has its own Enter handling — don't let the
+        // global handler also fire doLogin() against the empty full-login fields
+        const safeSection = document.getElementById('safe-login-section');
+        const safeVisible = safeSection && safeSection.style.display !== 'none';
+        if (!safeVisible) doLogin();
+      }
       // Skip global doSetup() if focus is on a field that has its own Enter handler
       if (currentMode === 'setup') {
         const nav = ['setup-username', 'setup-password', 'setup-password2'];
