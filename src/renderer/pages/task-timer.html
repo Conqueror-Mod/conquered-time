@@ -420,7 +420,16 @@ window.addEventListener('DOMContentLoaded', async () => {
   activeEntry = await api.invoke('entries:get-active');
   await updateBanner();
 
-  if (!activeEntry) return; // no session, show fallback
+  if (!activeEntry) {
+    // Wire buttons to show error — don't silently swallow clicks
+    const noSessionGuard = () => {
+      Shell.toast('No active punch. Go to Time Tracker and clock in first.', 'error');
+    };
+    document.getElementById('btn-start').addEventListener('click', noSessionGuard);
+    document.getElementById('btn-break').addEventListener('click', noSessionGuard);
+    document.getElementById('btn-lunch').addEventListener('click', noSessionGuard);
+    return;
+  }
 
   // Load tasks and recent labels
   taskItems = await api.invoke('tasks:list', activeEntry.id);

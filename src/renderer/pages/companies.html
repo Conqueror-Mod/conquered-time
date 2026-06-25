@@ -625,6 +625,10 @@
     };
     Object.entries(fields).forEach(([id, val]) => { const el = document.getElementById(id); if (el) el.value = val; });
     document.getElementById('company-modal').style.display = 'flex';
+    setTimeout(() => {
+      const focus = co ? document.getElementById('f-hier-company') : document.getElementById('f-hier-company');
+      if (focus) focus.focus();
+    }, 50);
   }
 
   function closeModal() {
