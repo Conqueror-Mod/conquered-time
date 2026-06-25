@@ -1295,7 +1295,7 @@ ipcMain.handle('app:get-info', () => ({
 }));
 
 // Update check URL — point this at the raw version.json in your GitHub repo once published
-const UPDATE_CHECK_URL = 'https://raw.githubusercontent.com/Conqueror-Mod/conquered-time/main/version.json';
+const UPDATE_CHECK_URL = 'https://raw.githubusercontent.com/Conqueror-Mod/conquered-time/master/version.json';
 
 ipcMain.handle('app:check-update', () => new Promise((resolve) => {
   const https = require('https');

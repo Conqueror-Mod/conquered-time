@@ -1,5 +1,5 @@
 {
-  "version": "1.0.0",
+  "version": "3.0.0",
   "downloadUrl": "https://github.com/Conqueror-Mod/conquered-time/releases/latest",
-  "notes": "Initial release."
+  "notes": "v3.0 — Final Fantasy themes, multi-user profile architecture, Windows Hello quick-unlock, and full login screen overhaul."
 }
