@@ -1385,6 +1385,25 @@ ipcMain.handle('settings:set', (_, { key, value }) => {
 });
 
 // ── App lifecycle ──────────────────────────────────────────────────────────
+// ── Context menu (right-click) ─────────────────────────────────────────────
+// Electron disables the browser's built-in context menu by default.
+// This restores a standard edit menu (cut/copy/paste/select-all) on all windows.
+app.on('web-contents-created', (_e, wc) => {
+  wc.on('context-menu', (_ev, params) => {
+    const items = [];
+    if (params.isEditable) {
+      if (params.selectionText) items.push({ label: 'Cut',  role: 'cut'  });
+      items.push({ label: 'Copy',       role: 'copy'      });
+      items.push({ label: 'Paste',      role: 'paste'     });
+      items.push({ type:  'separator'                      });
+      items.push({ label: 'Select All', role: 'selectAll' });
+    } else if (params.selectionText) {
+      items.push({ label: 'Copy', role: 'copy' });
+    }
+    if (items.length) Menu.buildFromTemplate(items).popup({ window: wc.getOwnerBrowserWindow() });
+  });
+});
+
 app.whenReady().then(async () => {
   // Schedule email check fires every 5 minutes (catches sub-hour scheduling windows)
   setInterval(() => runScheduledEmailCheck().then(() => {

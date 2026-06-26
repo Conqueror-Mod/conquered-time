@@ -347,27 +347,118 @@
   function exportAllPDF() {
     if (filtered.length===0) { Shell.toast('No sessions to export.','warning'); return; }
     const coId=parseInt(document.getElementById('filter-company').value)||null;
-    if (coId) {
-      const co=compMap[coId];
-      const rows=[];
-      filtered.forEach(e => safeParseRows(e.rows_json).forEach(r=>{if(r.label||r.name)rows.push({...r,date:e.log_date});}));
-      printTimesheet(co,`${filtered[filtered.length-1]?.log_date} – ${filtered[0]?.log_date}`,'',rows,filtered.reduce((s,e)=>s+e.total_mins,0));
-    } else Shell.toast('Select a company filter for PDF export.','warning');
+    if (!coId) { Shell.toast('Select a company filter for PDF export.','warning'); return; }
+    const co=compMap[coId];
+    const sessions=[...filtered].reverse(); // chronological order
+    const grandTotal=filtered.reduce((s,e)=>s+e.total_mins,0);
+    const dateFrom=sessions[0]?.log_date;
+    const dateTo=sessions[sessions.length-1]?.log_date;
+    const allRows=[];
+    sessions.forEach(e=>safeParseRows(e.rows_json).forEach(r=>{if(r.label||r.name)allRows.push(r);}));
+    const hierParts=co?[co.hier_company,co.hier_project,co.hier_platform,co.name].filter(Boolean).join(' › '):'—';
+    const summaryBreakdown=buildLabelBreakdown(allRows);
+    const summaryBdHtml=summaryBreakdown.length>=2?`
+      <h2 style="font-size:13px;font-weight:600;color:#374151;margin:20px 0 8px;border-bottom:1px solid #e5e7eb;padding-bottom:4px;">Time by Label</h2>
+      <table style="width:260px;">
+        <thead><tr><th>Label</th><th style="text-align:right;">Total</th></tr></thead>
+        <tbody>${summaryBreakdown.map(([lbl,mins])=>`<tr><td>${lbl}</td><td style="text-align:right;font-variant-numeric:tabular-nums;">${fmtHFull(mins)}</td></tr>`).join('')}
+        <tr class="total-row"><td>Total</td><td style="text-align:right;">${fmtHFull(grandTotal)}</td></tr></tbody>
+      </table>`:'';
+    const sessionBlocks=sessions.map(e=>{
+      const sRows=safeParseRows(e.rows_json).filter(r=>r.label||r.name);
+      const taskRows=sRows.map((r,i)=>`<tr>
+        <td>${String(i+1).padStart(2,'0')}</td>
+        <td>${r.label||''}</td><td>${r.name||''}</td>
+        <td>${r.desc||r.description||''}</td>
+        <td>${r.clock_in||''}</td><td>${r.clock_out||''}</td>
+        <td>${fmtHFull(r.total_mins)}</td>
+      </tr>`).join('');
+      const bd=buildLabelBreakdown(sRows);
+      const bdHtml=bd.length>=2?`
+        <div style="margin-top:8px;">
+          <table style="width:260px;">
+            <thead><tr><th>Label</th><th style="text-align:right;">Total</th></tr></thead>
+            <tbody>${bd.map(([lbl,mins])=>`<tr><td>${lbl}</td><td style="text-align:right;font-variant-numeric:tabular-nums;">${fmtHFull(mins)}</td></tr>`).join('')}</tbody>
+          </table>
+        </div>`:'';
+      return `<div class="session-block">
+        <div class="session-header">${e.log_date}${e.session_label?' · '+e.session_label:''}</div>
+        <table>
+          <thead><tr><th>#</th><th>Label</th><th>Name</th><th>Description</th><th>Clock In</th><th>Clock Out</th><th>Duration</th></tr></thead>
+          <tbody>${taskRows}<tr class="total-row"><td colspan="6" style="text-align:right;">Session Total</td><td>${fmtHFull(e.total_mins)}</td></tr></tbody>
+        </table>${bdHtml}
+      </div>`;
+    }).join('');
+    const metaLines=[
+      co.job_title?`<div class="meta">${co.job_title}</div>`:'',
+      co.work_type?`<div class="meta">Work type: ${co.work_type}</div>`:'',
+      co.location?`<div class="meta">Location: ${co.location}</div>`:'',
+      co.supervisors?`<div class="meta">Submitted to: ${co.supervisors}</div>`:'',
+    ].join('');
+    const win=window.open('','_blank');
+    win.document.write(`<!DOCTYPE html><html><head><title>Timesheet</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+      body{font-family:Inter,system-ui,sans-serif;font-size:12px;color:#111;padding:40px;max-width:960px;margin:0 auto;}
+      h1{font-size:20px;font-weight:600;margin:0 0 3px;}
+      .meta{color:#666;font-size:11px;margin-bottom:3px;}
+      .hier{color:#2563eb;font-size:11px;font-weight:500;margin-bottom:4px;}
+      .summary-period{font-size:11px;color:#374151;margin-bottom:4px;}
+      table{width:100%;border-collapse:collapse;margin-top:8px;}
+      th{background:#f1f5f9;border-bottom:2px solid #2563eb;padding:9px 8px;text-align:left;font-size:11px;font-weight:600;color:#374151;}
+      td{padding:8px;border-bottom:1px solid #e5e7eb;font-size:12px;}
+      .total-row{font-weight:600;background:#f9fafb;}
+      .session-block{margin-top:28px;page-break-inside:avoid;}
+      .session-header{font-size:12px;font-weight:600;color:#374151;border-bottom:2px solid #2563eb;padding-bottom:4px;margin-bottom:0;}
+      .footer{margin-top:32px;color:#9ca3af;font-size:10px;border-top:1px solid #e5e7eb;padding-top:10px;display:flex;justify-content:space-between;}
+    </style></head><body>
+    <h1>${co.name}</h1>
+    ${metaLines}
+    <div class="hier">${hierParts}</div>
+    <div class="summary-period">Period: ${dateFrom} – ${dateTo} &nbsp;·&nbsp; ${sessions.length} session${sessions.length!==1?'s':''} &nbsp;·&nbsp; Grand total: ${fmtHFull(grandTotal)}</div>
+    ${summaryBdHtml}
+    ${sessionBlocks}
+    <div class="footer"><span>Generated by Conquered Time · ${new Date().toLocaleString()}</span><span>CONFIDENTIAL</span></div>
+    </body></html>`);
+    win.document.close(); win.print();
+  }
+
+  function buildLabelBreakdown(rows) {
+    const map={};
+    rows.filter(r=>r.label).forEach(r=>{ map[r.label]=(map[r.label]||0)+(r.total_mins||0); });
+    return Object.entries(map).sort((a,b)=>b[1]-a[1]);
   }
 
   function printTimesheet(co,dateStr,sessionLabel,rows,totalMins) {
     const hierParts=co?[co.hier_company,co.hier_project,co.hier_platform,co.name].filter(Boolean).join(' › '):'—';
-    const taskRows=rows.filter(r=>r.label||r.name).map((r,i)=>`<tr>
+    const filledRows=rows.filter(r=>r.label||r.name);
+    const taskRows=filledRows.map((r,i)=>`<tr>
       <td>${String(i+1).padStart(2,'0')}</td>
       <td>${r.label||''}</td><td>${r.name||''}</td>
       <td>${r.desc||r.description||''}</td>
       <td>${r.clock_in||''}</td><td>${r.clock_out||''}</td>
       <td>${fmtHFull(r.total_mins)}</td>
     </tr>`).join('');
+    const breakdown=buildLabelBreakdown(filledRows);
+    const bdHtml=breakdown.length>=2?`
+      <h2 style="font-size:12px;font-weight:600;color:#374151;margin:20px 0 6px;border-bottom:1px solid #e5e7eb;padding-bottom:4px;">Time by Label</h2>
+      <table style="width:260px;">
+        <thead><tr><th>Label</th><th style="text-align:right;">Total</th></tr></thead>
+        <tbody>${breakdown.map(([lbl,mins])=>`<tr><td>${lbl}</td><td style="text-align:right;font-variant-numeric:tabular-nums;">${fmtHFull(mins)}</td></tr>`).join('')}</tbody>
+      </table>`:'';
+    const metaLines=[
+      co?.job_title?`<div class="meta">${co.job_title}${sessionLabel?' · '+sessionLabel:''}</div>`:(sessionLabel?`<div class="meta">${sessionLabel}</div>`:''),
+      co?.work_type?`<div class="meta">Work type: ${co.work_type}</div>`:'',
+      co?.location?`<div class="meta">Location: ${co.location}</div>`:'',
+      co?.supervisors?`<div class="meta">Submitted to: ${co.supervisors}</div>`:'',
+    ].join('');
     const win=window.open('','_blank');
     win.document.write(`<!DOCTYPE html><html><head><title>Timesheet</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
-      body{font-family:DM Sans,Arial,sans-serif;font-size:12px;color:#111;padding:40px;max-width:960px;margin:0 auto;}
+      body{font-family:Inter,system-ui,sans-serif;font-size:12px;color:#111;padding:40px;max-width:960px;margin:0 auto;}
       h1{font-size:20px;font-weight:600;margin:0 0 3px;}
       .meta{color:#666;font-size:11px;margin-bottom:3px;}
       .hier{color:#2563eb;font-size:11px;font-weight:500;margin-bottom:20px;}
@@ -378,13 +469,14 @@
       .footer{margin-top:32px;color:#9ca3af;font-size:10px;border-top:1px solid #e5e7eb;padding-top:10px;display:flex;justify-content:space-between;}
     </style></head><body>
     <h1>${co?.name||'Timesheet'}</h1>
-    <div class="meta">${co?.job_title||''}${sessionLabel?' · '+sessionLabel:''}</div>
+    ${metaLines}
     <div class="hier">${hierParts}</div>
     <div class="meta">Period: ${dateStr}</div>
     <table>
       <thead><tr><th>#</th><th>Label</th><th>Name</th><th>Description</th><th>Clock In</th><th>Clock Out</th><th>Duration</th></tr></thead>
       <tbody>${taskRows}<tr class="total-row"><td colspan="6" style="text-align:right;">Total</td><td>${fmtHFull(totalMins)}</td></tr></tbody>
     </table>
+    ${bdHtml}
     <div class="footer"><span>Generated by Conquered Time · ${new Date().toLocaleString()}</span><span>CONFIDENTIAL</span></div>
     </body></html>`);
     win.document.close(); win.print();
