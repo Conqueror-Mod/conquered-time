@@ -1,5 +1,5 @@
 {
-  "version": "3.1.0",
+  "version": "3.3.0",
   "downloadUrl": "https://github.com/Conqueror-Mod/conquered-time/releases/latest",
-  "notes": "v3.1 — Email PDF/CSV reports via SMTP, auto-scheduled delivery, US federal break/lunch compliance rules, and company web overhaul."
+  "notes": "v3.3 — Time entries encrypted at rest (AES-256-GCM), US state break/lunch compliance policy, Windows Hello / Quick Unlock fast login, and login screen overhaul."
 }

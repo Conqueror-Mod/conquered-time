@@ -8,26 +8,30 @@ A secure, locally-encrypted desktop time tracker built for remote professionals 
 ## Features
 
 - **TOTP MFA login** — Google Authenticator compatible, no external servers
-- **AES-256-GCM encryption** — all PPI fields encrypted at rest with PBKDF2 key derivation
+- **AES-256-GCM encryption** — all PPI fields and time entries encrypted at rest with PBKDF2 key derivation
+- **Windows Hello / Quick Unlock** — fast login via biometric or PIN after first session; password fallback always available
 - **3-attempt lockout** — 24-hour lockout with live countdown display
-- **Local recovery code** — one-time printable backup key generated at setup
-- **Splash screen** — branded 3-second startup screen, theme-aware
-- **Company spiderweb** — force-graph visualization of your client network
+- **Local recovery code** — one-time printable backup key; enables full password reset with automatic key re-encryption, no data loss
+- **Multi-user profile selector** — isolated per-user vaults; avatar cards on login screen; auto-migration from legacy single-vault layout
+- **Splash screen** — branded startup screen, theme-aware
+- **Company spiderweb** — force-graph visualization of your client network with inline detail pane
 - **Dynamic time tracker** — clock in/out with task labels and per-company sessions, auto-grows as needed
 - **Inline editing** — double-click any field to edit; duration recalculates automatically
-- **User Profile** — avatar upload with manual crop modal (drag-to-pan, zoom in/out, circular preview); animated formats (GIF, APNG, WebP) preserved with Discord-style hover animation on sidebar
-- **Dispatch (Task Timer)** — dedicated task timing module with break/lunch compliance, description writeback, and sidebar live timer
+- **User Profile** — avatar upload with manual crop modal (drag-to-pan, zoom, circular preview); animated formats (GIF, APNG, WebP) preserved
+- **Dispatch (Task Timer)** — dedicated task timing module with break/lunch compliance, sidebar live timer, description writeback to tracker
+- **Break/lunch compliance** — US state-specific policy (California, New York, federal default); compliance checked in Dispatch and Audit
 - **Global log** — filterable history across all companies with expandable session detail
-- **Reports & Audit** — time summaries, label breakdowns, audit log with per-row dismiss/fix/suggest actions, dismissed items persisted across sessions
-- **PDF & CSV export** — clean timesheet format; NavID excluded from all exports
-- **Auto-save & backup** — configurable autosave interval, dated `.db` backups on every save (last 30 kept)
-- **Backup Library** — browse, preview, and restore from any saved backup directly in Settings; current data safety-saved before any restore
+- **Reports & Audit** — period summary, company breakdown, audit log with per-row dismiss/fix/suggest; dismissed items persisted; US state policy named in suggestion text
+- **PDF & CSV export** — clean timesheet format; work type, location, supervisors in header; per-label subtotals; Export All includes summary section; NavID excluded from all exports
+- **Email Reports** — send PDF + CSV directly via SMTP from the Reports page; scheduled delivery (daily/weekly/monthly/quarterly/annual)
+- **Auto-save & backup** — configurable autosave interval; dated `.db` backups on every save (last 30 kept)
+- **Backup Library** — browse, preview, and restore from any saved backup in Settings; current data safety-saved before any restore
 - **Session auto-lock** — configurable idle timeout (Off / 5 / 15 / 30 / 60 min)
 - **5 themes** — Arctic (default), Void, Slate, Paper, Quartz
-- **Steam-style Settings** — split-panel layout with left category nav (Appearance, Time & Display, Data, Security, Accessibility, About)
+- **Steam-style Settings** — split-panel layout with left category nav (Appearance, Time & Display, Window, Security, Data, Reports, Accessibility, About)
 - **Manual DB clear** — three-level wipe (Time Clock, Companies, Full) with typed CONFIRM confirmation
 - **Keyboard navigation** — Ctrl+1–5 to switch modules, Ctrl+, for Settings, full modal tab-trapping
-- **Electron security** — contextIsolation enabled, nodeIntegration disabled, sandboxed renderers
+- **Electron security** — contextIsolation enabled, nodeIntegration disabled, sandboxed renderers, whitelisted IPC channels
 
 ---
 
@@ -38,6 +42,7 @@ A secure, locally-encrypted desktop time tracker built for remote professionals 
 - **speakeasy** — TOTP generation and verification
 - **qrcode** — QR code generation for TOTP setup
 - **bcryptjs** — password hashing
+- **nodemailer** — SMTP email delivery for reports
 - **electron-builder** — NSIS installer
 - **Node.js v20.11.1** via NVM for Windows (required — v24 breaks Electron prebuilds)
 
@@ -47,22 +52,24 @@ A secure, locally-encrypted desktop time tracker built for remote professionals 
 
 ```
 conquered-time/
-├── push.bat                      # One-click git commit and push
 ├── seed-dev.js                   # Dev seed script (bypasses TOTP)
+├── version.json                  # Version manifest for Check for Updates
 ├── src/
 │   ├── main/
 │   │   ├── main.js               # Main process: window, IPC, DB, crypto, TOTP, backup, audit
 │   │   └── preload.js            # Secure contextBridge API whitelist
 │   └── renderer/
 │       ├── pages/
-│       │   ├── splash.html       # Branded startup splash (3s, theme-aware)
-│       │   ├── login.html        # TOTP login, setup wizard, recovery, easter eggs
+│       │   ├── splash.html       # Branded startup splash (theme-aware)
+│       │   ├── login.html        # Profile selector, TOTP login, setup wizard, recovery
 │       │   ├── dashboard.html    # Stats, mini spiderweb, recent activity
 │       │   ├── companies.html    # Full spiderweb force graph, company CRUD
 │       │   ├── tracker.html      # Dynamic time entry table, clock in/out
 │       │   ├── task-timer.html   # Dispatch: task timer, break compliance, live sidebar timer
 │       │   ├── global-log.html   # Cross-company history, CSV/PDF export
-│       │   └── reports.html      # Audit log with dismiss/fix/suggest, charts, summaries
+│       │   ├── reports.html      # Audit log with dismiss/fix/suggest, period summary, email
+│       │   ├── audit-wizard.html # Step-through discrepancy resolution wizard
+│       │   └── profile.html      # Avatar upload, display name, password change, work state
 │       ├── components/
 │       │   ├── shell.js          # Titlebar, sidebar, toast, settings modal, backup library
 │       │   └── settings.js       # Theme, scale, accessibility, time format, auto-lock engine
@@ -122,13 +129,14 @@ Output: `dist/Conquered Time Setup.exe`
 
 ## First Run
 
-1. Launch the app — branded splash screen displays for 3 seconds
+1. Launch the app — branded splash screen displays
 2. The **Setup** tab appears automatically on first run
 3. Enter a username and strong password
 4. Scan the **TOTP QR code** with Google Authenticator
 5. **Write down your recovery code** — shown once, never again
 6. Enter the 6-digit code to verify and create your account
 7. Every subsequent login requires username + password + TOTP code
+8. Optionally enroll **Windows Hello / Quick Unlock** in Settings → Security for fast re-entry after locking
 
 ---
 
@@ -154,9 +162,10 @@ Output: `dist/Conquered Time Setup.exe`
 ## Data Location
 
 ```
-%APPDATA%\conquered-time\conquered-data\
-  vault.db        - encrypted SQLite database
-  backups\        - dated backup copies (last 30 retained)
+%APPDATA%\conquered-time\conquered-data\profiles\<username>\
+  vault.db               - encrypted SQLite database
+  backups\               - dated backup copies (last 30 retained)
+  profile-manifest.json  - profile metadata (display name, avatar, auth methods)
 ```
 
 ---
@@ -170,22 +179,18 @@ Login: password + TOTP code
          |
     32-byte AES-256-GCM key (memory only)
          |
-    Decrypts company/entry fields on access
+    Decrypts company fields, profile, and time entries on access
     Cleared on lock or app close
 ```
 
-- PPI fields (platform logins, Navigator IDs, URLs) encrypted individually per record
+- All time entry data (task labels, clock times, descriptions) encrypted at rest — AES-256-GCM, transparent one-time migration on first login after upgrade
+- PPI fields (platform logins, Navigator IDs, URLs) encrypted individually per company record
 - NavID never appears on exported PDFs — in-session display only
 - 3 failed TOTP attempts triggers a 24-hour lockout with countdown
-- Recovery code unlocks account locally — no network call required
+- Recovery code enables full password reset with automatic re-encryption of all data under the new key
+- Windows Hello / Quick Unlock uses Electron safeStorage (DPAPI-backed) to persist the session key securely across locks
 - Auto-backup on every save and on close; restore via Settings → Data → Backup Library
 - Session auto-lock on configurable idle timeout
-
----
-
-## Pushing Changes to GitHub
-
-Double-click `push.bat` in the project root. It will ask what you worked on, then commit and push automatically.
 
 ---
 
