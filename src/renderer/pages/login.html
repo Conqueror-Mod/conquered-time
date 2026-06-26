@@ -184,6 +184,35 @@
   [data-theme="memoria"] .corner,
   [data-theme="rabanastre"] .corner { border-color: rgba(0,0,0,0.25) !important; }
 
+  /* ── Easter egg overlay ── */
+  #egg-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.78);
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    cursor: pointer;
+  }
+  #egg-overlay.visible { opacity: 1; }
+  #egg-art {
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.25;
+    color: var(--accent);
+    text-shadow: 0 0 10px var(--accent), 0 0 24px var(--accent);
+    white-space: pre;
+    text-align: left;
+    user-select: none;
+    pointer-events: none;
+  }
+  /* Tone down glow on light themes so it stays readable */
+  [data-theme="memoria"] #egg-art,
+  [data-theme="rabanastre"] #egg-art { text-shadow: 0 0 6px var(--accent); }
+
 
   .login-brand { text-align: center; margin-bottom: 18px; }
   .login-brand-label {
@@ -793,6 +822,93 @@ function animateGrid() {
 
   animFrame = requestAnimationFrame(animateGrid);
 }
+
+// ═══════════════════════════════════════════════════════
+//  EASTER EGG — KONAMI CODE
+// ═══════════════════════════════════════════════════════
+
+const KONAMI = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown',
+                'ArrowLeft','ArrowRight','ArrowLeft','ArrowRight',
+                'b','a','Enter'];
+let konamiIdx = 0;
+let eggActive = false;
+
+const EGG_ART = `\
+(0RGSDOFCJftli;.:.)
++==================+
+|;,. . .     .   ,;|
+ \\;,. . .     . ,;/
+  \\;,. . .   . ,;/
+   \\;,. . . . ,;/
+    \\;,. .  .,;/
+     \\;,.  .,;/
+      \\;,  ,;/
+       \\;  ;/
+        \\;;/
+         lf
+         ||
+         ;l
+        /;;\\
+       /;  ;\\
+      /;,  ,;\\
+     /;,.  .,;\\
+    /;,. .  .,;\\
+   /;,. . . . ,;\\
+  /;,. . .   . ,;\\
+ /;,. . .     . ,;\\
+|;,. . .     .   ,;|
++==================+
+(QB0ZDOLC7itz!;.:.)  `;
+
+function showEasterEgg() {
+  if (eggActive) return;
+  eggActive = true;
+
+  const overlay = document.createElement('div');
+  overlay.id = 'egg-overlay';
+  const art = document.createElement('pre');
+  art.id = 'egg-art';
+  art.textContent = EGG_ART;
+  overlay.appendChild(art);
+  document.body.appendChild(overlay);
+
+  // Force reflow so the transition fires
+  overlay.getBoundingClientRect();
+  overlay.classList.add('visible');
+
+  let dismissed = false;
+  function dismiss() {
+    if (dismissed) return;
+    dismissed = true;
+    overlay.classList.remove('visible');
+    overlay.addEventListener('transitionend', () => { overlay.remove(); eggActive = false; }, { once: true });
+  }
+
+  const autoTimer = setTimeout(dismiss, 4500);
+
+  overlay.addEventListener('click', () => { clearTimeout(autoTimer); dismiss(); });
+  document.addEventListener('keydown', function onKey() {
+    clearTimeout(autoTimer);
+    dismiss();
+    document.removeEventListener('keydown', onKey);
+  }, { once: true });
+}
+
+document.addEventListener('keydown', function(e) {
+  // Only active on the profile selector screen
+  if (!profileMode) { konamiIdx = 0; return; }
+
+  if (e.key === KONAMI[konamiIdx]) {
+    konamiIdx++;
+    if (konamiIdx === KONAMI.length) {
+      konamiIdx = 0;
+      showEasterEgg();
+    }
+  } else {
+    // Wrong key — reset, but re-check index 0 in case this key starts a fresh sequence
+    konamiIdx = (e.key === KONAMI[0]) ? 1 : 0;
+  }
+});
 
 // ═══════════════════════════════════════════════════════
 //  STANDARD AUTH
