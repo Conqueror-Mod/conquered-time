@@ -170,6 +170,11 @@ async function initProfileDB(profileDir) {
     );
   `);
 
+  // time_entries encryption columns
+  try { db.run('ALTER TABLE time_entries ADD COLUMN rows_enc TEXT'); } catch {}
+  try { db.run('ALTER TABLE time_entries ADD COLUMN rows_iv  TEXT'); } catch {}
+  try { db.run('ALTER TABLE time_entries ADD COLUMN rows_tag TEXT'); } catch {}
+
   // Profile column migrations — safe to run on every startup
   try { db.run('ALTER TABLE users ADD COLUMN display_name TEXT'); } catch {}
   try { db.run('ALTER TABLE users ADD COLUMN profile_enc  TEXT'); } catch {}
@@ -269,6 +274,33 @@ function deriveKey(password, salt) {
   // Key derived from password + stable stored salt only.
   // TOTP is used for authentication but NOT key derivation (TOTP rotates every 30s).
   return crypto.pbkdf2Sync(password, salt, 310000, 32, 'sha256');
+}
+
+function decryptEntry(row) {
+  if (row.rows_enc && row.rows_iv && row.rows_tag) {
+    try {
+      row.rows_json = decrypt({ data: row.rows_enc, iv: row.rows_iv, tag: row.rows_tag }, sessionKey);
+    } catch { row.rows_json = '[]'; }
+  }
+  return row;
+}
+
+function migrateTimeEntries() {
+  if (!sessionKey || !sessionUser) return;
+  try {
+    const plain = dbAll(
+      'SELECT rowid as rid, rows_json FROM time_entries WHERE user_id=? AND rows_enc IS NULL',
+      [sessionUser.id]
+    );
+    for (const r of plain) {
+      const enc = encrypt(r.rows_json || '[]', sessionKey);
+      db.run(
+        'UPDATE time_entries SET rows_enc=?, rows_iv=?, rows_tag=?, rows_json=? WHERE rowid=?',
+        [enc.data, enc.iv, enc.tag, '', r.rid]
+      );
+    }
+    if (plain.length > 0) persistDB();
+  } catch (e) { console.warn('[migrateTimeEntries] failed:', e.message); }
 }
 
 // ── Window ─────────────────────────────────────────────────────────────────
@@ -458,9 +490,10 @@ function getDismissedSet() {
 function countAuditDiscrepancies() {
   if (!sessionUser) return 0;
   const dismissed = getDismissedSet();
-  const entries = dbAll('SELECT rowid as rid, rows_json, total_mins FROM time_entries WHERE user_id=?', [sessionUser.id]);
+  const entries = dbAll('SELECT rowid as rid, rows_json, rows_enc, rows_iv, rows_tag, total_mins FROM time_entries WHERE user_id=?', [sessionUser.id]);
   let count = 0;
   entries.forEach(e => {
+    decryptEntry(e);
     const entryId = Number(e.rid);
     try {
       JSON.parse(e.rows_json || '[]').forEach((r, idx) => {
@@ -736,6 +769,7 @@ ipcMain.handle('auth:safe-login', async () => {
     db.run('UPDATE users SET failed_attempts=0, locked_until=NULL WHERE rowid=?', [Number(user.rid)]);
     persistDB();
     resetIdleTimer();
+    migrateTimeEntries();
     return { ok: true, needsEmail: profileEmailMissing() };
   } catch (e) { return { ok: false, error: 'Secure sign-in failed — use password login.' }; }
 });
@@ -766,6 +800,7 @@ ipcMain.handle('auth:quick-unlock', async (_, { password }) => {
     db.run('UPDATE users SET failed_attempts=0, locked_until=NULL WHERE rowid=?', [Number(user.rid)]);
     persistDB();
     resetIdleTimer();
+    migrateTimeEntries();
     return { ok: true, needsEmail: profileEmailMissing() };
   } catch (e) { return { ok: false, error: e.message }; }
 });
@@ -882,6 +917,8 @@ ipcMain.handle('auth:login', async (_, { username, password, totpCode }) => {
       } catch (e) { console.warn('[login] profile decrypt failed:', e.message); }
     }
 
+    migrateTimeEntries();
+
     // Fire scheduled email check shortly after login (session now available)
     setTimeout(runScheduledEmailCheck, 5000);
 
@@ -962,6 +999,17 @@ ipcMain.handle('auth:recover', async (_, { username, recoveryCode, newPassword }
       } catch {}
     }
 
+    // Re-encrypt time entries
+    const entries = dbAll('SELECT rowid as rid, rows_enc, rows_iv, rows_tag FROM time_entries WHERE user_id=? AND rows_enc IS NOT NULL', [Number(user.rid)]);
+    for (const e of entries) {
+      try {
+        const plain = decrypt({ data: e.rows_enc, iv: e.rows_iv, tag: e.rows_tag }, oldKey);
+        const reenc = encrypt(plain, newKey);
+        db.run('UPDATE time_entries SET rows_enc=?,rows_iv=?,rows_tag=? WHERE rowid=?',
+          [reenc.data, reenc.iv, reenc.tag, e.rid]);
+      } catch(e) { return { ok: false, error: 'Re-encryption failed: ' + e.message }; }
+    }
+
     // Update password hash and clear lockout
     db.run('UPDATE users SET password_hash=?, failed_attempts=0, locked_until=NULL WHERE rowid=?',
       [bcrypt.hashSync(newPassword, 12), Number(user.rid)]);
@@ -1029,22 +1077,26 @@ ipcMain.handle('companies:delete', (_, id) => {
 ipcMain.handle('entries:list', (_, companyId) => {
   if (!sessionKey || !sessionUser) return [];
   return dbAll('SELECT rowid as rid, * FROM time_entries WHERE user_id=? AND company_id=? ORDER BY log_date DESC',
-    [sessionUser.id, companyId]).map(r => ({...r, id: Number(r.rid)}));
+    [sessionUser.id, companyId]).map(r => ({...decryptEntry(r), id: Number(r.rid)}));
 });
 
 ipcMain.handle('entries:save', (_, entry) => {
   if (!sessionKey || !sessionUser) return { ok: false };
   try {
+    const enc = encrypt(entry.rows_json || '[]', sessionKey);
     if (entry.id) {
-      db.run('UPDATE time_entries SET rows_json=?,total_mins=?,session_label=?,updated_at=strftime(\'%s\',\'now\') WHERE rowid=? AND user_id=?',
-        [entry.rows_json, entry.total_mins, entry.session_label || '', entry.id, sessionUser.id]);
+      db.run(
+        'UPDATE time_entries SET rows_enc=?,rows_iv=?,rows_tag=?,rows_json=?,total_mins=?,session_label=?,updated_at=strftime(\'%s\',\'now\') WHERE rowid=? AND user_id=?',
+        [enc.data, enc.iv, enc.tag, '', entry.total_mins, entry.session_label || '', entry.id, sessionUser.id]
+      );
       activeEntryId = Number(entry.id);
       persistDB(); performBackup();
       return { ok: true, id: entry.id };
     } else {
-      db.run('INSERT INTO time_entries (user_id,company_id,log_date,session_label,rows_json,total_mins) VALUES (?,?,?,?,?,?)',
-        [sessionUser.id, entry.company_id, entry.log_date, entry.session_label || '', entry.rows_json, entry.total_mins]);
-      // Get the rowid of the just-inserted row
+      db.run(
+        'INSERT INTO time_entries (user_id,company_id,log_date,session_label,rows_json,rows_enc,rows_iv,rows_tag,total_mins) VALUES (?,?,?,?,?,?,?,?,?)',
+        [sessionUser.id, entry.company_id, entry.log_date, entry.session_label || '', '', enc.data, enc.iv, enc.tag, entry.total_mins]
+      );
       const result = db.exec('SELECT MAX(rowid) as rid FROM time_entries WHERE user_id=?', [sessionUser.id]);
       const newId = (result && result[0] && result[0].values[0]) ? Number(result[0].values[0][0]) : null;
       activeEntryId = newId;
@@ -1057,7 +1109,7 @@ ipcMain.handle('entries:save', (_, entry) => {
 ipcMain.handle('entries:all', () => {
   if (!sessionKey || !sessionUser) return [];
   return dbAll('SELECT rowid as rid, * FROM time_entries WHERE user_id=? ORDER BY log_date DESC', [sessionUser.id])
-    .map(r => ({...r, id: Number(r.rid)}));
+    .map(r => ({...decryptEntry(r), id: Number(r.rid)}));
 });
 
 ipcMain.handle('entries:get-active', () => {
@@ -1080,6 +1132,7 @@ ipcMain.handle('entries:get-active', () => {
     );
     for (const c of candidates) {
       try {
+        decryptEntry(c);
         const rows = JSON.parse(c.rows_json || '[]');
         if (rows.some(r => r.clock_in && !r.clock_out)) { row = c; break; }
       } catch {}
@@ -1093,6 +1146,7 @@ ipcMain.handle('entries:get-active', () => {
       );
       for (const c of prev) {
         try {
+          decryptEntry(c);
           const rows = JSON.parse(c.rows_json || '[]');
           if (rows.some(r => r.clock_in && !r.clock_out)) { row = c; break; }
         } catch {}
@@ -1102,6 +1156,8 @@ ipcMain.handle('entries:get-active', () => {
   }
 
   if (!row) return null;
+
+  decryptEntry(row);
 
   let company_name = null;
   try {
@@ -1120,7 +1176,7 @@ ipcMain.handle('entries:get', (_, id) => {
   const row = dbGet('SELECT rowid as rid, * FROM time_entries WHERE rowid=? AND user_id=?',
     [Number(id), sessionUser.id]);
   if (!row) return null;
-  return { ...row, id: Number(row.rid) };
+  return { ...decryptEntry(row), id: Number(row.rid) };
 });
 
 // ── IPC: Task items ────────────────────────────────────────────────────────
@@ -1319,6 +1375,7 @@ ipcMain.handle('audit:apply-fix', (_, { entry_id, row_idx, fix_type }) => {
     [Number(entry_id), sessionUser.id]);
   if (!row) return { ok: false, error: 'Entry not found' };
   try {
+    decryptEntry(row);
     const rows = JSON.parse(row.rows_json || '[]');
     const r = rows[row_idx];
     if (!r) return { ok: false, error: 'Row not found' };
@@ -1340,10 +1397,13 @@ ipcMain.handle('audit:apply-fix', (_, { entry_id, row_idx, fix_type }) => {
     }
 
     rows[row_idx] = r;
-    const newJson = JSON.stringify(rows);
+    const newJson  = JSON.stringify(rows);
     const newTotal = rows.reduce((s, row) => s + (row.total_mins || 0), 0);
-    db.run('UPDATE time_entries SET rows_json=?, total_mins=?, updated_at=strftime(\'%s\',\'now\') WHERE rowid=? AND user_id=?',
-      [newJson, newTotal, Number(entry_id), sessionUser.id]);
+    const enc      = encrypt(newJson, sessionKey);
+    db.run(
+      'UPDATE time_entries SET rows_enc=?,rows_iv=?,rows_tag=?,rows_json=?,total_mins=?,updated_at=strftime(\'%s\',\'now\') WHERE rowid=? AND user_id=?',
+      [enc.data, enc.iv, enc.tag, '', newTotal, Number(entry_id), sessionUser.id]
+    );
     persistDB(); performBackup();
     return { ok: true };
   } catch (e) { return { ok: false, error: e.message }; }
@@ -1444,6 +1504,17 @@ ipcMain.handle('auth:change-password', async (_, { currentPassword, totpCode, ne
       setSetting('email_smtp_password_iv',  reenc.iv);
       setSetting('email_smtp_password_tag', reenc.tag);
     } catch {}
+  }
+
+  // Re-encrypt time entries
+  const entries = dbAll('SELECT rowid as rid, rows_enc, rows_iv, rows_tag FROM time_entries WHERE user_id=? AND rows_enc IS NOT NULL', [sessionUser.id]);
+  for (const e of entries) {
+    try {
+      const plain = decrypt({ data: e.rows_enc, iv: e.rows_iv, tag: e.rows_tag }, sessionKey);
+      const reenc = encrypt(plain, newKey);
+      db.run('UPDATE time_entries SET rows_enc=?,rows_iv=?,rows_tag=? WHERE rowid=?',
+        [reenc.data, reenc.iv, reenc.tag, e.rid]);
+    } catch(e) { return { ok: false, error: 'Re-encryption failed: ' + e.message }; }
   }
 
   const newHash = bcrypt.hashSync(newPassword, 12);

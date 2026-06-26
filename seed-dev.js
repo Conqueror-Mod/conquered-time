@@ -129,7 +129,10 @@ async function seed() {
       company_id    INTEGER NOT NULL REFERENCES companies(id),
       log_date      TEXT    NOT NULL,
       session_label TEXT,
-      rows_json     TEXT    NOT NULL,
+      rows_json     TEXT    NOT NULL DEFAULT '',
+      rows_enc      TEXT,
+      rows_iv       TEXT,
+      rows_tag      TEXT,
       total_mins    INTEGER NOT NULL DEFAULT 0,
       created_at    INTEGER NOT NULL DEFAULT (strftime('%s','now')),
       updated_at    INTEGER NOT NULL DEFAULT (strftime('%s','now'))
@@ -274,10 +277,11 @@ async function seed() {
     { label: 'Admin',      name: 'Batch submission',   desc: 'Submit completed batches to portal',total_mins: 15,  clock_in: timeStr(13, 0), clock_out: timeStr(13, 15) },
     ...blank(8)
   ];
+  const enc1 = encrypt(JSON.stringify(entry1Rows), sessionKey);
   db.run(
-    `INSERT INTO time_entries (user_id, company_id, log_date, session_label, rows_json, total_mins)
-     VALUES (?,?,?,?,?,?)`,
-    [userId, companyIdA, daysAgo(0), 'Morning Annotation Block', JSON.stringify(entry1Rows), 270]
+    `INSERT INTO time_entries (user_id, company_id, log_date, session_label, rows_json, rows_enc, rows_iv, rows_tag, total_mins)
+     VALUES (?,?,?,?,?,?,?,?,?)`,
+    [userId, companyIdA, daysAgo(0), 'Morning Annotation Block', '', enc1.data, enc1.iv, enc1.tag, 270]
   );
   const entry1Id = Number(db.exec('SELECT last_insert_rowid()')[0].values[0][0]);
   console.log(`✓ Entry 1: Today — Zenith Analytics — clean session (4h 30m)`);
@@ -290,10 +294,11 @@ async function seed() {
     { label: 'Bug Report', name: 'File BRs',            desc: 'Wrote up 3 P2 bugs in tracker',  total_mins: 45,  clock_in: timeStr(12, 45),clock_out: timeStr(13, 30) },
     ...blank(11)
   ];
+  const enc2 = encrypt(JSON.stringify(entry2Rows), sessionKey);
   db.run(
-    `INSERT INTO time_entries (user_id, company_id, log_date, session_label, rows_json, total_mins)
-     VALUES (?,?,?,?,?,?)`,
-    [userId, companyIdB, daysAgo(1), 'QA Regression Day', JSON.stringify(entry2Rows), 255]
+    `INSERT INTO time_entries (user_id, company_id, log_date, session_label, rows_json, rows_enc, rows_iv, rows_tag, total_mins)
+     VALUES (?,?,?,?,?,?,?,?,?)`,
+    [userId, companyIdB, daysAgo(1), 'QA Regression Day', '', enc2.data, enc2.iv, enc2.tag, 255]
   );
   const entry2Id = Number(db.exec('SELECT last_insert_rowid()')[0].values[0][0]);
   console.log(`✓ Entry 2: Yesterday — Apex Digital — clean session (4h 15m)`);
@@ -311,10 +316,11 @@ async function seed() {
     { label: 'Lunch',      name: 'Lunch',              desc: '',                                total_mins: 30,  clock_in: timeStr(12, 15),clock_out: timeStr(12, 45) },
     ...blank(10)
   ];
+  const enc3 = encrypt(JSON.stringify(entry3Rows), sessionKey);
   db.run(
-    `INSERT INTO time_entries (user_id, company_id, log_date, session_label, rows_json, total_mins)
-     VALUES (?,?,?,?,?,?)`,
-    [userId, companyIdA, daysAgo(3), 'Discrepancy Test Session', JSON.stringify(entry3Rows), 345]
+    `INSERT INTO time_entries (user_id, company_id, log_date, session_label, rows_json, rows_enc, rows_iv, rows_tag, total_mins)
+     VALUES (?,?,?,?,?,?,?,?,?)`,
+    [userId, companyIdA, daysAgo(3), 'Discrepancy Test Session', '', enc3.data, enc3.iv, enc3.tag, 345]
   );
   const entry3Id = Number(db.exec('SELECT last_insert_rowid()')[0].values[0][0]);
   console.log(`✓ Entry 3: 3 days ago — Zenith Analytics — DISCREPANCY session (audit bait)`);
@@ -326,10 +332,11 @@ async function seed() {
     { label: 'QA',         name: 'Verify hotfix',        desc: 'Confirmed fix on build 42a',     total_mins: 30,  clock_in: timeStr(11, 30),clock_out: timeStr(12, 0) },
     ...blank(12)
   ];
+  const enc4 = encrypt(JSON.stringify(entry4Rows), sessionKey);
   db.run(
-    `INSERT INTO time_entries (user_id, company_id, log_date, session_label, rows_json, total_mins)
-     VALUES (?,?,?,?,?,?)`,
-    [userId, companyIdB, daysAgo(5), 'Hotfix Verification', JSON.stringify(entry4Rows), 120]
+    `INSERT INTO time_entries (user_id, company_id, log_date, session_label, rows_json, rows_enc, rows_iv, rows_tag, total_mins)
+     VALUES (?,?,?,?,?,?,?,?,?)`,
+    [userId, companyIdB, daysAgo(5), 'Hotfix Verification', '', enc4.data, enc4.iv, enc4.tag, 120]
   );
   const entry4Id = Number(db.exec('SELECT last_insert_rowid()')[0].values[0][0]);
   console.log(`✓ Entry 4: 5 days ago — Apex Digital — clean session (2h)`);
@@ -340,10 +347,11 @@ async function seed() {
     { label: 'Annotation', name: 'Trial batch',          desc: 'Unpaid trial annotation set',    total_mins: 60,  clock_in: timeStr(11, 0), clock_out: timeStr(12, 0) },
     ...blank(13)
   ];
+  const enc5 = encrypt(JSON.stringify(entry5Rows), sessionKey);
   db.run(
-    `INSERT INTO time_entries (user_id, company_id, log_date, session_label, rows_json, total_mins)
-     VALUES (?,?,?,?,?,?)`,
-    [userId, companyIdA, daysAgo(10), 'Onboarding Week', JSON.stringify(entry5Rows), 180]
+    `INSERT INTO time_entries (user_id, company_id, log_date, session_label, rows_json, rows_enc, rows_iv, rows_tag, total_mins)
+     VALUES (?,?,?,?,?,?,?,?,?)`,
+    [userId, companyIdA, daysAgo(10), 'Onboarding Week', '', enc5.data, enc5.iv, enc5.tag, 180]
   );
   console.log(`✓ Entry 5: 10 days ago — Zenith Analytics — training session`);
 
@@ -352,10 +360,11 @@ async function seed() {
     { label: 'QA',         name: 'Environment setup',   desc: 'VPN + tooling setup for Apex',   total_mins: 90,  clock_in: timeStr(14, 0), clock_out: timeStr(15, 30) },
     ...blank(14)
   ];
+  const enc6 = encrypt(JSON.stringify(entry6Rows), sessionKey);
   db.run(
-    `INSERT INTO time_entries (user_id, company_id, log_date, session_label, rows_json, total_mins)
-     VALUES (?,?,?,?,?,?)`,
-    [userId, companyIdB, daysAgo(14), 'Setup Day', JSON.stringify(entry6Rows), 90]
+    `INSERT INTO time_entries (user_id, company_id, log_date, session_label, rows_json, rows_enc, rows_iv, rows_tag, total_mins)
+     VALUES (?,?,?,?,?,?,?,?,?)`,
+    [userId, companyIdB, daysAgo(14), 'Setup Day', '', enc6.data, enc6.iv, enc6.tag, 90]
   );
   console.log(`✓ Entry 6: 14 days ago — Apex Digital — setup session`);
 
