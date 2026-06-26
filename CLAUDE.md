@@ -146,7 +146,8 @@ Native `<input type="time">` renders in the OS locale's format (often 12-hour wi
 - Clock in/out with persistent timestamps (no longer auto-clear after 800ms — earlier bug, fixed)
 - Inline double-click editing on **any field of any row that already contains data** (label/name/description editable regardless of clock-out status; clock_in/clock_out independently editable once they have a value) — recalculates duration automatically
 - Session auto-save on every clock action and inline edit (manual "Save Session" button also present)
-- PDF export (per-session and per-company-filtered in Global Log) — clean Inter-based print stylesheet, NavID excluded
+- PDF export (per-session and per-company-filtered in Global Log) — Inter font, NavID excluded; header shows job title, work type, location, supervisors (when populated); per-label time subtotals block rendered when ≥2 distinct labels; Export All PDF has a summary section (date range, grand total, cross-session label breakdown) + per-session blocks each with their own table and subtotals
+- Right-click context menu enabled globally (Cut/Copy/Paste/Select All) via `web-contents-created` handler in `main.js`
 - CSV export from Global Log
 - Global Log: filterable by company/date range, expandable per-session task detail rows showing clock in/out times
 - Time summarization footer on tracker: total session time + per-task-label breakdown chips
