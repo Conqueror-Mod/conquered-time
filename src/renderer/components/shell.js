@@ -713,7 +713,7 @@ const Shell = (() => {
         wrapper.style.display = 'flex';
 
         function tickTimer() {
-          const secs = Math.floor((Date.now() - active.started_at) / 1000);
+          const secs = Math.floor((Date.now() - active.started_at * 1000) / 1000);
           const h = Math.floor(secs / 3600);
           const m = Math.floor((secs % 3600) / 60);
           const s = secs % 60;
