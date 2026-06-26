@@ -105,10 +105,14 @@ async function seed() {
       failed_attempts INTEGER NOT NULL DEFAULT 0,
       locked_until    INTEGER,
       display_name    TEXT,
-      profile_enc     TEXT,
-      profile_iv      TEXT,
-      profile_tag     TEXT,
-      created_at      INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+      profile_enc      TEXT,
+      profile_iv       TEXT,
+      profile_tag      TEXT,
+      recovery_key_enc  TEXT,
+      recovery_key_iv   TEXT,
+      recovery_key_tag  TEXT,
+      recovery_key_salt TEXT,
+      created_at       INTEGER NOT NULL DEFAULT (strftime('%s','now'))
     );
     CREATE TABLE IF NOT EXISTS companies (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -161,8 +165,11 @@ async function seed() {
   const keySalt    = crypto.randomBytes(32).toString('hex');
   const sessionKey = deriveKey(DEV_PASSWORD, keySalt);
 
-  const passwordHash = bcrypt.hashSync(DEV_PASSWORD, 10);
-  const recoveryHash = bcrypt.hashSync(DEV_RECOVERY, 10);
+  const passwordHash    = bcrypt.hashSync(DEV_PASSWORD, 10);
+  const recoveryHash    = bcrypt.hashSync(DEV_RECOVERY, 10);
+  const recoveryKeySalt = crypto.randomBytes(32).toString('hex');
+  const recoveryEncKey  = deriveKey(DEV_RECOVERY, recoveryKeySalt);
+  const recoveryKeyBlob = encrypt(sessionKey.toString('hex'), recoveryEncKey);
 
   // Avatar: Ruxin "COLLUSION!" reaction GIF
   const avatarDataUrl = `data:image/gif;base64,${require('fs').readFileSync(require('path').join(__dirname, 'assets', 'ruxin_dev.gif')).toString('base64')}`;
@@ -180,11 +187,13 @@ async function seed() {
   db.run(
     `INSERT INTO users
        (username, password_hash, totp_secret, totp_verified, recovery_hash,
-        key_salt, dev_mode, display_name, profile_enc, profile_iv, profile_tag)
-     VALUES (?,?,?,1,?,?,1,?,?,?,?)`,
+        key_salt, dev_mode, display_name, profile_enc, profile_iv, profile_tag,
+        recovery_key_enc, recovery_key_iv, recovery_key_tag, recovery_key_salt)
+     VALUES (?,?,?,1,?,?,1,?,?,?,?,?,?,?,?)`,
     [
       DEV_USERNAME, passwordHash, 'DEVMODE_NO_TOTP', recoveryHash, keySalt,
-      'Dev Tester', profEnc.data, profEnc.iv, profEnc.tag
+      'Dev Tester', profEnc.data, profEnc.iv, profEnc.tag,
+      recoveryKeyBlob.data, recoveryKeyBlob.iv, recoveryKeyBlob.tag, recoveryKeySalt
     ]
   );
   const userId = Number(db.exec('SELECT last_insert_rowid()')[0].values[0][0]);

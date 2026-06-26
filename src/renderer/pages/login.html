@@ -601,19 +601,79 @@
 
     <!-- RECOVERY -->
     <div id="form-recovery" class="login-form" style="display:none;">
-      <div style="font-family:var(--mono);font-size:9px;color:var(--text-muted);letter-spacing:1px;margin-bottom:4px;">
-        Enter your username and one-time recovery code to unlock your account.
+
+      <!-- Mode picker -->
+      <div id="rec-mode-picker" style="flex-direction:column;gap:10px;">
+        <div style="font-family:var(--mono);font-size:9px;color:var(--text-muted);letter-spacing:1px;margin-bottom:12px;text-align:center;">
+          ACCOUNT RECOVERY
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <button class="btn-neutral" onclick="showRecMode('unlock')" style="text-align:left;padding:10px 14px;">
+            <div style="font-size:13px;font-weight:600;">Unlock account</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Too many failed attempts? Clear the lockout with your recovery code.</div>
+          </button>
+          <button class="btn-neutral" onclick="showRecMode('reset')" style="text-align:left;padding:10px 14px;">
+            <div style="font-size:13px;font-weight:600;">Reset my password</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Forgot your password? Use your recovery code to set a new one.</div>
+          </button>
+          <button class="btn-neutral" onclick="showRecMode('restore')" style="text-align:left;padding:10px 14px;">
+            <div style="font-size:13px;font-weight:600;">Restore from backup</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Replace the current vault with a local backup file.</div>
+          </button>
+        </div>
       </div>
-      <div class="field-group">
-        <label class="field-label">Username</label>
-        <input type="text" id="rec-username" placeholder="Your username">
+
+      <!-- Sub-form A: Unlock -->
+      <div id="rec-sub-unlock" style="display:none;flex-direction:column;gap:10px;">
+        <div style="font-family:var(--mono);font-size:9px;color:var(--text-muted);letter-spacing:1px;">UNLOCK ACCOUNT</div>
+        <div class="field-group">
+          <label class="field-label">Username</label>
+          <input type="text" id="rec-username" placeholder="Your username">
+        </div>
+        <div class="field-group">
+          <label class="field-label">Recovery Code</label>
+          <input type="text" id="rec-code" placeholder="XXXX-XXXX-XXXX-XXXX" style="font-family:var(--mono);letter-spacing:2px;">
+        </div>
+        <div class="error-msg" id="rec-error"></div>
+        <button class="btn-primary" onclick="doRecovery()">⊕ Unlock Account</button>
+        <button class="btn-neutral" onclick="showRecMode('picker')" style="margin-top:6px;width:100%;">← Back</button>
       </div>
-      <div class="field-group">
-        <label class="field-label">Recovery Code</label>
-        <input type="text" id="rec-code" placeholder="XXXX-XXXX-XXXX-XXXX" style="font-family:var(--mono);letter-spacing:2px;">
+
+      <!-- Sub-form B: Reset password -->
+      <div id="rec-sub-reset" style="display:none;flex-direction:column;gap:10px;">
+        <div style="font-family:var(--mono);font-size:9px;color:var(--text-muted);letter-spacing:1px;">RESET PASSWORD</div>
+        <div class="field-group">
+          <label class="field-label">Username</label>
+          <input type="text" id="rec-reset-username" placeholder="Your username">
+        </div>
+        <div class="field-group">
+          <label class="field-label">Recovery Code</label>
+          <input type="text" id="rec-reset-code" placeholder="XXXX-XXXX-XXXX-XXXX" style="font-family:var(--mono);letter-spacing:2px;">
+        </div>
+        <div class="field-group">
+          <label class="field-label">New Password</label>
+          <input type="password" id="rec-new-password" placeholder="New password">
+        </div>
+        <div class="field-group">
+          <label class="field-label">Confirm Password</label>
+          <input type="password" id="rec-confirm-password" placeholder="Confirm new password">
+        </div>
+        <div class="error-msg" id="rec-reset-error"></div>
+        <button class="btn-primary" onclick="doPasswordReset()">⊕ Reset Password</button>
+        <button class="btn-neutral" onclick="showRecMode('picker')" style="margin-top:6px;width:100%;">← Back</button>
       </div>
-      <div class="error-msg" id="rec-error"></div>
-      <button class="btn-primary" onclick="doRecovery()">⊕ Unlock Account</button>
+
+      <!-- Sub-form C: Restore backup -->
+      <div id="rec-sub-restore" style="display:none;flex-direction:column;gap:10px;">
+        <div style="font-family:var(--mono);font-size:9px;color:var(--text-muted);letter-spacing:1px;">RESTORE FROM BACKUP</div>
+        <div style="font-size:12px;color:var(--text-muted);line-height:1.5;margin-bottom:12px;">
+          Select a vault backup file (.db) to restore. You will need to log in using the password that was active when that backup was taken.
+        </div>
+        <div class="error-msg" id="rec-restore-error"></div>
+        <button class="btn-primary" onclick="doBrowseRestore()">Choose backup file…</button>
+        <button class="btn-neutral" onclick="showRecMode('picker')" style="margin-top:6px;width:100%;">← Back</button>
+      </div>
+
     </div>
   </div>
 
@@ -1023,21 +1083,41 @@ window.addEventListener('DOMContentLoaded', async () => {
         const nav = ['setup-username', 'setup-password', 'setup-password2'];
         if (!nav.includes(document.activeElement?.id)) doSetup();
       }
-      if (currentMode === 'recovery') doRecovery();
+      if (currentMode === 'recovery-unlock') doRecovery();
+      if (currentMode === 'recovery-reset')  doPasswordReset();
     }
   });
 });
 
 function setMode(mode) {
   currentMode = mode;
+  const baseMode = mode.startsWith('recovery') ? 'recovery' : mode;
   ['login','setup','recovery'].forEach(m => {
-    document.getElementById(`form-${m}`).style.display = m === mode ? 'flex' : 'none';
+    document.getElementById(`form-${m}`).style.display = m === baseMode ? 'flex' : 'none';
   });
   document.querySelectorAll('.mode-tab').forEach((t, i) => {
-    t.classList.toggle('active', ['login','setup','recovery'][i] === mode);
+    t.classList.toggle('active', ['login','setup','recovery'][i] === baseMode);
   });
-  // Auto-generate QR the first time setup mode is shown
   if (mode === 'setup' && !totpSecret) generateTOTP();
+  if (baseMode === 'recovery') showRecMode('picker');
+}
+
+function showRecMode(sub) {
+  const subs = ['picker','unlock','reset','restore'];
+  subs.forEach(s => {
+    const el = document.getElementById(s === 'picker' ? 'rec-mode-picker' : `rec-sub-${s}`);
+    if (!el) return;
+    el.style.display = s === sub ? 'block' : 'none';
+  });
+  if (sub === 'picker') currentMode = 'recovery';
+  if (sub === 'unlock') currentMode = 'recovery-unlock';
+  if (sub === 'reset')  currentMode = 'recovery-reset';
+  if (sub === 'restore') currentMode = 'recovery-restore';
+  // Clear errors when switching
+  ['rec-error','rec-reset-error','rec-restore-error'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
 }
 
 function showRecovery() {
@@ -1140,6 +1220,37 @@ async function doRecovery() {
     setMode('login');
     document.getElementById('login-username').value = u;
   } else { showErr(errEl, res.error || 'Recovery failed.'); }
+}
+
+async function doPasswordReset() {
+  const u  = document.getElementById('rec-reset-username').value.trim();
+  const c  = document.getElementById('rec-reset-code').value.trim();
+  const p1 = document.getElementById('rec-new-password').value;
+  const p2 = document.getElementById('rec-confirm-password').value;
+  const errEl = document.getElementById('rec-reset-error');
+  errEl.style.display = 'none';
+  if (!u || !c || !p1) return showErr(errEl, 'All fields are required.');
+  if (p1 !== p2) return showErr(errEl, 'Passwords do not match.');
+  if (p1.length < 8) return showErr(errEl, 'Password must be at least 8 characters.');
+  const res = await api.invoke('auth:recover', { username: u, recoveryCode: c, newPassword: p1 });
+  if (res.ok && res.passwordReset) {
+    toast('Password reset successfully. Please log in.', 'success');
+    setMode('login');
+    document.getElementById('login-username').value = u;
+  } else if (res.noKeyPacket) {
+    showErr(errEl, res.error);
+  } else {
+    showErr(errEl, res.error || 'Reset failed.');
+  }
+}
+
+async function doBrowseRestore() {
+  const errEl = document.getElementById('rec-restore-error');
+  errEl.style.display = 'none';
+  const res = await api.invoke('auth:browse-backup');
+  if (res?.canceled) return;
+  if (!res?.ok) showErr(errEl, res?.error || 'Restore failed.');
+  // On success main.js navigates to login — no JS needed here
 }
 
 function showLockout(hoursRemaining) {

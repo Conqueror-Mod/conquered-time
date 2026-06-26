@@ -175,6 +175,11 @@ async function initProfileDB(profileDir) {
   try { db.run('ALTER TABLE users ADD COLUMN profile_enc  TEXT'); } catch {}
   try { db.run('ALTER TABLE users ADD COLUMN profile_iv   TEXT'); } catch {}
   try { db.run('ALTER TABLE users ADD COLUMN profile_tag  TEXT'); } catch {}
+  // Recovery key packet — seals the session key under the recovery code so password reset is possible
+  try { db.run('ALTER TABLE users ADD COLUMN recovery_key_enc  TEXT'); } catch {}
+  try { db.run('ALTER TABLE users ADD COLUMN recovery_key_iv   TEXT'); } catch {}
+  try { db.run('ALTER TABLE users ADD COLUMN recovery_key_tag  TEXT'); } catch {}
+  try { db.run('ALTER TABLE users ADD COLUMN recovery_key_salt TEXT'); } catch {}
 
   persistDB();
 }
@@ -739,9 +744,14 @@ ipcMain.handle('auth:setup', async (_, { username, password, totpSecret, totpCod
     const recoveryHash = bcrypt.hashSync(recoveryCode, 12);
     // Generate a stable random salt for key derivation — stored permanently
     const keySalt = crypto.randomBytes(32).toString('hex');
+    // Seal the session key under the recovery code so password reset can recover encrypted data
+    const sessionKeyBuf   = deriveKey(password, keySalt);
+    const recoveryKeySalt = crypto.randomBytes(32).toString('hex');
+    const recoveryEncKey  = deriveKey(recoveryCode, recoveryKeySalt);
+    const recoveryKeyBlob = encrypt(sessionKeyBuf.toString('hex'), recoveryEncKey);
     dbInsert(
-      'INSERT INTO users (username, password_hash, totp_secret, totp_verified, recovery_hash, key_salt) VALUES (?,?,?,1,?,?)',
-      [username, passwordHash, totpSecret, recoveryHash, keySalt]
+      'INSERT INTO users (username, password_hash, totp_secret, totp_verified, recovery_hash, key_salt, recovery_key_enc, recovery_key_iv, recovery_key_tag, recovery_key_salt) VALUES (?,?,?,1,?,?,?,?,?,?)',
+      [username, passwordHash, totpSecret, recoveryHash, keySalt, recoveryKeyBlob.data, recoveryKeyBlob.iv, recoveryKeyBlob.tag, recoveryKeySalt]
     );
     persistDB();
     // Write profile manifest so the selector card appears on next launch
@@ -826,14 +836,71 @@ function incrementFailed(user) {
   return { locked: false, attemptsLeft: 3 - attempts };
 }
 
-ipcMain.handle('auth:recover', async (_, { username, recoveryCode }) => {
+ipcMain.handle('auth:recover', async (_, { username, recoveryCode, newPassword }) => {
   const bcrypt = require('bcryptjs');
   const user   = dbGet('SELECT rowid as rid, * FROM users WHERE username=?', [username]);
   if (!user?.recovery_hash) return { ok: false, error: 'No recovery available.' };
   if (!bcrypt.compareSync(recoveryCode, user.recovery_hash)) return { ok: false, error: 'Invalid recovery code.' };
-  db.run('UPDATE users SET failed_attempts=0, locked_until=NULL WHERE rowid=?', [Number(user.rid)]);
-  persistDB();
-  return { ok: true };
+
+  // Path A — unlock only (no newPassword supplied)
+  if (!newPassword) {
+    db.run('UPDATE users SET failed_attempts=0, locked_until=NULL WHERE rowid=?', [Number(user.rid)]);
+    persistDB();
+    return { ok: true };
+  }
+
+  // Path B — full password reset using sealed recovery key packet
+  if (!user.recovery_key_enc || !user.recovery_key_salt) {
+    return { ok: false, noKeyPacket: true, error: 'Password reset via recovery code is only available for accounts created with this feature. You can still unlock your account, or restore from a backup.' };
+  }
+  try {
+    const recoveryEncKey = deriveKey(recoveryCode, user.recovery_key_salt);
+    const oldKeyHex      = decrypt({ data: user.recovery_key_enc, iv: user.recovery_key_iv, tag: user.recovery_key_tag }, recoveryEncKey);
+    const oldKey         = Buffer.from(oldKeyHex, 'hex');
+    const newKey         = deriveKey(newPassword, user.key_salt);
+
+    // Re-encrypt all company rows
+    const companies = dbAll('SELECT rowid as rid, * FROM companies WHERE user_id=?', [Number(user.rid)]);
+    for (const co of companies) {
+      try {
+        const plain = decrypt({ data: co.data_enc, iv: co.data_iv, tag: co.data_tag }, oldKey);
+        const reenc = encrypt(plain, newKey);
+        db.run('UPDATE companies SET data_enc=?, data_iv=?, data_tag=? WHERE rowid=?',
+          [reenc.data, reenc.iv, reenc.tag, Number(co.rid)]);
+      } catch(e) { return { ok: false, error: 'Re-encryption failed: ' + e.message }; }
+    }
+
+    // Re-encrypt profile blob if present
+    if (user.profile_enc && user.profile_iv && user.profile_tag) {
+      try {
+        const plain = decrypt({ data: user.profile_enc, iv: user.profile_iv, tag: user.profile_tag }, oldKey);
+        const reenc = encrypt(plain, newKey);
+        db.run('UPDATE users SET profile_enc=?, profile_iv=?, profile_tag=? WHERE rowid=?',
+          [reenc.data, reenc.iv, reenc.tag, Number(user.rid)]);
+      } catch {}
+    }
+
+    // Re-encrypt SMTP password if present
+    const smtpEnc = dbGet("SELECT value FROM app_settings WHERE key='email_smtp_password_enc'");
+    const smtpIv  = dbGet("SELECT value FROM app_settings WHERE key='email_smtp_password_iv'");
+    const smtpTag = dbGet("SELECT value FROM app_settings WHERE key='email_smtp_password_tag'");
+    if (smtpEnc?.value && smtpIv?.value && smtpTag?.value) {
+      try {
+        const plain = decrypt({ data: smtpEnc.value, iv: smtpIv.value, tag: smtpTag.value }, oldKey);
+        const reenc = encrypt(plain, newKey);
+        const setSetting = (k, v) => db.run('INSERT OR REPLACE INTO app_settings (key,value) VALUES (?,?)', [k, v]);
+        setSetting('email_smtp_password_enc', reenc.data);
+        setSetting('email_smtp_password_iv',  reenc.iv);
+        setSetting('email_smtp_password_tag', reenc.tag);
+      } catch {}
+    }
+
+    // Update password hash and clear lockout
+    db.run('UPDATE users SET password_hash=?, failed_attempts=0, locked_until=NULL WHERE rowid=?',
+      [bcrypt.hashSync(newPassword, 12), Number(user.rid)]);
+    persistDB(); performBackup();
+    return { ok: true, passwordReset: true };
+  } catch(e) { return { ok: false, error: 'Recovery failed: ' + e.message }; }
 });
 
 ipcMain.handle('totp:generate', async () => {
@@ -1112,6 +1179,27 @@ ipcMain.handle('backup:restore', (_, filename) => {
   } catch(e) { return { ok: false, error: e.message }; }
 });
 
+// Pre-auth backup restore — opens file dialog, no session required
+ipcMain.handle('auth:browse-backup', async () => {
+  const { dialog } = require('electron');
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Select vault backup to restore',
+    filters: [{ name: 'Vault backup', extensions: ['db'] }],
+    properties: ['openFile']
+  });
+  if (result.canceled || !result.filePaths.length) return { ok: false, canceled: true };
+  const src = result.filePaths[0];
+  try {
+    if (fs.existsSync(DB_FILE)) fs.copyFileSync(DB_FILE, DB_FILE + '.pre-restore.bak');
+    fs.copyFileSync(src, DB_FILE);
+    const buf = fs.readFileSync(DB_FILE);
+    db = new SQL.Database(buf);
+    clearIdleTimer(); sessionKey = null; sessionUser = null; activeEntryId = null;
+    mainWindow.loadFile(path.join(__dirname, '../renderer/pages/login.html'));
+    return { ok: true };
+  } catch(e) { return { ok: false, error: e.message }; }
+});
+
 // ── IPC: Audit dismissed ──────────────────────────────────────────────────
 ipcMain.handle('audit:get-dismissed', () => {
   if (!sessionUser) return [];
@@ -1256,6 +1344,21 @@ ipcMain.handle('auth:change-password', async (_, { currentPassword, totpCode, ne
       const reenc = encrypt(plain, newKey);
       db.run('UPDATE users SET profile_enc=?, profile_iv=?, profile_tag=? WHERE rowid=?',
         [reenc.data, reenc.iv, reenc.tag, sessionUser.id]);
+    } catch {}
+  }
+
+  // Re-encrypt SMTP password if present
+  const smtpEnc = dbGet("SELECT value FROM app_settings WHERE key='email_smtp_password_enc'");
+  const smtpIv  = dbGet("SELECT value FROM app_settings WHERE key='email_smtp_password_iv'");
+  const smtpTag = dbGet("SELECT value FROM app_settings WHERE key='email_smtp_password_tag'");
+  if (smtpEnc?.value && smtpIv?.value && smtpTag?.value) {
+    try {
+      const plain = decrypt({ data: smtpEnc.value, iv: smtpIv.value, tag: smtpTag.value }, sessionKey);
+      const reenc = encrypt(plain, newKey);
+      const setSetting = (k, v) => db.run('INSERT OR REPLACE INTO app_settings (key,value) VALUES (?,?)', [k, v]);
+      setSetting('email_smtp_password_enc', reenc.data);
+      setSetting('email_smtp_password_iv',  reenc.iv);
+      setSetting('email_smtp_password_tag', reenc.tag);
     } catch {}
   }
 
