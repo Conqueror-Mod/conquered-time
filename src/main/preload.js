@@ -16,7 +16,7 @@ const ALLOWED_INVOKE = new Set([
   'app:get-info', 'app:check-update',
   'db:clear-timeclock', 'db:clear-companies', 'db:clear-full',
   'profile:get', 'profile:save', 'auth:change-password',
-  'audit:get-dismissed', 'audit:dismiss', 'audit:clear-dismissed', 'audit:apply-fix', 'audit:open-wizard',
+  'audit:get-policy', 'audit:get-dismissed', 'audit:dismiss', 'audit:clear-dismissed', 'audit:apply-fix', 'audit:open-wizard',
   'backup:list', 'backup:preview', 'backup:restore',
   'email:save-config', 'email:get-config', 'email:test-smtp', 'email:send-report',
   'email:send-scheduled-now', 'email:get-schedule-status', 'email:trigger-schedule-check',

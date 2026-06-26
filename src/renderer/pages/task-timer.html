@@ -118,6 +118,7 @@ let timerInterval = null;   // setInterval handle for stopwatch
 let activeBreakId  = null;  // task_item id of in-progress break
 let activeLunchId  = null;  // task_item id of in-progress lunch
 let sessionStartMs = null;  // ms when the active row clocked in (for compliance calc)
+let dispatchPolicy = null;  // loaded from audit:get-policy on init
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function fmtSecs(totalSecs) {
@@ -171,8 +172,20 @@ function buildDescString(tasks) {
 
 function checkComplianceStatus(type) {
   // Returns 'ok', 'warn' (approaching), or 'over'
-  const thresholdMs = type === 'break' ? 2.5 * 3600000 : 5 * 3600000;
-  const warnMs      = type === 'break' ? 2.0 * 3600000 : 4.5 * 3600000;
+  const p = dispatchPolicy;
+  let thresholdMs, warnMs;
+  if (type === 'break') {
+    // Break is "overdue" once the session crosses breakThresholds[0][0] (transition from 0→1+ required).
+    // null threshold means no break requirement (meal_only) → treat as Infinity → never overdue.
+    const rawDue = p?.breakThresholds?.[0]?.[0];
+    thresholdMs = (rawDue != null) ? rawDue * 60000 : Infinity;
+    const rawWarn = p?.dispatchBreakWarnMins;
+    warnMs = (rawWarn != null) ? rawWarn * 60000 : Infinity;
+  } else {
+    thresholdMs = p ? p.lunchThreshMins * 60000 : 5 * 3600000;
+    const rawLunchWarn = p?.dispatchLunchWarnMins;
+    warnMs = (rawLunchWarn != null) ? rawLunchWarn * 60000 : 4.5 * 3600000;
+  }
   const relevant = taskItems.filter(t => t.item_type === type && t.stopped_at);
   const activeItem = taskItems.find(
     t => t.item_type === type && !t.stopped_at
@@ -292,7 +305,10 @@ function renderComplianceFor(type) {
 
   const activeItem = taskItems.find(t => t.item_type === type && !t.stopped_at);
   const relevant   = taskItems.filter(t => t.item_type === type && t.stopped_at);
-  const threshLabel = type === 'break' ? '2.5h' : '5h';
+  const p2 = dispatchPolicy;
+  const threshLabel = type === 'break'
+    ? (() => { for (const [t,c] of (p2?.breakThresholds||[[210,0],[360,1]])) { if (c===1) return `${Math.round(t/60*10)/10}h`; } return '3.5h'; })()
+    : `${Math.round((p2?.lunchThreshMins||300)/60*10)/10}h`;
 
   if (activeItem) {
     el.innerHTML = `<svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><circle cx="5" cy="5" r="5"/></svg>
@@ -415,6 +431,8 @@ async function complianceTick() {
 window.addEventListener('DOMContentLoaded', async () => {
   await Shell.init('task-timer');
   document.documentElement.style.visibility = '';
+
+  dispatchPolicy = await api.invoke('audit:get-policy');
 
   // Load active entry
   activeEntry = await api.invoke('entries:get-active');

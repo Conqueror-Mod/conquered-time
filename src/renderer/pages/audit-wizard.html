@@ -325,15 +325,41 @@
     return 'ok';
   }
 
+  let auditPolicy = null; // loaded on DOMContentLoaded
+
+  function policyBreakHours(policy) {
+    // break first required once session crosses breakThresholds[0][0]
+    const t0 = policy?.breakThresholds?.[0]?.[0];
+    return t0 != null ? Math.round(t0 / 60 * 10) / 10 : 3.5;
+  }
+
+  function localRequiredBreaks(totalMins, policy) {
+    const thresholds = policy?.breakThresholds || [[210,0],[360,1],[600,2],[Infinity,3]];
+    for (const [threshold, count] of thresholds) {
+      if (threshold === null || totalMins < threshold) return count;
+    }
+    return 0;
+  }
+
   function auditMeta(type, r) {
+    const p         = auditPolicy;
+    const stateName = p?.stateName || null;
+    const lunchH    = p ? Math.round(p.lunchThreshMins / 60 * 10) / 10 : 5;
+    const breakH    = policyBreakHours(p);
+    const breakSugg = stateName
+      ? `${stateName} law requires a rest break for shifts over ${breakH}h. Log break(s) in Dispatch.`
+      : `Policy requires rest breaks for shifts over ${breakH}h. Log break(s) in Dispatch.`;
+    const lunchSugg = stateName
+      ? `A meal break is required after ${lunchH}h worked (${stateName}). Log a lunch in Dispatch.`
+      : `A meal break is required after ${lunchH}h worked. Log a lunch in Dispatch.`;
     switch (type) {
-      case 'no_clock_in':   return { flag: '⚠ No clock-in',    cls: 'flag-error', suggestion: 'Enter a clock-in time in the Time Tracker.',             fix: null };
-      case 'no_clock_out':  return { flag: '● No clock-out',    cls: 'flag-error', suggestion: 'Auto-set clock-out to clock-in + 8h.',                   fix: 'set_clock_out' };
-      case 'zero_duration': return { flag: '⚠ Zero duration',   cls: 'flag-warn',  suggestion: 'Recalculate duration from clock-in / clock-out.',         fix: (r.clock_in && r.clock_out) ? 'recalc_duration' : null };
-      case 'over_12h':      return { flag: '⚠ Over 12h',        cls: 'flag-warn',  suggestion: 'Review clock-out — session exceeds 12 hours.',            fix: null };
-      case 'missing_break': return { flag: '⚠ Break(s) missing', cls: 'flag-warn',  suggestion: `US policy requires 1 break per 3.5–6h shift, 2 for 6–10h, 3 for 10h+. Log break(s) in Dispatch.`,  fix: null };
-      case 'missing_lunch': return { flag: '⚠ No lunch logged',  cls: 'flag-warn',  suggestion: 'A meal break is required after 5 hours worked. Log a lunch in Dispatch.',                             fix: null };
-      default:              return { flag: '✓ OK',               cls: 'flag-ok',    suggestion: '',                                                        fix: null };
+      case 'no_clock_in':   return { flag: '⚠ No clock-in',     cls: 'flag-error', suggestion: 'Enter a clock-in time in the Time Tracker.',        fix: null };
+      case 'no_clock_out':  return { flag: '● No clock-out',     cls: 'flag-error', suggestion: 'Auto-set clock-out to clock-in + 8h.',              fix: 'set_clock_out' };
+      case 'zero_duration': return { flag: '⚠ Zero duration',    cls: 'flag-warn',  suggestion: 'Recalculate duration from clock-in / clock-out.',   fix: (r.clock_in && r.clock_out) ? 'recalc_duration' : null };
+      case 'over_12h':      return { flag: '⚠ Over 12h',         cls: 'flag-warn',  suggestion: 'Review clock-out — session exceeds 12 hours.',      fix: null };
+      case 'missing_break': return { flag: '⚠ Break(s) missing', cls: 'flag-warn',  suggestion: breakSugg,                                           fix: null };
+      case 'missing_lunch': return { flag: '⚠ No lunch logged',  cls: 'flag-warn',  suggestion: lunchSugg,                                           fix: null };
+      default:              return { flag: '✓ OK',                cls: 'flag-ok',    suggestion: '',                                                  fix: null };
     }
   }
 
@@ -348,11 +374,13 @@
       if (s?.scale) document.documentElement.setAttribute('data-scale', s.scale);
     }
 
-    const [allEntries, dismissedRows, taskSummary] = await Promise.all([
+    const [allEntries, dismissedRows, taskSummary, policy] = await Promise.all([
       api.invoke('entries:all'),
       api.invoke('audit:get-dismissed'),
       api.invoke('tasks:summary'),
+      api.invoke('audit:get-policy'),
     ]);
+    auditPolicy = policy;
     const taskMap = taskSummary || {};
 
     const entries     = allEntries    || [];
@@ -380,13 +408,14 @@
 
       const totalMins  = Number(e.total_mins || 0);
       const tsk        = taskMap[entryId] || { break_count: 0, lunch_count: 0 };
-      const reqBreaks  = totalMins < 210 ? 0 : totalMins < 360 ? 1 : totalMins < 600 ? 2 : 3;
+      const reqBreaks  = localRequiredBreaks(totalMins, auditPolicy);
       if (reqBreaks > 0 && tsk.break_count < reqBreaks) {
         const bKey = `${entryId}:-1:missing_break`;
         if (!dismissedSet.has(bKey))
           issues.push({ date: e.log_date, company: co?.name || `#${e.company_id}`, entryId, rowIdx: -1, type: 'missing_break', dKey: bKey, r: { clock_in: '—', clock_out: '—', total_mins: totalMins, label: '(session)', req_breaks: reqBreaks, has_breaks: tsk.break_count } });
       }
-      if (totalMins > 300 && tsk.lunch_count < 1) {
+      const lunchThresh = auditPolicy?.lunchThreshMins || 300;
+      if (totalMins > lunchThresh && tsk.lunch_count < 1) {
         const lKey = `${entryId}:-1:missing_lunch`;
         if (!dismissedSet.has(lKey))
           issues.push({ date: e.log_date, company: co?.name || `#${e.company_id}`, entryId, rowIdx: -1, type: 'missing_lunch', dKey: lKey, r: { clock_in: '—', clock_out: '—', total_mins: totalMins, label: '(session)' } });

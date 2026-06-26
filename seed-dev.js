@@ -179,6 +179,7 @@ async function seed() {
     email:       'dev@conqueredtime.app',
     phone:       '555-0100',
     job_title:   'QA Engineer',
+    work_state:  'CA',
     descriptor:  'Testing all the things so you don\'t have to.',
     avatar:      avatarDataUrl
   };

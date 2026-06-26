@@ -387,11 +387,64 @@ function navigate(page) {
   mainWindow.loadFile(path.join(__dirname, `../renderer/pages/${page}.html`));
 }
 
-function requiredBreaks(totalMins) {
-  if (totalMins < 210) return 0;  // < 3.5h — no break required
-  if (totalMins < 360) return 1;  // 3.5h–6h — 1 break
-  if (totalMins < 600) return 2;  // 6h–10h  — 2 breaks
-  return 3;                        // 10h+    — 3 breaks
+const BREAK_POLICIES = {
+  default: {
+    label: 'General recommendation',
+    breakThresholds: [[210, 0], [360, 1], [600, 2], [Infinity, 3]],
+    lunchThreshMins: 300,
+    dispatchBreakWarnMins: 150,
+    dispatchLunchWarnMins: 270,
+  },
+  strict_breaks: {
+    label: 'Strict rest breaks (per 4h)',
+    breakThresholds: [[120, 0], [360, 1], [600, 2], [Infinity, 3]],
+    lunchThreshMins: 300,
+    dispatchBreakWarnMins: 90,
+    dispatchLunchWarnMins: 270,
+  },
+  meal_only: {
+    label: 'Meal break required (no rest break mandate)',
+    breakThresholds: [[Infinity, 0]],
+    lunchThreshMins: 360,
+    dispatchBreakWarnMins: Infinity,
+    dispatchLunchWarnMins: 300,
+  },
+};
+
+const STATE_POLICY = {
+  CA:'strict_breaks', CO:'strict_breaks', IL:'strict_breaks', KY:'strict_breaks',
+  ME:'strict_breaks', MN:'strict_breaks', NE:'strict_breaks', NV:'strict_breaks',
+  NH:'strict_breaks', ND:'strict_breaks', OR:'strict_breaks', VT:'strict_breaks',
+  WA:'strict_breaks', WV:'strict_breaks',
+  CT:'meal_only', DE:'meal_only', MA:'meal_only', NM:'meal_only',
+  NY:'meal_only', RI:'meal_only', TN:'meal_only',
+};
+
+const STATE_NAMES = {
+  AL:'Alabama', AK:'Alaska', AZ:'Arizona', AR:'Arkansas', CA:'California',
+  CO:'Colorado', CT:'Connecticut', DE:'Delaware', DC:'Washington D.C.', FL:'Florida',
+  GA:'Georgia', HI:'Hawaii', ID:'Idaho', IL:'Illinois', IN:'Indiana',
+  IA:'Iowa', KS:'Kansas', KY:'Kentucky', LA:'Louisiana', ME:'Maine',
+  MD:'Maryland', MA:'Massachusetts', MI:'Michigan', MN:'Minnesota', MS:'Mississippi',
+  MO:'Missouri', MT:'Montana', NE:'Nebraska', NV:'Nevada', NH:'New Hampshire',
+  NJ:'New Jersey', NM:'New Mexico', NY:'New York', NC:'North Carolina', ND:'North Dakota',
+  OH:'Ohio', OK:'Oklahoma', OR:'Oregon', PA:'Pennsylvania', RI:'Rhode Island',
+  SC:'South Carolina', SD:'South Dakota', TN:'Tennessee', TX:'Texas', UT:'Utah',
+  VT:'Vermont', VA:'Virginia', WA:'Washington', WV:'West Virginia', WI:'Wisconsin',
+  WY:'Wyoming',
+};
+
+function getPolicy(workState) {
+  const key = workState ? (STATE_POLICY[workState] || 'default') : 'default';
+  return BREAK_POLICIES[key];
+}
+
+function requiredBreaks(totalMins, policy) {
+  const thresholds = (policy || BREAK_POLICIES.default).breakThresholds;
+  for (const [threshold, count] of thresholds) {
+    if (totalMins < threshold) return count;
+  }
+  return 0;
 }
 
 function getDismissedSet() {
@@ -425,13 +478,14 @@ function countAuditDiscrepancies() {
     } catch {}
 
     const totalMins = Number(e.total_mins || 0);
-    const reqBreaks = requiredBreaks(totalMins);
+    const policy = getPolicy(sessionUser.work_state);
+    const reqBreaks = requiredBreaks(totalMins, policy);
     if (reqBreaks > 0) {
       const breakCount = (dbGet('SELECT COUNT(*) as c FROM task_items WHERE entry_id=? AND user_id=? AND item_type=?',
         [entryId, sessionUser.id, 'break']) || {}).c || 0;
       if (breakCount < reqBreaks && !dismissed.has(`${entryId}:-1:missing_break`)) count++;
     }
-    if (totalMins > 300) {
+    if (totalMins > policy.lunchThreshMins) {
       const hasLunch = dbGet('SELECT id FROM task_items WHERE entry_id=? AND user_id=? AND item_type=? LIMIT 1',
         [entryId, sessionUser.id, 'lunch']);
       if (!hasLunch && !dismissed.has(`${entryId}:-1:missing_lunch`)) count++;
@@ -672,7 +726,13 @@ ipcMain.handle('auth:safe-login', async () => {
     if (!user) return { ok: false, error: 'No account found in this profile.' };
 
     sessionKey  = key;
-    sessionUser = { id: Number(user.rid), username: user.username, display_name: user.display_name || null };
+    sessionUser = { id: Number(user.rid), username: user.username, display_name: user.display_name || null, work_state: null };
+    if (user.profile_enc && user.profile_iv && user.profile_tag) {
+      try {
+        const pd = JSON.parse(decrypt({ data: user.profile_enc, iv: user.profile_iv, tag: user.profile_tag }, key));
+        sessionUser.work_state = pd?.work_state || null;
+      } catch {}
+    }
     db.run('UPDATE users SET failed_attempts=0, locked_until=NULL WHERE rowid=?', [Number(user.rid)]);
     persistDB();
     resetIdleTimer();
@@ -696,7 +756,13 @@ ipcMain.handle('auth:quick-unlock', async (_, { password }) => {
     const canaryPlain = decrypt(stored.canary, key);
     if (canaryPlain !== 'conquered-time-v1') return { ok: false, error: 'Key mismatch — use full login.' };
     sessionKey  = key;
-    sessionUser = { id: Number(user.rid), username: user.username, display_name: user.display_name || null };
+    sessionUser = { id: Number(user.rid), username: user.username, display_name: user.display_name || null, work_state: null };
+    if (user.profile_enc && user.profile_iv && user.profile_tag) {
+      try {
+        const pd = JSON.parse(decrypt({ data: user.profile_enc, iv: user.profile_iv, tag: user.profile_tag }, key));
+        sessionUser.work_state = pd?.work_state || null;
+      } catch {}
+    }
     db.run('UPDATE users SET failed_attempts=0, locked_until=NULL WHERE rowid=?', [Number(user.rid)]);
     persistDB();
     resetIdleTimer();
@@ -797,22 +863,23 @@ ipcMain.handle('auth:login', async (_, { username, password, totpCode }) => {
     const salt  = user.key_salt || user.totp_secret;
     sessionKey  = deriveKey(password, salt);
     // Always use rowid — sql.js AUTOINCREMENT id columns return null through our query helper
-    sessionUser = { id: Number(user.rid), username: user.username, display_name: user.display_name || null };
+    sessionUser = { id: Number(user.rid), username: user.username, display_name: user.display_name || null, work_state: null };
     db.run('UPDATE users SET failed_attempts=0, locked_until=NULL WHERE rowid=?', [Number(user.rid)]);
     persistDB();
     resetIdleTimer();
 
-    // Backfill avatar_thumb_48 in manifest if missing (catches avatars saved before this fix)
-    if (ACTIVE_PROFILE_DIR && !IS_DEV) {
+    // Decrypt profile blob once to backfill avatar_thumb and extract work_state
+    if (user.profile_enc && user.profile_iv && user.profile_tag) {
       try {
-        const manifest = readManifest(ACTIVE_PROFILE_DIR);
-        if (manifest && !manifest.avatar_thumb_48 && user.profile_enc && user.profile_iv && user.profile_tag) {
-          const profileData = JSON.parse(decrypt({ data: user.profile_enc, iv: user.profile_iv, tag: user.profile_tag }, sessionKey));
-          if (profileData?.avatar) {
+        const profileData = JSON.parse(decrypt({ data: user.profile_enc, iv: user.profile_iv, tag: user.profile_tag }, sessionKey));
+        sessionUser.work_state = profileData?.work_state || null;
+        if (ACTIVE_PROFILE_DIR && !IS_DEV) {
+          const manifest = readManifest(ACTIVE_PROFILE_DIR);
+          if (manifest && !manifest.avatar_thumb_48 && profileData?.avatar) {
             writeManifest(ACTIVE_PROFILE_DIR, { ...manifest, avatar_thumb_48: profileData.avatar });
           }
         }
-      } catch (e) { console.warn('[login] avatar_thumb backfill failed:', e.message); }
+      } catch (e) { console.warn('[login] profile decrypt failed:', e.message); }
     }
 
     // Fire scheduled email check shortly after login (session now available)
@@ -911,7 +978,7 @@ ipcMain.handle('totp:generate', async () => {
   return { secret: secret.base32, qrUrl };
 });
 
-ipcMain.handle('session:get', () => sessionUser ? { id: sessionUser.id, username: sessionUser.username, display_name: sessionUser.display_name || null } : null);
+ipcMain.handle('session:get', () => sessionUser ? { id: sessionUser.id, username: sessionUser.username, display_name: sessionUser.display_name || null, work_state: sessionUser.work_state || null } : null);
 ipcMain.handle('session:heartbeat', () => { if (sessionUser) resetIdleTimer(); return null; });
 ipcMain.on('session:request-lock',   () => lockSession(false));
 ipcMain.on('session:confirm-close',  () => { forceClose = true; mainWindow.close(); });
@@ -1200,6 +1267,22 @@ ipcMain.handle('auth:browse-backup', async () => {
   } catch(e) { return { ok: false, error: e.message }; }
 });
 
+// ── IPC: Audit policy ────────────────────────────────────────────────────
+ipcMain.handle('audit:get-policy', () => {
+  const stateCode = sessionUser?.work_state || null;
+  const policy    = getPolicy(stateCode);
+  const stateName = stateCode ? (STATE_NAMES[stateCode] || stateCode) : null;
+  // Replace Infinity with null so serialization is safe across IPC boundary
+  const safeThresholds = policy.breakThresholds.map(([t, c]) => [isFinite(t) ? t : null, c]);
+  return {
+    stateCode, stateName, policyLabel: policy.label,
+    breakThresholds: safeThresholds,
+    lunchThreshMins: policy.lunchThreshMins,
+    dispatchBreakWarnMins: isFinite(policy.dispatchBreakWarnMins) ? policy.dispatchBreakWarnMins : null,
+    dispatchLunchWarnMins: isFinite(policy.dispatchLunchWarnMins) ? policy.dispatchLunchWarnMins : null,
+  };
+});
+
 // ── IPC: Audit dismissed ──────────────────────────────────────────────────
 ipcMain.handle('audit:get-dismissed', () => {
   if (!sessionUser) return [];
@@ -1291,13 +1374,14 @@ ipcMain.handle('profile:get', () => {
   return { display_name: user.display_name || '', ...profileData };
 });
 
-ipcMain.handle('profile:save', (_, { display_name, full_name, email, phone, job_title, avatar, avatar_thumb_48 }) => {
+ipcMain.handle('profile:save', (_, { display_name, full_name, email, phone, job_title, work_state, avatar, avatar_thumb_48 }) => {
   if (!sessionKey || !sessionUser) return { ok: false };
   try {
-    const blob = encrypt(JSON.stringify({ full_name: full_name || '', email: email || '', phone: phone || '', job_title: job_title || '', avatar: avatar || null }), sessionKey);
+    const blob = encrypt(JSON.stringify({ full_name: full_name || '', email: email || '', phone: phone || '', job_title: job_title || '', work_state: work_state || null, avatar: avatar || null }), sessionKey);
     db.run('UPDATE users SET display_name=?, profile_enc=?, profile_iv=?, profile_tag=? WHERE rowid=?',
       [display_name || null, blob.data, blob.iv, blob.tag, sessionUser.id]);
     sessionUser.display_name = display_name || null;
+    sessionUser.work_state   = work_state   || null;
     persistDB();
     // Keep profile selector card in sync
     if (ACTIVE_PROFILE_DIR && !IS_DEV) {
