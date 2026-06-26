@@ -464,26 +464,22 @@ const Shell = (() => {
               </div>
 
               <div class="about-section">
-                <div class="about-section-title">What's New — v3.1</div>
+                <div class="about-section-title">What's New — v3.2</div>
                 <ul class="about-changelog">
-                  <li>Email Reports — send PDF + CSV attachments directly via SMTP from the Reports page</li>
-                  <li>Scheduled Reports — automatic delivery on daily, weekly, monthly, quarterly, or annual cadence</li>
-                  <li>Settings → Reports tab — dedicated home for SMTP config, schedule, and Send Now</li>
-                  <li>Break/lunch compliance overhaul — US federal policy rules, count-based break detection across Dispatch, Audit, and Reports</li>
-                  <li>Company Web overhaul — wider layout, inline detail pane, dynamic physics scaling, solid center node</li>
-                  <li>Settings tab reorder — logical Appearance → Time & Display → Window → Security → Data → Reports flow</li>
+                  <li>Full account recovery — recovery key packet seals your session key under your recovery code at setup, enabling password reset without data loss</li>
+                  <li>Password reset via recovery code — re-encrypts all company, profile, and SMTP data under your new password automatically</li>
+                  <li>Pre-auth backup restore — restore a vault backup from a local file directly on the login screen, no active session required</li>
+                  <li>PDF export enriched — work type, location, supervisors in header; per-label time subtotals; Export All restructured with summary section</li>
+                  <li>Right-click context menu — Cut/Copy/Paste/Select All now available globally in all text fields</li>
                 </ul>
               </div>
               <div class="about-section">
-                <div class="about-section-title">v3.0</div>
+                <div class="about-section-title">v3.1</div>
                 <ul class="about-changelog">
-                  <li>Five Final Fantasy themes — Zanarkand, Memoria, Rabanastre, Treno, Nibelheim</li>
-                  <li>Multi-user profile architecture — isolated vaults, profile selector, auto-migration</li>
-                  <li>Windows Hello / Quick Unlock — DPAPI fast-path, PIN and biometric support</li>
-                  <li>Full login screen overhaul — profile cards, avatar backfill, unified branding</li>
-                  <li>Avatar upload with manual crop, zoom, and animated GIF/APNG support</li>
-                  <li>User Profile Screen — display name, descriptor fields, password change</li>
-                  <li>Session auto-lock with configurable idle timeout</li>
+                  <li>Email Reports — send PDF + CSV attachments directly via SMTP from the Reports page</li>
+                  <li>Scheduled Reports — automatic delivery on daily, weekly, monthly, quarterly, or annual cadence</li>
+                  <li>Break/lunch compliance overhaul — US federal policy rules, count-based break detection</li>
+                  <li>Company Web overhaul — wider layout, inline detail pane, dynamic physics scaling</li>
                 </ul>
               </div>
               <div class="about-section">
