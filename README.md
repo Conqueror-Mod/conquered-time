@@ -32,6 +32,7 @@ A secure, locally-encrypted desktop time tracker built for remote professionals 
 - **Manual DB clear** — three-level wipe (Time Clock, Companies, Full) with typed CONFIRM confirmation
 - **Keyboard navigation** — Ctrl+1–5 to switch modules, Ctrl+, for Settings, full modal tab-trapping
 - **Electron security** — contextIsolation enabled, nodeIntegration disabled, sandboxed renderers, whitelisted IPC channels
+- **Easter egg** — Konami code on the profile selector reveals a hidden ASCII hourglass
 
 ---
 
@@ -156,6 +157,7 @@ Output: `dist/Conquered Time Setup.exe`
 | `Arrow keys` | Navigate sidebar |
 | `Tab / Shift+Tab` | Cycle focus in modals |
 | `Alt+F4` | Close app (triggers audit check) |
+| `↑↑↓↓←→←→BA↵` | ??? (profile selector only) |
 
 ---
 

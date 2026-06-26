@@ -470,6 +470,7 @@ const Shell = (() => {
                   <li>US state break/lunch compliance — set your work state in Profile; California, New York, and other state-specific break rules applied in Dispatch and Audit</li>
                   <li>Windows Hello / Quick Unlock — fast login via biometric or PIN after first session; password fallback always available; managed in Settings → Security</li>
                   <li>Login screen overhaul — profile selector cards with avatars, unified branding, pre-auth settings access, QR code auto-generates on Setup tab</li>
+                  <li>Easter egg — try the Konami code on the profile selector</li>
                 </ul>
               </div>
               <div class="about-section">
