@@ -86,7 +86,7 @@ conquered-time/
 
 ### IPC Surface (main.js ↔ preload.js ↔ renderer)
 Whitelisted channels only, enforced in `preload.js`:
-- `auth:check-setup`, `auth:setup`, `auth:login`, `auth:recover`
+- `auth:check-setup`, `auth:setup`, `auth:login`, `auth:recover`, `auth:browse-backup`
 - `totp:generate`
 - `session:get`
 - `companies:list/save/delete`
@@ -139,7 +139,8 @@ Native `<input type="time">` renders in the OS locale's format (often 12-hour wi
 - TOTP MFA login (QR setup, Google Authenticator compatible)
 - AES-256-GCM encryption of company PPI fields, PBKDF2 key derivation from password + stable salt
 - 3-attempt lockout with 24h countdown UI
-- Local recovery code (generated once, bcrypt-hashed)
+- Local recovery code (generated once, bcrypt-hashed) + **recovery key packet**: session key sealed under recovery code via PBKDF2+AES-256-GCM at setup time, enabling full password reset without data loss
+- Full account recovery UI on login screen: three-mode picker — **Unlock account** (clears lockout), **Reset my password** (decrypts old key via recovery code, re-encrypts all data under new password, logs in), **Restore from backup** (pre-auth file dialog, no session required)
 - Company CRUD with full work hierarchy: Company › Project › Platform › Navigator ID (NavID never appears on PDF exports, only in-session)
 - Spiderweb company visualization (force-simulated layout, sphere-gradient nodes, theme-aware colors, ResizeObserver-based responsive redraw) on both Dashboard (mini) and Companies (full) pages
 - Dynamic time-entry table: starts at 5 rows, auto-grows when the last row is used, trims unused trailing blank rows, never goes below 5
@@ -172,7 +173,7 @@ Native `<input type="time">` renders in the OS locale's format (often 12-hour wi
 - **Auto Backup UI** ✅ — Settings → Data → Backup Library; lazy-loaded list of up to 30 auto-backups; accordion preview (account, company count, entry count, date range); CONFIRM-gated restore; current data safety-saved before any restore; logs out to login after restore
 - **Manual database clear** ✅ — three-option wipe in Settings → Data: Time Clock Clear, Companies Clear, Full DB Clear; inline CONFIRM-typed confirmation
 - **Task Timer & Counter page** ✅ — implemented as "Dispatch" module; task timing, break/lunch compliance, description writeback, sidebar live timer, Tracker footer preview
-- **Recovery** — full account recovery flow beyond the current one-time recovery code; includes the LOAD DBA local restore UI
+- **Recovery** ✅ — full account recovery flow: recovery key packet (session key sealed under recovery code at setup), password reset with full re-encryption of all encrypted data, pre-auth backup restore via file dialog; login recovery tab redesigned with three-mode picker
 - **User Profile Icon** — avatar/icon displayed in the sidebar user block and profile screen
 - **User Profile Screen** — dedicated screen for user profile management (username, password change, avatar, account details)
 - **Encrypt time log entries** — time data is treated as PPI (learnable information); open question: encrypt individual time entries the same way company fields are, OR lock all user data behind session encryption on session lock. Needs design decision before implementation.
