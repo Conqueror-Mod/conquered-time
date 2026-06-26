@@ -564,7 +564,24 @@ const Shell = (() => {
     }
   }
 
+  function _injectScript(src) {
+    return new Promise((resolve, reject) => {
+      if (document.querySelector(`script[src="${src}"]`)) { resolve(); return; }
+      const s = document.createElement('script');
+      s.src = src;
+      s.onload = resolve;
+      s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
+
   async function init(activePage) {
+    await Promise.all([
+      _injectScript('../ipc.js'),
+      _injectScript('../validator.js'),
+    ]);
+    await _injectScript('../store.js'); // store.js depends on IPC
+
     const [user, profile] = await Promise.all([
       api.invoke('session:get'),
       api.invoke('profile:get').catch(() => null)

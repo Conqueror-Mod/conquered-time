@@ -489,8 +489,8 @@
   });
 
   async function loadCompanies() {
-    companies = await api.invoke('companies:list') || [];
-    entries   = await api.invoke('entries:all')    || [];
+    companies = await Store.getCompanies();
+    entries   = await Store.getEntries();
     renderList();
     document.getElementById('company-count').textContent = companies.length;
     if (selectedId) {
@@ -659,10 +659,11 @@
       supervisors:     document.getElementById('f-supervisors').value.trim(),
       notes:           document.getElementById('f-notes').value.trim(),
     };
-    const res = await api.invoke('companies:save', data);
+    const res = await IPC.companies.save(data);
     if (res.ok) {
       Shell.toast(editingId ? 'Company updated.' : 'Company added.', 'success');
       closeModal();
+      Store.invalidate('companies');
       await loadCompanies();
       drawWeb();
     } else {
@@ -672,19 +673,21 @@
 
   async function deleteCompany() {
     if (!editingId || !confirm('Delete this company and all its time entries?')) return;
-    await api.invoke('companies:delete', editingId);
+    await IPC.companies.delete(editingId);
     Shell.toast('Company deleted.', 'warning');
     if (selectedId === editingId) closeDetail();
     closeModal();
+    Store.invalidate('all');
     await loadCompanies();
     drawWeb();
   }
 
   async function deleteSelected() {
     if (!selectedId || !confirm('Delete this company and all its time entries?')) return;
-    await api.invoke('companies:delete', selectedId);
+    await IPC.companies.delete(selectedId);
     Shell.toast('Company deleted.', 'warning');
     closeDetail();
+    Store.invalidate('all');
     await loadCompanies();
     drawWeb();
   }
@@ -697,10 +700,11 @@
   function ctxEditCompany() { if (ctxTarget) openModal(ctxTarget); }
   async function ctxDeleteCompany() {
     if (!ctxTarget || !confirm(`Delete ${ctxTarget.name}?`)) return;
-    await api.invoke('companies:delete', ctxTarget.id);
+    await IPC.companies.delete(ctxTarget.id);
     Shell.toast('Company deleted.', 'warning');
     if (selectedId === ctxTarget.id) closeDetail();
     ctxTarget = null;
+    Store.invalidate('all');
     await loadCompanies();
     drawWeb();
   }

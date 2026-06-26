@@ -225,8 +225,8 @@
   });
 
   async function loadData() {
-    companies  = await api.invoke('companies:list') || [];
-    allEntries = await api.invoke('entries:all')    || [];
+    companies  = await Store.getCompanies();
+    allEntries = await Store.getEntries();
     compMap    = {};
     companies.forEach(c => compMap[c.id] = c);
     const sel = document.getElementById('filter-company');
