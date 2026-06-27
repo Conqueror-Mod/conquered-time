@@ -27,11 +27,12 @@ A secure, locally-encrypted desktop time tracker built for remote professionals 
 - **Auto-save & backup** — configurable autosave interval; dated `.db` backups on every save (last 30 kept)
 - **Backup Library** — browse, preview, and restore from any saved backup in Settings; current data safety-saved before any restore
 - **Session auto-lock** — configurable idle timeout (Off / 5 / 15 / 30 / 60 min)
-- **5 themes** — Arctic (default), Void, Slate, Paper, Quartz
+- **5 themes** — Zanarkand (default), Memoria, Rabanastre, Treno, Nibelheim
 - **Steam-style Settings** — split-panel layout with left category nav (Appearance, Time & Display, Window, Security, Data, Reports, Accessibility, About)
 - **Manual DB clear** — three-level wipe (Time Clock, Companies, Full) with typed CONFIRM confirmation
 - **Keyboard navigation** — Ctrl+1–5 to switch modules, Ctrl+, for Settings, full modal tab-trapping
 - **Electron security** — contextIsolation enabled, nodeIntegration disabled, sandboxed renderers, whitelisted IPC channels
+- **Centralized data layer** — shared Store / IPC / Validator modules give the renderer one source of truth for fetching, record-ID normalization, and input validation
 - **Easter egg** — Konami code on the profile selector reveals a hidden ASCII hourglass
 
 ---
@@ -60,6 +61,9 @@ conquered-time/
 │   │   ├── main.js               # Main process: window, IPC, DB, crypto, TOTP, backup, audit
 │   │   └── preload.js            # Secure contextBridge API whitelist
 │   └── renderer/
+│       ├── store.js              # In-memory data cache + pub/sub invalidation, ID normalization
+│       ├── ipc.js                # Thin typed wrapper over the preload IPC channels
+│       ├── validator.js          # Input validation/normalization before save
 │       ├── pages/
 │       │   ├── splash.html       # Branded startup splash (theme-aware)
 │       │   ├── login.html        # Profile selector, TOTP login, setup wizard, recovery

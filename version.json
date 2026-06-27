@@ -1,5 +1,5 @@
 {
-  "version": "3.3.0",
+  "version": "3.4.0",
   "downloadUrl": "https://github.com/Conqueror-Mod/conquered-time/releases/latest",
-  "notes": "v3.3 — Time entries encrypted at rest (AES-256-GCM), US state break/lunch compliance policy, Windows Hello / Quick Unlock fast login, and login screen overhaul."
+  "notes": "v3.4 — Internal architecture refactor: centralized Store/IPC/Validator layer for the renderer. Single source of truth for data fetching, ID normalization, and input validation across all pages."
 }

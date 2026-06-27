@@ -464,21 +464,20 @@ const Shell = (() => {
               </div>
 
               <div class="about-section">
-                <div class="about-section-title">What's New — v3.3</div>
+                <div class="about-section-title">What's New — v3.4</div>
+                <ul class="about-changelog">
+                  <li>Architecture refactor — new centralized Store / IPC / Validator layer behind the scenes; one source of truth for data fetching and record ID handling across every page</li>
+                  <li>Input validation — company and time-entry saves are now validated and normalized before they're written, catching malformed clock times and missing fields earlier</li>
+                  <li>Foundation work — no visible feature changes, but a cleaner base for upcoming reporting and multi-platform work</li>
+                </ul>
+              </div>
+              <div class="about-section">
+                <div class="about-section-title">v3.3</div>
                 <ul class="about-changelog">
                   <li>Time entries encrypted at rest — task labels, names, descriptions, and clock times now stored as AES-256-GCM ciphertext; transparent one-time migration on login</li>
                   <li>US state break/lunch compliance — set your work state in Profile; California, New York, and other state-specific break rules applied in Dispatch and Audit</li>
                   <li>Windows Hello / Quick Unlock — fast login via biometric or PIN after first session; password fallback always available; managed in Settings → Security</li>
                   <li>Login screen overhaul — profile selector cards with avatars, unified branding, pre-auth settings access, QR code auto-generates on Setup tab</li>
-                  <li>Easter egg — try the Konami code on the profile selector</li>
-                </ul>
-              </div>
-              <div class="about-section">
-                <div class="about-section-title">v3.2</div>
-                <ul class="about-changelog">
-                  <li>Full account recovery — recovery key packet seals session key under recovery code at setup, enabling password reset without data loss</li>
-                  <li>PDF export enriched — work type, location, supervisors in header; per-label time subtotals; Export All restructured with summary section</li>
-                  <li>Right-click context menu — Cut/Copy/Paste/Select All now available globally in all text fields</li>
                 </ul>
               </div>
               <div class="about-section">
