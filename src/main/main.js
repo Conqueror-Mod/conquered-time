@@ -15,7 +15,9 @@ if (!gotLock) { app.quit(); process.exit(0); }
 // ── Data paths ─────────────────────────────────────────────────────────────
 // --dev flag: uses ./dev-data/dev-vault.db; skips profile selector entirely.
 // Production: each user lives in conquered-data/profiles/<username>/vault.db.
-const IS_DEV        = process.argv.includes('--dev');
+// --dev is honored only in an unpackaged (developer) run. A shipped build must
+// never drop into the dev-data sandbox just because someone passed --dev.
+const IS_DEV        = process.argv.includes('--dev') && !app.isPackaged;
 const ROOT_DATA_DIR = IS_DEV
   ? path.join(__dirname, '..', '..', 'dev-data')
   : path.join(app.getPath('userData'), 'conquered-data');
@@ -1768,7 +1770,14 @@ async function doSendReport({ htmlContent, subject, recipients, entriesOverride 
       });
     } catch {}
   });
-  const csv = [csvHeader, ...csvRows].map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  // Quote every field, double embedded quotes, and neutralize CSV formula
+  // injection (leading = + - @ tab CR) by prefixing a single quote.
+  const csvCell = (v) => {
+    let s = v == null ? '' : String(v);
+    if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+    return '"' + s.replace(/"/g, '""') + '"';
+  };
+  const csv = [csvHeader, ...csvRows].map(r => r.map(csvCell).join(',')).join('\n');
 
   const pdfBuf = await generatePDF(htmlContent);
   const dateTag = new Date().toISOString().slice(0, 10);

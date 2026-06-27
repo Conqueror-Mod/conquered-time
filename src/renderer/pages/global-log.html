@@ -482,15 +482,25 @@
     win.document.close(); win.print();
   }
 
+  // Safely encode a value as a CSV field: double embedded quotes, always quote,
+  // and neutralize formula injection — a leading =, +, -, @, tab or CR makes
+  // Excel/Sheets evaluate the cell as a formula, so prefix those with a single
+  // quote. (e.g. a company named "=cmd|'/c calc'!A1" must not execute on open.)
+  function csvCell(v) {
+    let s = v == null ? '' : String(v);
+    if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+    return '"' + s.replace(/"/g, '""') + '"';
+  }
+
   function exportCSV() {
     if (filtered.length===0) { Shell.toast('No data to export.','warning'); return; }
     const lines=['Company,Date,Session,Task Label,Task Name,Description,Clock In,Clock Out,Duration (mins)'];
     filtered.forEach(e => {
       const co=compMap[e.company_id];
       safeParseRows(e.rows_json).filter(r=>r.label||r.name).forEach(r => {
-        lines.push([`"${co?.name||''}"`,e.log_date,`"${e.session_label||''}"`,
-          `"${r.label||''}"`,`"${r.name||''}"`,`"${r.desc||r.description||''}"`,
-          `"${r.clock_in||''}"`,`"${r.clock_out||''}"`,r.total_mins||0].join(','));
+        lines.push([csvCell(co?.name),csvCell(e.log_date),csvCell(e.session_label),
+          csvCell(r.label),csvCell(r.name),csvCell(r.desc||r.description),
+          csvCell(r.clock_in),csvCell(r.clock_out),r.total_mins||0].join(','));
       });
     });
     const blob=new Blob([lines.join('\n')],{type:'text/csv'});
