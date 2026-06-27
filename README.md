@@ -58,7 +58,8 @@ conquered-time/
 ├── version.json                  # Version manifest for Check for Updates
 ├── src/
 │   ├── main/
-│   │   ├── main.js               # Main process: window, IPC, DB, crypto, TOTP, backup, audit
+│   │   ├── main.js               # Main process: window, IPC, DB, TOTP, backup, audit
+│   │   ├── vault-crypto.js       # Pure AES-256-GCM / PBKDF2 + atomic re-encryption (unit-tested)
 │   │   └── preload.js            # Secure contextBridge API whitelist
 │   └── renderer/
 │       ├── store.js              # In-memory data cache + pub/sub invalidation, ID normalization
@@ -89,6 +90,8 @@ conquered-time/
 │           └── print.css
 ├── assets/
 │   └── icon.ico                  # App icon
+├── test/
+│   └── vault-crypto.test.js      # node --test suite for crypto + re-encryption
 ├── package.json
 └── README.md
 ```
@@ -121,6 +124,17 @@ npm run seed
 ```
 
 Credentials: `devuser` / `devpass123`
+
+### Run tests
+
+```bash
+npm test
+```
+
+Uses the built-in `node --test` runner (no extra dependencies). Covers the
+security-critical paths in `src/main/vault-crypto.js`: AES-256-GCM round-trips,
+PBKDF2 key separation, and the all-or-nothing re-encryption used by password
+change / recovery (read-phase abort and write-phase rollback).
 
 ### Build installer
 

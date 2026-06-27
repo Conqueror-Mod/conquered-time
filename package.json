@@ -17,6 +17,7 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
+    "test": "node --test",
     "seed": "node seed-dev.js",
     "build": "electron-builder --win --x64",
     "build:mac": "electron-builder --mac",
