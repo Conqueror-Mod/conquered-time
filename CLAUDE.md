@@ -98,6 +98,7 @@ Whitelisted channels only, enforced in `preload.js`:
 ### Electron Security Hardening
 - `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true` on all renderer processes.
 - Frameless window with custom titlebar (drag region + minimize/maximize/close).
+- **CSP** (identical `<meta>` on all 10 pages): `default-src 'self'`, no remote script/img origins, `img-src 'self' data:`, `object-src 'none'`, `base-uri 'self'`. `'unsafe-inline'` is **deliberately retained** for `script-src`/`style-src` — every page's logic and ~150 event handlers are inline (many generated in `shell.js` template strings), so removing it would require externalizing all scripts + converting all handlers + nonces: a large, high-risk refactor for defense-in-depth that the output-escaping already mitigates. The practical XSS defense is `window.escapeHtml()` (in `shell.js`; local copies in `login.html`/`audit-wizard.html`) applied at every `${userField}` HTML interpolation. Don't reintroduce unescaped user data into `innerHTML`/`document.write`.
 
 ### Navigation Model
 - **Not a SPA.** Each "page" (dashboard, companies, tracker, global-log, login) is a full `mainWindow.loadFile()` swap.

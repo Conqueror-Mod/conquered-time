@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy"
-  content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; img-src 'self' data:; blob:;">
+  content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self';">
 <title>Conquered Time — Reports</title>
 <link rel="stylesheet" href="../styles/design-system.css">
 <script>
@@ -426,8 +426,9 @@
       api.invoke('audit:open-wizard', { mode: 'fix', theme });
     });
     api.on('audit:wizard-done', async () => {
+      Store.invalidate('entries');  // audit wizard may have applied fixes
       [allEntries, taskMap] = await Promise.all([
-        api.invoke('entries:all'),
+        Store.getEntries(),
         api.invoke('tasks:summary'),
       ]);
       allEntries = allEntries || [];
@@ -453,8 +454,8 @@
   // ── Data ──
   async function loadData() {
     [companies, allEntries, taskMap] = await Promise.all([
-      api.invoke('companies:list'),
-      api.invoke('entries:all'),
+      Store.getCompanies(),
+      Store.getEntries(),
       api.invoke('tasks:summary'),
     ]);
     try { auditPolicy = await api.invoke('audit:get-policy'); } catch(e) { auditPolicy = null; }
@@ -829,7 +830,8 @@
     const res = await api.invoke('audit:apply-fix', { entry_id: Number(entryId), row_idx: Number(rowIdx), fix_type: fixType });
     if (!res?.ok) { Shell.toast('Fix could not be applied: ' + (res?.error || 'unknown error'), 'error'); return; }
     // Reload entries so the fix is reflected
-    allEntries = await api.invoke('entries:all') || [];
+    Store.invalidate('entries');
+    allEntries = await Store.getEntries();
     // Auto-dismiss the fixed item
     await api.invoke('audit:dismiss', { entry_id: Number(entryId), row_idx: Number(rowIdx), type: fixType === 'set_clock_out' ? 'no_clock_out' : 'zero_duration' });
     dismissedSet.add(dKey);
