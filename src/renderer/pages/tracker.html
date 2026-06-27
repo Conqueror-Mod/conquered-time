@@ -654,6 +654,8 @@
       rows_json: JSON.stringify(rowsData),
       total_mins: total
     };
+    const valid = Validator.validateEntry(entry);
+    if (!valid.ok) { if (!silent) Shell.toast(valid.error, 'error'); return; }
     const res = await IPC.entries.save(entry);
     if (res.ok) {
       if (!currentEntryId && res.id) currentEntryId = res.id;

@@ -659,6 +659,8 @@
       supervisors:     document.getElementById('f-supervisors').value.trim(),
       notes:           document.getElementById('f-notes').value.trim(),
     };
+    const valid = Validator.validateCompany(data);
+    if (!valid.ok) { Shell.toast(valid.error, 'error'); return; }
     const res = await IPC.companies.save(data);
     if (res.ok) {
       Shell.toast(editingId ? 'Company updated.' : 'Company added.', 'success');
