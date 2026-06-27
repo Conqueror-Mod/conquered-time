@@ -303,6 +303,80 @@ function decryptEntry(row) {
   return row;
 }
 
+// ── Atomic vault re-encryption ─────────────────────────────────────────────
+// Re-encrypts every encrypted blob in the active vault (companies, profile,
+// SMTP password, time entries) from oldKey to newKey. All-or-nothing:
+//
+//   1. Read phase — decrypt EVERYTHING first. If a single blob can't be read,
+//      abort before any mutation. (No swallowed failures: a profile/SMTP blob
+//      that won't decrypt aborts the whole operation rather than being silently
+//      left under the old key.)
+//   2. Snapshot the in-memory db.
+//   3. Write phase — apply all re-encrypts plus onCommit (password hash, lockout
+//      reset) together. If anything throws, roll the in-memory db back to the
+//      snapshot so a half-re-encrypted (mixed-key) database can never be left in
+//      memory to be persisted by a later save.
+//
+// Caller is responsible for persistDB()/performBackup() only after { ok:true }.
+function reEncryptVault({ oldKey, newKey, userId, user, onCommit }) {
+  const writes = [];
+  try {
+    const companies = dbAll('SELECT rowid as rid, data_enc, data_iv, data_tag FROM companies WHERE user_id=?', [userId]);
+    for (const co of companies) {
+      const plain = decrypt({ data: co.data_enc, iv: co.data_iv, tag: co.data_tag }, oldKey);
+      writes.push(() => {
+        const r = encrypt(plain, newKey);
+        db.run('UPDATE companies SET data_enc=?, data_iv=?, data_tag=? WHERE rowid=?', [r.data, r.iv, r.tag, Number(co.rid)]);
+      });
+    }
+
+    if (user.profile_enc && user.profile_iv && user.profile_tag) {
+      const plain = decrypt({ data: user.profile_enc, iv: user.profile_iv, tag: user.profile_tag }, oldKey);
+      writes.push(() => {
+        const r = encrypt(plain, newKey);
+        db.run('UPDATE users SET profile_enc=?, profile_iv=?, profile_tag=? WHERE rowid=?', [r.data, r.iv, r.tag, userId]);
+      });
+    }
+
+    const smtpEnc = dbGet("SELECT value FROM app_settings WHERE key='email_smtp_password_enc'");
+    const smtpIv  = dbGet("SELECT value FROM app_settings WHERE key='email_smtp_password_iv'");
+    const smtpTag = dbGet("SELECT value FROM app_settings WHERE key='email_smtp_password_tag'");
+    if (smtpEnc?.value && smtpIv?.value && smtpTag?.value) {
+      const plain = decrypt({ data: smtpEnc.value, iv: smtpIv.value, tag: smtpTag.value }, oldKey);
+      writes.push(() => {
+        const r = encrypt(plain, newKey);
+        const set = (k, v) => db.run('INSERT OR REPLACE INTO app_settings (key,value) VALUES (?,?)', [k, v]);
+        set('email_smtp_password_enc', r.data);
+        set('email_smtp_password_iv',  r.iv);
+        set('email_smtp_password_tag', r.tag);
+      });
+    }
+
+    const entries = dbAll('SELECT rowid as rid, rows_enc, rows_iv, rows_tag FROM time_entries WHERE user_id=? AND rows_enc IS NOT NULL', [userId]);
+    for (const e of entries) {
+      const plain = decrypt({ data: e.rows_enc, iv: e.rows_iv, tag: e.rows_tag }, oldKey);
+      writes.push(() => {
+        const r = encrypt(plain, newKey);
+        db.run('UPDATE time_entries SET rows_enc=?, rows_iv=?, rows_tag=? WHERE rowid=?', [r.data, r.iv, r.tag, e.rid]);
+      });
+    }
+  } catch (e) {
+    // Nothing mutated yet — safe to bail.
+    return { ok: false, error: 'Re-encryption aborted (could not read existing data): ' + e.message };
+  }
+
+  const snapshot = Buffer.from(db.export());
+  try {
+    for (const apply of writes) apply();
+    if (onCommit) onCommit();
+    return { ok: true };
+  } catch (e) {
+    try { db.close(); } catch {}
+    db = new SQL.Database(snapshot);
+    return { ok: false, error: 'Re-encryption failed during write, rolled back: ' + e.message };
+  }
+}
+
 function migrateTimeEntries() {
   if (!sessionKey || !sessionUser) return;
   try {
@@ -981,56 +1055,13 @@ ipcMain.handle('auth:recover', async (_, { username, recoveryCode, newPassword }
     const oldKey         = Buffer.from(oldKeyHex, 'hex');
     const newKey         = deriveKey(newPassword, user.key_salt);
 
-    // Re-encrypt all company rows
-    const companies = dbAll('SELECT rowid as rid, * FROM companies WHERE user_id=?', [Number(user.rid)]);
-    for (const co of companies) {
-      try {
-        const plain = decrypt({ data: co.data_enc, iv: co.data_iv, tag: co.data_tag }, oldKey);
-        const reenc = encrypt(plain, newKey);
-        db.run('UPDATE companies SET data_enc=?, data_iv=?, data_tag=? WHERE rowid=?',
-          [reenc.data, reenc.iv, reenc.tag, Number(co.rid)]);
-      } catch(e) { return { ok: false, error: 'Re-encryption failed: ' + e.message }; }
-    }
+    const res = reEncryptVault({
+      oldKey, newKey, userId: Number(user.rid), user,
+      onCommit: () => db.run('UPDATE users SET password_hash=?, failed_attempts=0, locked_until=NULL WHERE rowid=?',
+        [bcrypt.hashSync(newPassword, 12), Number(user.rid)]),
+    });
+    if (!res.ok) return res;
 
-    // Re-encrypt profile blob if present
-    if (user.profile_enc && user.profile_iv && user.profile_tag) {
-      try {
-        const plain = decrypt({ data: user.profile_enc, iv: user.profile_iv, tag: user.profile_tag }, oldKey);
-        const reenc = encrypt(plain, newKey);
-        db.run('UPDATE users SET profile_enc=?, profile_iv=?, profile_tag=? WHERE rowid=?',
-          [reenc.data, reenc.iv, reenc.tag, Number(user.rid)]);
-      } catch {}
-    }
-
-    // Re-encrypt SMTP password if present
-    const smtpEnc = dbGet("SELECT value FROM app_settings WHERE key='email_smtp_password_enc'");
-    const smtpIv  = dbGet("SELECT value FROM app_settings WHERE key='email_smtp_password_iv'");
-    const smtpTag = dbGet("SELECT value FROM app_settings WHERE key='email_smtp_password_tag'");
-    if (smtpEnc?.value && smtpIv?.value && smtpTag?.value) {
-      try {
-        const plain = decrypt({ data: smtpEnc.value, iv: smtpIv.value, tag: smtpTag.value }, oldKey);
-        const reenc = encrypt(plain, newKey);
-        const setSetting = (k, v) => db.run('INSERT OR REPLACE INTO app_settings (key,value) VALUES (?,?)', [k, v]);
-        setSetting('email_smtp_password_enc', reenc.data);
-        setSetting('email_smtp_password_iv',  reenc.iv);
-        setSetting('email_smtp_password_tag', reenc.tag);
-      } catch {}
-    }
-
-    // Re-encrypt time entries
-    const entries = dbAll('SELECT rowid as rid, rows_enc, rows_iv, rows_tag FROM time_entries WHERE user_id=? AND rows_enc IS NOT NULL', [Number(user.rid)]);
-    for (const e of entries) {
-      try {
-        const plain = decrypt({ data: e.rows_enc, iv: e.rows_iv, tag: e.rows_tag }, oldKey);
-        const reenc = encrypt(plain, newKey);
-        db.run('UPDATE time_entries SET rows_enc=?,rows_iv=?,rows_tag=? WHERE rowid=?',
-          [reenc.data, reenc.iv, reenc.tag, e.rid]);
-      } catch(e) { return { ok: false, error: 'Re-encryption failed: ' + e.message }; }
-    }
-
-    // Update password hash and clear lockout
-    db.run('UPDATE users SET password_hash=?, failed_attempts=0, locked_until=NULL WHERE rowid=?',
-      [bcrypt.hashSync(newPassword, 12), Number(user.rid)]);
     persistDB(); performBackup();
     return { ok: true, passwordReset: true };
   } catch(e) { return { ok: false, error: 'Recovery failed: ' + e.message }; }
@@ -1488,55 +1519,13 @@ ipcMain.handle('auth:change-password', async (_, { currentPassword, totpCode, ne
 
   const newKey = deriveKey(newPassword, user.key_salt);
 
-  // Re-encrypt all company rows with the new key
-  const companies = dbAll('SELECT rowid as rid, * FROM companies WHERE user_id=?', [sessionUser.id]);
-  for (const co of companies) {
-    try {
-      const plain = decrypt({ data: co.data_enc, iv: co.data_iv, tag: co.data_tag }, sessionKey);
-      const reenc = encrypt(plain, newKey);
-      db.run('UPDATE companies SET data_enc=?, data_iv=?, data_tag=? WHERE rowid=?',
-        [reenc.data, reenc.iv, reenc.tag, Number(co.rid)]);
-    } catch(e) { return { ok: false, error: 'Re-encryption failed: ' + e.message }; }
-  }
+  const res = reEncryptVault({
+    oldKey: sessionKey, newKey, userId: sessionUser.id, user,
+    onCommit: () => db.run('UPDATE users SET password_hash=? WHERE rowid=?',
+      [bcrypt.hashSync(newPassword, 12), sessionUser.id]),
+  });
+  if (!res.ok) return res;
 
-  // Re-encrypt profile blob if present
-  if (user.profile_enc && user.profile_iv && user.profile_tag) {
-    try {
-      const plain = decrypt({ data: user.profile_enc, iv: user.profile_iv, tag: user.profile_tag }, sessionKey);
-      const reenc = encrypt(plain, newKey);
-      db.run('UPDATE users SET profile_enc=?, profile_iv=?, profile_tag=? WHERE rowid=?',
-        [reenc.data, reenc.iv, reenc.tag, sessionUser.id]);
-    } catch {}
-  }
-
-  // Re-encrypt SMTP password if present
-  const smtpEnc = dbGet("SELECT value FROM app_settings WHERE key='email_smtp_password_enc'");
-  const smtpIv  = dbGet("SELECT value FROM app_settings WHERE key='email_smtp_password_iv'");
-  const smtpTag = dbGet("SELECT value FROM app_settings WHERE key='email_smtp_password_tag'");
-  if (smtpEnc?.value && smtpIv?.value && smtpTag?.value) {
-    try {
-      const plain = decrypt({ data: smtpEnc.value, iv: smtpIv.value, tag: smtpTag.value }, sessionKey);
-      const reenc = encrypt(plain, newKey);
-      const setSetting = (k, v) => db.run('INSERT OR REPLACE INTO app_settings (key,value) VALUES (?,?)', [k, v]);
-      setSetting('email_smtp_password_enc', reenc.data);
-      setSetting('email_smtp_password_iv',  reenc.iv);
-      setSetting('email_smtp_password_tag', reenc.tag);
-    } catch {}
-  }
-
-  // Re-encrypt time entries
-  const entries = dbAll('SELECT rowid as rid, rows_enc, rows_iv, rows_tag FROM time_entries WHERE user_id=? AND rows_enc IS NOT NULL', [sessionUser.id]);
-  for (const e of entries) {
-    try {
-      const plain = decrypt({ data: e.rows_enc, iv: e.rows_iv, tag: e.rows_tag }, sessionKey);
-      const reenc = encrypt(plain, newKey);
-      db.run('UPDATE time_entries SET rows_enc=?,rows_iv=?,rows_tag=? WHERE rowid=?',
-        [reenc.data, reenc.iv, reenc.tag, e.rid]);
-    } catch(e) { return { ok: false, error: 'Re-encryption failed: ' + e.message }; }
-  }
-
-  const newHash = bcrypt.hashSync(newPassword, 12);
-  db.run('UPDATE users SET password_hash=? WHERE rowid=?', [newHash, sessionUser.id]);
   sessionKey = newKey;
   persistDB(); performBackup();
   return { ok: true };
