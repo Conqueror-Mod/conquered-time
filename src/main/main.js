@@ -1068,6 +1068,17 @@ ipcMain.handle('entries:all', () => {
     .map(r => ({...decryptEntry(r), id: Number(r.rid)}));
 });
 
+// Lightweight variant: returns only the plaintext aggregate columns and does NOT
+// decrypt rows_json. Consumers that only need totals/dates/labels (dashboard,
+// company hour rollups) use this so they don't pay AES-GCM decryption on the
+// entire entry history every page load. Anything needing per-row clock detail
+// (global log, audit, reports) must keep using entries:all.
+ipcMain.handle('entries:summary', () => {
+  if (!sessionKey || !sessionUser) return [];
+  return dbAll('SELECT rowid as rid, company_id, log_date, session_label, total_mins FROM time_entries WHERE user_id=? ORDER BY log_date DESC', [sessionUser.id])
+    .map(r => ({ ...r, id: Number(r.rid) }));
+});
+
 ipcMain.handle('entries:get-active', () => {
   if (!sessionKey || !sessionUser) return null;
 

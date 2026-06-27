@@ -19,10 +19,11 @@ window.IPC = (() => {
       delete: (id)     => call('companies:delete', id),
     },
     entries: {
-      list:   (compId) => call('entries:list', compId),
-      all:    ()       => call('entries:all'),
-      save:   (entry)  => call('entries:save', entry),
-      active: ()       => call('entries:get-active'),
+      list:    (compId) => call('entries:list', compId),
+      all:     ()       => call('entries:all'),
+      summary: ()       => call('entries:summary'),
+      save:    (entry)  => call('entries:save', entry),
+      active:  ()       => call('entries:get-active'),
     },
     tasks: {
       list:    (entryId) => call('tasks:list', entryId),

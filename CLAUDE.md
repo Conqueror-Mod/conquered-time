@@ -90,7 +90,8 @@ Whitelisted channels only, enforced in `preload.js`:
 - `totp:generate`
 - `session:get`
 - `companies:list/save/delete`
-- `entries:list/save/all`
+- `entries:list/save/all/summary`
+  - **Two read paths:** `entries:all` decrypts every entry's `rows_json` (per-row clock detail) — used by global log, audit, reports. `entries:summary` returns only the plaintext aggregate columns (`company_id`, `log_date`, `session_label`, `total_mins`) and does **no** decryption — used by dashboard and company hour rollups to avoid paying AES-GCM on the whole history every page load. In the renderer these are `Store.getEntries()` vs `Store.getEntriesSummary()` (separate cache slots, both invalidated together on `entries`). Do not read `rows_json` off a summary result — it isn't there.
 - `settings:get/set`
 - `win:minimize/maximize/close`, `navigate`
 

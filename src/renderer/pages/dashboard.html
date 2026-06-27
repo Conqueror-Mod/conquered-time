@@ -215,7 +215,7 @@
 
   async function loadData() {
     companies  = await Store.getCompanies();
-    allEntries = await Store.getEntries();
+    allEntries = await Store.getEntriesSummary();
 
     const today   = new Date().toISOString().slice(0,10);
     const weekAgo = new Date(Date.now() - 7*86400000).toISOString().slice(0,10);

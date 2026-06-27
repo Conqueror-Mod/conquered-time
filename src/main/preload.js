@@ -10,7 +10,7 @@ const ALLOWED_INVOKE = new Set([
   'totp:generate',
   'session:get', 'session:heartbeat',
   'companies:list', 'companies:save', 'companies:delete',
-  'entries:list', 'entries:save', 'entries:all', 'entries:get-active', 'entries:get',
+  'entries:list', 'entries:save', 'entries:all', 'entries:summary', 'entries:get-active', 'entries:get',
   'tasks:list', 'tasks:save', 'tasks:delete', 'tasks:recent-labels', 'tasks:summary',
   'settings:get', 'settings:set',
   'app:get-info', 'app:check-update',

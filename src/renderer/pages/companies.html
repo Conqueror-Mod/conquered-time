@@ -490,7 +490,7 @@
 
   async function loadCompanies() {
     companies = await Store.getCompanies();
-    entries   = await Store.getEntries();
+    entries   = await Store.getEntriesSummary();
     renderList();
     document.getElementById('company-count').textContent = companies.length;
     if (selectedId) {
