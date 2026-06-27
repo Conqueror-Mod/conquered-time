@@ -190,10 +190,28 @@ async function initProfileDB(profileDir) {
 }
 
 // ── Persist sql.js DB to disk ──────────────────────────────────────────────
+// Atomic write: dump to a sibling temp file, flush it to disk, then rename
+// over the live vault. rename(2) is atomic on the same volume (and Windows
+// MoveFileEx replaces atomically), so a crash or power loss mid-write can
+// never leave the vault truncated — on disk you always have either the
+// complete old file or the complete new one, never a half-written blob.
 function persistDB() {
-  if (!db) return;
-  const data = db.export();
-  fs.writeFileSync(DB_FILE, Buffer.from(data));
+  if (!db || !DB_FILE) return;
+  const data = Buffer.from(db.export());
+  const tmp  = DB_FILE + '.tmp';
+  const fd = fs.openSync(tmp, 'w');
+  try {
+    fs.writeSync(fd, data);
+    fs.fsyncSync(fd);       // force kernel buffers to physical disk before swap
+  } finally {
+    fs.closeSync(fd);
+  }
+  try {
+    fs.renameSync(tmp, DB_FILE);
+  } catch (e) {
+    try { fs.unlinkSync(tmp); } catch {}  // don't leave a stale .tmp behind
+    throw e;
+  }
 }
 
 // ── Backup ─────────────────────────────────────────────────────────────────
