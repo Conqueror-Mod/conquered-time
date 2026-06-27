@@ -127,4 +127,23 @@ function reEncryptVault({ SQL, db, oldKey, newKey, userId, user, onCommit }) {
   }
 }
 
-module.exports = { encrypt, decrypt, deriveKey, reEncryptVault };
+// ── One-time time-entry encryption migration ───────────────────────────────
+// Encrypts any time_entries rows still stored as plaintext rows_json (rows_enc
+// IS NULL) under `key`, blanking the plaintext column afterward. Idempotent:
+// already-encrypted rows are skipped (their rows_enc is non-null), so it is safe
+// to run on every login. Returns the number of rows migrated.
+//
+// Not wrapped in the snapshot/rollback machinery on purpose — it only ever adds
+// ciphertext to previously-plaintext rows and never re-keys existing ciphertext,
+// so a crash mid-run simply leaves the remaining rows for the next pass.
+function migrateTimeEntries({ db, key, userId }) {
+  const plain = all(db, 'SELECT rowid as rid, rows_json FROM time_entries WHERE user_id=? AND rows_enc IS NULL', [userId]);
+  for (const r of plain) {
+    const enc = encrypt(r.rows_json || '[]', key);
+    db.run('UPDATE time_entries SET rows_enc=?, rows_iv=?, rows_tag=?, rows_json=? WHERE rowid=?',
+      [enc.data, enc.iv, enc.tag, '', r.rid]);
+  }
+  return plain.length;
+}
+
+module.exports = { encrypt, decrypt, deriveKey, reEncryptVault, migrateTimeEntries };

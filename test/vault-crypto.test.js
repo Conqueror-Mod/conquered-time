@@ -10,7 +10,7 @@
 const { test } = require('node:test');
 const assert   = require('node:assert');
 const initSqlJs = require('sql.js');
-const { encrypt, decrypt, deriveKey, reEncryptVault } = require('../src/main/vault-crypto');
+const { encrypt, decrypt, deriveKey, reEncryptVault, migrateTimeEntries } = require('../src/main/vault-crypto');
 
 let SQL;
 async function getSQL() { return SQL || (SQL = await initSqlJs()); }
@@ -170,4 +170,86 @@ test('reEncryptVault: write-phase failure rolls the db back to pre-write state',
     assert.doesNotThrow(() => decrypt(b, oldKey));
     assert.throws(() => decrypt(b, newKey));
   }
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+//  Time-entry encryption migration
+// ════════════════════════════════════════════════════════════════════════════
+
+// Vault with `plaintext` rows_json entries (rows_enc NULL) and optionally some
+// rows already encrypted under `key`.
+function makeMigrationVault(key, { plaintext = [], encrypted = [] } = {}) {
+  const db = new SQL.Database();
+  db.run('CREATE TABLE time_entries (id INTEGER PRIMARY KEY, user_id INTEGER, rows_json TEXT, rows_enc TEXT, rows_iv TEXT, rows_tag TEXT);');
+  for (const json of plaintext) {
+    db.run('INSERT INTO time_entries (user_id, rows_json, rows_enc, rows_iv, rows_tag) VALUES (1, ?, NULL, NULL, NULL)', [json]);
+  }
+  for (const json of encrypted) {
+    const e = encrypt(json, key);
+    db.run('INSERT INTO time_entries (user_id, rows_json, rows_enc, rows_iv, rows_tag) VALUES (1, ?, ?, ?, ?)', ['', e.data, e.iv, e.tag]);
+  }
+  return db;
+}
+
+function entryRows(db) {
+  const res = db.exec('SELECT rows_json, rows_enc, rows_iv, rows_tag FROM time_entries ORDER BY id');
+  return (res[0]?.values || []).map(v => ({ rows_json: v[0], rows_enc: v[1], rows_iv: v[2], rows_tag: v[3] }));
+}
+
+test('migrateTimeEntries: encrypts plaintext rows and blanks the plaintext column', async () => {
+  await getSQL();
+  const key = deriveKey('pw', 'salt-mig00000000a');
+  const payloads = ['[{"label":"task"}]', '[]', '[{"a":1},{"b":2}]'];
+  const db = makeMigrationVault(key, { plaintext: payloads });
+
+  const n = migrateTimeEntries({ db, key, userId: 1 });
+
+  assert.strictEqual(n, 3);
+  for (const [i, row] of entryRows(db).entries()) {
+    assert.strictEqual(row.rows_json, '', 'plaintext column must be blanked');
+    assert.ok(row.rows_enc && row.rows_iv && row.rows_tag, 'ciphertext columns populated');
+    assert.strictEqual(decrypt({ data: row.rows_enc, iv: row.rows_iv, tag: row.rows_tag }, key), payloads[i]);
+  }
+});
+
+test('migrateTimeEntries: is idempotent — a second pass migrates nothing and touches nothing', async () => {
+  await getSQL();
+  const key = deriveKey('pw', 'salt-mig11111111b');
+  const db = makeMigrationVault(key, { plaintext: ['[{"x":1}]', '[{"y":2}]'] });
+
+  assert.strictEqual(migrateTimeEntries({ db, key, userId: 1 }), 2);
+  const afterFirst = entryRows(db);
+  assert.strictEqual(migrateTimeEntries({ db, key, userId: 1 }), 0, 'second pass migrates 0 rows');
+  assert.deepStrictEqual(entryRows(db), afterFirst, 'already-encrypted rows are byte-identical after a re-run');
+});
+
+test('migrateTimeEntries: only touches plaintext rows in a mixed vault', async () => {
+  await getSQL();
+  const key = deriveKey('pw', 'salt-mig22222222c');
+  const db = makeMigrationVault(key, { plaintext: ['[{"new":1}]'], encrypted: ['[{"old":1}]'] });
+  const before = entryRows(db);
+
+  const n = migrateTimeEntries({ db, key, userId: 1 });
+
+  assert.strictEqual(n, 1, 'only the single plaintext row is migrated');
+  const after = entryRows(db);
+  // The pre-encrypted row (id 2) is unchanged; both rows decrypt to their payloads.
+  assert.deepStrictEqual(after[1], before[1], 'pre-encrypted row untouched');
+  assert.strictEqual(decrypt({ data: after[0].rows_enc, iv: after[0].rows_iv, tag: after[0].rows_tag }, key), '[{"new":1}]');
+  assert.strictEqual(decrypt({ data: after[1].rows_enc, iv: after[1].rows_iv, tag: after[1].rows_tag }, key), '[{"old":1}]');
+});
+
+test('migrateTimeEntries: scopes to the given user', async () => {
+  await getSQL();
+  const key = deriveKey('pw', 'salt-mig33333333d');
+  const db = makeMigrationVault(key, { plaintext: ['[{"mine":1}]'] });
+  // Add a second user's plaintext row that must be left alone.
+  db.run("INSERT INTO time_entries (user_id, rows_json, rows_enc, rows_iv, rows_tag) VALUES (2, '[{\"theirs\":1}]', NULL, NULL, NULL)");
+
+  const n = migrateTimeEntries({ db, key, userId: 1 });
+
+  assert.strictEqual(n, 1);
+  const other = db.exec('SELECT rows_json, rows_enc FROM time_entries WHERE user_id=2')[0].values[0];
+  assert.strictEqual(other[0], '[{"theirs":1}]', "other user's plaintext untouched");
+  assert.strictEqual(other[1], null, "other user's row not encrypted");
 });

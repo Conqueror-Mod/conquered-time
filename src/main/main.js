@@ -6,7 +6,7 @@ const fs         = require('fs');
 const crypto     = require('crypto');
 const nodemailer = require('nodemailer');
 const { execFile } = require('child_process');
-const { encrypt, decrypt, deriveKey, reEncryptVault: reEncryptVaultCore } = require('./vault-crypto');
+const { encrypt, decrypt, deriveKey, reEncryptVault: reEncryptVaultCore, migrateTimeEntries: migrateTimeEntriesCore } = require('./vault-crypto');
 
 // ── Single instance lock ───────────────────────────────────────────────────
 const gotLock = app.requestSingleInstanceLock();
@@ -297,18 +297,8 @@ function reEncryptVault(opts) {
 function migrateTimeEntries() {
   if (!sessionKey || !sessionUser) return;
   try {
-    const plain = dbAll(
-      'SELECT rowid as rid, rows_json FROM time_entries WHERE user_id=? AND rows_enc IS NULL',
-      [sessionUser.id]
-    );
-    for (const r of plain) {
-      const enc = encrypt(r.rows_json || '[]', sessionKey);
-      db.run(
-        'UPDATE time_entries SET rows_enc=?, rows_iv=?, rows_tag=?, rows_json=? WHERE rowid=?',
-        [enc.data, enc.iv, enc.tag, '', r.rid]
-      );
-    }
-    if (plain.length > 0) persistDB();
+    const migrated = migrateTimeEntriesCore({ db, key: sessionKey, userId: sessionUser.id });
+    if (migrated > 0) persistDB();
   } catch (e) { console.warn('[migrateTimeEntries] failed:', e.message); }
 }
 
