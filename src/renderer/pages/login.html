@@ -723,6 +723,12 @@
 <script>
 'use strict';
 
+// Standalone window (no shell.js) — local HTML-escape for user-controlled text.
+function escapeHtml(v) {
+  if (v == null) return '';
+  return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
 // ═══════════════════════════════════════════════════════
 //  INTERACTIVE GRID
 // ═══════════════════════════════════════════════════════
@@ -930,7 +936,7 @@ function avatarInitials(name) {
 
 function buildAvatarEl(el, profile, size) {
   if (profile.avatar_thumb_48) {
-    el.innerHTML = `<img src="${profile.avatar_thumb_48}" alt="">`;
+    el.innerHTML = `<img src="${escapeHtml(profile.avatar_thumb_48)}" alt="">`;
   } else {
     el.textContent = avatarInitials(profile.display_name || profile.username);
   }
@@ -1898,8 +1904,8 @@ function paRenderDeleteUser() {
   const p   = _paOpenedWithProfile;
   const initials = (p.display_name || p.username || '?').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
   const avatarHTML = p.avatar_thumb_48
-    ? `<img src="${p.avatar_thumb_48}" alt="">`
-    : initials;
+    ? `<img src="${escapeHtml(p.avatar_thumb_48)}" alt="">`
+    : escapeHtml(initials);
 
   area.innerHTML = `
     <div class="pa-delete-card" id="pa-del-card">
@@ -1907,8 +1913,8 @@ function paRenderDeleteUser() {
         <div class="pa-delete-profile">
           <div class="pa-delete-avatar">${avatarHTML}</div>
           <div>
-            <div class="pa-delete-name">${p.display_name || p.username}</div>
-            <div class="pa-delete-user">${p.username}</div>
+            <div class="pa-delete-name">${escapeHtml(p.display_name || p.username)}</div>
+            <div class="pa-delete-user">${escapeHtml(p.username)}</div>
           </div>
         </div>
         <button class="dba-trigger-btn danger" onclick="paArmDelete()">Delete</button>

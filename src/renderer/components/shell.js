@@ -1,5 +1,20 @@
 'use strict';
 
+// Escape user-controlled text before it is interpolated into an innerHTML / HTML
+// template string. Prevents stored values (company names, task labels, session
+// notes, etc.) from injecting markup or executing as script. Use everywhere a
+// `${userField}` lands inside an HTML string; not needed for textContent or
+// plain-text contexts (toast, confirm, <input>.value).
+window.escapeHtml = function (v) {
+  if (v == null) return '';
+  return String(v)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+};
+
 const Shell = (() => {
 
   const IC = {

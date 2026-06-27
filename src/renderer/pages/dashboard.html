@@ -238,8 +238,8 @@
 
     list.innerHTML = recent.map(e => `
       <div class="activity-row">
-        <div class="activity-company">${compMap[e.company_id] || '—'}</div>
-        <div class="activity-date">${e.log_date}${e.session_label ? ' · ' + e.session_label : ''}</div>
+        <div class="activity-company">${escapeHtml(compMap[e.company_id]) || '—'}</div>
+        <div class="activity-date">${escapeHtml(e.log_date)}${e.session_label ? ' · ' + escapeHtml(e.session_label) : ''}</div>
         <div class="activity-hours">${fmtH(e.total_mins)}</div>
       </div>
     `).join('');

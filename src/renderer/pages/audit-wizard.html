@@ -308,6 +308,11 @@
 
 <script src="../components/settings.js"></script>
 <script>
+  // Standalone window (no shell.js) — local HTML-escape for user-controlled text.
+  function escapeHtml(v) {
+    if (v == null) return '';
+    return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
   const params   = new URLSearchParams(window.location.search);
   const mode     = params.get('mode') || 'fix';
   const isFix    = mode === 'fix';
@@ -476,11 +481,11 @@
         <div class="issue-detail">
           <div class="detail-field">
             <div class="detail-label">Task Label</div>
-            <div class="detail-value task-label">${r.label || '—'}</div>
+            <div class="detail-value task-label">${escapeHtml(r.label) || '—'}</div>
           </div>
           <div class="detail-field">
             <div class="detail-label">Task Name</div>
-            <div class="detail-value task-label">${r.name || '—'}</div>
+            <div class="detail-value task-label">${escapeHtml(r.name) || '—'}</div>
           </div>
           <div class="detail-field">
             <div class="detail-label">Clock In</div>

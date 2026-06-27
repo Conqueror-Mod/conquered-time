@@ -267,7 +267,7 @@ function renderTaskList() {
     list.innerHTML = completed.map((t, i) => `
       <div class="tt-task-row">
         <span class="tt-task-num">#${i+1}</span>
-        <span class="tt-task-label">${t.label}</span>
+        <span class="tt-task-label">${escapeHtml(t.label)}</span>
         <span class="tt-task-dur">${fmtDurSecs(t.duration_secs)}</span>
         <button class="tt-task-del" data-id="${t.id}" title="Remove">✕</button>
       </div>

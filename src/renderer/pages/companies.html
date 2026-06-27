@@ -520,8 +520,8 @@
         <div class="company-list-item${sel}" onclick="selectCompany(${co.id})" data-id="${co.id}">
           <div class="company-dot"></div>
           <div class="company-info">
-            <div class="company-name">${co.name || '—'}</div>
-            ${sub ? `<div class="company-sub">${sub}</div>` : ''}
+            <div class="company-name">${escapeHtml(co.name) || '—'}</div>
+            ${sub ? `<div class="company-sub">${escapeHtml(sub)}</div>` : ''}
           </div>
           <div class="company-hours">${fmtH(mins[co.id] || 0)}</div>
         </div>`;
@@ -552,11 +552,11 @@
     statsHtml += `<div class="det-chip yellow">${fmtH(hours)} logged</div>`;
     if (co.pay_rate) statsHtml += `<div class="det-chip accent">$${parseFloat(co.pay_rate).toFixed(2)}/hr</div>`;
     statsHtml += `<div class="det-chip ${isActive ? 'green' : ''}">${isActive ? 'Active' : 'Ended'}</div>`;
-    if (co.work_type) statsHtml += `<div class="det-chip">${co.work_type}</div>`;
+    if (co.work_type) statsHtml += `<div class="det-chip">${escapeHtml(co.work_type)}</div>`;
     document.getElementById('det-stats').innerHTML = statsHtml;
 
     const fv = (v) => v
-      ? `<span class="det-field-value">${v}</span>`
+      ? `<span class="det-field-value">${escapeHtml(v)}</span>`
       : `<span class="det-field-value empty">—</span>`;
 
     document.getElementById('det-fields').innerHTML = `

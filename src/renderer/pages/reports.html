@@ -674,8 +674,8 @@
 
       return `<div class="company-card">
         <div>
-          <div class="cc-name">${co.name}</div>
-          ${hier ? `<div class="cc-hier">${hier}</div>` : ''}
+          <div class="cc-name">${escapeHtml(co.name)}</div>
+          ${hier ? `<div class="cc-hier">${escapeHtml(hier)}</div>` : ''}
         </div>
         <div class="cc-stats">
           <div class="cc-stat"><div class="cc-stat-val">${fmtH(totMins)}</div><div class="cc-stat-lbl">Total</div></div>
@@ -781,8 +781,8 @@
 
       return `<tr${rowCls}>
         <td style="font-family:var(--mono);font-size:11px;color:var(--text-muted);white-space:nowrap;">${date}</td>
-        <td style="font-family:var(--sans);font-size:12px;font-weight:500;color:var(--accent);">${company}</td>
-        <td style="font-family:var(--sans);font-size:12px;color:var(--text-bright);">${r.label||'—'}</td>
+        <td style="font-family:var(--sans);font-size:12px;font-weight:500;color:var(--accent);">${escapeHtml(company)}</td>
+        <td style="font-family:var(--sans);font-size:12px;color:var(--text-bright);">${escapeHtml(r.label)||'—'}</td>
         <td style="font-family:var(--mono);font-size:11px;color:var(--text-muted);">${r.clock_in||'—'}</td>
         <td style="font-family:var(--mono);font-size:11px;color:var(--text-muted);">${r.clock_out||'—'}</td>
         <td style="font-family:var(--mono);font-size:11px;color:var(--yellow);text-align:center;">${r.total_mins ? fmtM(r.total_mins) : '—'}</td>
@@ -959,7 +959,7 @@
     const rows = companies.map(co => {
       const ces = allEntries.filter(e=>Number(e.company_id)===Number(co.id));
       const m   = ces.reduce((s,e)=>s+(e.total_mins||0),0);
-      return `<tr><td>${co.name}</td><td>${ces.length}</td><td style="text-align:right">${fmtM(m)}</td></tr>`;
+      return `<tr><td>${escapeHtml(co.name)}</td><td>${ces.length}</td><td style="text-align:right">${fmtM(m)}</td></tr>`;
     }).join('');
     const win = window.open('','_blank');
     win.document.write(`<!DOCTYPE html><html><head><title>Company Report</title>
