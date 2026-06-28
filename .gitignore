@@ -6,3 +6,4 @@ dev-data/
 *.db-backup-*
 .env
 .claude/settings.local.json
+.tmp-shots/
