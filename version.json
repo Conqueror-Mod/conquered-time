@@ -1,5 +1,5 @@
 {
-  "version": "3.5.0",
+  "version": "3.6.0",
   "downloadUrl": "https://github.com/Conqueror-Mod/conquered-time/releases/latest",
-  "notes": "v3.5 — Reliability & security hardening: crash-safe atomic vault writes, all-or-nothing password re-encryption with rollback, stored-data sanitization (XSS/CSV), faster dashboard & company views, and an automated test suite for the encryption/migration/recovery paths."
+  "notes": "v3.6 — CSP hardening (script-src 'self' on every page; no inline scripts or handlers), faster navigation via a main-process read cache that reuses decrypted data across pages, and a Playwright-based run-app skill for live UI verification."
 }
