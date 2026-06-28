@@ -104,3 +104,8 @@ duplicate sessions in the Global Log.
   (`node -e "console.log(require('electron'))"`).
 - **Login never reaches dashboard** — the dev vault may be missing; run
   `npm run seed`.
+- **`launch` times out on splash.html, then "Target page has been closed"** —
+  a stray `electron.exe` from a previous (crashed/timed-out) run still holds the
+  single-instance lock, so the new launch quits immediately and its window
+  closes. Kill strays first:
+  `Get-Process electron -ErrorAction SilentlyContinue | Stop-Process -Force`

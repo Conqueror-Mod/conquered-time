@@ -7,6 +7,7 @@ const crypto     = require('crypto');
 const nodemailer = require('nodemailer');
 const { execFile } = require('child_process');
 const { encrypt, decrypt, deriveKey, reEncryptVault: reEncryptVaultCore, migrateTimeEntries: migrateTimeEntriesCore } = require('./vault-crypto');
+const { createReadCache } = require('./read-cache');
 
 // ── Single instance lock ───────────────────────────────────────────────────
 const gotLock = app.requestSingleInstanceLock();
@@ -40,6 +41,19 @@ let db          = null;   // sql.js Database instance
 let idleTimer    = null;   // auto-lock timeout handle
 let forceClose   = false;  // set true after user confirms close through audit prompt
 let activeEntryId = null;  // rowid of the currently live time_entries row
+
+// Memoizes decrypted session-wide reads (companies:list / entries:all /
+// entries:summary) across page navigations — see read-cache.js. Keyed on
+// sessionUser.id; mutations invalidate, session resets clear().
+const readCache = createReadCache();
+// Cache owner token. NOTE: sessionUser.id is the user's rowid, which is 1 in
+// every profile vault — so it alone can't tell two profiles apart. Compose it
+// with ACTIVE_PROFILE_DIR (unique per profile) so switching profiles changes
+// the owner and the cache auto-clears before serving another profile's data.
+const cacheOwner = () => `${ACTIVE_PROFILE_DIR}#${sessionUser && sessionUser.id}`;
+// Both entry views (full + summary) go stale together — mirrors the renderer
+// Store's coupled invalidation (store.js).
+const invalidateEntriesCache = () => readCache.invalidate('entriesAll', 'entriesSummary');
 
 // ── Profile manifest helpers ───────────────────────────────────────────────
 function writeManifest(profileDir, data) {
@@ -300,7 +314,7 @@ function migrateTimeEntries() {
   if (!sessionKey || !sessionUser) return;
   try {
     const migrated = migrateTimeEntriesCore({ db, key: sessionKey, userId: sessionUser.id });
-    if (migrated > 0) persistDB();
+    if (migrated > 0) { persistDB(); invalidateEntriesCache(); }
   } catch (e) { console.warn('[migrateTimeEntries] failed:', e.message); }
 }
 
@@ -993,16 +1007,18 @@ ipcMain.on('session:confirm-lock',   () => lockSession(true));
 // ── IPC: Companies ─────────────────────────────────────────────────────────
 ipcMain.handle('companies:list', () => {
   if (!sessionKey || !sessionUser) return [];
-  const rows = dbAll('SELECT rowid as rid, * FROM companies WHERE user_id=? ORDER BY rowid ASC', [sessionUser.id]);
-  return rows.map(r => {
-    const id = (r.id != null && r.id !== 0) ? Number(r.id) : Number(r.rid);
-    try {
-      const plain = decrypt({ iv: r.data_iv, tag: r.data_tag, data: r.data_enc }, sessionKey);
-      const parsed = JSON.parse(plain);
-      // Ensure id is never null/NaN — always a real positive integer
-      const finalId = (id && !isNaN(id)) ? id : Number(r.rid);
-      return { ...parsed, id: finalId };
-    } catch { return { id: Number(r.rid), name: '[Decryption Error]' }; }
+  return readCache.get('companies', cacheOwner(), () => {
+    const rows = dbAll('SELECT rowid as rid, * FROM companies WHERE user_id=? ORDER BY rowid ASC', [sessionUser.id]);
+    return rows.map(r => {
+      const id = (r.id != null && r.id !== 0) ? Number(r.id) : Number(r.rid);
+      try {
+        const plain = decrypt({ iv: r.data_iv, tag: r.data_tag, data: r.data_enc }, sessionKey);
+        const parsed = JSON.parse(plain);
+        // Ensure id is never null/NaN — always a real positive integer
+        const finalId = (id && !isNaN(id)) ? id : Number(r.rid);
+        return { ...parsed, id: finalId };
+      } catch { return { id: Number(r.rid), name: '[Decryption Error]' }; }
+    });
   });
 });
 
@@ -1018,6 +1034,7 @@ ipcMain.handle('companies:save', (_, data) => {
         [sessionUser.id, enc, iv, tag]);
     }
     persistDB(); performBackup();
+    readCache.invalidate('companies');
     return { ok: true };
   } catch (e) { return { ok: false, error: e.message }; }
 });
@@ -1028,6 +1045,9 @@ ipcMain.handle('companies:delete', (_, id) => {
   db.run('DELETE FROM time_entries WHERE company_id=? AND user_id=?', [numId, sessionUser.id]);
   db.run('DELETE FROM companies WHERE rowid=? AND user_id=?', [numId, sessionUser.id]);
   persistDB(); performBackup();
+  // Deletes the company AND its time_entries → both caches go stale.
+  readCache.invalidate('companies');
+  invalidateEntriesCache();
   return { ok: true };
 });
 
@@ -1049,6 +1069,7 @@ ipcMain.handle('entries:save', (_, entry) => {
       );
       activeEntryId = Number(entry.id);
       persistDB(); performBackup();
+      invalidateEntriesCache();
       return { ok: true, id: entry.id };
     } else {
       db.run(
@@ -1059,6 +1080,7 @@ ipcMain.handle('entries:save', (_, entry) => {
       const newId = (result && result[0] && result[0].values[0]) ? Number(result[0].values[0][0]) : null;
       activeEntryId = newId;
       persistDB(); performBackup();
+      invalidateEntriesCache();
       return { ok: true, id: newId };
     }
   } catch (e) { return { ok: false, error: e.message }; }
@@ -1066,8 +1088,9 @@ ipcMain.handle('entries:save', (_, entry) => {
 
 ipcMain.handle('entries:all', () => {
   if (!sessionKey || !sessionUser) return [];
-  return dbAll('SELECT rowid as rid, * FROM time_entries WHERE user_id=? ORDER BY log_date DESC', [sessionUser.id])
-    .map(r => ({...decryptEntry(r), id: Number(r.rid)}));
+  return readCache.get('entriesAll', cacheOwner(), () =>
+    dbAll('SELECT rowid as rid, * FROM time_entries WHERE user_id=? ORDER BY log_date DESC', [sessionUser.id])
+      .map(r => ({...decryptEntry(r), id: Number(r.rid)})));
 });
 
 // Lightweight variant: returns only the plaintext aggregate columns and does NOT
@@ -1077,8 +1100,9 @@ ipcMain.handle('entries:all', () => {
 // (global log, audit, reports) must keep using entries:all.
 ipcMain.handle('entries:summary', () => {
   if (!sessionKey || !sessionUser) return [];
-  return dbAll('SELECT rowid as rid, company_id, log_date, session_label, total_mins FROM time_entries WHERE user_id=? ORDER BY log_date DESC', [sessionUser.id])
-    .map(r => ({ ...r, id: Number(r.rid) }));
+  return readCache.get('entriesSummary', cacheOwner(), () =>
+    dbAll('SELECT rowid as rid, company_id, log_date, session_label, total_mins FROM time_entries WHERE user_id=? ORDER BY log_date DESC', [sessionUser.id])
+      .map(r => ({ ...r, id: Number(r.rid) })));
 });
 
 ipcMain.handle('entries:get-active', () => {
@@ -1263,6 +1287,9 @@ ipcMain.handle('backup:restore', (_, filename) => {
     // Reload the DB in memory
     const buf = fs.readFileSync(DB_FILE);
     db = new SQL.Database(buf);
+    // Vault replaced in place (same profile dir + user id ⇒ owner unchanged),
+    // so the owner guard won't auto-clear — drop the cache explicitly.
+    readCache.clear();
     // Clear session
     clearIdleTimer();
     sessionKey = null; sessionUser = null; activeEntryId = null;
@@ -1469,6 +1496,7 @@ ipcMain.handle('db:clear-timeclock', () => {
   db.run('DELETE FROM time_entries WHERE user_id=?', [uid]);
   activeEntryId = null;
   persistDB(); performBackup();
+  invalidateEntriesCache();
   return { ok: true };
 });
 
@@ -1480,6 +1508,8 @@ ipcMain.handle('db:clear-companies', () => {
   db.run('DELETE FROM companies    WHERE user_id=?', [uid]);
   activeEntryId = null;
   persistDB(); performBackup();
+  readCache.invalidate('companies');
+  invalidateEntriesCache();
   return { ok: true };
 });
 
