@@ -31,8 +31,9 @@ A secure, locally-encrypted desktop time tracker built for remote professionals 
 - **Steam-style Settings** — split-panel layout with left category nav (Appearance, Time & Display, Window, Security, Data, Reports, Accessibility, About)
 - **Manual DB clear** — three-level wipe (Time Clock, Companies, Full) with typed CONFIRM confirmation
 - **Keyboard navigation** — Ctrl+1–5 to switch modules, Ctrl+, for Settings, full modal tab-trapping
-- **Electron security** — contextIsolation enabled, nodeIntegration disabled, sandboxed renderers, whitelisted IPC channels
+- **Electron security** — contextIsolation enabled, nodeIntegration disabled, sandboxed renderers, whitelisted IPC channels, strict Content-Security-Policy (`script-src 'self'` on every page — no inline scripts or event handlers)
 - **Centralized data layer** — shared Store / IPC / Validator modules give the renderer one source of truth for fetching, record-ID normalization, and input validation
+- **Cross-navigation caching** — a main-process read cache reuses decrypted company/entry data across page navigations, so the dashboard, companies, and reports don't re-decrypt your history on every visit
 - **Easter egg** — Konami code on the profile selector reveals a hidden ASCII hourglass
 
 ---
@@ -60,24 +61,30 @@ conquered-time/
 │   ├── main/
 │   │   ├── main.js               # Main process: window, IPC, DB, TOTP, backup, audit
 │   │   ├── vault-crypto.js       # Pure AES-256-GCM / PBKDF2 + atomic re-encryption (unit-tested)
+│   │   ├── read-cache.js         # Pure main-process read cache (owner-keyed; unit-tested)
 │   │   └── preload.js            # Secure contextBridge API whitelist
 │   └── renderer/
 │       ├── store.js              # In-memory data cache + pub/sub invalidation, ID normalization
 │       ├── ipc.js                # Thin typed wrapper over the preload IPC channels
 │       ├── validator.js          # Input validation/normalization before save
 │       ├── pages/
-│       │   ├── splash.html       # Branded startup splash (theme-aware)
-│       │   ├── login.html        # Profile selector, TOTP login, setup wizard, recovery
-│       │   ├── dashboard.html    # Stats, mini spiderweb, recent activity
-│       │   ├── companies.html    # Full spiderweb force graph, company CRUD
-│       │   ├── tracker.html      # Dynamic time entry table, clock in/out
-│       │   ├── task-timer.html   # Dispatch: task timer, break compliance, live sidebar timer
-│       │   ├── global-log.html   # Cross-company history, CSV/PDF export
-│       │   ├── reports.html      # Audit log with dismiss/fix/suggest, period summary, email
-│       │   ├── audit-wizard.html # Step-through discrepancy resolution wizard
-│       │   └── profile.html      # Avatar upload, display name, password change, work state
+│       │   │                     # Each page is <name>.html + a sibling <name>.js
+│       │   │                     # (no inline scripts/handlers — strict CSP)
+│       │   ├── splash.html/.js   # Branded startup splash (theme-aware)
+│       │   ├── login.html/.js    # Profile selector, TOTP login, setup wizard, recovery, pre-auth settings
+│       │   ├── dashboard.html/.js# Stats, mini spiderweb, recent activity
+│       │   ├── companies.html/.js# Full spiderweb force graph, company CRUD
+│       │   ├── tracker.html/.js  # Dynamic time entry table, clock in/out
+│       │   ├── task-timer.html/.js # Dispatch: task timer, break compliance, live sidebar timer
+│       │   ├── global-log.html/.js # Cross-company history, CSV/PDF export
+│       │   ├── reports.html/.js  # Audit log with dismiss/fix/suggest, period summary, email
+│       │   ├── audit-wizard.html/.js # Step-through discrepancy resolution wizard
+│       │   ├── profile.html/.js  # Avatar upload, display name, password change, work state
+│       │   ├── theme-init.js     # Pre-paint theme guard (inner pages, sessionStorage)
+│       │   ├── login-theme-init.js  # Pre-paint theme guard (login, localStorage ct_pa_*)
+│       │   └── audit-theme-init.js  # Pre-paint theme guard (audit wizard, query-param)
 │       ├── components/
-│       │   ├── shell.js          # Titlebar, sidebar, toast, settings modal, backup library
+│       │   ├── shell.js          # Titlebar, sidebar, toast, settings modal, backup library, delegated event dispatcher
 │       │   └── settings.js       # Theme, scale, accessibility, time format, auto-lock engine
 │       └── styles/
 │           ├── design-system.css # Entry point — imports all partials
@@ -91,7 +98,9 @@ conquered-time/
 ├── assets/
 │   └── icon.ico                  # App icon
 ├── test/
-│   └── vault-crypto.test.js      # node --test suite for crypto + re-encryption
+│   ├── vault-crypto.test.js      # node --test suite for crypto + re-encryption
+│   └── read-cache.test.js        # node --test suite for the main-process read cache
+├── .claude/skills/run-app/       # Playwright REPL driver for launching/driving the app (dev tooling)
 ├── package.json
 └── README.md
 ```
@@ -132,9 +141,12 @@ npm test
 ```
 
 Uses the built-in `node --test` runner (no extra dependencies). Covers the
-security-critical paths in `src/main/vault-crypto.js`: AES-256-GCM round-trips,
+security-critical paths in `src/main/vault-crypto.js` (AES-256-GCM round-trips,
 PBKDF2 key separation, and the all-or-nothing re-encryption used by password
-change / recovery (read-phase abort and write-phase rollback).
+change / recovery — read-phase abort and write-phase rollback) and the
+main-process read cache in `src/main/read-cache.js` (hit/miss memoization,
+targeted/full invalidation, and the owner-change auto-clear that prevents
+cross-profile data leaks).
 
 ### Build installer
 
@@ -211,6 +223,7 @@ Login: password + TOTP code
 - Windows Hello / Quick Unlock uses Electron safeStorage (DPAPI-backed) to persist the session key securely across locks
 - Auto-backup on every save and on close; restore via Settings → Data → Backup Library
 - Session auto-lock on configurable idle timeout
+- Strict Content-Security-Policy on every page: `script-src 'self'` with no inline scripts or `on*` event handlers (all logic in external `.js`, all handlers via delegated dispatchers) — defense-in-depth against script injection, on top of `escapeHtml()` output sanitization
 
 ---
 

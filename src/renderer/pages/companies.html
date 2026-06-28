@@ -3,12 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy"
-  content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self';">
+  content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'self';">
 <title>Conquered Time — Companies</title>
 <link rel="stylesheet" href="../styles/design-system.css">
-<script>
-  (function(){var t=sessionStorage.getItem('ct_theme');var s=sessionStorage.getItem('ct_scale');if(t)document.documentElement.setAttribute('data-theme',t);if(s)document.documentElement.setAttribute('data-scale',s);document.documentElement.style.visibility='hidden';})();
-</script>
+<script src="theme-init.js"></script>
 <style>
   .web-layout {
     display: grid;
@@ -299,7 +297,7 @@
     <div class="page-title">Company Web</div>
   </div>
   <div class="page-actions">
-    <button class="btn-primary" onclick="openModal()">+ Add Company</button>
+    <button class="btn-primary" id="btn-add-company">+ Add Company</button>
   </div>
 </div>
 
@@ -312,10 +310,10 @@
       <div class="tooltip-detail" id="tt-detail"></div>
     </div>
     <div id="ctx-menu">
-      <div class="ctx-item" onclick="ctxOpenTracker()">⏱ Open Time Tracker</div>
-      <div class="ctx-item" onclick="ctxEditCompany()">✎ Edit Company</div>
+      <div class="ctx-item" id="ctx-open-tracker">⏱ Open Time Tracker</div>
+      <div class="ctx-item" id="ctx-edit">✎ Edit Company</div>
       <div class="ctx-divider"></div>
-      <div class="ctx-item danger" onclick="ctxDeleteCompany()">⊗ Delete</div>
+      <div class="ctx-item danger" id="ctx-delete">⊗ Delete</div>
     </div>
   </div>
 
@@ -338,7 +336,7 @@
     <div class="hud-panel company-detail-panel" id="company-detail">
       <div class="hud-panel-header">
         <div class="hud-panel-title" id="det-panel-title">Details</div>
-        <button class="detail-close-btn" onclick="closeDetail()">✕</button>
+        <button class="detail-close-btn" id="det-close-btn">✕</button>
       </div>
       <div class="detail-body">
         <div>
@@ -455,486 +453,15 @@
     </div>
 
     <div class="modal-actions">
-      <button class="btn-neutral" onclick="closeModal()">Cancel</button>
-      <button class="btn-danger"  id="delete-btn" onclick="deleteCompany()" style="display:none;">Delete</button>
-      <button class="btn-primary" onclick="saveCompany()">Save Company</button>
+      <button class="btn-neutral" id="modal-cancel-btn">Cancel</button>
+      <button class="btn-danger"  id="delete-btn" style="display:none;">Delete</button>
+      <button class="btn-primary" id="modal-save-btn">Save Company</button>
     </div>
   </div>
 </div>
 
 <script src="../components/settings.js"></script>
 <script src="../components/shell.js"></script>
-<script>
-  let companies = [], entries = [], nodes = [];
-  let editingId = null, selectedId = null, ctxTarget = null;
-  let animFrame = null, resizeObserver = null;
-
-  window.addEventListener('DOMContentLoaded', async () => {
-    await Shell.init('companies');
-    document.documentElement.style.visibility = '';
-    const mc = document.getElementById('main-content');
-    if (mc) { mc.style.display = 'flex'; mc.style.flexDirection = 'column'; mc.style.overflow = 'hidden'; }
-    await loadCompanies();
-    drawWeb();
-
-    document.getElementById('det-edit-btn').addEventListener('click', () => {
-      const co = companies.find(c => c.id === selectedId);
-      if (co) openModal(co);
-    });
-    document.getElementById('det-tracker-btn').addEventListener('click', () => {
-      const co = companies.find(c => c.id === selectedId);
-      if (co) { sessionStorage.setItem('active_company', JSON.stringify(co)); api.send('navigate', 'tracker'); }
-    });
-    document.getElementById('det-delete-btn').addEventListener('click', () => deleteSelected());
-  });
-
-  async function loadCompanies() {
-    companies = await Store.getCompanies();
-    entries   = await Store.getEntriesSummary();
-    renderList();
-    document.getElementById('company-count').textContent = companies.length;
-    if (selectedId) {
-      const co = companies.find(c => c.id === selectedId);
-      if (co) renderDetail(co); else closeDetail();
-    }
-  }
-
-  function compMinsMap() {
-    const m = {};
-    entries.forEach(e => { m[e.company_id] = (m[e.company_id] || 0) + e.total_mins; });
-    return m;
-  }
-
-  function renderList() {
-    const el = document.getElementById('company-list');
-    if (companies.length === 0) {
-      el.innerHTML = `<div style="font-size:12px;color:var(--text-dim);text-align:center;padding:24px 0;">No companies yet.<br>Add one to begin.</div>`;
-      return;
-    }
-    const mins = compMinsMap();
-    el.innerHTML = companies.map(co => {
-      const hier = [co.hier_project, co.hier_platform].filter(Boolean).join(' › ');
-      const sub  = hier || co.job_title || co.work_type || '';
-      const sel  = co.id === selectedId ? ' selected' : '';
-      return `
-        <div class="company-list-item${sel}" onclick="selectCompany(${co.id})" data-id="${co.id}">
-          <div class="company-dot"></div>
-          <div class="company-info">
-            <div class="company-name">${escapeHtml(co.name) || '—'}</div>
-            ${sub ? `<div class="company-sub">${escapeHtml(sub)}</div>` : ''}
-          </div>
-          <div class="company-hours">${fmtH(mins[co.id] || 0)}</div>
-        </div>`;
-    }).join('');
-  }
-
-  function selectCompany(id) {
-    selectedId = id;
-    document.querySelectorAll('.company-list-item').forEach(el =>
-      el.classList.toggle('selected', parseInt(el.dataset.id) === id)
-    );
-    const co = companies.find(c => c.id === id);
-    if (co) renderDetail(co);
-  }
-
-  function renderDetail(co) {
-    const mins  = compMinsMap();
-    const hours = mins[co.id] || 0;
-
-    document.getElementById('det-panel-title').textContent = 'Details';
-    document.getElementById('det-name').textContent = co.name || '—';
-
-    const hierParts = [co.hier_company, co.hier_project, co.hier_platform].filter(Boolean);
-    document.getElementById('det-breadcrumb').textContent = hierParts.join(' › ');
-
-    const isActive = !co.date_end;
-    let statsHtml = '';
-    statsHtml += `<div class="det-chip yellow">${fmtH(hours)} logged</div>`;
-    if (co.pay_rate) statsHtml += `<div class="det-chip accent">$${parseFloat(co.pay_rate).toFixed(2)}/hr</div>`;
-    statsHtml += `<div class="det-chip ${isActive ? 'green' : ''}">${isActive ? 'Active' : 'Ended'}</div>`;
-    if (co.work_type) statsHtml += `<div class="det-chip">${escapeHtml(co.work_type)}</div>`;
-    document.getElementById('det-stats').innerHTML = statsHtml;
-
-    const fv = (v) => v
-      ? `<span class="det-field-value">${escapeHtml(v)}</span>`
-      : `<span class="det-field-value empty">—</span>`;
-
-    document.getElementById('det-fields').innerHTML = `
-      <div class="det-field">
-        <div class="det-field-label">Job Title</div>
-        ${fv(co.job_title)}
-      </div>
-      <div class="det-field">
-        <div class="det-field-label">Location</div>
-        ${fv(co.location)}
-      </div>
-      <div class="det-field">
-        <div class="det-field-label">Started</div>
-        ${fv(co.date_start)}
-      </div>
-      <div class="det-field">
-        <div class="det-field-label">Ended</div>
-        ${fv(co.date_end || (isActive ? 'Present' : null))}
-      </div>
-      ${co.supervisors ? `
-      <div class="det-field span-2">
-        <div class="det-field-label">Supervisors</div>
-        ${fv(co.supervisors)}
-      </div>` : ''}
-    `;
-
-    const notesBlock = document.getElementById('det-notes-block');
-    if (co.notes) {
-      notesBlock.classList.add('has-notes');
-      document.getElementById('det-notes-text').textContent = co.notes;
-    } else {
-      notesBlock.classList.remove('has-notes');
-    }
-
-    document.getElementById('company-panel').classList.add('detail-open');
-  }
-
-  function closeDetail() {
-    selectedId = null;
-    document.getElementById('company-panel').classList.remove('detail-open');
-    document.querySelectorAll('.company-list-item').forEach(el => el.classList.remove('selected'));
-  }
-
-  // ── Modal ──
-  function openModal(co = null) {
-    editingId = co?.id || null;
-    document.getElementById('modal-title').textContent = co ? 'Edit Company' : 'Add Company';
-    document.getElementById('delete-btn').style.display = co ? '' : 'none';
-    const fields = {
-      'f-hier-company':  co?.hier_company  || '',
-      'f-hier-project':  co?.hier_project  || '',
-      'f-hier-platform': co?.hier_platform || '',
-      'f-navid':         co?.nav_id        || '',
-      'f-name':          co?.name === co?.hier_company ? '' : (co?.name || ''),
-      'f-title':         co?.job_title     || '',
-      'f-work-type':     co?.work_type     || '',
-      'f-location':      co?.location      || '',
-      'f-payrate':       co?.pay_rate      || '',
-      'f-date-start':    co?.date_start    || '',
-      'f-date-end':      co?.date_end      || '',
-      'f-login':         co?.platform_login  || '',
-      'f-email':         co?.platform_email  || '',
-      'f-url':           co?.platform_url    || '',
-      'f-supervisors':   co?.supervisors     || '',
-      'f-notes':         co?.notes           || '',
-    };
-    Object.entries(fields).forEach(([id, val]) => { const el = document.getElementById(id); if (el) el.value = val; });
-    document.getElementById('company-modal').style.display = 'flex';
-    setTimeout(() => {
-      const focus = co ? document.getElementById('f-hier-company') : document.getElementById('f-hier-company');
-      if (focus) focus.focus();
-    }, 50);
-  }
-
-  function closeModal() {
-    document.getElementById('company-modal').style.display = 'none';
-    editingId = null;
-  }
-
-  async function saveCompany() {
-    const hierCompany = document.getElementById('f-hier-company').value.trim();
-    if (!hierCompany) { Shell.toast('Company field is required.', 'error'); return; }
-    const alias = document.getElementById('f-name').value.trim();
-    const data = {
-      id:              editingId,
-      name:            alias || hierCompany,
-      job_title:       document.getElementById('f-title').value.trim(),
-      work_type:       document.getElementById('f-work-type').value,
-      location:        document.getElementById('f-location').value.trim(),
-      pay_rate:        parseFloat(document.getElementById('f-payrate').value) || 0,
-      date_start:      document.getElementById('f-date-start').value,
-      date_end:        document.getElementById('f-date-end').value,
-      hier_company:    hierCompany,
-      hier_project:    document.getElementById('f-hier-project').value.trim(),
-      hier_platform:   document.getElementById('f-hier-platform').value.trim(),
-      nav_id:          document.getElementById('f-navid').value.trim(),
-      platform_login:  document.getElementById('f-login').value.trim(),
-      platform_email:  document.getElementById('f-email').value.trim(),
-      platform_url:    document.getElementById('f-url').value.trim(),
-      supervisors:     document.getElementById('f-supervisors').value.trim(),
-      notes:           document.getElementById('f-notes').value.trim(),
-    };
-    const valid = Validator.validateCompany(data);
-    if (!valid.ok) { Shell.toast(valid.error, 'error'); return; }
-    const res = await IPC.companies.save(data);
-    if (res.ok) {
-      Shell.toast(editingId ? 'Company updated.' : 'Company added.', 'success');
-      closeModal();
-      Store.invalidate('companies');
-      await loadCompanies();
-      drawWeb();
-    } else {
-      Shell.toast(res.error || 'Save failed.', 'error');
-    }
-  }
-
-  async function deleteCompany() {
-    if (!editingId || !confirm('Delete this company and all its time entries?')) return;
-    await IPC.companies.delete(editingId);
-    Shell.toast('Company deleted.', 'warning');
-    if (selectedId === editingId) closeDetail();
-    closeModal();
-    Store.invalidate('all');
-    await loadCompanies();
-    drawWeb();
-  }
-
-  async function deleteSelected() {
-    if (!selectedId || !confirm('Delete this company and all its time entries?')) return;
-    await IPC.companies.delete(selectedId);
-    Shell.toast('Company deleted.', 'warning');
-    closeDetail();
-    Store.invalidate('all');
-    await loadCompanies();
-    drawWeb();
-  }
-
-  // ── Context menu ──
-  function showCtx(x, y, co) { ctxTarget = co; const m = document.getElementById('ctx-menu'); m.style.left = x + 'px'; m.style.top = y + 'px'; m.style.display = 'block'; }
-  function hideCtx() { document.getElementById('ctx-menu').style.display = 'none'; }
-  document.addEventListener('click', hideCtx);
-  function ctxOpenTracker() { if (!ctxTarget) return; sessionStorage.setItem('active_company', JSON.stringify(ctxTarget)); api.send('navigate', 'tracker'); }
-  function ctxEditCompany() { if (ctxTarget) openModal(ctxTarget); }
-  async function ctxDeleteCompany() {
-    if (!ctxTarget || !confirm(`Delete ${ctxTarget.name}?`)) return;
-    await IPC.companies.delete(ctxTarget.id);
-    Shell.toast('Company deleted.', 'warning');
-    if (selectedId === ctxTarget.id) closeDetail();
-    ctxTarget = null;
-    Store.invalidate('all');
-    await loadCompanies();
-    drawWeb();
-  }
-
-  // ── Spiderweb ──
-  function drawWeb() {
-    const canvas = document.getElementById('web-canvas');
-    const wrap   = document.getElementById('spiderweb-wrap');
-    const ctx    = canvas.getContext('2d');
-    if (animFrame) cancelAnimationFrame(animFrame);
-    if (resizeObserver) resizeObserver.disconnect();
-
-    const mins = compMinsMap();
-
-    function initNodes(W, H) {
-      const cx = W / 2, cy = H / 2;
-      const count = companies.length;
-
-      // All physics/visual params scale with company count
-      const nodeR    = count === 0 ? 28 : Math.max(16, Math.round(32 - count * 1.2));
-      const ringFrac = count <= 1  ? 0.36 : count <= 3 ? 0.38 : count <= 6 ? 0.43 : 0.47;
-      const LINK     = count <= 1  ? 270  : count <= 3 ? 240  : count <= 6 ? 245  : 275;
-      const REPEL    = count <= 1  ? 500  : count <= 3 ? 3500 : count <= 6 ? 6500 : 9500;
-      const steps    = count <= 2  ? 60   : count <= 5 ? 160  : 260;
-
-      const ns = [{ x: cx, y: cy, r: 36, label: (window.__currentUsername || 'YOU'), isCenter: true, co: null, fixed: true }];
-      companies.forEach((co, i) => {
-        const a = (Math.PI * 2 * i / count) - Math.PI / 2;
-        const d = Math.min(W, H) * ringFrac;
-        ns.push({
-          x: cx + Math.cos(a) * d,
-          y: cy + Math.sin(a) * d,
-          vx: 0, vy: 0,
-          r: nodeR,
-          label:    (co.name || '?').slice(0, 12),
-          sublabel: co.hier_project ? co.hier_project.slice(0, 10) : '',
-          isCenter: false,
-          co,
-          hours: mins[co.id] || 0,
-        });
-      });
-      for (let s = 0; s < steps; s++) forceStep(ns, cx, cy, W, H, LINK, REPEL);
-      return ns;
-    }
-
-    function resizeCanvas() {
-      const W = wrap.clientWidth, H = wrap.clientHeight;
-      canvas.width  = W * devicePixelRatio;
-      canvas.height = H * devicePixelRatio;
-      canvas.style.width  = W + 'px';
-      canvas.style.height = H + 'px';
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.scale(devicePixelRatio, devicePixelRatio);
-      nodes = initNodes(W, H);
-    }
-    resizeCanvas();
-
-    resizeObserver = new ResizeObserver(() => {
-      if (animFrame) cancelAnimationFrame(animFrame);
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      resizeCanvas();
-      startRender();
-    });
-    resizeObserver.observe(wrap);
-    startRender();
-
-    canvas.addEventListener('mousemove', e => {
-      const rect = canvas.getBoundingClientRect();
-      const mx = e.clientX - rect.left, my = e.clientY - rect.top;
-      const tt = document.getElementById('node-tooltip');
-      let hit = false;
-      nodes.slice(1).forEach(n => {
-        if (Math.hypot(mx - n.x, my - n.y) < n.r + 10) {
-          const wr = wrap.getBoundingClientRect();
-          tt.style.left = (e.clientX - wr.left + 16) + 'px';
-          tt.style.top  = (e.clientY - wr.top  - 12) + 'px';
-          tt.style.display = 'block';
-          document.getElementById('tt-name').textContent = n.co.name;
-          const hierParts = [n.co.hier_company, n.co.hier_project, n.co.hier_platform].filter(Boolean);
-          document.getElementById('tt-hier').textContent   = hierParts.length > 1 ? hierParts.join(' › ') : '';
-          document.getElementById('tt-detail').textContent = [
-            n.co.job_title,
-            n.co.location,
-            n.hours ? fmtH(n.hours) + ' logged' : '',
-          ].filter(Boolean).join(' · ');
-          canvas.style.cursor = 'pointer';
-          hit = true;
-        }
-      });
-      if (!hit) { tt.style.display = 'none'; canvas.style.cursor = 'default'; }
-    });
-
-    canvas.addEventListener('click', e => {
-      const rect = canvas.getBoundingClientRect();
-      const mx = e.clientX - rect.left, my = e.clientY - rect.top;
-      nodes.slice(1).forEach(n => {
-        if (Math.hypot(mx - n.x, my - n.y) < n.r + 10) {
-          const wr = wrap.getBoundingClientRect();
-          showCtx(e.clientX - wr.left, e.clientY - wr.top, n.co);
-        }
-      });
-    });
-  }
-
-  function startRender() {
-    const canvas = document.getElementById('web-canvas');
-    const wrap   = document.getElementById('spiderweb-wrap');
-    const ctx    = canvas.getContext('2d');
-    let pulse = 0;
-
-    function render() {
-      const W = canvas.offsetWidth, H = canvas.offsetHeight;
-      const cx = W / 2, cy = H / 2;
-      const c = getCanvasColors();
-      nodes[0].x = cx; nodes[0].y = cy;
-      pulse += 0.025;
-      ctx.clearRect(0, 0, W, H);
-
-      // Grid
-      ctx.strokeStyle = c.grid; ctx.lineWidth = 0.5;
-      for (let gx = 0; gx < W; gx += 40) { ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, H); ctx.stroke(); }
-      for (let gy = 0; gy < H; gy += 40) { ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke(); }
-
-      // Edges
-      nodes.slice(1).forEach(n => {
-        const grad = ctx.createLinearGradient(cx, cy, n.x, n.y);
-        grad.addColorStop(0, c.edge1); grad.addColorStop(1, c.edge2);
-        ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(n.x, n.y);
-        ctx.strokeStyle = grad; ctx.lineWidth = 2; ctx.stroke();
-      });
-
-      // Company nodes
-      nodes.slice(1).forEach(n => {
-        drawSphereNode(ctx, n.x, n.y, n.r, false, n.label, n.sublabel);
-        if (n.hours) {
-          ctx.fillStyle = c.hours;
-          ctx.font = '500 10px DM Sans, system-ui, sans-serif';
-          ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-          ctx.fillText(fmtH(n.hours), n.x, n.y + n.r + 6);
-        }
-      });
-
-      // Center node — pulsing
-      const pR = nodes[0].r + 4 * Math.sin(pulse);
-      drawSphereNode(ctx, nodes[0].x, nodes[0].y, pR, true, nodes[0].label, '');
-
-      animFrame = requestAnimationFrame(render);
-    }
-    animFrame = requestAnimationFrame(render);
-  }
-
-  function getCanvasColors() {
-    const theme = document.documentElement.getAttribute('data-theme') || 'memoria';
-    const isLight = theme === 'memoria' || theme === 'rabanastre';
-    if (isLight) return {
-      center: { g1: 'rgba(30,58,138,0.95)', g2: 'rgba(15,23,80,0.9)', border: '#1d4ed8', label: '#ffffff', sublabel: 'rgba(255,255,255,0.7)', glow: 'rgba(29,78,216,0.18)' },
-      node:   { g1: 'rgba(49,46,129,0.95)', g2: 'rgba(30,27,90,0.9)', border: '#4338ca', label: '#ffffff', sublabel: 'rgba(255,255,255,0.65)' },
-      edge1: 'rgba(29,78,216,0.7)', edge2: 'rgba(67,56,202,0.15)',
-      grid: 'rgba(0,0,0,0.05)', hours: '#92400e',
-    };
-    return {
-      center: { base: '#0f2060', g1: 'rgba(80,130,255,1)', g2: 'rgba(25,55,175,1)', border: '#3b82f6', label: '#bfdbfe', sublabel: 'rgba(191,219,254,0.7)', glow: 'rgba(59,130,246,0.12)' },
-      node:   { g1: 'rgba(129,140,248,0.22)', g2: 'rgba(67,56,202,0.14)', border: '#6366f1', label: '#e0e7ff', sublabel: 'rgba(224,231,255,0.55)' },
-      edge1: 'rgba(59,130,246,0.5)', edge2: 'rgba(99,102,241,0.08)',
-      grid: 'rgba(255,255,255,0.025)', hours: 'rgba(245,158,11,0.9)',
-    };
-  }
-
-  function drawSphereNode(ctx, x, y, r, isCenter, label, sublabel) {
-    const c  = getCanvasColors();
-    const nc = isCenter ? c.center : c.node;
-    if (isCenter) {
-      ctx.beginPath(); ctx.arc(x, y, r + 12, 0, Math.PI * 2);
-      ctx.fillStyle = nc.glow; ctx.fill();
-    }
-    if (isCenter && nc.base) {
-      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
-      ctx.fillStyle = nc.base; ctx.fill();
-    }
-    const grad = ctx.createRadialGradient(x - r * 0.3, y - r * 0.3, r * 0.1, x, y, r);
-    grad.addColorStop(0, nc.g1); grad.addColorStop(0.6, nc.g2); grad.addColorStop(1, isCenter ? 'rgba(8,18,70,1)' : 'rgba(0,0,0,0.35)');
-    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.fillStyle = grad; ctx.fill();
-    ctx.strokeStyle = nc.border; ctx.lineWidth = isCenter ? 2 : 1.5; ctx.stroke();
-    const hl = ctx.createRadialGradient(x - r * 0.35, y - r * 0.35, 0, x - r * 0.35, y - r * 0.35, r * 0.6);
-    hl.addColorStop(0, 'rgba(255,255,255,0.16)'); hl.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = hl; ctx.fill();
-
-    if (sublabel) {
-      ctx.fillStyle = nc.label;
-      ctx.font = `${isCenter ? '600 ' : '500 '}${isCenter ? 11 : 10}px DM Sans, system-ui, sans-serif`;
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(label, x, y - 5);
-      ctx.fillStyle = nc.sublabel;
-      ctx.font = '400 9px DM Sans, system-ui, sans-serif';
-      ctx.fillText(sublabel, x, y + 6);
-    } else {
-      ctx.fillStyle = nc.label;
-      ctx.font = `${isCenter ? '600 ' : '500 '}${isCenter ? 11 : 10}px DM Sans, system-ui, sans-serif`;
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(label, x, y);
-    }
-  }
-
-  function forceStep(nodes, cx, cy, W, H, LINK, REPEL) {
-    const DAMP = 0.65;
-    nodes.slice(1).forEach((a, i) => {
-      const dx = cx - a.x, dy = cy - a.y, d = Math.hypot(dx, dy) || 1;
-      const pull = (d - LINK) * 0.01;
-      a.vx += (dx / d) * pull; a.vy += (dy / d) * pull;
-      nodes.slice(1).forEach((b, j) => {
-        if (i === j) return;
-        const rx = a.x - b.x, ry = a.y - b.y, rd = Math.hypot(rx, ry) || 1;
-        const f = REPEL / (rd * rd);
-        a.vx += (rx / rd) * f; a.vy += (ry / rd) * f;
-      });
-      a.vx *= DAMP; a.vy *= DAMP;
-      a.x += a.vx; a.y += a.vy;
-      a.x = Math.max(50, Math.min(W - 50, a.x));
-      a.y = Math.max(50, Math.min(H - 50, a.y));
-    });
-  }
-
-  function fmtH(mins) { return mins ? (mins / 60).toFixed(1) + 'h' : '0h'; }
-
-  document.getElementById('company-modal').addEventListener('click', function (e) {
-    if (e.target === this) closeModal();
-  });
-</script>
+<script src="companies.js"></script>
 </body>
 </html>
