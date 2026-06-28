@@ -102,6 +102,25 @@
     0%, 100% { opacity: 1; }
     50%       { opacity: 0.3; }
   }
+
+  /* ── Break & Lunch strip ── */
+  .break-lunch-strip { display: flex; flex-direction: column; gap: 10px; }
+  .bl-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .bl-label {
+    font-family: var(--sans); font-size: 10px; font-weight: 600;
+    color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em;
+    margin-right: 4px;
+  }
+  #btn-break.bl-active, #btn-lunch.bl-active { border-color: var(--yellow); color: var(--yellow); }
+  .bl-compliance-row { display: flex; gap: 18px; flex-wrap: wrap; }
+  .bl-compliance {
+    font-family: var(--sans); font-size: 11px; color: var(--text-dim);
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .bl-compliance svg { flex-shrink: 0; }
+  .bl-compliance.ok   { color: var(--text-dim); }
+  .bl-compliance.warn { color: var(--yellow); }
+  .bl-compliance.over { color: var(--red); }
 </style>
 </head>
 <body>
@@ -170,6 +189,18 @@
     <button class="btn-neutral" id="btn-save">Save</button>
     <button class="btn-danger"  id="btn-clear-all">Clear All</button>
   </div>
+  <div class="panel-divider"></div>
+  <div class="break-lunch-strip">
+    <div class="bl-actions">
+      <span class="bl-label">Break &amp; Lunch</span>
+      <button class="btn-neutral" id="btn-break">☕ Start Break</button>
+      <button class="btn-neutral" id="btn-lunch">Start Lunch</button>
+    </div>
+    <div class="bl-compliance-row">
+      <span class="bl-compliance" id="compliance-break">—</span>
+      <span class="bl-compliance" id="compliance-lunch">—</span>
+    </div>
+  </div>
 </div>
 
 <div class="table-wrap">
@@ -201,8 +232,6 @@
           <span id="dispatch-count-label">Dispatch</span>
         </span>
         <div id="dispatch-task-chips" style="display:flex;gap:5px;flex-wrap:wrap;"></div>
-        <span id="dispatch-break-badge" style="display:none;"></span>
-        <span id="dispatch-lunch-badge" style="display:none;"></span>
         <span id="dispatch-open-link"
               data-action="navigate" data-arg="task-timer"
               style="font-family:var(--sans);font-size:11px;color:var(--accent);cursor:pointer;margin-left:auto;opacity:.8;">
