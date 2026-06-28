@@ -1,5 +1,5 @@
 {
-  "version": "3.4.0",
+  "version": "3.5.0",
   "downloadUrl": "https://github.com/Conqueror-Mod/conquered-time/releases/latest",
-  "notes": "v3.4 — Internal architecture refactor: centralized Store/IPC/Validator layer for the renderer. Single source of truth for data fetching, ID normalization, and input validation across all pages."
+  "notes": "v3.5 — Reliability & security hardening: crash-safe atomic vault writes, all-or-nothing password re-encryption with rollback, stored-data sanitization (XSS/CSV), faster dashboard & company views, and an automated test suite for the encryption/migration/recovery paths."
 }

@@ -479,20 +479,20 @@ const Shell = (() => {
               </div>
 
               <div class="about-section">
-                <div class="about-section-title">What's New — v3.4</div>
+                <div class="about-section-title">What's New — v3.5</div>
                 <ul class="about-changelog">
-                  <li>Architecture refactor — new centralized Store / IPC / Validator layer behind the scenes; one source of truth for data fetching and record ID handling across every page</li>
-                  <li>Input validation — company and time-entry saves are now validated and normalized before they're written, catching malformed clock times and missing fields earlier</li>
-                  <li>Foundation work — no visible feature changes, but a cleaner base for upcoming reporting and multi-platform work</li>
+                  <li>Crash-safe saves — your vault is now written atomically, so a power loss or crash can never corrupt your data mid-write</li>
+                  <li>Safer password changes — changing or recovering your password re-encrypts everything as all-or-nothing, rolling back cleanly if anything goes wrong</li>
+                  <li>Stronger data protection — company names, task labels, and notes are fully sanitized everywhere they're shown or exported (XSS and spreadsheet-formula safety)</li>
+                  <li>Faster dashboard & company views — these pages no longer decrypt your entire history on every visit</li>
+                  <li>Automated test coverage — the encryption, migration, and recovery paths are now backed by an automated test suite</li>
                 </ul>
               </div>
               <div class="about-section">
-                <div class="about-section-title">v3.3</div>
+                <div class="about-section-title">v3.4</div>
                 <ul class="about-changelog">
-                  <li>Time entries encrypted at rest — task labels, names, descriptions, and clock times now stored as AES-256-GCM ciphertext; transparent one-time migration on login</li>
-                  <li>US state break/lunch compliance — set your work state in Profile; California, New York, and other state-specific break rules applied in Dispatch and Audit</li>
-                  <li>Windows Hello / Quick Unlock — fast login via biometric or PIN after first session; password fallback always available; managed in Settings → Security</li>
-                  <li>Login screen overhaul — profile selector cards with avatars, unified branding, pre-auth settings access, QR code auto-generates on Setup tab</li>
+                  <li>Architecture refactor — new centralized Store / IPC / Validator layer behind the scenes; one source of truth for data fetching and record ID handling across every page</li>
+                  <li>Input validation — company and time-entry saves are now validated and normalized before they're written, catching malformed clock times and missing fields earlier</li>
                 </ul>
               </div>
               <div class="about-section">
