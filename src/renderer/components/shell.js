@@ -107,7 +107,6 @@ const Shell = (() => {
   function buildSettingsModal() {
     const NAV_ITEMS = [
       { id: 'appearance',   label: 'Appearance',    icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>' },
-      { id: 'display',      label: 'Time & Display', icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>' },
       { id: 'window',       label: 'Window',         icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 9h20"/><path d="M7 4v5"/></svg>' },
       { id: 'security',     label: 'Security',       icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>' },
       { id: 'data',         label: 'Data',           icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>' },
@@ -164,6 +163,15 @@ const Shell = (() => {
                   <button class="s-btn" data-s="large"       data-action="applyScale" data-arg="large">Large</button>
                 </div>
               </div>
+
+              <div class="settings-group">
+                <div class="settings-group-title">Clock Format</div>
+                <div class="settings-row-label">How times are shown throughout the app</div>
+                <div class="settings-btn-group" id="time-btns" style="margin-top:8px;">
+                  <button class="s-btn" data-tf="24h" data-action="applyTimeFormat" data-arg="24h">24-Hour (14:30)</button>
+                  <button class="s-btn" data-tf="12h" data-action="applyTimeFormat" data-arg="12h">12-Hour (2:30 PM)</button>
+                </div>
+              </div>
             </div>
 
             <!-- ── WINDOW ────────────────────────────────────── -->
@@ -198,20 +206,6 @@ const Shell = (() => {
                 </div>
               </div>
             </div><!-- /settings-cat-window -->
-
-            <!-- ── TIME & DISPLAY ───────────────────────────── -->
-            <div id="settings-cat-display" class="settings-cat-panel" style="display:none;">
-              <div class="sc-title">Time & Display</div>
-
-              <div class="settings-group">
-                <div class="settings-group-title">Clock Format</div>
-                <div class="settings-row-label">How times are shown throughout the app</div>
-                <div class="settings-btn-group" id="time-btns" style="margin-top:8px;">
-                  <button class="s-btn" data-tf="24h" data-action="applyTimeFormat" data-arg="24h">24-Hour (14:30)</button>
-                  <button class="s-btn" data-tf="12h" data-action="applyTimeFormat" data-arg="12h">12-Hour (2:30 PM)</button>
-                </div>
-              </div>
-            </div>
 
             <!-- ── DATA ─────────────────────────────────────── -->
             <div id="settings-cat-data" class="settings-cat-panel" style="display:none;">
