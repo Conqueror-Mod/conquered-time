@@ -11,6 +11,15 @@ let selectedIndex = null;
 let autoSaveTimer = null;
 const MIN_ROWS = 5;
 
+// ── Break & Lunch (relocated from Dispatch) ──────────────────────────────────
+// Stored as task_items (entry_id-scoped, item_type 'break'|'lunch') — same data
+// model as before; only the controls + compliance display now live here.
+let taskItems     = [];     // task_items for the current entry (breaks/lunches/tasks)
+let activeBreakId = null;   // in-progress break task_item id, or null
+let activeLunchId = null;   // in-progress lunch task_item id, or null
+let auditPolicy   = null;   // US-state break/lunch policy from audit:get-policy
+let complianceTimer = null; // 60s tick refreshing the compliance status lines
+
 document.getElementById('log-date').valueAsDate = new Date();
 
 window.addEventListener('DOMContentLoaded', async () => {
@@ -27,7 +36,13 @@ window.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('btn-clear-all').addEventListener('click', () => clearAll());
   document.getElementById('btn-save-session').addEventListener('click', () => saveSession());
   document.getElementById('btn-export-pdf').addEventListener('click', exportPDF);
+  document.getElementById('btn-break').addEventListener('click', () => togglePunch('break'));
+  document.getElementById('btn-lunch').addEventListener('click', () => togglePunch('lunch'));
   document.getElementById('log-date').addEventListener('change', () => { if (currentCompany) loadTodayEntry(); });
+
+  // Break/lunch compliance policy + status ticker
+  try { auditPolicy = await api.invoke('audit:get-policy'); } catch { auditPolicy = null; }
+  setInterval(renderCompliance, 60000);
 
   ['log-date','log-notes','input-name','input-desc'].forEach(id => {
     const el = document.getElementById(id);
@@ -110,33 +125,41 @@ async function loadTodayEntry() {
     document.getElementById('log-notes').value = existing.session_label || '';
     restoreRows(JSON.parse(existing.rows_json || '[]'));
     document.getElementById('session-status').textContent = 'Session loaded';
-    updateTaskChip(existing.id);
+    await loadTaskItems(existing.id);
   } else {
     currentEntryId = null;
     clearAll(true);
-    updateTaskChip(null);
+    await loadTaskItems(null);
   }
 }
 
-async function updateTaskChip(entryId) {
+// Load the current entry's task_items (Dispatch tasks + break/lunch punches),
+// derive active break/lunch state, and refresh both the Dispatch chip and the
+// break/lunch strip. Single fetch shared by both UIs.
+async function loadTaskItems(entryId) {
+  taskItems = entryId ? (await api.invoke('tasks:list', entryId) || []) : [];
+  activeBreakId = taskItems.find(t => t.item_type === 'break' && !t.stopped_at)?.id || null;
+  activeLunchId = taskItems.find(t => t.item_type === 'lunch' && !t.stopped_at)?.id || null;
+  updateDispatchChip();
+  updateBreakButtons();
+  renderCompliance();
+}
+
+// Footer Dispatch preview — task count + per-label chips (break/lunch now live
+// in the control-panel strip, not here).
+function updateDispatchChip() {
   const preview = document.getElementById('dispatch-preview');
   if (!preview) return;
-  if (!entryId) { preview.style.display = 'none'; return; }
+  if (!currentEntryId) { preview.style.display = 'none'; return; }
 
-  const tasks = await api.invoke('tasks:list', entryId);
-  const completed = tasks.filter(t => t.item_type === 'task' && t.stopped_at);
-  const activeBreak = tasks.find(t => t.item_type === 'break' && !t.stopped_at);
-  const activeLunch = tasks.find(t => t.item_type === 'lunch' && !t.stopped_at);
-
+  const completed = taskItems.filter(t => t.item_type === 'task' && t.stopped_at);
   preview.style.display = 'block';
 
-  // Count label — always show; "Dispatch" when no tasks yet
   const countLabel = document.getElementById('dispatch-count-label');
   countLabel.textContent = completed.length > 0
     ? `${completed.length} task${completed.length === 1 ? '' : 's'}`
     : 'Dispatch';
 
-  // Per-label breakdown chips
   const chipsEl = document.getElementById('dispatch-task-chips');
   if (completed.length > 0) {
     const counts = {};
@@ -148,28 +171,113 @@ async function updateTaskChip(entryId) {
   } else {
     chipsEl.innerHTML = '';
   }
+}
 
-  // Break badge
-  const breakBadge = document.getElementById('dispatch-break-badge');
-  if (activeBreak) {
-    breakBadge.style.display = 'inline-flex';
-    breakBadge.className = 'breakdown-chip';
-    breakBadge.style.color = 'var(--yellow)';
-    breakBadge.textContent = '☕ On break';
-  } else {
-    breakBadge.style.display = 'none';
-  }
+// ── Break & Lunch ────────────────────────────────────────────────────────────
+// ms at the start of the active (clocked-in, not clocked-out) row, used as the
+// "since clock-in" anchor for compliance. null when nothing is clocked in.
+function sessionStartMs() {
+  const active = rowsData.find(r => r.clock_in && !r.clock_out);
+  if (!active) return null;
+  const [h, m] = active.clock_in.split(':').map(Number);
+  const d = new Date(); d.setHours(h, m, 0, 0);
+  return d.getTime();
+}
 
-  // Lunch badge
-  const lunchBadge = document.getElementById('dispatch-lunch-badge');
-  if (activeLunch) {
-    lunchBadge.style.display = 'inline-flex';
-    lunchBadge.className = 'breakdown-chip';
-    lunchBadge.style.color = 'var(--yellow)';
-    lunchBadge.textContent = '🍽 On lunch';
-  } else {
-    lunchBadge.style.display = 'none';
+function elapsedSince(ms) {
+  const diff = Date.now() - ms;
+  const h = Math.floor(diff / 3600000);
+  const m = Math.floor((diff % 3600000) / 60000);
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+
+async function togglePunch(type) {
+  if (!currentCompany) { Shell.toast('Select a company first.', 'warning'); return; }
+  if (sessionStartMs() === null && !(type === 'break' ? activeBreakId : activeLunchId)) {
+    Shell.toast('Clock in before starting a break or lunch.', 'warning');
+    return;
   }
+  // Break/lunch are scoped to an entry — make sure the session is saved first.
+  if (!currentEntryId) { await saveSession(true); if (!currentEntryId) return; }
+
+  const activeId = type === 'break' ? activeBreakId : activeLunchId;
+  const label = type === 'break' ? 'Break' : 'Lunch';
+  if (activeId) {
+    const item = taskItems.find(t => t.id === activeId);
+    const durationSecs = item ? Math.max(0, Math.floor((Date.now() - item.started_at) / 1000)) : 0;
+    await api.invoke('tasks:save', { id: activeId, label, item_type: type, stopped_at: Date.now(), duration_secs: durationSecs });
+    Shell.toast(`${label} ended.`, 'success');
+  } else {
+    await api.invoke('tasks:save', { entry_id: currentEntryId, label, item_type: type, started_at: Date.now(), duration_secs: 0 });
+    Shell.toast(`${label} started.`, 'success');
+  }
+  await loadTaskItems(currentEntryId);
+}
+
+function updateBreakButtons() {
+  const b = document.getElementById('btn-break');
+  const l = document.getElementById('btn-lunch');
+  if (b) { b.textContent = activeBreakId ? '✓ End Break' : '☕ Start Break'; b.classList.toggle('bl-active', !!activeBreakId); }
+  if (l) { l.textContent = activeLunchId ? '✓ End Lunch' : 'Start Lunch';   l.classList.toggle('bl-active', !!activeLunchId); }
+}
+
+// Returns 'ok' | 'warn' | 'over' for break/lunch relative to the US-state policy.
+function checkComplianceStatus(type) {
+  const p = auditPolicy;
+  let thresholdMs, warnMs;
+  if (type === 'break') {
+    const rawDue  = p?.breakThresholds?.[0]?.[0];
+    thresholdMs   = (rawDue != null) ? rawDue * 60000 : Infinity;
+    const rawWarn = p?.dispatchBreakWarnMins;
+    warnMs        = (rawWarn != null) ? rawWarn * 60000 : Infinity;
+  } else {
+    thresholdMs   = p ? p.lunchThreshMins * 60000 : 5 * 3600000;
+    const rawWarn = p?.dispatchLunchWarnMins;
+    warnMs        = (rawWarn != null) ? rawWarn * 60000 : 4.5 * 3600000;
+  }
+  if ((type === 'break' ? activeBreakId : activeLunchId)) return 'ok'; // currently on it
+  const relevant = taskItems.filter(t => t.item_type === type && t.stopped_at);
+  const start = sessionStartMs();
+  const lastStop = relevant.length ? Math.max(...relevant.map(t => t.stopped_at)) : (start || Date.now());
+  const elapsed = Date.now() - lastStop;
+  if (elapsed >= thresholdMs) return 'over';
+  if (elapsed >= warnMs) return 'warn';
+  return 'ok';
+}
+
+const DOT_SVG = '<svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><circle cx="5" cy="5" r="5"/></svg>';
+
+function renderCompliance() {
+  renderComplianceFor('break');
+  renderComplianceFor('lunch');
+}
+
+function renderComplianceFor(type) {
+  const el = document.getElementById(`compliance-${type}`);
+  if (!el) return;
+  const status = checkComplianceStatus(type);
+  el.className = `bl-compliance ${status}`;
+
+  const activeId = type === 'break' ? activeBreakId : activeLunchId;
+  if (activeId) {
+    el.innerHTML = `${DOT_SVG} ${type === 'break' ? 'On break' : 'On lunch'}`;
+    return;
+  }
+  const start = sessionStartMs();
+  if (start === null) { el.innerHTML = `${DOT_SVG} ${type === 'break' ? 'Break' : 'Lunch'}: clock in to track`; return; }
+
+  const relevant = taskItems.filter(t => t.item_type === type && t.stopped_at);
+  if (!relevant.length) {
+    const elStr = elapsedSince(start);
+    if (status === 'over')      el.innerHTML = `${DOT_SVG} ⚠ No ${type} taken — ${elStr} since clock-in`;
+    else if (status === 'warn') el.innerHTML = `${DOT_SVG} Approaching ${type} time (${elStr})`;
+    else                        el.innerHTML = `${DOT_SVG} No ${type} yet — ${elStr} since clock-in`;
+    return;
+  }
+  const elStr = elapsedSince(Math.max(...relevant.map(t => t.stopped_at)));
+  el.innerHTML = status === 'over'
+    ? `${DOT_SVG} ⚠ ${type === 'break' ? 'Break' : 'Lunch'} overdue — last ${type} ${elStr} ago`
+    : `${DOT_SVG} Last ${type}: ${elStr} ago ✓`;
 }
 
 // ── Row data helpers ──
@@ -443,7 +551,7 @@ async function saveSession(silent=false, fromTimer=false) {
   if (res.ok) {
     if (!currentEntryId && res.id) currentEntryId = res.id;
     Store.invalidate('entries');
-    updateTaskChip(currentEntryId);
+    loadTaskItems(currentEntryId);
     if (!silent) Shell.toast('Session saved.', 'success');
     const label = fromTimer ? `Auto-saved at ${nowTime()}` : `Saved at ${nowTime()}`;
     document.getElementById('session-status').textContent = label;

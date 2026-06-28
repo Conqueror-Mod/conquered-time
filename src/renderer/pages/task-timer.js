@@ -3,6 +3,9 @@
 // Dispatch (task timer) page logic. Externalized from an inline <script> so the
 // page runs under a strict script-src 'self' CSP. Depends on globals injected by
 // shell.js (Shell, api, Settings, escapeHtml) — must load after shell.js.
+//
+// Break/lunch punches moved to the Time Tracker (v3.6) — Dispatch is now purely
+// task timing + counting. Break/lunch are still task_items, just managed there.
 
 // ── State ──────────────────────────────────────────────────────────────────
 let activeEntry   = null;   // full entry object from entries:get-active
@@ -10,11 +13,7 @@ let taskItems     = [];     // current session task_items
 let activeTaskId  = null;   // task_item id of the in-progress task (or null)
 let timerStart    = null;   // Date.now() when current task started
 let timerInterval = null;   // setInterval handle for stopwatch
-
-let activeBreakId  = null;  // task_item id of in-progress break
-let activeLunchId  = null;  // task_item id of in-progress lunch
-let sessionStartMs = null;  // ms when the active row clocked in (for compliance calc)
-let dispatchPolicy = null;  // loaded from audit:get-policy on init
+let sessionStartMs = null;  // ms when the active row clocked in (for banner duration)
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function fmtSecs(totalSecs) {
@@ -56,44 +55,7 @@ function buildDescString(tasks) {
   const parts = Object.entries(counts)
     .sort((a,b) => b[1]-a[1])
     .map(([l,c]) => c > 1 ? `${l} ×${c}` : l);
-  const hasBreakOverdue  = checkComplianceStatus('break')  === 'over';
-  const hasLunchOverdue  = checkComplianceStatus('lunch')  === 'over';
-  const warnings = [
-    hasBreakOverdue  && '⚠ Break overdue',
-    hasLunchOverdue  && '⚠ Lunch overdue',
-  ].filter(Boolean);
-  const warnStr = warnings.length ? ` | ${warnings.join(', ')}` : '';
-  return `[${completed.length} task${completed.length===1?'':'s'}${warnStr}] ${parts.join(', ')}`;
-}
-
-function checkComplianceStatus(type) {
-  // Returns 'ok', 'warn' (approaching), or 'over'
-  const p = dispatchPolicy;
-  let thresholdMs, warnMs;
-  if (type === 'break') {
-    // Break is "overdue" once the session crosses breakThresholds[0][0] (transition from 0→1+ required).
-    // null threshold means no break requirement (meal_only) → treat as Infinity → never overdue.
-    const rawDue = p?.breakThresholds?.[0]?.[0];
-    thresholdMs = (rawDue != null) ? rawDue * 60000 : Infinity;
-    const rawWarn = p?.dispatchBreakWarnMins;
-    warnMs = (rawWarn != null) ? rawWarn * 60000 : Infinity;
-  } else {
-    thresholdMs = p ? p.lunchThreshMins * 60000 : 5 * 3600000;
-    const rawLunchWarn = p?.dispatchLunchWarnMins;
-    warnMs = (rawLunchWarn != null) ? rawLunchWarn * 60000 : 4.5 * 3600000;
-  }
-  const relevant = taskItems.filter(t => t.item_type === type && t.stopped_at);
-  const activeItem = taskItems.find(
-    t => t.item_type === type && !t.stopped_at
-  );
-  if (activeItem) return 'ok'; // currently on break/lunch
-  const lastStop = relevant.length
-    ? Math.max(...relevant.map(t => t.stopped_at))
-    : (sessionStartMs || Date.now());
-  const elapsed = Date.now() - lastStop;
-  if (elapsed >= thresholdMs) return 'over';
-  if (elapsed >= warnMs) return 'warn';
-  return 'ok';
+  return `[${completed.length} task${completed.length===1?'':'s'}] ${parts.join(', ')}`;
 }
 
 function elapsedSinceMs(ms) {
@@ -186,73 +148,6 @@ function renderTaskList() {
   }
 }
 
-// ── Compliance indicators ──────────────────────────────────────────────────
-function renderCompliance() {
-  renderComplianceFor('break');
-  renderComplianceFor('lunch');
-}
-
-function renderComplianceFor(type) {
-  const el = document.getElementById(`compliance-${type}`);
-  if (!el) return;
-
-  const status = checkComplianceStatus(type);
-  el.className = `tt-compliance ${status}`;
-
-  const activeItem = taskItems.find(t => t.item_type === type && !t.stopped_at);
-  const relevant   = taskItems.filter(t => t.item_type === type && t.stopped_at);
-  const p2 = dispatchPolicy;
-  const threshLabel = type === 'break'
-    ? (() => { for (const [t,c] of (p2?.breakThresholds||[[210,0],[360,1]])) { if (c===1) return `${Math.round(t/60*10)/10}h`; } return '3.5h'; })()
-    : `${Math.round((p2?.lunchThreshMins||300)/60*10)/10}h`;
-
-  if (activeItem) {
-    el.innerHTML = `<svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><circle cx="5" cy="5" r="5"/></svg>
-      ${type === 'break' ? 'On break' : 'On lunch'} since ${fmtTime(new Date(activeItem.started_at).toTimeString().slice(0,5))}`;
-    return;
-  }
-  if (!relevant.length) {
-    if (!sessionStartMs) { el.textContent = '—'; return; }
-    const elapsed = Date.now() - sessionStartMs;
-    const elStr = elapsedSinceMs(sessionStartMs);
-    if (status === 'over')
-      el.innerHTML = `<svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><circle cx="5" cy="5" r="5"/></svg> ⚠ No ${type} taken — ${elStr} since clock-in (over ${threshLabel})`;
-    else if (status === 'warn')
-      el.innerHTML = `<svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><circle cx="5" cy="5" r="5"/></svg> Approaching ${type} time (${elStr})`;
-    else
-      el.innerHTML = `<svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><circle cx="5" cy="5" r="5"/></svg> No ${type} yet — ${elStr} since clock-in`;
-    return;
-  }
-  const lastStop = Math.max(...relevant.map(t => t.stopped_at));
-  const elStr = elapsedSinceMs(lastStop);
-  if (status === 'over')
-    el.innerHTML = `<svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><circle cx="5" cy="5" r="5"/></svg> ⚠ ${type === 'break' ? 'Break overdue' : 'Lunch overdue'} — last ${type} ${elStr} ago`;
-  else
-    el.innerHTML = `<svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><circle cx="5" cy="5" r="5"/></svg> Last ${type}: ${elStr} ago ✓`;
-}
-
-// ── Break/Lunch buttons ────────────────────────────────────────────────────
-function updateBreakButtons() {
-  const btnBreak = document.getElementById('btn-break');
-  const btnLunch = document.getElementById('btn-lunch');
-
-  if (activeBreakId) {
-    btnBreak.textContent = '✓ End Break';
-    btnBreak.classList.add('active');
-  } else {
-    btnBreak.textContent = '☕ Start Break';
-    btnBreak.classList.remove('active');
-  }
-
-  if (activeLunchId) {
-    btnLunch.textContent = '✓ End Lunch';
-    btnLunch.classList.add('active');
-  } else {
-    btnLunch.textContent = 'Start Lunch';
-    btnLunch.classList.remove('active');
-  }
-}
-
 // ── Timer controls ─────────────────────────────────────────────────────────
 function startStopwatch(startedAtMs) {
   timerStart = startedAtMs || Date.now();
@@ -303,24 +198,7 @@ async function deleteTask(id) {
   await api.invoke('tasks:delete', id);
   taskItems = taskItems.filter(t => t.id !== id);
   renderTaskList();
-  renderCompliance();
   await writeDescToEntry();
-}
-
-// ── Compliance check tick ─────────────────────────────────────────────────
-async function complianceTick() {
-  renderCompliance();
-  const breakStatus = checkComplianceStatus('break');
-  const lunchStatus = checkComplianceStatus('lunch');
-
-  if (breakStatus === 'over' && !activeBreakId) {
-    Shell.toast('Take a break — you\'ve been working over 2 hours.', 'info', 6000);
-    await writeDescToEntry();
-  }
-  if (lunchStatus === 'over' && !activeLunchId) {
-    Shell.toast('Time for lunch — you\'ve been working over 5 hours.', 'info', 6000);
-    await writeDescToEntry();
-  }
 }
 
 // ── Main init ─────────────────────────────────────────────────────────────
@@ -328,31 +206,20 @@ window.addEventListener('DOMContentLoaded', async () => {
   await Shell.init('task-timer');
   document.documentElement.style.visibility = '';
 
-  dispatchPolicy = await api.invoke('audit:get-policy');
-
   // Load active entry
   activeEntry = await api.invoke('entries:get-active');
   await updateBanner();
 
   if (!activeEntry) {
-    // Wire buttons to show error — don't silently swallow clicks
-    const noSessionGuard = () => {
+    // Wire button to show error — don't silently swallow clicks
+    document.getElementById('btn-start').addEventListener('click', () => {
       Shell.toast('No active punch. Go to Time Tracker and clock in first.', 'error');
-    };
-    document.getElementById('btn-start').addEventListener('click', noSessionGuard);
-    document.getElementById('btn-break').addEventListener('click', noSessionGuard);
-    document.getElementById('btn-lunch').addEventListener('click', noSessionGuard);
+    });
     return;
   }
 
   // Load tasks and recent labels
   taskItems = await api.invoke('tasks:list', activeEntry.id);
-
-  // Detect any in-progress break/lunch
-  const inProgressBreak = taskItems.find(t => t.item_type === 'break' && !t.stopped_at);
-  const inProgressLunch = taskItems.find(t => t.item_type === 'lunch' && !t.stopped_at);
-  if (inProgressBreak) activeBreakId = inProgressBreak.id;
-  if (inProgressLunch) activeLunchId = inProgressLunch.id;
 
   // Resume an in-progress task (user navigated away and returned)
   const inProgressTask = taskItems.find(t => t.item_type === 'task' && t.started_at && !t.stopped_at);
@@ -368,15 +235,10 @@ window.addEventListener('DOMContentLoaded', async () => {
   }
 
   renderTaskList();
-  renderCompliance();
-  updateBreakButtons();
   await loadRecentLabels();
 
   // ── Banner duration ticker ──
   setInterval(updateBannerDuration, 30000);
-
-  // ── Compliance tick every 60s ──
-  setInterval(complianceTick, 60000);
 
   // ── Start Task ──
   document.getElementById('btn-start').addEventListener('click', async () => {
@@ -423,7 +285,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     // Refresh task list
     taskItems = await api.invoke('tasks:list', activeEntry.id);
     renderTaskList();
-    renderCompliance();
     await writeDescToEntry();
     await loadRecentLabels();
 
@@ -456,66 +317,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btn-start').style.display  = '';
     document.getElementById('btn-stop').style.display   = 'none';
     document.getElementById('btn-cancel').style.display = 'none';
-  });
-
-  // ── Break toggle ──
-  document.getElementById('btn-break').addEventListener('click', async () => {
-    if (activeBreakId) {
-      // End break
-      const durationSecs = Math.floor((Date.now() - taskItems.find(t=>t.id===activeBreakId)?.started_at) / 1000);
-      await api.invoke('tasks:save', {
-        id: activeBreakId,
-        label: 'Break',
-        item_type: 'break',
-        stopped_at: Date.now(),
-        duration_secs: Math.max(0, durationSecs),
-      });
-      activeBreakId = null;
-      Shell.toast('Break ended.', 'success');
-    } else {
-      // Start break
-      const res = await api.invoke('tasks:save', {
-        entry_id: activeEntry.id,
-        label: 'Break',
-        item_type: 'break',
-        started_at: Date.now(),
-        duration_secs: 0,
-      });
-      activeBreakId = res.id;
-      Shell.toast('Break started.', 'success');
-    }
-    taskItems = await api.invoke('tasks:list', activeEntry.id);
-    updateBreakButtons();
-    renderCompliance();
-  });
-
-  // ── Lunch toggle ──
-  document.getElementById('btn-lunch').addEventListener('click', async () => {
-    if (activeLunchId) {
-      const durationSecs = Math.floor((Date.now() - taskItems.find(t=>t.id===activeLunchId)?.started_at) / 1000);
-      await api.invoke('tasks:save', {
-        id: activeLunchId,
-        label: 'Lunch',
-        item_type: 'lunch',
-        stopped_at: Date.now(),
-        duration_secs: Math.max(0, durationSecs),
-      });
-      activeLunchId = null;
-      Shell.toast('Lunch ended.', 'success');
-    } else {
-      const res = await api.invoke('tasks:save', {
-        entry_id: activeEntry.id,
-        label: 'Lunch',
-        item_type: 'lunch',
-        started_at: Date.now(),
-        duration_secs: 0,
-      });
-      activeLunchId = res.id;
-      Shell.toast('Lunch started.', 'success');
-    }
-    taskItems = await api.invoke('tasks:list', activeEntry.id);
-    updateBreakButtons();
-    renderCompliance();
   });
 
   // ── Enter key on label input starts timer ──
