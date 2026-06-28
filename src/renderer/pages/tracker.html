@@ -56,7 +56,6 @@
     gap: 14px;
     box-shadow: var(--shadow-1), var(--shadow-inset);
   }
-  .panel-inputs { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
   .panel-field { display: flex; flex-direction: column; gap: 4px; }
   .panel-field label {
     font-family: var(--sans);
@@ -69,7 +68,6 @@
   .panel-field--wide { flex: 1; min-width: 200px; }
   .panel-field select, .panel-field input { font-size: 13px; }
   .panel-divider { height: 1px; background: var(--border); margin: 0 -18px; }
-  .panel-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 
   .row-num { font-family: var(--mono); font-size: 11px; color: var(--text-dim); text-align: center; min-width: 36px; }
   .cell-label  { font-family: var(--sans); font-size: 12px; font-weight: 500; color: var(--accent); }
@@ -103,16 +101,25 @@
     50%       { opacity: 0.3; }
   }
 
-  /* ── Break & Lunch strip ── */
-  .break-lunch-strip { display: flex; flex-direction: column; gap: 10px; }
-  .bl-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-  .bl-label {
+  /* ── Two-module control panel ── */
+  .cp-modules { display: flex; gap: 14px; align-items: stretch; flex-wrap: wrap; }
+  .cp-module-label {
     font-family: var(--sans); font-size: 10px; font-weight: 600;
     color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em;
-    margin-right: 4px;
   }
+  /* Left: Session Clock module */
+  .clock-module {
+    flex: 0 0 236px;
+    display: flex; flex-direction: column; gap: 10px;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--surface-2);
+  }
+  .clock-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .clock-grid button { width: 100%; white-space: nowrap; }
   #btn-break.bl-active, #btn-lunch.bl-active { border-color: var(--yellow); color: var(--yellow); }
-  .bl-compliance-row { display: flex; gap: 18px; flex-wrap: wrap; }
+  .bl-compliance-row { display: flex; flex-direction: column; gap: 4px; margin-top: auto; }
   .bl-compliance {
     font-family: var(--sans); font-size: 11px; color: var(--text-dim);
     display: inline-flex; align-items: center; gap: 6px;
@@ -121,6 +128,15 @@
   .bl-compliance.ok   { color: var(--text-dim); }
   .bl-compliance.warn { color: var(--yellow); }
   .bl-compliance.over { color: var(--red); }
+  /* Right: task inputs module */
+  .inputs-module { flex: 1; min-width: 280px; display: flex; flex-direction: column; gap: 12px; }
+  .inputs-top { display: flex; gap: 12px; flex-wrap: wrap; }
+  .inputs-top .panel-field:first-child { flex: 0 0 170px; }
+  .inputs-top .panel-field--wide { flex: 1; min-width: 160px; }
+  .inputs-module .panel-field input,
+  .inputs-module .panel-field select { width: 100%; }
+  /* Row tools strip */
+  .row-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 </style>
 </head>
 <body>
@@ -159,47 +175,55 @@
 </div>
 
 <div class="control-panel">
-  <div class="panel-inputs">
-    <div class="panel-field">
-      <label>Task Label</label>
-      <select id="input-label">
-        <option value="">— Select —</option>
-        <option>Training</option><option>Evaluation</option>
-        <option>Review</option><option>Annotation</option>
-        <option>QA</option><option>Research</option>
-        <option>Admin</option><option>Communication</option>
-        <option>Other</option>
-      </select>
+  <div class="cp-modules">
+
+    <!-- Left: Session Clock module — clock in/out + break/lunch -->
+    <div class="clock-module">
+      <span class="cp-module-label">Session Clock</span>
+      <div class="clock-grid">
+        <button class="btn-primary" id="btn-clock-in">⏱ Clock In</button>
+        <button class="btn-primary" id="btn-clock-out">⏹ Clock Out</button>
+        <button class="btn-neutral" id="btn-break">☕ Break</button>
+        <button class="btn-neutral" id="btn-lunch">🍽 Lunch</button>
+      </div>
+      <div class="bl-compliance-row">
+        <span class="bl-compliance" id="compliance-break">—</span>
+        <span class="bl-compliance" id="compliance-lunch">—</span>
+      </div>
     </div>
-    <div class="panel-field">
-      <label>Task Name</label>
-      <input type="text" id="input-name" placeholder="Enter task name…" style="user-select:text;-webkit-user-select:text;">
+
+    <!-- Right: Task input fields -->
+    <div class="inputs-module">
+      <div class="inputs-top">
+        <div class="panel-field">
+          <label>Task Label</label>
+          <select id="input-label">
+            <option value="">— Select —</option>
+            <option>Training</option><option>Evaluation</option>
+            <option>Review</option><option>Annotation</option>
+            <option>QA</option><option>Research</option>
+            <option>Admin</option><option>Communication</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div class="panel-field panel-field--wide">
+          <label>Task Name</label>
+          <input type="text" id="input-name" placeholder="Enter task name…" style="user-select:text;-webkit-user-select:text;">
+        </div>
+      </div>
+      <div class="panel-field">
+        <label>Description</label>
+        <input type="text" id="input-desc" placeholder="Enter description…" style="user-select:text;-webkit-user-select:text;">
+      </div>
     </div>
-    <div class="panel-field panel-field--wide">
-      <label>Description</label>
-      <input type="text" id="input-desc" placeholder="Enter description…" style="user-select:text;-webkit-user-select:text;">
-    </div>
+
   </div>
   <div class="panel-divider"></div>
-  <div class="panel-actions">
-    <button class="btn-primary" id="btn-clock-in">⏱ Clock In</button>
-    <button class="btn-primary" id="btn-clock-out">⏹ Clock Out</button>
-    <button class="btn-neutral" id="btn-add-row">+ Add Row</button>
+  <div class="row-tools">
+    <span class="cp-module-label">Row Tools</span>
+    <button class="btn-neutral" id="btn-manual-entry">+ Manual Entry</button>
     <button class="btn-neutral" id="btn-clear-row">Clear Row</button>
-    <button class="btn-neutral" id="btn-save">Save</button>
-    <button class="btn-danger"  id="btn-clear-all">Clear All</button>
-  </div>
-  <div class="panel-divider"></div>
-  <div class="break-lunch-strip">
-    <div class="bl-actions">
-      <span class="bl-label">Break &amp; Lunch</span>
-      <button class="btn-neutral" id="btn-break">☕ Start Break</button>
-      <button class="btn-neutral" id="btn-lunch">Start Lunch</button>
-    </div>
-    <div class="bl-compliance-row">
-      <span class="bl-compliance" id="compliance-break">—</span>
-      <span class="bl-compliance" id="compliance-lunch">—</span>
-    </div>
+    <button class="btn-danger"  id="btn-clear-all" style="margin-left:auto;">Clear All</button>
   </div>
 </div>
 
