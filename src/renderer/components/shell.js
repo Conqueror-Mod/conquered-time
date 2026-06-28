@@ -49,9 +49,9 @@ const Shell = (() => {
         <span class="titlebar-page">${pageLabel}</span>
       </div>
       <div class="titlebar-controls">
-        <button class="titlebar-btn" onclick="api.send('win:minimize')">─</button>
-        <button class="titlebar-btn" onclick="api.send('win:maximize')">□</button>
-        <button class="titlebar-btn close" onclick="api.send('win:close')">✕</button>
+        <button class="titlebar-btn" data-action="winMinimize">─</button>
+        <button class="titlebar-btn" data-action="winMaximize">□</button>
+        <button class="titlebar-btn close" data-action="winClose">✕</button>
       </div>
     </div>`;
   }
@@ -60,8 +60,7 @@ const Shell = (() => {
     const navItems = NAV.map(n => `
       <a class="nav-item ${n.id === activeId ? 'active' : ''}"
          tabindex="0"
-         onclick="api.send('navigate', '${n.id}')"
-         onkeydown="if(event.key==='Enter')api.send('navigate','${n.id}')">
+         data-action="navigate" data-arg="${n.id}">
         <span class="nav-icon">${n.icon}</span>
         ${n.label}
       </a>`).join('');
@@ -81,13 +80,13 @@ const Shell = (() => {
 
       <div class="sidebar-section" style="margin-bottom:0;">
         <div class="sidebar-label">Session</div>
-        <a class="nav-item" onclick="api.send('session:request-lock')">
+        <a class="nav-item" tabindex="0" data-action="requestLock">
           <span class="nav-icon">${IC.lock}</span> Lock
         </a>
       </div>
 
       <div style="border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:10px 0;margin-bottom:0;">
-        <button class="settings-trigger" id="settings-trigger-btn" onclick="openSettingsModal()" title="Settings (Ctrl+,)">
+        <button class="settings-trigger" id="settings-trigger-btn" data-action="openSettings" title="Settings (Ctrl+,)">
           <span style="display:inline-flex;align-items:center;">${IC.settings}</span> Settings
         </button>
       </div>
@@ -118,18 +117,18 @@ const Shell = (() => {
     ];
 
     const navHTML = NAV_ITEMS.map(n => `
-      <button class="sn-item${n.id === 'appearance' ? ' active' : ''}" data-cat="${n.id}" onclick="switchSettingsCategory('${n.id}')">
+      <button class="sn-item${n.id === 'appearance' ? ' active' : ''}" data-cat="${n.id}" data-action="switchCat" data-arg="${n.id}">
         <span class="sn-icon">${n.icon}</span>
         <span class="sn-label">${n.label}</span>
       </button>`).join('');
 
     return `
-    <div id="settings-modal" onclick="handleModalBackdrop(event)">
+    <div id="settings-modal">
       <div class="settings-modal-box">
 
         <div class="settings-modal-header">
           <div class="settings-modal-title" style="display:flex;align-items:center;gap:8px;">${IC.settings} Settings</div>
-          <button class="settings-modal-close" onclick="closeSettingsModal()">✕</button>
+          <button class="settings-modal-close" data-action="closeSettings">✕</button>
         </div>
 
         <div class="settings-layout">
@@ -147,11 +146,11 @@ const Shell = (() => {
               <div class="settings-group">
                 <div class="settings-group-title">Theme</div>
                 <div class="theme-cards" id="theme-cards">
-                  <div class="theme-card" data-t="zanarkand"  onclick="applyTheme('zanarkand')"><div class="theme-swatch" data-t="zanarkand"></div><div class="theme-card-name">Zanarkand</div></div>
-                  <div class="theme-card" data-t="memoria"    onclick="applyTheme('memoria')"><div class="theme-swatch" data-t="memoria"></div><div class="theme-card-name">Memoria</div></div>
-                  <div class="theme-card" data-t="rabanastre" onclick="applyTheme('rabanastre')"><div class="theme-swatch" data-t="rabanastre"></div><div class="theme-card-name">Rabanastre</div></div>
-                  <div class="theme-card" data-t="treno"      onclick="applyTheme('treno')"><div class="theme-swatch" data-t="treno"></div><div class="theme-card-name">Treno</div></div>
-                  <div class="theme-card" data-t="nibelheim"  onclick="applyTheme('nibelheim')"><div class="theme-swatch" data-t="nibelheim"></div><div class="theme-card-name">Nibelheim</div></div>
+                  <div class="theme-card" data-t="zanarkand"  data-action="applyTheme" data-arg="zanarkand"><div class="theme-swatch" data-t="zanarkand"></div><div class="theme-card-name">Zanarkand</div></div>
+                  <div class="theme-card" data-t="memoria"    data-action="applyTheme" data-arg="memoria"><div class="theme-swatch" data-t="memoria"></div><div class="theme-card-name">Memoria</div></div>
+                  <div class="theme-card" data-t="rabanastre" data-action="applyTheme" data-arg="rabanastre"><div class="theme-swatch" data-t="rabanastre"></div><div class="theme-card-name">Rabanastre</div></div>
+                  <div class="theme-card" data-t="treno"      data-action="applyTheme" data-arg="treno"><div class="theme-swatch" data-t="treno"></div><div class="theme-card-name">Treno</div></div>
+                  <div class="theme-card" data-t="nibelheim"  data-action="applyTheme" data-arg="nibelheim"><div class="theme-swatch" data-t="nibelheim"></div><div class="theme-card-name">Nibelheim</div></div>
                 </div>
               </div>
 
@@ -159,10 +158,10 @@ const Shell = (() => {
                 <div class="settings-group-title">UI Scale</div>
                 <div class="settings-row-label">Scales all app content proportionally</div>
                 <div class="settings-btn-group" id="scale-btns" style="margin-top:8px;">
-                  <button class="s-btn" data-s="compact"     onclick="applyScale('compact')">Compact</button>
-                  <button class="s-btn" data-s="normal"      onclick="applyScale('normal')">Normal</button>
-                  <button class="s-btn" data-s="comfortable" onclick="applyScale('comfortable')">Comfortable</button>
-                  <button class="s-btn" data-s="large"       onclick="applyScale('large')">Large</button>
+                  <button class="s-btn" data-s="compact"     data-action="applyScale" data-arg="compact">Compact</button>
+                  <button class="s-btn" data-s="normal"      data-action="applyScale" data-arg="normal">Normal</button>
+                  <button class="s-btn" data-s="comfortable" data-action="applyScale" data-arg="comfortable">Comfortable</button>
+                  <button class="s-btn" data-s="large"       data-action="applyScale" data-arg="large">Large</button>
                 </div>
               </div>
             </div>
@@ -184,7 +183,7 @@ const Shell = (() => {
                     <div class="toggle-label">Launch maximized</div>
                     <div class="toggle-desc">Opens the app filling the full display on startup</div>
                   </div>
-                  <button class="toggle-switch" id="toggle-start-maximized" onclick="applyWinToggle('win_startMaximized', this)"></button>
+                  <button class="toggle-switch" id="toggle-start-maximized" data-action="applyWinToggle" data-arg="win_startMaximized"></button>
                 </div>
               </div>
 
@@ -195,7 +194,7 @@ const Shell = (() => {
                     <div class="toggle-label">Restore window position</div>
                     <div class="toggle-desc">Reopens the app at the same size and position as last time</div>
                   </div>
-                  <button class="toggle-switch" id="toggle-remember-position" onclick="applyWinToggle('win_rememberPosition', this)"></button>
+                  <button class="toggle-switch" id="toggle-remember-position" data-action="applyWinToggle" data-arg="win_rememberPosition"></button>
                 </div>
               </div>
             </div><!-- /settings-cat-window -->
@@ -208,8 +207,8 @@ const Shell = (() => {
                 <div class="settings-group-title">Clock Format</div>
                 <div class="settings-row-label">How times are shown throughout the app</div>
                 <div class="settings-btn-group" id="time-btns" style="margin-top:8px;">
-                  <button class="s-btn" data-tf="24h" onclick="applyTimeFormat('24h')">24-Hour (14:30)</button>
-                  <button class="s-btn" data-tf="12h" onclick="applyTimeFormat('12h')">12-Hour (2:30 PM)</button>
+                  <button class="s-btn" data-tf="24h" data-action="applyTimeFormat" data-arg="24h">24-Hour (14:30)</button>
+                  <button class="s-btn" data-tf="12h" data-action="applyTimeFormat" data-arg="12h">12-Hour (2:30 PM)</button>
                 </div>
               </div>
             </div>
@@ -222,10 +221,10 @@ const Shell = (() => {
                 <div class="settings-group-title">Auto-Save</div>
                 <div class="settings-row-label">How often active sessions are automatically saved</div>
                 <div class="settings-btn-group" id="autosave-btns" style="margin-top:8px;">
-                  <button class="s-btn" data-asi="0"   onclick="applyAutoSave(0)">Off</button>
-                  <button class="s-btn" data-asi="30"  onclick="applyAutoSave(30)">30 sec</button>
-                  <button class="s-btn" data-asi="60"  onclick="applyAutoSave(60)">1 min</button>
-                  <button class="s-btn" data-asi="300" onclick="applyAutoSave(300)">5 min</button>
+                  <button class="s-btn" data-asi="0"   data-action="applyAutoSave" data-arg="0">Off</button>
+                  <button class="s-btn" data-asi="30"  data-action="applyAutoSave" data-arg="30">30 sec</button>
+                  <button class="s-btn" data-asi="60"  data-action="applyAutoSave" data-arg="60">1 min</button>
+                  <button class="s-btn" data-asi="300" data-action="applyAutoSave" data-arg="300">5 min</button>
                 </div>
               </div>
 
@@ -241,14 +240,14 @@ const Shell = (() => {
                         <div class="dba-card-title">Time Clock Clear</div>
                         <div class="dba-card-desc">Removes all time entries and Dispatch task records. Companies are kept.</div>
                       </div>
-                      <button class="dba-trigger-btn" onclick="showDbaConfirm('timeclock')">Clear</button>
+                      <button class="dba-trigger-btn" data-action="showDbaConfirm" data-arg="timeclock">Clear</button>
                     </div>
                     <div class="dba-confirm" id="dba-confirm-timeclock" style="display:none;">
                       <div class="dba-confirm-warning">⚠ This will permanently delete all time entries and task records for your account.</div>
                       <div class="dba-confirm-row">
                         <input class="dba-confirm-input" id="dba-input-timeclock" placeholder='Type CONFIRM to proceed' autocomplete="off">
-                        <button class="dba-confirm-btn danger" onclick="executeDbaClear('timeclock')">Delete</button>
-                        <button class="dba-confirm-btn" onclick="hideDbaConfirm('timeclock')">Cancel</button>
+                        <button class="dba-confirm-btn danger" data-action="executeDbaClear" data-arg="timeclock">Delete</button>
+                        <button class="dba-confirm-btn" data-action="hideDbaConfirm" data-arg="timeclock">Cancel</button>
                       </div>
                     </div>
                   </div>
@@ -259,14 +258,14 @@ const Shell = (() => {
                         <div class="dba-card-title">Companies Clear</div>
                         <div class="dba-card-desc">Removes all companies and their associated time entries and tasks.</div>
                       </div>
-                      <button class="dba-trigger-btn" onclick="showDbaConfirm('companies')">Clear</button>
+                      <button class="dba-trigger-btn" data-action="showDbaConfirm" data-arg="companies">Clear</button>
                     </div>
                     <div class="dba-confirm" id="dba-confirm-companies" style="display:none;">
                       <div class="dba-confirm-warning">⚠ This will permanently delete all companies, time entries, and task records for your account.</div>
                       <div class="dba-confirm-row">
                         <input class="dba-confirm-input" id="dba-input-companies" placeholder='Type CONFIRM to proceed' autocomplete="off">
-                        <button class="dba-confirm-btn danger" onclick="executeDbaClear('companies')">Delete</button>
-                        <button class="dba-confirm-btn" onclick="hideDbaConfirm('companies')">Cancel</button>
+                        <button class="dba-confirm-btn danger" data-action="executeDbaClear" data-arg="companies">Delete</button>
+                        <button class="dba-confirm-btn" data-action="hideDbaConfirm" data-arg="companies">Cancel</button>
                       </div>
                     </div>
                   </div>
@@ -277,14 +276,14 @@ const Shell = (() => {
                         <div class="dba-card-title">Full Database Clear</div>
                         <div class="dba-card-desc">Wipes everything — account, companies, all data. Resets app to first-run state.</div>
                       </div>
-                      <button class="dba-trigger-btn danger" onclick="showDbaConfirm('full')">Wipe</button>
+                      <button class="dba-trigger-btn danger" data-action="showDbaConfirm" data-arg="full">Wipe</button>
                     </div>
                     <div class="dba-confirm" id="dba-confirm-full" style="display:none;">
                       <div class="dba-confirm-warning">⚠ DESTRUCTIVE — This permanently deletes your account and all data. You will be logged out and returned to setup.</div>
                       <div class="dba-confirm-row">
                         <input class="dba-confirm-input" id="dba-input-full" placeholder='Type CONFIRM to proceed' autocomplete="off">
-                        <button class="dba-confirm-btn danger" onclick="executeDbaClear('full')">Wipe Everything</button>
-                        <button class="dba-confirm-btn" onclick="hideDbaConfirm('full')">Cancel</button>
+                        <button class="dba-confirm-btn danger" data-action="executeDbaClear" data-arg="full">Wipe Everything</button>
+                        <button class="dba-confirm-btn" data-action="hideDbaConfirm" data-arg="full">Cancel</button>
                       </div>
                     </div>
                   </div>
@@ -296,7 +295,7 @@ const Shell = (() => {
                 <div class="settings-group-title">Backup Library</div>
                 <div class="settings-row-label">Restore from a previous automatic backup. Your current data is saved first as a safety checkpoint before any restore.</div>
                 <div id="backup-list-area" style="margin-top:10px;">
-                  <button class="s-btn" onclick="loadBackupList()">Load Backups</button>
+                  <button class="s-btn" data-action="loadBackupList">Load Backups</button>
                 </div>
               </div>
 
@@ -343,8 +342,8 @@ const Shell = (() => {
                   </div>
                 </div>
                 <div style="margin-top:14px;display:flex;gap:8px;align-items:center;">
-                  <button class="s-btn s-btn-primary" id="email-save-btn" onclick="saveEmailConfig()">Save Config</button>
-                  <button class="s-btn" id="email-test-btn" onclick="testEmailConfig()">Test SMTP</button>
+                  <button class="s-btn s-btn-primary" id="email-save-btn" data-action="saveEmailConfig">Save Config</button>
+                  <button class="s-btn" id="email-test-btn" data-action="testEmailConfig">Test SMTP</button>
                   <span id="email-status-text" style="font-size:11px;color:var(--text-muted);margin-left:4px;"></span>
                 </div>
               </div>
@@ -355,7 +354,7 @@ const Shell = (() => {
                 <div style="margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;">
                   <div>
                     <div class="settings-row-label" style="margin-bottom:4px;">Frequency</div>
-                    <select class="sc-input" id="sched-freq" onchange="saveScheduleConfig()">
+                    <select class="sc-input" id="sched-freq" data-action-change="saveScheduleConfig">
                       <option value="off">Off</option>
                       <option value="daily">Daily</option>
                       <option value="weekly">Weekly (Monday)</option>
@@ -366,11 +365,11 @@ const Shell = (() => {
                   </div>
                   <div>
                     <div class="settings-row-label" style="margin-bottom:4px;">Send At</div>
-                    <input class="sc-input" id="sched-time" type="time" value="08:00" onchange="saveScheduleConfig()">
+                    <input class="sc-input" id="sched-time" type="time" value="08:00" data-action-change="saveScheduleConfig">
                   </div>
                 </div>
                 <div style="margin-top:12px;display:flex;gap:8px;align-items:center;">
-                  <button class="s-btn" id="sched-send-now-btn" onclick="sendScheduledNow()">Send Now</button>
+                  <button class="s-btn" id="sched-send-now-btn" data-action="sendScheduledNow">Send Now</button>
                   <span id="sched-send-status" style="font-size:11px;color:var(--text-muted);"></span>
                 </div>
                 <div id="sched-next-send" style="margin-top:10px;font-size:11px;color:var(--text-muted);"></div>
@@ -386,11 +385,11 @@ const Shell = (() => {
                 <div class="settings-group-title">Auto-Lock</div>
                 <div class="settings-row-label">Lock the app after a period of inactivity</div>
                 <div class="settings-btn-group" id="autolock-btns" style="margin-top:8px;">
-                  <button class="s-btn" data-al="0"  onclick="applyAutoLock(0)">Off</button>
-                  <button class="s-btn" data-al="5"  onclick="applyAutoLock(5)">5 min</button>
-                  <button class="s-btn" data-al="15" onclick="applyAutoLock(15)">15 min</button>
-                  <button class="s-btn" data-al="30" onclick="applyAutoLock(30)">30 min</button>
-                  <button class="s-btn" data-al="60" onclick="applyAutoLock(60)">1 hour</button>
+                  <button class="s-btn" data-al="0"  data-action="applyAutoLock" data-arg="0">Off</button>
+                  <button class="s-btn" data-al="5"  data-action="applyAutoLock" data-arg="5">5 min</button>
+                  <button class="s-btn" data-al="15" data-action="applyAutoLock" data-arg="15">15 min</button>
+                  <button class="s-btn" data-al="30" data-action="applyAutoLock" data-arg="30">30 min</button>
+                  <button class="s-btn" data-al="60" data-action="applyAutoLock" data-arg="60">1 hour</button>
                 </div>
               </div>
 
@@ -414,21 +413,21 @@ const Shell = (() => {
                     <div class="toggle-label">Reduce Motion</div>
                     <div class="toggle-desc">Disables animations and transitions</div>
                   </div>
-                  <button class="toggle-switch" id="toggle-motion" onclick="applyToggle('reducedMotion', this)"></button>
+                  <button class="toggle-switch" id="toggle-motion" data-action="applyToggle" data-arg="reducedMotion"></button>
                 </div>
                 <div class="toggle-row">
                   <div class="toggle-info">
                     <div class="toggle-label">High Contrast</div>
                     <div class="toggle-desc">Increases border and text contrast across all themes</div>
                   </div>
-                  <button class="toggle-switch" id="toggle-highcontrast" onclick="applyToggle('highContrast', this)"></button>
+                  <button class="toggle-switch" id="toggle-highcontrast" data-action="applyToggle" data-arg="highContrast"></button>
                 </div>
                 <div class="toggle-row">
                   <div class="toggle-info">
                     <div class="toggle-label">Focus Indicators</div>
                     <div class="toggle-desc">Shows visible outlines for keyboard navigation</div>
                   </div>
-                  <button class="toggle-switch" id="toggle-focus" onclick="applyToggle('focusIndicators', this)"></button>
+                  <button class="toggle-switch" id="toggle-focus" data-action="applyToggle" data-arg="focusIndicators"></button>
                 </div>
               </div>
 
@@ -436,9 +435,9 @@ const Shell = (() => {
                 <div class="settings-group-title">Color Vision</div>
                 <div class="settings-row-label">Adjust colors for color vision deficiencies</div>
                 <div class="settings-btn-group" id="colorblind-btns" style="margin-top:8px;">
-                  <button class="s-btn" data-cb="off"          onclick="applyColorblind('off')">Off</button>
-                  <button class="s-btn" data-cb="deuteranopia" onclick="applyColorblind('deuteranopia')">Deuteranopia</button>
-                  <button class="s-btn" data-cb="protanopia"   onclick="applyColorblind('protanopia')">Protanopia</button>
+                  <button class="s-btn" data-cb="off"          data-action="applyColorblind" data-arg="off">Off</button>
+                  <button class="s-btn" data-cb="deuteranopia" data-action="applyColorblind" data-arg="deuteranopia">Deuteranopia</button>
+                  <button class="s-btn" data-cb="protanopia"   data-action="applyColorblind" data-arg="protanopia">Protanopia</button>
                 </div>
               </div>
             </div>
@@ -498,7 +497,7 @@ const Shell = (() => {
               <div class="about-section">
                 <div class="about-changelog-more">
                   Showing the two most recent releases. Older release notes are available on
-                  <button class="about-changelog-link" onclick="Shell._openExternal('github')">GitHub</button>.
+                  <button class="about-changelog-link" data-action="openExternal" data-arg="github">GitHub</button>.
                 </div>
               </div>
 
@@ -516,12 +515,12 @@ const Shell = (() => {
               <div class="about-section">
                 <div class="about-section-title">Links</div>
                 <div class="about-links">
-                  <button class="about-link-btn" onclick="Shell._openExternal('github')">
+                  <button class="about-link-btn" data-action="openExternal" data-arg="github">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
                     GitHub
                     <span class="about-link-placeholder">Coming soon</span>
                   </button>
-                  <button class="about-link-btn" onclick="Shell._openExternal('donate')">
+                  <button class="about-link-btn" data-action="openExternal" data-arg="donate">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
                     Support / Donate
                     <span class="about-link-placeholder">Coming soon</span>
@@ -630,6 +629,12 @@ const Shell = (() => {
     `;
 
     setSidebarAvatar(profile, user.display_name, user.username);
+
+    // Wire delegated handlers (CSP-safe; replaces inline on* attributes).
+    installShellDelegation();
+    // Backdrop close is special — must fire only when the modal element itself
+    // (not its box children) is clicked, so it can't use the closest() dispatcher.
+    document.getElementById('settings-modal')?.addEventListener('click', handleModalBackdrop);
 
     // Load settings and sync UI
     await Settings.load();
@@ -1009,14 +1014,14 @@ async function toggleBackupPreview(idx) {
         <span class="bp-label">Date Range</span> <span class="bp-value">${info.dateFrom} → ${info.dateTo}</span>
       </div>
       <div id="brestore-row-${idx}">
-        <button class="backup-restore-btn" onclick="showBackupConfirm(${idx})">Restore This Backup</button>
+        <button class="backup-restore-btn" data-action="showBackupConfirm" data-arg="${idx}">Restore This Backup</button>
       </div>
       <div class="backup-confirm-area" id="bconfirm-${idx}" style="display:none;">
         <div class="backup-confirm-warning">⚠ This will replace your live database with this backup and log you out. Your current data is saved as a safety checkpoint first.</div>
         <div class="backup-confirm-row">
           <input class="dba-confirm-input" id="binput-${idx}" placeholder="Type CONFIRM to restore" autocomplete="off">
-          <button class="dba-confirm-btn danger" onclick="executeBackupRestore(${idx})">Restore</button>
-          <button class="dba-confirm-btn" onclick="hideBackupConfirm(${idx})">Cancel</button>
+          <button class="dba-confirm-btn danger" data-action="executeBackupRestore" data-arg="${idx}">Restore</button>
+          <button class="dba-confirm-btn" data-action="hideBackupConfirm" data-arg="${idx}">Cancel</button>
         </div>
       </div>
     </div>`;
@@ -1236,11 +1241,11 @@ async function loadDisplayPicker() {
   ]);
   const saved = savedDisp || 'primary';
   const btns = [
-    `<button class="s-btn${saved === 'primary' ? ' active' : ''}" onclick="applyPreferredDisplay('primary')">Primary Display</button>`
+    `<button class="s-btn${saved === 'primary' ? ' active' : ''}" data-action="applyPreferredDisplay" data-arg="primary">Primary Display</button>`
   ];
   displays.filter(d => !d.isPrimary).forEach(d => {
     const id = String(d.id);
-    btns.push(`<button class="s-btn${saved === id ? ' active' : ''}" onclick="applyPreferredDisplay('${id}')">Display ${d.index} — ${d.width}×${d.height}</button>`);
+    btns.push(`<button class="s-btn${saved === id ? ' active' : ''}" data-action="applyPreferredDisplay" data-arg="${id}">Display ${d.index} — ${d.width}×${d.height}</button>`);
   });
   area.innerHTML = `<div class="settings-btn-group">${btns.join('')}</div>`;
   const tsm = document.getElementById('toggle-start-maximized');
@@ -1351,14 +1356,14 @@ async function loadSafeStorageStatus() {
               <div class="dba-card-title">Disable Secure Sign-in</div>
               <div class="dba-card-desc">You will need your password and TOTP to sign in again</div>
             </div>
-            <button class="dba-trigger-btn danger" onclick="armSafeDisable()">Disable</button>
+            <button class="dba-trigger-btn danger" data-action="armSafeDisable">Disable</button>
           </div>
           <div id="safe-disable-confirm" style="display:none;padding:0 0 4px;">
             <div class="dba-confirm-warning" style="margin-bottom:8px;">Enter your password to confirm.</div>
             <div class="dba-confirm-row">
               <input type="password" class="dba-confirm-input" id="safe-disable-pw" placeholder="Current password" autocomplete="current-password">
-              <button class="dba-confirm-btn danger" onclick="executeSafeDisable()">Confirm</button>
-              <button class="dba-confirm-btn" onclick="disarmSafeDisable()">Cancel</button>
+              <button class="dba-confirm-btn danger" data-action="executeSafeDisable">Confirm</button>
+              <button class="dba-confirm-btn" data-action="disarmSafeDisable">Cancel</button>
             </div>
             <div class="error-msg" id="safe-disable-err" style="display:none;margin-top:6px;"></div>
           </div>
@@ -1371,14 +1376,14 @@ async function loadSafeStorageStatus() {
               <div class="dba-card-title">Enable Secure Sign-in</div>
               <div class="dba-card-desc">Skip password &amp; TOTP — your Windows account protects the vault</div>
             </div>
-            <button class="dba-trigger-btn" onclick="armSafeSetup()">Enable</button>
+            <button class="dba-trigger-btn" data-action="armSafeSetup">Enable</button>
           </div>
           <div id="safe-setup-confirm" style="display:none;padding:0 0 4px;">
             <div class="dba-confirm-warning" style="margin-bottom:8px;">Enter your current password to enroll.</div>
             <div class="dba-confirm-row">
               <input type="password" class="dba-confirm-input" id="safe-setup-pw" placeholder="Current password" autocomplete="current-password">
-              <button class="dba-confirm-btn" onclick="executeSafeSetup()">Enroll</button>
-              <button class="dba-confirm-btn" onclick="disarmSafeSetup()">Cancel</button>
+              <button class="dba-confirm-btn" data-action="executeSafeSetup">Enroll</button>
+              <button class="dba-confirm-btn" data-action="disarmSafeSetup">Cancel</button>
             </div>
             <div class="error-msg" id="safe-setup-err" style="display:none;margin-top:6px;"></div>
           </div>
@@ -1440,8 +1445,77 @@ async function executeSafeDisable() {
 }
 
 async function applyAutoLock(minutes) {
+  minutes = Number(minutes);
   await Settings.set('autoLockMinutes', minutes);
   // Immediately inform main process so the timer resets with the new value
   await api.invoke('session:heartbeat');
   syncSettingsModal();
+}
+
+// ── Event delegation (CSP: no inline on* handlers) ────────────────────────────
+// Every interactive element rendered by shell.js uses data-action (click) or
+// data-action-change (change) instead of an inline handler, so the pages can run
+// under a strict script-src 'self' CSP. A single document-level dispatcher routes
+// to the named handler — this also covers dynamically-injected HTML (backup list,
+// display picker, safe-storage panel) without re-wiring after each innerHTML.
+function installShellDelegation() {
+  if (window.__shellDelegated) return;
+  window.__shellDelegated = true;
+
+  const ACTIONS = {
+    navigate:              a       => api.send('navigate', a),
+    winMinimize:           ()      => api.send('win:minimize'),
+    winMaximize:           ()      => api.send('win:maximize'),
+    winClose:              ()      => api.send('win:close'),
+    requestLock:           ()      => api.send('session:request-lock'),
+    openSettings:          ()      => openSettingsModal(),
+    closeSettings:         ()      => closeSettingsModal(),
+    switchCat:             a       => switchSettingsCategory(a),
+    applyTheme:            a       => applyTheme(a),
+    applyScale:            a       => applyScale(a),
+    applyTimeFormat:       a       => applyTimeFormat(a),
+    applyAutoSave:         a       => applyAutoSave(Number(a)),
+    applyAutoLock:         a       => applyAutoLock(Number(a)),
+    applyColorblind:       a       => applyColorblind(a),
+    applyToggle:           (a, el) => applyToggle(a, el),
+    applyWinToggle:        (a, el) => applyWinToggle(a, el),
+    applyPreferredDisplay: a       => applyPreferredDisplay(a),
+    showDbaConfirm:        a       => showDbaConfirm(a),
+    hideDbaConfirm:        a       => hideDbaConfirm(a),
+    executeDbaClear:       a       => executeDbaClear(a),
+    loadBackupList:        ()      => loadBackupList(),
+    showBackupConfirm:     a       => showBackupConfirm(Number(a)),
+    hideBackupConfirm:     a       => hideBackupConfirm(Number(a)),
+    executeBackupRestore:  a       => executeBackupRestore(Number(a)),
+    saveEmailConfig:       ()      => saveEmailConfig(),
+    testEmailConfig:       ()      => testEmailConfig(),
+    sendScheduledNow:      ()      => sendScheduledNow(),
+    saveScheduleConfig:    ()      => saveScheduleConfig(),
+    openExternal:          a       => Shell._openExternal(a),
+    armSafeSetup:          ()      => armSafeSetup(),
+    disarmSafeSetup:       ()      => disarmSafeSetup(),
+    executeSafeSetup:      ()      => executeSafeSetup(),
+    armSafeDisable:        ()      => armSafeDisable(),
+    disarmSafeDisable:     ()      => disarmSafeDisable(),
+    executeSafeDisable:    ()      => executeSafeDisable(),
+  };
+
+  const run = el => { const fn = ACTIONS[el.dataset.action]; if (fn) fn(el.dataset.arg, el); };
+
+  document.addEventListener('click', e => {
+    const el = e.target.closest('[data-action]');
+    if (el) run(el);
+  });
+
+  document.addEventListener('change', e => {
+    const el = e.target.closest('[data-action-change]');
+    if (el) { const fn = ACTIONS[el.dataset.actionChange]; if (fn) fn(el.dataset.arg, el); }
+  });
+
+  // Enter activates a focused sidebar nav item (replaces its old inline onkeydown).
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    const el = e.target.closest('.nav-item[data-action]');
+    if (el) { e.preventDefault(); run(el); }
+  });
 }
