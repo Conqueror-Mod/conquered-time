@@ -730,6 +730,17 @@ const Shell = (() => {
     api.on('menu:export-csv', () => { if (typeof onExportCSV === 'function') onExportCSV(); });
     api.on('audit:close-warning', ({ count, action }) => showAuditWarning(count, action));
 
+    // ── Login-time audit notice ────────────────────────────────────────────
+    // Flag is set by login.js after a successful login; show once on the first
+    // inner page so the user is reminded of unresolved discrepancies.
+    if (sessionStorage.getItem('audit_check_pending')) {
+      sessionStorage.removeItem('audit_check_pending');
+      try {
+        const n = await api.invoke('audit:count');
+        if (n > 0) showAuditWarning(n, 'login');
+      } catch {}
+    }
+
     // ── Sidebar active-task timer ──────────────────────────────────────────
     // Delegate to showSidebarTimer (the single tracked interval) — do NOT start a
     // second interval here. started_at is stored in ms (tasks save Date.now()).
@@ -1288,9 +1299,14 @@ function showAuditWarning(count, action) {
   if (!modal || !body) return;
 
   const noun = count === 1 ? 'discrepancy' : 'discrepancies';
-  const verb = action === 'close' ? 'closing' : 'locking';
-  body.innerHTML = `<strong style="color:var(--text-white);">${count} audit ${noun}</strong> detected in your session log — entries with missing clock-outs, zero duration, or unusual hours.<br><br>Review before ${verb}?`;
-  dismissBtn.textContent = action === 'close' ? 'Close Anyway' : 'Lock Anyway';
+  if (action === 'login') {
+    body.innerHTML = `<strong style="color:var(--text-white);">${count} audit ${noun}</strong> detected in your session log — entries with missing clock-ins/outs, zero duration, unusual hours, or missing breaks.<br><br>Review now?`;
+    dismissBtn.textContent = 'Dismiss';
+  } else {
+    const verb = action === 'close' ? 'closing' : 'locking';
+    body.innerHTML = `<strong style="color:var(--text-white);">${count} audit ${noun}</strong> detected in your session log — entries with missing clock-outs, zero duration, or unusual hours.<br><br>Review before ${verb}?`;
+    dismissBtn.textContent = action === 'close' ? 'Close Anyway' : 'Lock Anyway';
+  }
 
   modal.style.display = 'flex';
   setTimeout(() => viewBtn?.focus(), 50);
@@ -1305,8 +1321,9 @@ function showAuditWarning(count, action) {
 
   dismissBtn.onclick = () => {
     cleanup();
-    if (action === 'close') api.send('session:confirm-close');
-    else                    api.send('session:confirm-lock');
+    if (action === 'close')     api.send('session:confirm-close');
+    else if (action === 'lock') api.send('session:confirm-lock');
+    // action === 'login' → informational only; just close the modal.
   };
 }
 

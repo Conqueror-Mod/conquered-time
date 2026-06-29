@@ -748,6 +748,9 @@ async function postLoginNavigate(res) {
     if (theme) sessionStorage.setItem('ct_theme', theme);
     if (scale) sessionStorage.setItem('ct_scale', scale);
   } catch {}
+  // Ask the first inner page (shell.js) to surface an audit notice if the
+  // session log has unresolved discrepancies. One-shot per login.
+  sessionStorage.setItem('audit_check_pending', '1');
   if (res.needsEmail) {
     sessionStorage.setItem('require_email', '1');
     api.send('navigate', 'profile');
