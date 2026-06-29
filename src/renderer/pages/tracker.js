@@ -382,6 +382,15 @@ function clockIn() {
   const label = document.getElementById('input-label').value;
   const name  = document.getElementById('input-name').value.trim();
   const desc  = document.getElementById('input-desc').value.trim();
+  // Both a Task Label and a Task Name are required to clock in. Clock Out is
+  // implicitly covered (it acts on a row that was clocked in with both). Only
+  // "+ Manual Entry" bypasses this, for backfilling a forgotten session.
+  if (!label || !name) {
+    Shell.toast('A Task Label and Task Name are required to clock in.', 'warning');
+    if (!label) document.getElementById('input-label').focus();
+    else document.getElementById('input-name').focus();
+    return;
+  }
   const t = nowTime();
 
   let idx = -1;
