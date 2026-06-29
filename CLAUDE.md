@@ -77,7 +77,7 @@ conquered-time/
 - **Key derivation:** `PBKDF2(password, stored_random_salt, 310000, 32, sha256)` → AES-256-GCM key, held in memory only (`sessionKey` in `main.js`), cleared on lock/close.
 - **3 failed TOTP attempts → 24-hour lockout** with live countdown on the login screen.
 - **Local-only recovery code** generated once at setup, shown once, bcrypt-hashed in DB.
-- **`dev_mode` user flag** (set only by `seed-dev.js`) bypasses TOTP entirely for local dev/testing — never set this flag through the normal app UI.
+- **`dev_mode` user flag** (set only by `seed-dev.js`) bypasses TOTP entirely for local dev/testing — never set this flag through the normal app UI. **The bypass is gated on `IS_DEV && user.dev_mode`** at both TOTP-verify sites (`auth:login`, `auth:change-password`), and `IS_DEV` is `--dev && !app.isPackaged`, so the bypass is **physically impossible in a packaged build** no matter what the vault contains. Belt-and-suspenders: `initProfileDB()` scrubs any `dev_mode=1` → `0` (with a logged warning) when `app.isPackaged`. Do not "simplify" the bypass back to keying on `user.dev_mode` alone — that reopens the hole.
 
 ### Database (sql.js)
 - Tables: `users`, `companies`, `time_entries`, `app_settings`.
