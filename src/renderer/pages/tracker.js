@@ -20,6 +20,13 @@ let activeLunchId = null;   // in-progress lunch task_item id, or null
 let auditPolicy   = null;   // US-state break/lunch policy from audit:get-policy
 let complianceTimer = null; // 60s tick refreshing the compliance status lines
 
+// Display-only 12h/24h formatting. Stored/internal value is always 24h HH:MM
+// (gotcha #8); this only affects how an already-stored time is shown.
+function fmtClock(hhmm) {
+  // Settings is a top-level const (not a window property) — guard via typeof.
+  return (hhmm && typeof Settings !== 'undefined') ? Settings.formatTime(hhmm) : hhmm;
+}
+
 document.getElementById('log-date').valueAsDate = new Date();
 
 window.addEventListener('DOMContentLoaded', async () => {
@@ -60,6 +67,11 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (!td || !td.classList.contains('editable')) return;
     const tr = td.closest('tr');
     startEdit(td, parseInt(tr.dataset.idx), td.dataset.field);
+  });
+
+  // Live 12h/24h switch — re-render already-drawn rows in place (no reload).
+  document.addEventListener('ct:settings-changed', e => {
+    if (e.detail?.key === 'timeFormat') { renderTable(); updateTotals(); }
   });
 
   window.addEventListener('beforeunload', clearAutoSaveTimer);
@@ -332,8 +344,8 @@ function rowHTML(r, idx) {
     <td class="${r.label?'cell-label':'cell-empty'} ${editableText}" data-field="label" title="${filled?'Double-click to edit':''}">${escapeHtml(r.label)||'—'}</td>
     <td class="${r.name?'cell-text':'cell-empty'} ${editableText}" data-field="name" title="${filled?'Double-click to edit':''}">${escapeHtml(r.name)||'—'}</td>
     <td class="${r.desc?'cell-desc':'cell-empty'} ${editableText}" data-field="desc" title="${filled?'Double-click to edit':''}">${escapeHtml(r.desc)||'—'}</td>
-    <td class="cell-time ${r.clock_in?'has-time':''} ${editableIn}" data-field="clock_in" title="${r.clock_in?'Double-click to edit':''}">${r.clock_in||'—'}</td>
-    <td class="cell-time ${r.clock_out?'has-time':''} ${editableOut}" data-field="clock_out" title="${r.clock_out?'Double-click to edit':''}">${r.clock_out||'—'}</td>
+    <td class="cell-time ${r.clock_in?'has-time':''} ${editableIn}" data-field="clock_in" title="${r.clock_in?'Double-click to edit':''}">${fmtClock(r.clock_in)||'—'}</td>
+    <td class="cell-time ${r.clock_out?'has-time':''} ${editableOut}" data-field="clock_out" title="${r.clock_out?'Double-click to edit':''}">${fmtClock(r.clock_out)||'—'}</td>
     <td class="cell-duration" data-field="duration">${r.total_mins>0?formatMins(r.total_mins):'—'}</td>
   </tr>`;
 }
@@ -447,8 +459,11 @@ function addManualRow() {
 function startEdit(cell, idx, field) {
   const row = rowsData[idx];
   if (!row) return;
-  const current = cell.textContent === '—' ? '' : cell.textContent;
   const isTime  = field === 'clock_in' || field === 'clock_out';
+  // Time cells display in the 12h/24h preference, but editing is always raw 24h
+  // HH:MM (gotcha #8) — seed from the stored value, not the formatted cell text.
+  const current = isTime ? (row[field] || '')
+                : cell.textContent === '—' ? '' : cell.textContent;
   const isLabel = field === 'label';
   const original = cell.innerHTML;
 

@@ -221,6 +221,11 @@ window.addEventListener('DOMContentLoaded', async () => {
   activeEntry = await api.invoke('entries:get-active');
   await updateBanner();
 
+  // Live 12h/24h switch — re-render the banner clock-in time in place.
+  document.addEventListener('ct:settings-changed', e => {
+    if (e.detail?.key === 'timeFormat' && activeEntry) updateBanner();
+  });
+
   if (!activeEntry) {
     // Wire button to show error — don't silently swallow clicks
     document.getElementById('btn-start').addEventListener('click', () => {
