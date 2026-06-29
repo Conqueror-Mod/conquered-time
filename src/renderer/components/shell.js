@@ -472,21 +472,21 @@ const Shell = (() => {
               </div>
 
               <div class="about-section">
-                <div class="about-section-title">What's New — v3.6</div>
+                <div class="about-section-title">What's New — v3.7</div>
+                <ul class="about-changelog">
+                  <li>Redesigned Time Tracker — a single Session Clock module (Clock In/Out, Break, Lunch in one place) beside roomier task fields</li>
+                  <li>Break &amp; Lunch now live in the Time Tracker, with at-a-glance compliance status — no need to hop over to Dispatch</li>
+                  <li>Manual Entry — backfill a session you forgot to clock by typing the times in directly</li>
+                  <li>Dispatch task picks now come from your current session's task names</li>
+                  <li>Clock format moved into Appearance settings; fixed a double-counting session timer</li>
+                </ul>
+              </div>
+              <div class="about-section">
+                <div class="about-section-title">v3.6</div>
                 <ul class="about-changelog">
                   <li>Hardened security — every screen now blocks inline scripts at the browser level (strict Content-Security-Policy), shrinking the attack surface for injected code</li>
                   <li>Snappier navigation — your data is decrypted once and reused as you move between pages, so the dashboard, companies, and reports load faster</li>
                   <li>Under the hood — each page's code is now a separate file, making the app easier to maintain and verify</li>
-                </ul>
-              </div>
-              <div class="about-section">
-                <div class="about-section-title">v3.5</div>
-                <ul class="about-changelog">
-                  <li>Crash-safe saves — your vault is now written atomically, so a power loss or crash can never corrupt your data mid-write</li>
-                  <li>Safer password changes — changing or recovering your password re-encrypts everything as all-or-nothing, rolling back cleanly if anything goes wrong</li>
-                  <li>Stronger data protection — company names, task labels, and notes are fully sanitized everywhere they're shown or exported (XSS and spreadsheet-formula safety)</li>
-                  <li>Faster dashboard & company views — these pages no longer decrypt your entire history on every visit</li>
-                  <li>Automated test coverage — the encryption, migration, and recovery paths are now backed by an automated test suite</li>
                 </ul>
               </div>
               <div class="about-section">

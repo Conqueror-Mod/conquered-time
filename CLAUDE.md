@@ -177,7 +177,7 @@ Native `<input type="time">` renders in the OS locale's format (often 12-hour wi
 - **Audit: 'Clear Messages' and 'Suggest discrepancy fix'** ✅ — per-row Dismiss/Apply Fix buttons in audit log; dismissed items excluded from close/lock warning count; suggestion text per discrepancy type; Clear All and Show/Hide Dismissed toolbar; `audit_dismissed` table persists state
 - **Auto Backup UI** ✅ — Settings → Data → Backup Library; lazy-loaded list of up to 30 auto-backups; accordion preview (account, company count, entry count, date range); CONFIRM-gated restore; current data safety-saved before any restore; logs out to login after restore
 - **Manual database clear** ✅ — three-option wipe in Settings → Data: Time Clock Clear, Companies Clear, Full DB Clear; inline CONFIRM-typed confirmation
-- **Task Timer & Counter page** ✅ — implemented as "Dispatch" module; task timing, break/lunch compliance, description writeback, sidebar live timer, Tracker footer preview
+- **Task Timer & Counter page** ✅ — implemented as "Dispatch" module; task timing, description writeback, sidebar live timer, Tracker footer preview. **Break/lunch were relocated to the Time Tracker in v3.7** (Dispatch is now task-only); the Dispatch "Log a Task" quick-picks source from the active session's row Task Names. Break/lunch are still `task_items` (entry_id-scoped) — only the controls moved.
 - **Recovery** ✅ — full account recovery flow: recovery key packet (session key sealed under recovery code at setup), password reset with full re-encryption of all encrypted data, pre-auth backup restore via file dialog; login recovery tab redesigned with three-mode picker
 - **User Profile Icon** — avatar/icon displayed in the sidebar user block and profile screen
 - **User Profile Screen** — dedicated screen for user profile management (username, password change, avatar, account details)
@@ -185,7 +185,7 @@ Native `<input type="time">` renders in the OS locale's format (often 12-hour wi
 - **Reports / Auditing** — larger feature, builds on clock_in/clock_out timestamp data already captured per row; includes charts, label breakdowns, and full audit log
 - **Session Auto Lock/Timeout** ✅ — fully wired: idle timer in main.js, heartbeat IPC, activity listeners in shell.js, settings UI (0/5/15/30/60 min); default corrected to Off
 - **Container/store architecture refactor** ✅ — centralized `src/renderer/store.js` (in-memory cache + pub/sub invalidation + rowid→id normalization), `ipc.js` (typed wrapper over preload channels), `validator.js` (input validation); injected by `Shell.init()` on every inner page. Cache is **per-page** (full `loadFile()` reloads recreate `window.Store` each nav) so it dedups within a page, not across navigations — true session caching deferred. Validator wired into `saveCompany()` and `saveSession()`.
-- **Settings redesign** ✅ — Steam-style split layout: left nav (Appearance, Time & Display, Data, Security, Accessibility, About), scrollable right panel; 860px modal
+- **Settings redesign** ✅ — Steam-style split layout: left nav (Appearance, Window, Security, Data, Reports, Accessibility, About), scrollable right panel; 860px modal. (The "Time & Display" tab was removed in v3.7 — clock format now lives under Appearance.)
 - **Light theme polish** — Paper and Quartz flagged as still feeling "derivative"; functional but not fully realized
 - **Language change / i18n** — lowest priority, most complex; tackle last
 - The North Phoenician cipher-layer concept was discussed in depth but explicitly **deferred to theory** — only the visual grid mechanic is built; the deeper PBKDF2 factor idea remains unbuilt
@@ -236,6 +236,11 @@ These were real conversations with the user that may resurface — worth knowing
 3. **Reporting/Auditing feature.** Discussed only at the concept level — the user wants a "full reporting/auditing feature" eventually, motivated specifically by wanting clock_in/clock_out to be visually/permanently tracked (which is why those fields were added to the row schema and made independently editable). No UI or spec has been designed yet.
 
 ---
+
+## Known Non-Issues (don't chase these)
+
+- **`network_service_instance_impl.cc(...) Network service crashed, restarting service`** in the console at startup is a benign Chromium-internal message (the network utility process restarts itself). Not caused by app code; auto-recovers; no functional impact. The only "fixes" are command-line switches that weaken the sandbox — **do not add them**. Safe to ignore.
+- **Google Fonts are loaded remotely at runtime** (themes.css `@import` from fonts.googleapis.com; Inter for PDF export). It's the app's only outbound request; offline it falls back to system fonts. Bundling fonts locally (then dropping the font origins from CSP) is a deferred improvement, not a bug.
 
 ## Things NOT To Do
 
