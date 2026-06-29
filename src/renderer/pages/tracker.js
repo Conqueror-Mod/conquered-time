@@ -64,6 +64,13 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   window.addEventListener('beforeunload', clearAutoSaveTimer);
 
+  // Date must be applied before onCompanyChange(), which loads the entry for log-date.value.
+  const targetDate = sessionStorage.getItem('tracker_date');
+  if (targetDate) {
+    document.getElementById('log-date').value = targetDate;
+    sessionStorage.removeItem('tracker_date');
+  }
+
   const saved = sessionStorage.getItem('active_company');
   if (saved) {
     try {
