@@ -507,9 +507,18 @@ function createTray() {
 // ── Launch at startup ───────────────────────────────────────────────────────
 // Registers/clears the OS login item. In a packaged build process.execPath is the
 // installed Conquered Time .exe; in dev it's electron.exe (registers the dev binary).
+// Login-item path/args. Unpackaged: process.execPath is electron.exe, which with
+// no args opens the default Electron shell (no app, no tray) — so pass the app
+// path. The SAME opts must be used to read back, or Windows' getLoginItemSettings
+// won't match the entry and reports openAtLogin:false. Packaged: execPath IS the
+// real app exe and needs no args.
+function loginItemOpts(extra) {
+  const o = app.isPackaged ? {} : { path: process.execPath, args: [app.getAppPath()] };
+  return Object.assign(o, extra);
+}
 function applyLaunchAtStartup(enabled) {
   try {
-    app.setLoginItemSettings({ openAtLogin: !!enabled, path: process.execPath });
+    app.setLoginItemSettings(loginItemOpts({ openAtLogin: !!enabled }));
   } catch (e) {
     console.error('[startup] setLoginItemSettings failed:', e.message);
   }
@@ -693,9 +702,10 @@ ipcMain.handle('win:set-launch-at-startup', (_, enabled) => {
   applyLaunchAtStartup(enabled);
   return { ok: true };
 });
-// Source of truth is the OS login item itself — no app storage needed.
+// Source of truth is the OS login item itself — no app storage needed. Read with
+// the same opts used to register, or Windows won't match the entry (see loginItemOpts).
 ipcMain.handle('win:get-launch-at-startup', () => {
-  try { return app.getLoginItemSettings().openAtLogin === true; } catch { return false; }
+  try { return app.getLoginItemSettings(loginItemOpts()).openAtLogin === true; } catch { return false; }
 });
 ipcMain.handle('win:get-close-to-tray', () => getAppPref('closeToTray', false) === true);
 ipcMain.handle('win:set-close-to-tray', (_, enabled) => {
