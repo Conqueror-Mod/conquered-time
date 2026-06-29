@@ -22,9 +22,9 @@ A secure, locally-encrypted desktop time tracker built for remote professionals 
 - **Dispatch (Task Timer)** — dedicated task timing/counting module with sidebar live timer and description writeback to the tracker; the task list draws from the active session's task names
 - **Break & Lunch punches** — Start/End break and lunch from the Time Tracker's Session Clock module, with inline US-state compliance status (California, New York, federal default); also surfaced in Reports/Audit
 - **Global log** — filterable history across all companies with expandable session detail
-- **Reports & Audit** — period summary, company breakdown, audit log with per-row dismiss/fix/suggest; dismissed items persisted; US state policy named in suggestion text
+- **Reports & Audit** — period summary, company breakdown, audit log with per-row dismiss/fix/suggest/**email**; dismissed & emailed items persisted (emailed stay visible, badged); a discrepancy notice is shown at login; US state policy named in suggestion text
 - **PDF & CSV export** — clean timesheet format; work type, location, supervisors in header; per-label subtotals; Export All includes summary section; NavID excluded from all exports
-- **Email Reports** — send PDF + CSV directly via SMTP from the Reports page; scheduled delivery (daily/weekly/monthly/quarterly/annual)
+- **Email Reports** — send PDF + CSV directly via SMTP from the Reports page; scheduled delivery (daily/weekly/monthly/quarterly/annual). Note: scheduled sends fire only while the app is open and unlocked — a missed send is caught up on next sign-in (any login method)
 - **Auto-save & backup** — configurable autosave interval; dated `.db` backups on every save (last 30 kept)
 - **Backup Library** — browse, preview, and restore from any saved backup in Settings; current data safety-saved before any restore
 - **Session auto-lock** — configurable idle timeout (Off / 5 / 15 / 30 / 60 min)
