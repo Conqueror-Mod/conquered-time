@@ -2,9 +2,12 @@
 
 /* ══════════════════════════════════════════════════════════════
    CONQUERED TIME — Themes
-   Five Final Fantasy city themes.
-   Light: Memoria (default), Lindblum, Rabanastre
-   Dark:  Treno, Nibelheim
+   Six Final Fantasy city palettes are defined below. FIVE are selectable in the
+   theme pickers (shell.js + login.html) and listed in settings.js:
+     Light: Memoria (default), Rabanastre
+     Dark:  Zanarkand, Treno, Nibelheim
+   Lindblum (light) is fully defined but NOT exposed in either picker — leave it
+   as a spare, or wire it into the pickers + settings.js valid set to ship it.
    ══════════════════════════════════════════════════════════════ */
 
 /* ── Shared tokens: identical across all themes ── */

@@ -23,7 +23,7 @@ This file gives Claude Code full context to continue work on **Conquered Time** 
 
 3. **The user is non-technical-ish but capable** — comfortable in cmd, willing to read console errors and screenshot them, but needs exact copy-pasteable commands and plain explanations of *why* something broke, not just the fix.
 
-4. **Design philosophy has shifted over the project's life**: it started as a "Steam meets professional timesheet" HUD aesthetic (heavy monospace, glowing teal, corner brackets) and was deliberately matured into a professional, restrained, Inter-typography design system with five selectable themes (see Design System section). The original HUD look survives only as the "Void" theme option, not the default.
+4. **Design philosophy has shifted over the project's life**: it started as a "Steam meets professional timesheet" HUD aesthetic (heavy monospace, glowing teal, corner brackets) and was deliberately matured into a professional, restrained, DM-Sans-typography design system with five selectable **Final Fantasy city themes** (see Design System section). The original glowing-HUD spirit survives mainly in the dark **Zanarkand** theme, not the default (Memoria).
 
 ---
 
@@ -160,7 +160,7 @@ Native `<input type="time">` renders in the OS locale's format (often 12-hour wi
 - CSV export from Global Log
 - Global Log: filterable by company/date range, expandable per-session task detail rows showing clock in/out times
 - Time summarization footer on tracker: total session time + per-task-label breakdown chips
-- Full Settings system: 5 themes (Slate default→ now **Arctic** is default, Void, Paper, Quartz), 4 UI scale steps (compact/normal/comfortable/large via `#main-content`-scoped zoom), 12h/24h time display toggle, accessibility toggles (reduced motion, high contrast, colorblind-safe palette), all persisted to `app_settings` table, applied via `data-*` attributes on `<html>` cascading through CSS custom properties
+- Full Settings system: 5 Final Fantasy themes (**Memoria** default, Zanarkand, Rabanastre, Treno, Nibelheim; `lindblum` defined but not exposed), 4 UI scale steps (compact/normal/comfortable/large via `#main-content`-scoped zoom), 12h/24h time display toggle, accessibility toggles (reduced motion, high contrast, colorblind-safe palette), all persisted to `app_settings` table under `ui_*` keys, applied via `data-*` attributes on `<html>` cascading through CSS custom properties
 - Settings accessible via sidebar button (above username) opening a **centered modal** (not a sidebar panel — this was explicitly requested after an earlier sidebar-panel version), plus `Ctrl+,` global shortcut
 - Interactive login background: canvas grid of cells with a subtle hover glow (cosmetic only). **The old hidden click-sequences were removed in session 9** — there is **no** 3-cell/5-cell sequence, **no** "Backdoor Access" screen, and **no** `Ctrl+Shift+D` debug overlay anymore (do not reintroduce them). The only surviving easter egg is the **Konami code** (↑↑↓↓←→←→BA Enter) on the **profile selector**, which shows a cosmetic ASCII-hourglass overlay (session 13).
 - Dev seed script (`npm run seed`, v3.0) — wipes `dev-data/`, creates `devuser`/`devpass123` with `dev_mode=1` (TOTP bypassed, `work_state=TX` → default break/lunch policy), **2 companies** (Zenith Analytics, Apex Digital — all fields, fake NavIDs) and **6 time entries** (5 genuinely clean + 1 discrepancy session planting EXACTLY 6 real audit issues: `no_clock_in`, `no_clock_out`, `zero_duration`, `over_12h`, `missing_break`, `missing_lunch`). App settings are written under the **real** `ui_*`/`win_*` keys with a **valid** theme (`zanarkand`) — the old seed wrote bare keys (silently ignored) and `theme='arctic'` (no longer a theme). On completion it prints a **self-check PASS/FAIL ledger** (asserts counts + decrypt round-trip + expected audit count) and an **order-of-operations verification packet** (Tier A automated / Tier B manual, ending in a PASS/FAIL + bugs template). The seed's `computeExpectedDiscrepancies()` mirrors `countAuditDiscrepancies()` in `main.js` — keep both in sync. Essential for fast iteration; never ships in production. **Note:** the audit engine detects only those 6 types — it does NOT detect row overlaps or stored-vs-span mismatches, so don't seed those expecting flags.
@@ -193,8 +193,8 @@ Native `<input type="time">` renders in the OS locale's format (often 12-hour wi
 - The North Phoenician cipher-layer concept was discussed in depth but explicitly **deferred to theory** — only the visual grid mechanic is built; the deeper PBKDF2 factor idea remains unbuilt
 
 #### Fun
-- **Rename themes to Final Fantasy names** — replace Arctic/Void/Slate/Paper/Quartz with FF-inspired names
-- **Final Fantasy based theme variants** — explore FF-aesthetic color palettes as additional or replacement themes
+- **Rename themes to Final Fantasy names** ✅ — the 5 themes are now Memoria/Zanarkand/Rabanastre/Treno/Nibelheim (see Design System section)
+- **Final Fantasy theme variants** — optional. Note `lindblum` is a fully-built 6th FF palette already in `themes.css` but not wired into the pickers; exposing it is the cheapest "new theme."
 
 #### Final / Release
 - **Package for multi-platform release** — Windows (done), macOS, Linux, iOS, Android, iOS Mobile; icon assets already prepared for Win/Mac/Linux
@@ -205,22 +205,26 @@ Native `<input type="time">` renders in the OS locale's format (often 12-hour wi
 
 ## Design System Reference (current state)
 
-**Default theme:** Arctic (cool blue, deep navy) — changed from Slate after user feedback during theme review.
+**Themes were renamed to Final Fantasy city palettes.** The old Slate/Void/Arctic/Paper/Quartz set no longer exists — do not reference those names.
 
-**Five themes**, all defined as `[data-theme="x"]` CSS variable blocks in `design-system.css`:
-1. **Slate** — professional blue-grey, the original "matured" default
-2. **Void** — the original "Steam meets professional timesheet" HUD aesthetic (teal-on-black, glow effects, corner brackets) preserved as an opt-in theme, later deliberately pushed *harder* (more teal contrast on panel borders/active nav) after feedback that it felt "too derivative" of the others
-3. **Arctic** — cool blue-white on deep navy — **current default**
-4. **Paper** — light mode (soft blue-grey-white, not stark white — an earlier all-white version was reported as "blindingly white," softened)
-5. **Quartz** — light mode, the deliberate "polar opposite" of Paper: near-black charcoal as the primary accent (no color emotion), maximum contrast, stark/legal-document feel. Replaced an earlier "Ember" (amber/orange) theme that was scrapped as "ugly" and not fitting the set; later a "Dusk" (violet) idea was also considered and rejected as "derivative" before landing on Quartz.
+**Default theme:** **Memoria** (`settings.js` defaults `theme: 'memoria'`). The startup **splash always uses Zanarkand** as a fixed brand moment (`createSplashWindow('zanarkand')` in `main.js`), independent of the user's selected theme.
+
+**Five selectable themes**, each a `[data-theme="x"]` CSS variable block in `themes.css` (imported by `design-system.css`); the picker order in `shell.js`/`login.html` is Zanarkand, Memoria, Rabanastre, Treno, Nibelheim:
+1. **Memoria** (FF9) — **default**, light. Crystalline/ethereal: cool silver-white base, soft lavender/amethyst accents.
+2. **Zanarkand** (FF10) — dark. The "dream city": deep twilight-ocean base with glowing bioluminescent accents (closest spiritual successor to the old "Void" HUD aesthetic).
+3. **Rabanastre** (FF12) — light. Sun-baked sandstone base, deep teal oasis accents; warm without softness.
+4. **Treno** (FF9) — dark. Aristocratic gas-lamp mood: warm plum-charcoal base, amber-gold + wine-burgundy accents.
+5. **Nibelheim** (FF7) — dark. Cold and stark: near-black slate base, icy silver-white accent, zero warmth.
+
+**A sixth palette, `lindblum`** (FF9, light — aged parchment + amber-bronze), is fully defined in `themes.css` but is **NOT** exposed in either theme picker and is **not** in `settings.js`'s valid set. It's a spare; to ship it, add it to the picker markup (`shell.js` + `login.html`) and the `settings.js` theme list. (Conversely, this is the one current theme inconsistency worth a decision: expose it or remove it.)
 
 **Typography rule (strict, enforced project-wide):** **DM Sans** (`var(--sans)`) for all UI text — navigation, labels, headers, body, descriptions, buttons. **JetBrains Mono** (`var(--mono)`) is reserved exclusively for data values — timestamps, durations, IDs, numeric stats, and the brand wordmark/login ASCII art. (PDF exports use **Inter**, base64-inlined.) All three are bundled locally — see the font-bundling note in Known Non-Issues. This was a deliberate full-project sweep after the user felt the original all-monospace, heavy-letter-spacing, uppercase-everything look was unreadable and "not professional."
 
-**Elevation system:** 3-layer shadow system (`--shadow-1/2/3` + `--shadow-inset`) gives panels/cards/modals a sense of physical depth without literal 3D. Spiderweb nodes use radial-gradient "sphere" fills (light source top-left) rather than flat circles — and are **theme-aware**: a separate `getCanvasColors()` helper function in both `dashboard.html` and `companies.html` returns different fill/border/label colors depending on whether the active theme is light (Paper/Quartz) or dark, because the original gradient-based node fills were invisible/illegible on light backgrounds.
+**Elevation system:** 3-layer shadow system (`--shadow-1/2/3` + `--shadow-inset`) gives panels/cards/modals a sense of physical depth without literal 3D. Spiderweb nodes use radial-gradient "sphere" fills (light source top-left) rather than flat circles — and are **theme-aware**: a separate `getCanvasColors()` helper function in both `dashboard.js` and `companies.js` returns different fill/border/label colors depending on whether the active theme is light (Memoria/Rabanastre) or dark (Zanarkand/Treno/Nibelheim), because the original gradient-based node fills were invisible/illegible on light backgrounds.
 
 **UI scale:** `Compact / Normal / Comfortable / Large`, implemented via CSS `zoom` scoped to `#main-content` only (see gotcha #5).
 
-**Login card:** Must always render as a fully opaque, isolated (`isolation: isolate`) floating layer with its own strong shadow stack — this was a real bug on light themes where the white-ish card blended into a similarly light background; fixed by darkening the `.login-body` background specifically under `[data-theme="paper"]`/`[data-theme="quartz"]` selectors so the card has guaranteed contrast against it.
+**Login card:** Must always render as a fully opaque, isolated (`isolation: isolate`) floating layer with its own strong shadow stack — this was a real bug on light themes where the white-ish card blended into a similarly light background; fixed by darkening the `.login-body` background specifically under the **light themes** (`[data-theme="memoria"]`/`[data-theme="rabanastre"]`, and `lindblum` if exposed) so the card has guaranteed contrast against it.
 
 **Settings UI:** Centered modal (`#settings-modal`), NOT a sidebar-embedded panel — an earlier sidebar-panel implementation was explicitly rejected by the user in favor of the modal pattern, triggered by a "⚙ Settings" button placed in the sidebar directly above the username/active-session block, separated by its own border lines.
 

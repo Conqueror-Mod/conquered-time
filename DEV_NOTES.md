@@ -16,7 +16,9 @@ node --version    # confirm v20.11.1
 cd conquered-time
 npm install
 
-# 3. Seed a dev account (wipes DB, creates devuser/devpass123, dev_mode=1, sample company+entry)
+# 3. Seed a dev account (wipes dev-data/, creates devuser/devpass123, dev_mode=1,
+#    2 companies + 6 entries incl. a 6-discrepancy audit session; prints a
+#    self-check PASS/FAIL ledger + an order-of-operations verification packet)
 npm run seed
 
 # 4. Launch
@@ -44,7 +46,7 @@ rmdir /s /q "%APPDATA%\conquered-time"
 | Password | `devpass123` |
 | TOTP | leave blank — `dev_mode=1` bypasses it |
 
-Or use the hidden grid backdoor sequence on the login screen (press `Ctrl+Shift+D` to reveal target cells, then click the 5 red-outlined cells in order D1→D5).
+The TOTP bypass is gated on `IS_DEV && user.dev_mode` (so it can't work in a packaged build). The old hidden grid backdoor / `Ctrl+Shift+D` overlay were removed in session 9 — they no longer exist.
 
 ---
 
@@ -53,7 +55,7 @@ Or use the hidden grid backdoor sequence on the login screen (press `Ctrl+Shift+
 ```bash
 npm run build
 ```
-Output: `dist/Conquered Time Setup.exe` (NSIS installer, requires `assets/icon.ico` — not yet added as of this handoff).
+Output: `dist/Conquered Time Setup <version>.exe` (NSIS installer). `assets/icon.ico` is present. `IS_DEV` is `--dev && !app.isPackaged`, so a packaged build ignores `--dev` and never enters the dev-data sandbox or honors `dev_mode`.
 
 ---
 
@@ -94,7 +96,13 @@ await api.invoke('settings:get', key)
 await api.invoke('settings:set', { key, value })
 
 api.send('win:minimize' | 'win:maximize' | 'win:close')
-api.send('navigate', 'dashboard' | 'companies' | 'tracker' | 'global-log' | 'login')
+api.send('navigate', 'dashboard' | 'companies' | 'tracker' | 'task-timer' | 'global-log' | 'reports' | 'profile' | 'login')
+
+// App-behavior settings (app-global, not per-profile vault):
+await api.invoke('win:get-launch-at-startup')          // OS login item is source of truth
+await api.invoke('win:set-launch-at-startup', bool)
+await api.invoke('win:get-close-to-tray')              // <ROOT_DATA_DIR>/app-prefs.json
+await api.invoke('win:set-close-to-tray', bool)
 
 api.on('toast', ({ msg, type }) => {...})
 api.on('menu:export-pdf', () => {...})
@@ -122,11 +130,11 @@ window.addEventListener('DOMContentLoaded', async () => {
 
 ## Theme System Quick Reference
 
-5 themes via `document.documentElement.setAttribute('data-theme', 'arctic'|'slate'|'void'|'paper'|'quartz')`, applied by `settings.js`'s `apply()` function. All theme tokens are CSS custom properties defined once per `[data-theme="x"]` block in `design-system.css` — components should only ever reference `var(--accent)`, `var(--surface-1)`, etc., never hardcoded colors, so new themes drop in cleanly.
+5 selectable Final Fantasy themes via `document.documentElement.setAttribute('data-theme', 'memoria'|'zanarkand'|'rabanastre'|'treno'|'nibelheim')`, applied by `settings.js`'s `apply()`. **Default is `memoria`** (settings.js). A 6th palette, `lindblum`, is fully defined in `themes.css` but is NOT in the pickers or settings.js valid set (spare). The splash always uses `zanarkand` as a brand moment. All theme tokens are CSS custom properties defined once per `[data-theme="x"]` block in `themes.css` (imported by `design-system.css`) — components reference `var(--accent)`, `var(--surface-1)`, etc., never hardcoded colors, so new themes drop in cleanly.
 
-Canvas-drawn elements (spiderweb nodes) **cannot** use CSS variables directly — they read the active theme via `document.documentElement.getAttribute('data-theme')` and branch through a local `getCanvasColors()` helper (duplicated in both `dashboard.html` and `companies.html` — if you change node colors, update both places).
+Canvas-drawn elements (spiderweb nodes) **cannot** use CSS variables directly — they read the active theme via `document.documentElement.getAttribute('data-theme')` and branch through a local `getCanvasColors()` helper (duplicated in both `dashboard.js` and `companies.js` — if you change node colors, update both places).
 
-Typography rule: Inter (`var(--sans)`) for all UI text, Share Tech Mono (`var(--mono)`) only for data values (timestamps/durations/IDs/numbers). Don't violate this — it was a deliberate full-project fix after user feedback that all-mono was unreadable.
+Typography rule: **DM Sans** (`var(--sans)`) for all UI text, **JetBrains Mono** (`var(--mono)`) only for data values (timestamps/durations/IDs/numbers). Inter is used **only** for PDF export (base64-inlined). Don't violate this — it was a deliberate full-project fix after user feedback that all-mono was unreadable.
 
 ---
 
@@ -136,9 +144,8 @@ Typography rule: Inter (`var(--sans)`) for all UI text, Share Tech Mono (`var(--
 - `font-size`-based UI scaling (didn't actually scale anything visually — switched to `zoom`)
 - `better-sqlite3` (native compilation requirement)
 - Deriving encryption keys from TOTP
-- "Ember" (amber/orange) theme — called "ugly," replaced
-- "Dusk" (violet) theme proposal — called "derivative," not built; Quartz used instead
-- Pure-white Paper theme — too blinding, softened to blue-grey-white
+- (Historical, pre-FF-rename theme experiments — all superseded by the current 5 Final Fantasy themes; don't resurrect the old names: "Ember" amber/orange "ugly", "Dusk" violet "derivative", an earlier all-white "Paper" "too blinding". The old Slate/Void/Arctic/Paper/Quartz set no longer exists.)
+- Light-theme polish / theme reordering / ASCII-egg redesign — dropped as irrelevant (2026-06-29); do not reintroduce as open items
 
 ---
 
