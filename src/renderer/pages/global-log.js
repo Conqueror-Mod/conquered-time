@@ -208,8 +208,7 @@ function exportAllPDF() {
   ].join('');
   const win=window.open('','_blank');
   win.document.write(`<!DOCTYPE html><html><head><title>Timesheet</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>${window.PDF_FONT_CSS || ''}</style>
   <style>
     body{font-family:Inter,system-ui,sans-serif;font-size:12px;color:#111;padding:40px;max-width:960px;margin:0 auto;}
     h1{font-size:20px;font-weight:600;margin:0 0 3px;}
@@ -266,8 +265,7 @@ function printTimesheet(co,dateStr,sessionLabel,rows,totalMins) {
   ].join('');
   const win=window.open('','_blank');
   win.document.write(`<!DOCTYPE html><html><head><title>Timesheet</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>${window.PDF_FONT_CSS || ''}</style>
   <style>
     body{font-family:Inter,system-ui,sans-serif;font-size:12px;color:#111;padding:40px;max-width:960px;margin:0 auto;}
     h1{font-size:20px;font-weight:600;margin:0 0 3px;}
