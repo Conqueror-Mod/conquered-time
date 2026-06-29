@@ -1,6 +1,6 @@
 'use strict';
 
-const { app, BrowserWindow, ipcMain, Menu, dialog, screen, safeStorage } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, Tray, nativeImage, dialog, screen, safeStorage } = require('electron');
 const path       = require('path');
 const fs         = require('fs');
 const crypto     = require('crypto');
@@ -41,6 +41,8 @@ let db          = null;   // sql.js Database instance
 let idleTimer    = null;   // auto-lock timeout handle
 let forceClose   = false;  // set true after user confirms close through audit prompt
 let activeEntryId = null;  // rowid of the currently live time_entries row
+let tray         = null;   // system tray icon (created on whenReady)
+let isQuitting   = false;  // set true when the user really means to quit (tray/menu Quit)
 
 // Memoizes decrypted session-wide reads (companies:list / entries:all /
 // entries:summary) across page navigations — see read-cache.js. Keyed on
@@ -389,6 +391,13 @@ function createWindow() {
   buildMenu();
   mainWindow.loadFile(path.join(__dirname, '../renderer/pages/login.html'));
   mainWindow.on('close', (event) => {
+    // Close-to-tray: hide the window instead of quitting, keeping the session alive.
+    // Bypassed when the user explicitly quits (tray/menu Quit set isQuitting).
+    if (!isQuitting && tray && readStartupSetting('win_closeToTray') === 'true') {
+      event.preventDefault();
+      mainWindow.hide();
+      return;
+    }
     if (sessionUser && !forceClose) {
       const count = countAuditDiscrepancies();
       if (count > 0) {
@@ -413,7 +422,7 @@ function buildMenu() {
       { type: 'separator' },
       { label: 'Backup Now',     click: () => { persistDB(); performBackup(); mainWindow.webContents.send('toast', { msg: 'Backup saved.', type: 'success' }); } },
       { type: 'separator' },
-      { label: 'Quit',           accelerator: 'CmdOrCtrl+Q', click: () => app.quit() }
+      { label: 'Quit',           accelerator: 'CmdOrCtrl+Q', click: () => { isQuitting = true; app.quit(); } }
     ]},
     { label: 'Edit', submenu: [
       { role: 'undo' }, { role: 'redo' }, { type: 'separator' },
@@ -431,6 +440,43 @@ function buildMenu() {
     ]}
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
+
+// ── System tray ─────────────────────────────────────────────────────────────
+function showMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+function createTray() {
+  if (tray) return;
+  const icon = nativeImage.createFromPath(path.join(__dirname, '../../assets/icon.ico'));
+  tray = new Tray(icon.isEmpty() ? nativeImage.createEmpty() : icon);
+  tray.setToolTip('Conquered Time');
+  const menu = Menu.buildFromTemplate([
+    { label: 'Open Conquered Time', click: showMainWindow },
+    { type: 'separator' },
+    { label: 'Lock Session', click: () => { showMainWindow(); lockSession(); } },
+    { label: 'Backup Now',   click: () => { persistDB(); performBackup(); if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('toast', { msg: 'Backup saved.', type: 'success' }); } },
+    { type: 'separator' },
+    { label: 'Quit', click: () => { isQuitting = true; app.quit(); } }
+  ]);
+  tray.setContextMenu(menu);
+  tray.on('click', showMainWindow);
+  tray.on('double-click', showMainWindow);
+}
+
+// ── Launch at startup ───────────────────────────────────────────────────────
+// Registers/clears the OS login item. In a packaged build process.execPath is the
+// installed Conquered Time .exe; in dev it's electron.exe (registers the dev binary).
+function applyLaunchAtStartup(enabled) {
+  try {
+    app.setLoginItemSettings({ openAtLogin: !!enabled, path: process.execPath });
+  } catch (e) {
+    console.error('[startup] setLoginItemSettings failed:', e.message);
+  }
 }
 
 function navigate(page) {
@@ -605,6 +651,10 @@ ipcMain.handle('win:move-to-display', (_, displayId) => {
   if (mainWindow.isMaximized()) mainWindow.unmaximize();
   mainWindow.setPosition(target.bounds.x + 10, target.bounds.y + 10);
   mainWindow.maximize();
+  return { ok: true };
+});
+ipcMain.handle('win:set-launch-at-startup', (_, enabled) => {
+  applyLaunchAtStartup(enabled);
   return { ok: true };
 });
 ipcMain.on('navigate',     (_, page) => navigate(page));
@@ -1711,6 +1761,10 @@ app.whenReady().then(async () => {
   // Splash always uses zanarkand — it's a brand moment, not a user preference moment.
   const splash = createSplashWindow('zanarkand');
   createWindow(); // creates hidden (show: false)
+  createTray();
+
+  // Keep the OS login item in sync with the stored preference on every launch.
+  applyLaunchAtStartup(readStartupSetting('win_launchAtStartup') === 'true');
 
   // Apply window position/size settings before show
   const rememberPos   = readStartupSetting('win_rememberPosition') === 'true';
@@ -2037,8 +2091,12 @@ td{padding:7px 8px;border-bottom:1px solid #e5e7eb;}
 }
 
 app.on('window-all-closed', () => {
+  // With close-to-tray the main window can be hidden (not closed), so this won't
+  // fire then. If it does fire, the user is genuinely done — persist and quit.
   persistDB(); performBackup(); app.quit();
 });
+
+app.on('before-quit', () => { isQuitting = true; });
 
 app.on('second-instance', () => {
   if (mainWindow) { mainWindow.show(); mainWindow.focus(); }
