@@ -69,11 +69,11 @@ window.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('titlebar-label').textContent = isFix ? 'Suggest Discrepancy Fix' : 'Acknowledge Discrepancies';
   document.getElementById('btn-titlebar-close').addEventListener('click', () => window.close());
 
-  // Apply settings (scale only — theme already set via query param)
-  if (typeof Settings !== 'undefined') {
-    const s = await api.invoke('settings:get');
-    if (s?.scale) document.documentElement.setAttribute('data-scale', s.scale);
-  }
+  // Apply settings (scale only — theme already set via query param).
+  // settings:get requires a key and returns the raw stored string; UI prefs
+  // are persisted under the `ui_` prefix (see settings.js).
+  const scale = await api.invoke('settings:get', 'ui_scale');
+  if (scale) document.documentElement.setAttribute('data-scale', scale);
 
   const [allEntries, dismissedRows, taskSummary, policy] = await Promise.all([
     api.invoke('entries:all'),
