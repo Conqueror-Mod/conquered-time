@@ -175,7 +175,6 @@ Native `<input type="time">` renders in the OS locale's format (often 12-hour wi
 
 #### Feature Add
 - **Tray + launch-at-startup** ✅ (PR #21 + PR #23) — system `Tray` (Open / Lock Session / Backup Now / Quit; click+dblclick restore the window), opt-in **Close to Tray** toggle (close hides the window and keeps `sessionKey`/`sessionUser` alive so the scheduled-report poller keeps firing; an `isQuitting` flag set by tray Quit / menu Quit / `before-quit` bypasses the hide; default behavior unchanged — close still quits), and **Launch at Startup** toggle (`app.setLoginItemSettings({ openAtLogin, path: process.execPath })`; `win:set-launch-at-startup` IPC). **Both settings are app-global, not per-profile** (PR #23): launch-at-startup's source of truth is the **OS login item itself** (`win:get-launch-at-startup` reads `app.getLoginItemSettings().openAtLogin` — no app storage); close-to-tray lives in **`<ROOT_DATA_DIR>/app-prefs.json`** via `getAppPref/setAppPref` (`win:get/set-close-to-tray`), read by `main.js` at window-close with no vault loaded. This is why the toggles appear and work identically in **both** the in-app Window settings tab AND the **pre-auth login settings tab** (the login screen has no vault, so per-profile vault keys would have been UI-only there). Do **not** move these back into the per-profile `app_settings` vault. Still TODO: optional "start minimized to tray" on login-launch (deferred); re-verify launch-at-startup after the first packaged NSIS build (a dev run registers `electron.exe` as the login item — packaged builds resolve `process.execPath` to the real installed `.exe` automatically).
-- **Reorder themes in settings** — user wants to control the display order of theme cards in the Settings modal
 - **About module** ✅ — tab in Settings (Steam-style redesign); icon, wordmark, version, credits, changelog, placeholder links
 - **App load/splash screen** ✅ — branded 3-second splash before login with icon, wordmark, tagline, progress bar; theme-aware
 - **Audit: 'Clear Messages' and 'Suggest discrepancy fix'** ✅ — per-row Dismiss/Apply Fix buttons in audit log; dismissed items excluded from close/lock warning count; suggestion text per discrepancy type; Clear All and Show/Hide Dismissed toolbar; `audit_dismissed` table persists state
@@ -193,12 +192,10 @@ Native `<input type="time">` renders in the OS locale's format (often 12-hour wi
 - **Session Auto Lock/Timeout** ✅ — fully wired: idle timer in main.js, heartbeat IPC, activity listeners in shell.js, settings UI (0/5/15/30/60 min); default corrected to Off
 - **Container/store architecture refactor** ✅ — centralized `src/renderer/store.js` (in-memory cache + pub/sub invalidation + rowid→id normalization), `ipc.js` (typed wrapper over preload channels), `validator.js` (input validation); injected by `Shell.init()` on every inner page. Cache is **per-page** (full `loadFile()` reloads recreate `window.Store` each nav) so it dedups within a page, not across navigations — true session caching deferred. Validator wired into `saveCompany()` and `saveSession()`.
 - **Settings redesign** ✅ — Steam-style split layout: left nav (Appearance, Window, Security, Data, Reports, Accessibility, About), scrollable right panel; 860px modal. (The "Time & Display" tab was removed in v3.7 — clock format now lives under Appearance.)
-- **Light theme polish** — Paper and Quartz flagged as still feeling "derivative"; functional but not fully realized
 - **Language change / i18n** — lowest priority, most complex; tackle last
 - The North Phoenician cipher-layer concept was discussed in depth but explicitly **deferred to theory** — only the visual grid mechanic is built; the deeper PBKDF2 factor idea remains unbuilt
 
 #### Fun
-- **Redesign ASCII Easter Egg** — the cracked-hourglass ASCII art shown on the login easter egg sequence; user wants it bigger, better, clearer
 - **Rename themes to Final Fantasy names** — replace Arctic/Void/Slate/Paper/Quartz with FF-inspired names
 - **Final Fantasy based theme variants** — explore FF-aesthetic color palettes as additional or replacement themes
 
@@ -264,12 +261,14 @@ These were real conversations with the user that may resurface — worth knowing
 
 ## Suggested Next Steps (pick up here)
 
-In rough priority order based on the user's own stated roadmap and the last open threads:
-1. Continue refining the two light themes (Paper, Quartz) — user flagged them as still feeling "derivative"
-2. Reports/Auditing feature design + build (charts, label breakdowns — the audit log itself is done)
-3. User Profile Icon + User Profile Screen
-4. Full account recovery flow (beyond the one-time recovery code)
-5. Revisit the container/store architecture refactor now that the app is stable, *especially* if any new null-ID-style bugs reappear
-6. Language/i18n — lowest priority, most complex
+Most feature work is done (auth, recovery, encryption-at-rest, reports/audit, profiles, scheduling, tray). What remains, in rough priority:
+1. **Multi-platform packaging** — Windows installer works; macOS/Linux icons are ready. This is the highest-leverage next step: beta keys, the real-world launch-at-startup test, and monetization all sit downstream of having real installers.
+2. **Multi-DBA handling** (open design question) — one user working several Navigator IDs/accounts; needs a data-model + UI decision before any build.
+3. **Beta keys** — early-access gating (after packaging).
+4. **Contributions / monetization** — Patreon / purchase; email-vs-donation reminder logic (after packaging).
+5. **Language / i18n** — lowest priority, most complex; tackle last.
+6. **Auth & Encryption Reform** (backburner, design-only) — DPAPI/TPM-sealed key blob; do not start until multi-platform packaging is scoped.
+
+Note: light-theme polish, theme reordering, and the ASCII easter-egg redesign were dropped as not relevant (2026-06-29) — do not reintroduce them as open items.
 
 Always confirm scope and design direction with the user before building — this project's history shows a strong back-and-forth collaborative pattern where Claude proposes a plan/design rationale first and waits for explicit go-ahead before writing code.
