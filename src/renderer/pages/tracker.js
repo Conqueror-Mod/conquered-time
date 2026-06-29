@@ -487,7 +487,9 @@ function startEdit(cell, idx, field) {
   input.addEventListener('blur', commit);
   input.addEventListener('keydown', e => {
     if (e.key === 'Enter')  { input.removeEventListener('blur', commit); commit(); }
-    if (e.key === 'Escape') { cell.innerHTML = original; }
+    // Detach the blur handler first — reverting innerHTML removes the input,
+    // which would otherwise fire blur → commit and save the cancelled value.
+    if (e.key === 'Escape') { input.removeEventListener('blur', commit); cell.innerHTML = original; }
   });
 }
 
