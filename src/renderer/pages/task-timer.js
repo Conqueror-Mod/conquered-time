@@ -99,13 +99,24 @@ function updateBannerDuration() {
 }
 
 // ── Recent labels ──────────────────────────────────────────────────────────
-async function loadRecentLabels() {
-  const labels = await api.invoke('tasks:recent-labels');
+// Quick-picks / datalist for "Log a Task" draw from the active Time Tracker
+// session's Task Names (the `name` field of its saved rows), so Dispatch times
+// the tasks you've defined for today. Falls back to recent history when the
+// session has no named rows yet.
+async function loadTaskNameOptions() {
+  let labels = [];
+  try {
+    const rows = JSON.parse(activeEntry?.rows_json || '[]');
+    labels = [...new Set(rows.map(r => (r.name || '').trim()).filter(Boolean))];
+  } catch {}
+  if (!labels.length) labels = await api.invoke('tasks:recent-labels') || [];
+
   const datalist = document.getElementById('recent-labels-list');
   const row = document.getElementById('quickpick-row');
-  datalist.innerHTML = labels.map(l => `<option value="${l}">`).join('');
+  // escapeHtml — labels are user-controlled (row names / history)
+  datalist.innerHTML = labels.map(l => `<option value="${escapeHtml(l)}">`).join('');
   row.innerHTML = labels.map(l =>
-    `<button class="tt-quick-chip" data-label="${l}">${l}</button>`
+    `<button class="tt-quick-chip" data-label="${escapeHtml(l)}">${escapeHtml(l)}</button>`
   ).join('');
   row.querySelectorAll('.tt-quick-chip').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -235,7 +246,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   }
 
   renderTaskList();
-  await loadRecentLabels();
+  await loadTaskNameOptions();
 
   // ── Banner duration ticker ──
   setInterval(updateBannerDuration, 30000);
@@ -286,7 +297,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     taskItems = await api.invoke('tasks:list', activeEntry.id);
     renderTaskList();
     await writeDescToEntry();
-    await loadRecentLabels();
+    await loadTaskNameOptions();
 
     // Reset controls
     activeTaskId = null;
