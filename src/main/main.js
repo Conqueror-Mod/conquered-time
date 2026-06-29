@@ -19,6 +19,10 @@ if (!gotLock) { app.quit(); process.exit(0); }
 // --dev is honored only in an unpackaged (developer) run. A shipped build must
 // never drop into the dev-data sandbox just because someone passed --dev.
 const IS_DEV        = process.argv.includes('--dev') && !app.isPackaged;
+// True when the OS launched us via the login item (it passes --startup; see
+// loginItemOpts). Lets "start minimized to tray" apply only to auto-launches,
+// never to a manual open.
+const STARTED_AT_LOGIN = process.argv.includes('--startup');
 const ROOT_DATA_DIR = IS_DEV
   ? path.join(__dirname, '..', '..', 'dev-data')
   : path.join(app.getPath('userData'), 'conquered-data');
@@ -513,7 +517,12 @@ function createTray() {
 // won't match the entry and reports openAtLogin:false. Packaged: execPath IS the
 // real app exe and needs no args.
 function loginItemOpts(extra) {
-  const o = app.isPackaged ? {} : { path: process.execPath, args: [app.getAppPath()] };
+  // --startup lets the launched instance know it was auto-started (vs manual),
+  // so "start minimized to tray" can apply only then. The same args are used to
+  // read the item back, so the marker doesn't break openAtLogin detection.
+  const o = app.isPackaged
+    ? { args: ['--startup'] }
+    : { path: process.execPath, args: [app.getAppPath(), '--startup'] };
   return Object.assign(o, extra);
 }
 function applyLaunchAtStartup(enabled) {
@@ -710,6 +719,11 @@ ipcMain.handle('win:get-launch-at-startup', () => {
 ipcMain.handle('win:get-close-to-tray', () => getAppPref('closeToTray', false) === true);
 ipcMain.handle('win:set-close-to-tray', (_, enabled) => {
   setAppPref('closeToTray', !!enabled);
+  return { ok: true };
+});
+ipcMain.handle('win:get-start-minimized', () => getAppPref('startMinimized', false) === true);
+ipcMain.handle('win:set-start-minimized', (_, enabled) => {
+  setAppPref('startMinimized', !!enabled);
   return { ok: true };
 });
 ipcMain.on('navigate',     (_, page) => navigate(page));
@@ -1814,8 +1828,12 @@ app.whenReady().then(async () => {
   // Dev: auto-load the dev profile so the rest of the flow is identical
   if (IS_DEV) await initProfileDB(ROOT_DATA_DIR);
 
+  // Start minimized to tray: only when the OS auto-launched us (--startup) AND the
+  // user opted in. Skips the splash and leaves the window hidden in the tray.
+  const startHidden = STARTED_AT_LOGIN && getAppPref('startMinimized', false) === true;
+
   // Splash always uses zanarkand — it's a brand moment, not a user preference moment.
-  const splash = createSplashWindow('zanarkand');
+  const splash = startHidden ? null : createSplashWindow('zanarkand');
   createWindow(); // creates hidden (show: false)
   createTray();
   // No launch-at-startup re-sync needed here: the OS login item is its own
@@ -1850,14 +1868,20 @@ app.whenReady().then(async () => {
   mainWindow.on('moved',   saveWindowBounds);
   mainWindow.on('resized', saveWindowBounds);
 
-  setTimeout(() => {
-    if (!splash.isDestroyed()) splash.close();
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.show();
-      // Always maximize when preferred display is set, or when startMax is on
-      if (prefDisplay !== 'primary' || startMax) mainWindow.maximize();
-    }
-  }, 3000);
+  if (startHidden) {
+    // Stay in the tray: no splash, window created hidden, user opens it from the
+    // tray (Open) or by clicking the tray icon. Nothing else to do here.
+    console.log('[startup] Launched at login with "start minimized" — staying in tray.');
+  } else {
+    setTimeout(() => {
+      if (splash && !splash.isDestroyed()) splash.close();
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.show();
+        // Always maximize when preferred display is set, or when startMax is on
+        if (prefDisplay !== 'primary' || startMax) mainWindow.maximize();
+      }
+    }, 3000);
+  }
 });
 
 // ── Email helpers ─────────────────────────────────────────────────────────

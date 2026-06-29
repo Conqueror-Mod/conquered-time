@@ -227,6 +227,17 @@ const Shell = (() => {
                   <button class="toggle-switch" id="toggle-close-tray" data-action="applyCloseToTray"></button>
                 </div>
               </div>
+
+              <div class="settings-group">
+                <div class="settings-group-title">Start Minimized to Tray</div>
+                <div class="toggle-row">
+                  <div class="toggle-info">
+                    <div class="toggle-label">Start hidden in the tray</div>
+                    <div class="toggle-desc">When launched at startup, opens silently in the system tray instead of showing the window. Requires Launch at Startup.</div>
+                  </div>
+                  <button class="toggle-switch" id="toggle-start-minimized" data-action="applyStartMinimized"></button>
+                </div>
+              </div>
             </div><!-- /settings-cat-window -->
 
             <!-- ── DATA ─────────────────────────────────────── -->
@@ -1255,6 +1266,7 @@ async function loadDisplayPicker() {
     api.invoke('win:get-launch-at-startup'),  // OS login item is source of truth
     api.invoke('win:get-close-to-tray'),       // app-global pref (not per-profile)
   ]);
+  const savedStartMin = await api.invoke('win:get-start-minimized');
   const saved = savedDisp || 'primary';
   const btns = [
     `<button class="s-btn${saved === 'primary' ? ' active' : ''}" data-action="applyPreferredDisplay" data-arg="primary">Primary Display</button>`
@@ -1272,6 +1284,8 @@ async function loadDisplayPicker() {
   const tct = document.getElementById('toggle-close-tray');
   if (tls) tls.classList.toggle('on', savedLaunch === true);
   if (tct) tct.classList.toggle('on', savedCloseTray === true);
+  const tsmin = document.getElementById('toggle-start-minimized');
+  if (tsmin) tsmin.classList.toggle('on', savedStartMin === true);
 }
 
 async function applyPreferredDisplay(displayId) {
@@ -1295,6 +1309,12 @@ async function applyLaunchStartup(btn) {
 async function applyCloseToTray(btn) {
   const newVal = !btn.classList.contains('on');
   await api.invoke('win:set-close-to-tray', newVal); // app-global pref (not per-profile)
+  btn.classList.toggle('on', newVal);
+}
+
+async function applyStartMinimized(btn) {
+  const newVal = !btn.classList.contains('on');
+  await api.invoke('win:set-start-minimized', newVal); // app-global pref
   btn.classList.toggle('on', newVal);
 }
 
@@ -1519,6 +1539,7 @@ function installShellDelegation() {
     applyWinToggle:        (a, el) => applyWinToggle(a, el),
     applyLaunchStartup:    (a, el) => applyLaunchStartup(el),
     applyCloseToTray:      (a, el) => applyCloseToTray(el),
+    applyStartMinimized:   (a, el) => applyStartMinimized(el),
     applyPreferredDisplay: a       => applyPreferredDisplay(a),
     showDbaConfirm:        a       => showDbaConfirm(a),
     hideDbaConfirm:        a       => hideDbaConfirm(a),
