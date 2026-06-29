@@ -54,7 +54,7 @@ const DEV_PASSWORD = 'devpass123';
 const DEV_RECOVERY = 'SEED-ABCD-1234-EFGH';
 
 // ── Reference data (must mirror the live app) ──────────────────────────────
-const VALID_THEMES = ['memoria', 'zanarkand', 'rabanastre', 'treno', 'nibelheim', 'lindblum'];
+const VALID_THEMES = ['memoria', 'zanarkand', 'rabanastre', 'treno', 'nibelheim'];
 const SEED_THEME   = 'zanarkand'; // brand default (theme-init fallback)
 
 // ── Crypto (mirrors main.js exactly) ──────────────────────────────────────
@@ -568,7 +568,7 @@ function printPacket() {
   APPEARANCE:
   A  set.theme_default ....... opens on Zanarkand (seeded ui_theme)
   B  set.themes_all .......... Memoria, Zanarkand, Rabanastre, Treno,
-        Nibelheim, Lindblum each apply live (6 themes)
+        Nibelheim each apply live (5 themes)
   B  set.clock_format ........ 12h/24h toggle (under Appearance) updates times
   A  set.scale ............... Compact/Normal/Comfortable/Large; sidebar stays
         clickable at Large (scoped to #main-content)

@@ -130,7 +130,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
 ## Theme System Quick Reference
 
-5 selectable Final Fantasy themes via `document.documentElement.setAttribute('data-theme', 'memoria'|'zanarkand'|'rabanastre'|'treno'|'nibelheim')`, applied by `settings.js`'s `apply()`. **Default is `memoria`** (settings.js). A 6th palette, `lindblum`, is fully defined in `themes.css` but is NOT in the pickers or settings.js valid set (spare). The splash always uses `zanarkand` as a brand moment. All theme tokens are CSS custom properties defined once per `[data-theme="x"]` block in `themes.css` (imported by `design-system.css`) — components reference `var(--accent)`, `var(--surface-1)`, etc., never hardcoded colors, so new themes drop in cleanly.
+5 Final Fantasy themes via `document.documentElement.setAttribute('data-theme', 'memoria'|'zanarkand'|'rabanastre'|'treno'|'nibelheim')`, applied by `settings.js`'s `apply()`. **Default is `memoria`** (settings.js). The splash always uses `zanarkand` as a brand moment. All theme tokens are CSS custom properties defined once per `[data-theme="x"]` block in `themes.css` (imported by `design-system.css`) — components reference `var(--accent)`, `var(--surface-1)`, etc., never hardcoded colors, so new themes drop in cleanly.
 
 Canvas-drawn elements (spiderweb nodes) **cannot** use CSS variables directly — they read the active theme via `document.documentElement.getAttribute('data-theme')` and branch through a local `getCanvasColors()` helper (duplicated in both `dashboard.js` and `companies.js` — if you change node colors, update both places).
 

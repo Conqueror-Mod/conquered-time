@@ -2,12 +2,10 @@
 
 /* ══════════════════════════════════════════════════════════════
    CONQUERED TIME — Themes
-   Six Final Fantasy city palettes are defined below. FIVE are selectable in the
-   theme pickers (shell.js + login.html) and listed in settings.js:
+   Five Final Fantasy city palettes, all selectable in the theme pickers
+   (shell.js + login.html) and listed in settings.js:
      Light: Memoria (default), Rabanastre
      Dark:  Zanarkand, Treno, Nibelheim
-   Lindblum (light) is fully defined but NOT exposed in either picker — leave it
-   as a spare, or wire it into the pickers + settings.js valid set to ship it.
    ══════════════════════════════════════════════════════════════ */
 
 /* ── Shared tokens: identical across all themes ── */
@@ -215,54 +213,6 @@
   --shadow-2: 0 4px 16px rgba(0,8,24,0.70), 0 8px 32px rgba(0,8,24,0.55);
   --shadow-3: 0 12px 48px rgba(0,8,24,0.85), 0 24px 72px rgba(0,8,24,0.65);
   --shadow-inset: inset 0 1px 0 rgba(0,184,204,0.10);
-}
-
-/* ══════════════════════════════════════════════════════════════
-   LINDBLUM — Grand City-State (FF9)
-   Industrial capital. Airship docks, brass machinery, amber skies.
-   Aged parchment base, deep amber-bronze accent, verdigris secondary.
-   Wealth earned. Sophisticated, warm, handcrafted.
-   ══════════════════════════════════════════════════════════════ */
-[data-theme="lindblum"] {
-  /* Aged parchment — warm cream, each surface richer than the last */
-  --bg:           #f5f0e4;
-  --bg-deep:      #ece5d4;
-  --surface-0:    #f5f0e4;
-  --surface-1:    #faf6ec;
-  --surface-2:    #ede6d6;
-  --surface-3:    #e2d9c4;
-  --border:       #c4b090;
-  --border-light: #d4c4a4;
-
-  /* Deep amber-bronze — Lindblum's lanterns at dusk */
-  --accent:       #a06018;
-  --accent-dim:   rgba(160,96,24,0.12);
-  --accent-glow:  rgba(160,96,24,0.28);
-  /* Verdigris — oxidised brass, copper gone green */
-  --accent-2:     #3a7a6a;
-  --accent-2-dim: rgba(58,122,106,0.12);
-
-  --red:          #b03020;
-  --red-dim:      rgba(176,48,32,0.10);
-  --yellow:       #a07818;
-  --yellow-dim:   rgba(160,120,24,0.10);
-  --green:        #2a6e40;
-  --green-dim:    rgba(42,110,64,0.10);
-  --blue:         #2a5080;
-  --blue-dim:     rgba(42,80,128,0.10);
-
-  /* Ink on parchment — deep warm brown, not black */
-  --text:         #3c2e1a;
-  --text-dim:     #c4b090;
-  --text-muted:   #7a6040;
-  --text-bright:  #1e1608;
-  --text-white:   #120e04;
-
-  /* Sepia-tinted shadows — depth that feels handcrafted */
-  --shadow-1: 0 1px 4px rgba(80,48,8,0.14), 0 2px 10px rgba(80,48,8,0.09);
-  --shadow-2: 0 4px 16px rgba(80,48,8,0.18), 0 8px 32px rgba(80,48,8,0.12);
-  --shadow-3: 0 12px 40px rgba(80,48,8,0.26), 0 24px 64px rgba(80,48,8,0.16);
-  --shadow-inset: inset 0 1px 0 rgba(255,255,255,0.70);
 }
 
 /* ══════════════════════════════════════════════════════════════

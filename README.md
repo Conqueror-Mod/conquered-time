@@ -89,7 +89,7 @@ conquered-time/
 │       │   └── settings.js       # Theme, scale, accessibility, time format, auto-lock engine
 │       └── styles/
 │           ├── design-system.css # Entry point — imports all partials
-│           ├── themes.css        # FF city theme token sets — 5 selectable + Lindblum (defined, not exposed); imports fonts-local.css
+│           ├── themes.css        # 5 FF city theme token sets (imports fonts-local.css)
 │           ├── fonts-local.css   # @font-face for bundled DM Sans + JetBrains Mono
 │           ├── fonts/            # Bundled .woff2 files (no remote fetch)
 │           ├── base.css          # Scale, accessibility, reset
