@@ -44,6 +44,7 @@ function installLoginDelegation() {
     paApplyWinToggle:       (a, el) => paApplyWinToggle(a, el),
     paApplyLaunchStartup:   (a, el) => paApplyLaunchStartup(el),
     paApplyCloseToTray:     (a, el) => paApplyCloseToTray(el),
+    paApplyStartMinimized:  (a, el) => paApplyStartMinimized(el),
     paApplyPreferredDisplay:a       => paApplyPreferredDisplay(a),
     paArmDelete:            ()      => paArmDelete(),
     paExecuteDelete:        ()      => paExecuteDelete(),
@@ -895,14 +896,17 @@ async function paLoadDisplayPicker() {
     if (trp) trp.classList.toggle('on', savedRemember === 'true');
     // Launch-at-startup (OS login item) + close-to-tray (app-global pref) — both
     // resolved from main, not localStorage, so they match the in-app settings.
-    const [launch, closeTray] = await Promise.all([
+    const [launch, closeTray, startMin] = await Promise.all([
       api.invoke('win:get-launch-at-startup').catch(() => false),
       api.invoke('win:get-close-to-tray').catch(() => false),
+      api.invoke('win:get-start-minimized').catch(() => false),
     ]);
     const tls = document.getElementById('pa-toggle-launch-startup');
     const tct = document.getElementById('pa-toggle-close-tray');
+    const tsm2 = document.getElementById('pa-toggle-start-minimized');
     if (tls) tls.classList.toggle('on', launch === true);
     if (tct) tct.classList.toggle('on', closeTray === true);
+    if (tsm2) tsm2.classList.toggle('on', startMin === true);
   } catch(e) {
     area.innerHTML = `<div class="settings-row-label" style="color:var(--text-muted)">Display info unavailable.</div>`;
   }
@@ -931,6 +935,11 @@ async function paApplyLaunchStartup(btn) {
 async function paApplyCloseToTray(btn) {
   const on = !btn.classList.contains('on');
   try { await api.invoke('win:set-close-to-tray', on); } catch {}
+  btn.classList.toggle('on', on);
+}
+async function paApplyStartMinimized(btn) {
+  const on = !btn.classList.contains('on');
+  try { await api.invoke('win:set-start-minimized', on); } catch {}
   btn.classList.toggle('on', on);
 }
 
