@@ -16,7 +16,14 @@ function localRequiredBreaks(totalMins, policy) {
 let currentTab = 'period';
 let barResizeObserver = null;
 let dismissedSet = new Set();
+let emailedSet = new Set();   // dKeys the user was emailed about (acknowledged but kept visible)
 let showDismissed = false;
+
+// Build dismissedSet + emailedSet from audit:get-dismissed rows.
+function applyDismissedRows(rows) {
+  dismissedSet = new Set((rows || []).map(d => `${d.entry_id}:${d.row_idx}:${d.type}`));
+  emailedSet   = new Set((rows || []).filter(d => d.emailed_at).map(d => `${d.entry_id}:${d.row_idx}:${d.type}`));
+}
 
 window.addEventListener('DOMContentLoaded', async () => {
   await Shell.init('reports');
@@ -26,8 +33,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   await loadData();
   // Load dismissed audit items
-  const dismissedRows = await api.invoke('audit:get-dismissed');
-  dismissedSet = new Set((dismissedRows || []).map(d => `${d.entry_id}:${d.row_idx}:${d.type}`));
+  applyDismissedRows(await api.invoke('audit:get-dismissed'));
 
   setupTabs();
   initPeriodFilter();
@@ -51,6 +57,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (act === 'restore')      undismissAuditItem(dkey, eid, ridx, type);
     else if (act === 'fix')     applyAuditFix(eid, ridx, fix, dkey);
     else if (act === 'dismiss') dismissAuditItem(dkey, eid, ridx, type);
+    else if (act === 'email')   emailAuditItem(dkey, eid, ridx, type);
   });
 
   api.on('audit:wizard-done', async () => {
@@ -61,8 +68,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     ]);
     allEntries = allEntries || [];
     taskMap    = taskMap    || {};
-    const dismissedRows = await api.invoke('audit:get-dismissed');
-    dismissedSet = new Set((dismissedRows || []).map(d => `${d.entry_id}:${d.row_idx}:${d.type}`));
+    applyDismissedRows(await api.invoke('audit:get-dismissed'));
     renderAuditLog();
   });
 
@@ -370,7 +376,9 @@ function renderAuditLog() {
 
   items.sort((a,b) => b.date !== a.date ? b.date.localeCompare(a.date) : (a.r.clock_in||'').localeCompare(b.r.clock_in||''));
 
-  const visible = showDismissed ? items : items.filter(i => i.type === 'ok' || !dismissedSet.has(i.dKey));
+  // Emailed (acknowledged) items stay visible by default — only manually-dismissed
+  // items are hidden unless "Show Dismissed" is on.
+  const visible = showDismissed ? items : items.filter(i => i.type === 'ok' || !dismissedSet.has(i.dKey) || emailedSet.has(i.dKey));
   const flagged  = items.filter(i => i.type !== 'ok' && !dismissedSet.has(i.dKey)).length;
   const totalDismissed = items.filter(i => i.type !== 'ok' && dismissedSet.has(i.dKey)).length;
 
@@ -395,16 +403,18 @@ function renderAuditLog() {
   }
 
   tbody.innerHTML = visible.map(({ date, company, entryId, rowIdx, type, dKey, r }) => {
-    const isDismissed = type !== 'ok' && dismissedSet.has(dKey);
+    const isEmailed   = type !== 'ok' && emailedSet.has(dKey);
+    const isDismissed = type !== 'ok' && dismissedSet.has(dKey) && !isEmailed;
     const { flag, cls, suggestion, fix } = auditMeta(type, r);
-    const rowCls = isDismissed ? ' class="audit-dismissed-row"' : '';
-    const flagCls = isDismissed ? 'flag-dismissed' : cls;
-    const flagText = isDismissed ? '— dismissed' : flag;
+    const rowCls = (isDismissed || isEmailed) ? ' class="audit-dismissed-row"' : '';
+    const flagCls = isEmailed ? 'flag-dismissed' : isDismissed ? 'flag-dismissed' : cls;
+    const flagText = isEmailed ? '✉ emailed' : isDismissed ? '— dismissed' : flag;
 
-    const actionBtns = type === 'ok' ? '' : isDismissed
+    const actionBtns = type === 'ok' ? '' : (isDismissed || isEmailed)
       ? `<button class="audit-row-btn dismiss" data-act="restore" data-dkey="${dKey}" data-eid="${entryId}" data-ridx="${rowIdx}" data-type="${type}">Restore</button>`
       : [
           fix ? `<button class="audit-row-btn fix" data-act="fix" data-eid="${entryId}" data-ridx="${rowIdx}" data-fix="${fix}" data-dkey="${dKey}">Apply Fix</button>` : '',
+          `<button class="audit-row-btn" data-act="email" data-dkey="${dKey}" data-eid="${entryId}" data-ridx="${rowIdx}" data-type="${type}">Email Me</button>`,
           `<button class="audit-row-btn dismiss" data-act="dismiss" data-dkey="${dKey}" data-eid="${entryId}" data-ridx="${rowIdx}" data-type="${type}">Dismiss</button>`
         ].filter(Boolean).join(' ');
 
@@ -428,22 +438,33 @@ async function dismissAuditItem(dKey, entryId, rowIdx, type) {
   renderAuditLog();
 }
 
+async function emailAuditItem(dKey, entryId, rowIdx, type) {
+  const item = { type, r: {} };
+  const { suggestion } = auditMeta(type, item.r) || {};
+  const res = await api.invoke('audit:email-notify', {
+    entry_id: Number(entryId), row_idx: Number(rowIdx), type,
+    subject: 'Conquered Time — timesheet discrepancy',
+    message: `A timesheet discrepancy was flagged in your audit log. ${suggestion || ''}`.trim(),
+  });
+  if (!res?.ok) { Shell.toast('Could not send email: ' + (res?.error || 'unknown error'), 'error'); return; }
+  // Mark as emailed locally (silenced on close, kept visible in the log).
+  dismissedSet.add(dKey);
+  emailedSet.add(dKey);
+  Shell.toast(`Emailed ${res.to} — discrepancy acknowledged.`, 'success');
+  renderAuditLog();
+}
+
 async function undismissAuditItem(dKey, entryId, rowIdx, type) {
-  // No single-item restore IPC needed — just remove from local set and re-persist on clear
-  // For now: clear all dismissed then re-add the ones we still want (simpler UX)
+  await api.invoke('audit:undismiss', { entry_id: Number(entryId), row_idx: Number(rowIdx), type });
   dismissedSet.delete(dKey);
-  // Re-add remaining dismissed items to DB (clear + re-insert)
-  await api.invoke('audit:clear-dismissed');
-  for (const key of dismissedSet) {
-    const [eid, ridx, t] = key.split(':');
-    await api.invoke('audit:dismiss', { entry_id: Number(eid), row_idx: Number(ridx), type: t });
-  }
+  emailedSet.delete(dKey);
   renderAuditLog();
 }
 
 async function clearAllDismissed() {
   await api.invoke('audit:clear-dismissed');
   dismissedSet.clear();
+  emailedSet.clear();
   renderAuditLog();
 }
 

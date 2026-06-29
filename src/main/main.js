@@ -187,6 +187,10 @@ async function initProfileDB(profileDir) {
     );
   `);
 
+  // audit_dismissed: emailed_at marks discrepancies the user was emailed about
+  // (acknowledged) — silenced on close like a dismiss, but kept visible in the log.
+  try { db.run('ALTER TABLE audit_dismissed ADD COLUMN emailed_at INTEGER'); } catch {}
+
   // time_entries encryption columns
   try { db.run('ALTER TABLE time_entries ADD COLUMN rows_enc TEXT'); } catch {}
   try { db.run('ALTER TABLE time_entries ADD COLUMN rows_iv  TEXT'); } catch {}
@@ -1338,7 +1342,7 @@ ipcMain.handle('audit:get-policy', () => {
 // ── IPC: Audit dismissed ──────────────────────────────────────────────────
 ipcMain.handle('audit:get-dismissed', () => {
   if (!sessionUser) return [];
-  return dbAll('SELECT entry_id, row_idx, type FROM audit_dismissed WHERE user_id=?', [sessionUser.id]);
+  return dbAll('SELECT entry_id, row_idx, type, emailed_at FROM audit_dismissed WHERE user_id=?', [sessionUser.id]);
 });
 
 ipcMain.handle('audit:dismiss', (_, { entry_id, row_idx, type }) => {
@@ -1347,6 +1351,14 @@ ipcMain.handle('audit:dismiss', (_, { entry_id, row_idx, type }) => {
     'INSERT OR IGNORE INTO audit_dismissed (user_id, entry_id, row_idx, type) VALUES (?,?,?,?)',
     [sessionUser.id, Number(entry_id), Number(row_idx), type]
   );
+  persistDB();
+  return { ok: true };
+});
+
+ipcMain.handle('audit:undismiss', (_, { entry_id, row_idx, type }) => {
+  if (!sessionUser) return { ok: false };
+  db.run('DELETE FROM audit_dismissed WHERE user_id=? AND entry_id=? AND row_idx=? AND type=?',
+    [sessionUser.id, Number(entry_id), Number(row_idx), type]);
   persistDB();
   return { ok: true };
 });
@@ -1404,6 +1416,17 @@ ipcMain.handle('audit:apply-fix', (_, { entry_id, row_idx, fix_type }) => {
     return { ok: true };
   } catch (e) { return { ok: false, error: e.message }; }
 });
+
+// Returns the logged-in user's saved profile email, or '' if none.
+function getProfileEmail() {
+  if (!sessionKey || !sessionUser) return '';
+  try {
+    const user = dbGet('SELECT rowid as rid, * FROM users WHERE rowid=?', [sessionUser.id]);
+    if (!user || !user.profile_enc) return '';
+    const data = JSON.parse(decrypt({ data: user.profile_enc, iv: user.profile_iv, tag: user.profile_tag }, sessionKey));
+    return (data?.email || '').trim();
+  } catch { return ''; }
+}
 
 // Returns true when the logged-in user has no email saved in their profile blob.
 function profileEmailMissing() {
@@ -1485,6 +1508,43 @@ ipcMain.handle('audit:open-wizard', (_, { mode, theme } = {}) => {
 
 // Count of non-dismissed audit discrepancies — used for the at-login notice.
 ipcMain.handle('audit:count', () => countAuditDiscrepancies());
+
+// Consent-gated audit notification: email the user about a discrepancy (never
+// modifies a punch — fixes still require an explicit Apply Fix). On success the
+// discrepancy is recorded as emailed (emailed_at) so it's silenced on close/lock
+// but kept visible in the audit log.
+ipcMain.handle('audit:email-notify', async (_, { entry_id, row_idx, type, subject, message } = {}) => {
+  if (!sessionKey || !sessionUser) return { ok: false, error: 'Not logged in.' };
+  const to = getProfileEmail();
+  if (!to) return { ok: false, error: 'Add an email to your profile first (Profile screen).' };
+  const cfg = getEmailSmtpConfig();
+  if (!cfg.host || !cfg.username || !cfg.password) {
+    return { ok: false, error: 'Email not configured. Open Settings → Reports to add SMTP credentials.' };
+  }
+  try {
+    const transport = nodemailer.createTransport({
+      host: cfg.host, port: cfg.port, secure: cfg.port === 465,
+      connectionTimeout: 10000, greetingTimeout: 10000, socketTimeout: 15000,
+      auth: { user: cfg.username, pass: cfg.password },
+    });
+    const fromAddr = cfg.fromName ? `"${cfg.fromName}" <${cfg.username}>` : cfg.username;
+    const safeMsg  = String(message || 'A timesheet discrepancy needs your attention.')
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    await transport.sendMail({
+      from: fromAddr, to,
+      subject: subject || 'Conquered Time — timesheet discrepancy',
+      html: `<p>${safeMsg}</p>
+             <p style="color:#374151;font-size:13px">Review it in Conquered Time under <strong>Reports &rarr; Audit</strong>. No changes were made to your timesheet — applying a fix always requires your confirmation in the app.</p>
+             <p style="color:#9ca3af;font-size:12px">Sent ${new Date().toLocaleString()} · CONFIDENTIAL</p>`,
+    });
+    // Record as emailed/acknowledged (silenced on close, kept in the log).
+    const args = [sessionUser.id, Number(entry_id), Number(row_idx), type];
+    db.run('INSERT OR IGNORE INTO audit_dismissed (user_id, entry_id, row_idx, type) VALUES (?,?,?,?)', args);
+    db.run('UPDATE audit_dismissed SET emailed_at=strftime(\'%s\',\'now\') WHERE user_id=? AND entry_id=? AND row_idx=? AND type=?', args);
+    persistDB();
+    return { ok: true, to };
+  } catch (e) { return { ok: false, error: e.message }; }
+});
 
 // ── IPC: Database clear operations ────────────────────────────────────────
 // Architecture note: each profile has its own vault.db file, so `db` is
