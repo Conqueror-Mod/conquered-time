@@ -731,6 +731,8 @@ const Shell = (() => {
     api.on('audit:close-warning', ({ count, action }) => showAuditWarning(count, action));
 
     // ── Sidebar active-task timer ──────────────────────────────────────────
+    // Delegate to showSidebarTimer (the single tracked interval) — do NOT start a
+    // second interval here. started_at is stored in ms (tasks save Date.now()).
     (async () => {
       try {
         const entry = await api.invoke('entries:get-active');
@@ -738,23 +740,7 @@ const Shell = (() => {
         const tasks = await api.invoke('tasks:list', entry.id);
         const active = tasks.find(t => t.item_type === 'task' && t.started_at && !t.stopped_at);
         if (!active) return;
-
-        const wrapper = document.getElementById('sidebar-task-timer');
-        const display = document.getElementById('sidebar-task-time');
-        if (!wrapper || !display) return;
-        wrapper.style.display = 'flex';
-
-        function tickTimer() {
-          const secs = Math.floor((Date.now() - active.started_at * 1000) / 1000);
-          const h = Math.floor(secs / 3600);
-          const m = Math.floor((secs % 3600) / 60);
-          const s = secs % 60;
-          display.textContent = h > 0
-            ? `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
-            : `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-        }
-        tickTimer();
-        setInterval(tickTimer, 1000);
+        showSidebarTimer(active.started_at);
       } catch {}
     })();
 
