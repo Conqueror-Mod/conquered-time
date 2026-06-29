@@ -4,21 +4,34 @@
  *  Run:  npm run seed      → seeds ./dev-data/dev-vault.db (never touches real vault)
  *        npm run dev       → launches app using dev-vault.db
  *
- *  What this seeds:
- *    • 1 dev user (TOTP bypassed, profile pre-filled)
- *    • 2 companies with ALL fields populated
+ *  What this seeds (all values reconciled against the live app, 2026-06-29):
+ *    • 1 dev user (TOTP bypassed, profile pre-filled, work_state TX → default policy)
+ *    • 2 companies with ALL current fields populated
  *    • 6 time entries across multiple dates:
- *        - Clean sessions with clock in/out + break + lunch rows
- *        - Discrepancy sessions to exercise the audit system:
- *            › Missing clock-out on a row
- *            › Overlapping clock times between rows
- *            › Duration mismatch (stored vs calculated)
- *    • Task items for Dispatch module
- *    • App settings (Arctic theme default)
+ *        - 5 CLEAN sessions (every row has clock in+out, non-zero duration ≤12h;
+ *          kept under the break/lunch policy thresholds, or compliant via task_items)
+ *        - 1 DISCREPANCY session (Entry 3) planting ONLY real, detectable issues:
+ *            › no_clock_in   (row has clock-out but no clock-in)
+ *            › no_clock_out  (row has clock-in but no clock-out)
+ *            › zero_duration (clock in+out but total_mins = 0)
+ *            › over_12h      (row duration > 720 min)
+ *          + entry hours (480m) with no break/lunch task_items →
+ *            › missing_break  (default policy needs 2 breaks <600m)
+ *            › missing_lunch  (default policy needs lunch >300m)
+ *          ⇒ EXACTLY 6 audit discrepancies, all on Entry 3.
+ *    • Task items for Dispatch module + the break/lunch task_items that keep the
+ *      long compliant session (Entry 1) clean.
+ *    • App settings under the REAL keys (ui_* / win_*) with a REAL theme value.
  *
- *  Prints a structured manual-verification checklist on completion.
+ *  NOTE — the audit engine detects the 6 types above. It does NOT detect row
+ *  overlaps or stored-vs-span duration mismatches; do not seed those expecting
+ *  flags. (The previous seed claimed to, which was wrong.)
  *
- *  ⚠  NEVER ships in a production build — dev only.
+ *  Prints a structured, order-of-operations verification packet on completion,
+ *  plus a self-check PASS/FAIL ledger for the data it just wrote.
+ *
+ *  ⚠  NEVER ships in a production build — dev only (excluded from electron-builder
+ *     `files`; dev_mode is gated on IS_DEV in main.js so it can't bypass TOTP packaged).
  * ═══════════════════════════════════════════════════════════════════════
  */
 
@@ -29,9 +42,8 @@ const fs     = require('fs');
 const crypto = require('crypto');
 
 // ── Paths ──────────────────────────────────────────────────────────────────
-// Dev DB lives inside the project at ./dev-data/ — completely separate from
-// the real user vault in AppData. Run the app with `npm run start:dev` to
-// pick this DB up. The real vault.db is never touched by this script.
+// Dev DB lives inside the project at ./dev-data/ — completely separate from the
+// real user vault in AppData. Run `npm run dev` to pick this DB up.
 const DATA_DIR   = path.join(__dirname, 'dev-data');
 const DB_FILE    = path.join(DATA_DIR, 'dev-vault.db');
 const BACKUP_DIR = path.join(DATA_DIR, 'backups');
@@ -40,6 +52,10 @@ const BACKUP_DIR = path.join(DATA_DIR, 'backups');
 const DEV_USERNAME = 'devuser';
 const DEV_PASSWORD = 'devpass123';
 const DEV_RECOVERY = 'SEED-ABCD-1234-EFGH';
+
+// ── Reference data (must mirror the live app) ──────────────────────────────
+const VALID_THEMES = ['memoria', 'zanarkand', 'rabanastre', 'treno', 'nibelheim', 'lindblum'];
+const SEED_THEME   = 'zanarkand'; // brand default (theme-init fallback)
 
 // ── Crypto (mirrors main.js exactly) ──────────────────────────────────────
 function deriveKey(password, salt) {
@@ -51,6 +67,11 @@ function encrypt(plaintext, key) {
   const enc    = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
   const tag    = cipher.getAuthTag();
   return { iv: iv.toString('hex'), tag: tag.toString('hex'), data: enc.toString('hex') };
+}
+function decrypt(data, iv, tag, key) {
+  const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(iv, 'hex'));
+  decipher.setAuthTag(Buffer.from(tag, 'hex'));
+  return Buffer.concat([decipher.update(Buffer.from(data, 'hex')), decipher.final()]).toString('utf8');
 }
 
 // ── Date helpers ───────────────────────────────────────────────────────────
@@ -68,7 +89,7 @@ function unixNow(offsetMins = 0) {
 
 async function seed() {
   console.log('\n╔══════════════════════════════════════════════════╗');
-  console.log('║   CONQUERED TIME — Comprehensive Dev Seed v2.0  ║');
+  console.log('║   CONQUERED TIME — Comprehensive Dev Seed v3.0   ║');
   console.log('╚══════════════════════════════════════════════════╝\n');
 
   // ── Wipe & recreate data directory ────────────────────────────────────────
@@ -175,16 +196,16 @@ async function seed() {
   const recoveryKeyBlob = encrypt(sessionKey.toString('hex'), recoveryEncKey);
 
   // Avatar: Ruxin "COLLUSION!" reaction GIF
-  const avatarDataUrl = `data:image/gif;base64,${require('fs').readFileSync(require('path').join(__dirname, 'assets', 'ruxin_dev.gif')).toString('base64')}`;
+  const avatarDataUrl = `data:image/gif;base64,${fs.readFileSync(path.join(__dirname, 'assets', 'ruxin_dev.gif')).toString('base64')}`;
 
+  // Profile fields mirror the live Profile page (no 'descriptor' field exists).
   const profileData = {
-    full_name:   'Dev Tester',
-    email:       'dev@conqueredtime.app',
-    phone:       '555-0100',
-    job_title:   'QA Engineer',
-    work_state:  'CA',
-    descriptor:  'Testing all the things so you don\'t have to.',
-    avatar:      avatarDataUrl
+    full_name:  'Dev Tester',
+    email:      'dev@conqueredtime.app',
+    phone:      '555-0100',
+    job_title:  'QA Engineer',
+    work_state: 'TX',           // not in STATE_POLICY → default break/lunch policy
+    avatar:     avatarDataUrl,
   };
   const profEnc = encrypt(JSON.stringify(profileData), sessionKey);
 
@@ -201,7 +222,7 @@ async function seed() {
     ]
   );
   const userId = Number(db.exec('SELECT last_insert_rowid()')[0].values[0][0]);
-  console.log(`✓ Dev user created (id: ${userId}, display: Dev Tester)`);
+  console.log(`✓ Dev user created (id: ${userId}, display: Dev Tester, work_state: TX → default policy)`);
 
   // ── Company A — Zenith Analytics ──────────────────────────────────────────
   const companyA = {
@@ -223,10 +244,8 @@ async function seed() {
     notes:          'Primary client — annotation and QA cycles. High volume batches on Tuesdays.'
   };
   const encA = encrypt(JSON.stringify(companyA), sessionKey);
-  db.run(
-    `INSERT INTO companies (user_id, data_enc, data_iv, data_tag) VALUES (?,?,?,?)`,
-    [userId, encA.data, encA.iv, encA.tag]
-  );
+  db.run(`INSERT INTO companies (user_id, data_enc, data_iv, data_tag) VALUES (?,?,?,?)`,
+    [userId, encA.data, encA.iv, encA.tag]);
   const companyIdA = Number(db.exec('SELECT last_insert_rowid()')[0].values[0][0]);
   console.log(`✓ Company A: Zenith Analytics (id: ${companyIdA})`);
 
@@ -250,158 +269,127 @@ async function seed() {
     notes:          'Secondary client — bug regression cycles. Pays weekly via direct deposit.'
   };
   const encB = encrypt(JSON.stringify(companyB), sessionKey);
-  db.run(
-    `INSERT INTO companies (user_id, data_enc, data_iv, data_tag) VALUES (?,?,?,?)`,
-    [userId, encB.data, encB.iv, encB.tag]
-  );
+  db.run(`INSERT INTO companies (user_id, data_enc, data_iv, data_tag) VALUES (?,?,?,?)`,
+    [userId, encB.data, encB.iv, encB.tag]);
   const companyIdB = Number(db.exec('SELECT last_insert_rowid()')[0].values[0][0]);
   console.log(`✓ Company B: Apex Digital (id: ${companyIdB})`);
 
-  // ── Helper: blank filler rows ──────────────────────────────────────────────
-  const blank = (n = 12) => Array(n).fill(null).map(() => ({
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  const blank = (n) => Array(n).fill(null).map(() => ({
     label: '', name: '', desc: '', total_mins: 0, clock_in: '', clock_out: ''
   }));
+  function insertEntry(companyId, dayOffset, label, rows, totalMins) {
+    const enc = encrypt(JSON.stringify(rows), sessionKey);
+    db.run(
+      `INSERT INTO time_entries (user_id, company_id, log_date, session_label, rows_json, rows_enc, rows_iv, rows_tag, total_mins)
+       VALUES (?,?,?,?,?,?,?,?,?)`,
+      [userId, companyId, daysAgo(dayOffset), label, '', enc.data, enc.iv, enc.tag, totalMins]
+    );
+    return Number(db.exec('SELECT last_insert_rowid()')[0].values[0][0]);
+  }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  //  TIME ENTRIES
+  //  TIME ENTRIES   (default policy: breaks needed ≥210m; lunch needed >300m)
   // ═══════════════════════════════════════════════════════════════════════════
 
-  // ── Entry 1: TODAY — Company A — Clean session with break + lunch ──────────
+  // ── Entry 1: TODAY — Company A — CLEAN, long (360m) → compliant via task_items
   const entry1Rows = [
-    { label: 'Clock In',   name: 'Start of day',      desc: 'Logged in and set up workspace',   total_mins: 0,   clock_in: timeStr(8, 0),  clock_out: '' },
-    { label: 'Annotation', name: 'Batch Phoenix-001',  desc: 'Text classification — set A',      total_mins: 90,  clock_in: timeStr(8, 0),  clock_out: timeStr(9, 30) },
-    { label: 'Break',      name: 'Morning break',      desc: '15 min rest',                       total_mins: 15,  clock_in: timeStr(9, 30), clock_out: timeStr(9, 45) },
-    { label: 'Annotation', name: 'Batch Phoenix-002',  desc: 'Text classification — set B',      total_mins: 105, clock_in: timeStr(9, 45), clock_out: timeStr(11, 30) },
-    { label: 'Lunch',      name: 'Lunch break',        desc: '30 min lunch',                      total_mins: 30,  clock_in: timeStr(11, 30),clock_out: timeStr(12, 0) },
-    { label: 'QA',         name: 'Review pass',        desc: 'Spot-check annotations from AM',   total_mins: 60,  clock_in: timeStr(12, 0), clock_out: timeStr(13, 0) },
-    { label: 'Admin',      name: 'Batch submission',   desc: 'Submit completed batches to portal',total_mins: 15,  clock_in: timeStr(13, 0), clock_out: timeStr(13, 15) },
-    ...blank(8)
-  ];
-  const enc1 = encrypt(JSON.stringify(entry1Rows), sessionKey);
-  db.run(
-    `INSERT INTO time_entries (user_id, company_id, log_date, session_label, rows_json, rows_enc, rows_iv, rows_tag, total_mins)
-     VALUES (?,?,?,?,?,?,?,?,?)`,
-    [userId, companyIdA, daysAgo(0), 'Morning Annotation Block', '', enc1.data, enc1.iv, enc1.tag, 270]
-  );
-  const entry1Id = Number(db.exec('SELECT last_insert_rowid()')[0].values[0][0]);
-  console.log(`✓ Entry 1: Today — Zenith Analytics — clean session (4h 30m)`);
-
-  // ── Entry 2: YESTERDAY — Company B — Clean session ─────────────────────────
-  const entry2Rows = [
-    { label: 'QA',         name: 'Regression suite A', desc: 'Login flow + auth edge cases',    total_mins: 120, clock_in: timeStr(9, 0),  clock_out: timeStr(11, 0) },
-    { label: 'Break',      name: 'Break',               desc: '',                                total_mins: 15,  clock_in: timeStr(11, 0), clock_out: timeStr(11, 15) },
-    { label: 'QA',         name: 'Regression suite B', desc: 'Payment flow + checkout errors',  total_mins: 90,  clock_in: timeStr(11, 15),clock_out: timeStr(12, 45) },
-    { label: 'Bug Report', name: 'File BRs',            desc: 'Wrote up 3 P2 bugs in tracker',  total_mins: 45,  clock_in: timeStr(12, 45),clock_out: timeStr(13, 30) },
+    { label: 'Annotation', name: 'Batch Phoenix-001', desc: 'Text classification — set A', total_mins: 90,  clock_in: timeStr(8, 0),  clock_out: timeStr(9, 30) },
+    { label: 'Annotation', name: 'Batch Phoenix-002', desc: 'Text classification — set B', total_mins: 105, clock_in: timeStr(9, 45), clock_out: timeStr(11, 30) },
+    { label: 'QA',         name: 'Review pass',        desc: 'Spot-check AM annotations',   total_mins: 60,  clock_in: timeStr(12, 0), clock_out: timeStr(13, 0) },
+    { label: 'Annotation', name: 'Batch Phoenix-003', desc: 'Text classification — set C', total_mins: 105, clock_in: timeStr(13, 0), clock_out: timeStr(14, 45) },
     ...blank(11)
   ];
-  const enc2 = encrypt(JSON.stringify(entry2Rows), sessionKey);
-  db.run(
-    `INSERT INTO time_entries (user_id, company_id, log_date, session_label, rows_json, rows_enc, rows_iv, rows_tag, total_mins)
-     VALUES (?,?,?,?,?,?,?,?,?)`,
-    [userId, companyIdB, daysAgo(1), 'QA Regression Day', '', enc2.data, enc2.iv, enc2.tag, 255]
-  );
-  const entry2Id = Number(db.exec('SELECT last_insert_rowid()')[0].values[0][0]);
-  console.log(`✓ Entry 2: Yesterday — Apex Digital — clean session (4h 15m)`);
+  const entry1Id = insertEntry(companyIdA, 0, 'Morning Annotation Block', entry1Rows, 360);
+  console.log('✓ Entry 1: Today — Zenith — CLEAN compliant session (6h, breaks+lunch as task_items)');
 
-  // ── Entry 3: 3 DAYS AGO — Company A — DISCREPANCY SESSION (for audit) ──────
-  //    Discrepancies planted:
-  //      Row 1: missing clock_out (clock in recorded, never clocked out)
-  //      Row 2 & 3: overlapping clock times (row 2 ends at 11:30, row 3 starts at 11:00)
-  //      Row 4: duration mismatch (stored 120 mins but clock_in/out span = 45 mins)
-  const entry3Rows = [
-    { label: 'Annotation', name: 'Batch Phoenix-003', desc: 'Early session — interrupted',      total_mins: 60,  clock_in: timeStr(8, 0),  clock_out: '' },           // ← MISSING CLOCK-OUT
-    { label: 'QA',         name: 'Review batch 003',  desc: 'Spot check pass',                  total_mins: 90,  clock_in: timeStr(10, 0), clock_out: timeStr(11, 30) },
-    { label: 'Annotation', name: 'Batch Phoenix-004', desc: 'Overlap with QA row above',        total_mins: 75,  clock_in: timeStr(11, 0), clock_out: timeStr(12, 15) }, // ← OVERLAP (starts before row 2 ends)
-    { label: 'Admin',      name: 'Portal admin tasks', desc: 'Duration mismatch entry',         total_mins: 120, clock_in: timeStr(13, 0), clock_out: timeStr(13, 45) }, // ← MISMATCH (45 min span, stored 120)
-    { label: 'Lunch',      name: 'Lunch',              desc: '',                                total_mins: 30,  clock_in: timeStr(12, 15),clock_out: timeStr(12, 45) },
-    ...blank(10)
-  ];
-  const enc3 = encrypt(JSON.stringify(entry3Rows), sessionKey);
-  db.run(
-    `INSERT INTO time_entries (user_id, company_id, log_date, session_label, rows_json, rows_enc, rows_iv, rows_tag, total_mins)
-     VALUES (?,?,?,?,?,?,?,?,?)`,
-    [userId, companyIdA, daysAgo(3), 'Discrepancy Test Session', '', enc3.data, enc3.iv, enc3.tag, 345]
-  );
-  const entry3Id = Number(db.exec('SELECT last_insert_rowid()')[0].values[0][0]);
-  console.log(`✓ Entry 3: 3 days ago — Zenith Analytics — DISCREPANCY session (audit bait)`);
-
-  // ── Entry 4: 5 DAYS AGO — Company B — Clean older session ──────────────────
-  const entry4Rows = [
-    { label: 'QA',         name: 'Smoke test build 42', desc: 'Full app smoke test post-deploy', total_mins: 60,  clock_in: timeStr(10, 0), clock_out: timeStr(11, 0) },
-    { label: 'Bug Report', name: 'Critical BR',          desc: 'P1 crash on checkout — filed',   total_mins: 30,  clock_in: timeStr(11, 0), clock_out: timeStr(11, 30) },
-    { label: 'QA',         name: 'Verify hotfix',        desc: 'Confirmed fix on build 42a',     total_mins: 30,  clock_in: timeStr(11, 30),clock_out: timeStr(12, 0) },
-    ...blank(12)
-  ];
-  const enc4 = encrypt(JSON.stringify(entry4Rows), sessionKey);
-  db.run(
-    `INSERT INTO time_entries (user_id, company_id, log_date, session_label, rows_json, rows_enc, rows_iv, rows_tag, total_mins)
-     VALUES (?,?,?,?,?,?,?,?,?)`,
-    [userId, companyIdB, daysAgo(5), 'Hotfix Verification', '', enc4.data, enc4.iv, enc4.tag, 120]
-  );
-  const entry4Id = Number(db.exec('SELECT last_insert_rowid()')[0].values[0][0]);
-  console.log(`✓ Entry 4: 5 days ago — Apex Digital — clean session (2h)`);
-
-  // ── Entry 5: 10 DAYS AGO — Company A — Older global log entry ──────────────
-  const entry5Rows = [
-    { label: 'Training',   name: 'Platform onboarding', desc: 'ZenDesk Pro tutorial modules',   total_mins: 120, clock_in: timeStr(9, 0),  clock_out: timeStr(11, 0) },
-    { label: 'Annotation', name: 'Trial batch',          desc: 'Unpaid trial annotation set',    total_mins: 60,  clock_in: timeStr(11, 0), clock_out: timeStr(12, 0) },
+  // ── Entry 2: YESTERDAY — Company B — CLEAN, short (180m) → no break/lunch needed
+  const entry2Rows = [
+    { label: 'QA',         name: 'Regression suite A', desc: 'Login + auth edge cases',    total_mins: 120, clock_in: timeStr(9, 0),  clock_out: timeStr(11, 0) },
+    { label: 'Bug Report', name: 'File BRs',           desc: 'Wrote up 3 P2 bugs',         total_mins: 60,  clock_in: timeStr(11, 15), clock_out: timeStr(12, 15) },
     ...blank(13)
   ];
-  const enc5 = encrypt(JSON.stringify(entry5Rows), sessionKey);
-  db.run(
-    `INSERT INTO time_entries (user_id, company_id, log_date, session_label, rows_json, rows_enc, rows_iv, rows_tag, total_mins)
-     VALUES (?,?,?,?,?,?,?,?,?)`,
-    [userId, companyIdA, daysAgo(10), 'Onboarding Week', '', enc5.data, enc5.iv, enc5.tag, 180]
-  );
-  console.log(`✓ Entry 5: 10 days ago — Zenith Analytics — training session`);
+  insertEntry(companyIdB, 1, 'QA Regression Day', entry2Rows, 180);
+  console.log('✓ Entry 2: Yesterday — Apex — CLEAN short session (3h)');
 
-  // ── Entry 6: 14 DAYS AGO — Company B — Oldest entry ───────────────────────
+  // ── Entry 3: 3 DAYS AGO — Company A — DISCREPANCY SESSION (exactly 6 issues)
+  //    Row 0: no_clock_in   | Row 1: no_clock_out | Row 2: zero_duration | Row 3: over_12h
+  //    + entry total 480m, no break/lunch task_items → missing_break + missing_lunch
+  const entry3Rows = [
+    { label: 'Annotation', name: 'Forgot clock-in',   desc: 'Has clock-out, no clock-in',  total_mins: 60,  clock_in: '',             clock_out: timeStr(10, 0) }, // no_clock_in
+    { label: 'QA',         name: 'Forgot clock-out',  desc: 'Has clock-in, no clock-out',  total_mins: 0,   clock_in: timeStr(10, 0), clock_out: '' },             // no_clock_out
+    { label: 'Admin',      name: 'Zero duration',     desc: 'In+out but 0 minutes',        total_mins: 0,   clock_in: timeStr(11, 0), clock_out: timeStr(11, 30) }, // zero_duration
+    { label: 'Annotation', name: 'Marathon block',    desc: 'Over 12h on one row',         total_mins: 780, clock_in: timeStr(0, 0),  clock_out: timeStr(13, 0) },  // over_12h
+    ...blank(11)
+  ];
+  const entry3Id = insertEntry(companyIdA, 3, 'Discrepancy Test Session', entry3Rows, 480);
+  console.log('✓ Entry 3: 3 days ago — Zenith — DISCREPANCY session (expect EXACTLY 6 issues)');
+
+  // ── Entry 4: 5 DAYS AGO — Company B — CLEAN, short (150m)
+  const entry4Rows = [
+    { label: 'QA',         name: 'Smoke test build 42', desc: 'Full smoke test post-deploy', total_mins: 60, clock_in: timeStr(10, 0),  clock_out: timeStr(11, 0) },
+    { label: 'Bug Report', name: 'Critical BR',         desc: 'P1 crash on checkout — filed', total_mins: 30, clock_in: timeStr(11, 0),  clock_out: timeStr(11, 30) },
+    { label: 'QA',         name: 'Verify hotfix',       desc: 'Confirmed fix on build 42a',   total_mins: 60, clock_in: timeStr(11, 30), clock_out: timeStr(12, 30) },
+    ...blank(12)
+  ];
+  insertEntry(companyIdB, 5, 'Hotfix Verification', entry4Rows, 150);
+  console.log('✓ Entry 4: 5 days ago — Apex — CLEAN session (2h 30m)');
+
+  // ── Entry 5: 10 DAYS AGO — Company A — CLEAN, short (200m)
+  const entry5Rows = [
+    { label: 'Training',   name: 'Platform onboarding', desc: 'ZenDesk Pro tutorial modules', total_mins: 120, clock_in: timeStr(9, 0),  clock_out: timeStr(11, 0) },
+    { label: 'Annotation', name: 'Trial batch',         desc: 'Trial annotation set',         total_mins: 80,  clock_in: timeStr(11, 0), clock_out: timeStr(12, 20) },
+    ...blank(13)
+  ];
+  insertEntry(companyIdA, 10, 'Onboarding Week', entry5Rows, 200);
+  console.log('✓ Entry 5: 10 days ago — Zenith — CLEAN training session (3h 20m)');
+
+  // ── Entry 6: 14 DAYS AGO — Company B — CLEAN, short (90m)
   const entry6Rows = [
-    { label: 'QA',         name: 'Environment setup',   desc: 'VPN + tooling setup for Apex',   total_mins: 90,  clock_in: timeStr(14, 0), clock_out: timeStr(15, 30) },
+    { label: 'QA', name: 'Environment setup', desc: 'VPN + tooling setup for Apex', total_mins: 90, clock_in: timeStr(14, 0), clock_out: timeStr(15, 30) },
     ...blank(14)
   ];
-  const enc6 = encrypt(JSON.stringify(entry6Rows), sessionKey);
-  db.run(
-    `INSERT INTO time_entries (user_id, company_id, log_date, session_label, rows_json, rows_enc, rows_iv, rows_tag, total_mins)
-     VALUES (?,?,?,?,?,?,?,?,?)`,
-    [userId, companyIdB, daysAgo(14), 'Setup Day', '', enc6.data, enc6.iv, enc6.tag, 90]
-  );
-  console.log(`✓ Entry 6: 14 days ago — Apex Digital — setup session`);
+  insertEntry(companyIdB, 14, 'Setup Day', entry6Rows, 90);
+  console.log('✓ Entry 6: 14 days ago — Apex — CLEAN setup session (1h 30m)');
 
-  // ── Task items (Dispatch module) ────────────────────────────────────────────
+  // ── Task items ──────────────────────────────────────────────────────────────
+  // Entry 1 needs 2 breaks + 1 lunch (default policy, 360m) to stay clean — seeded
+  // as task_items (item_type break/lunch), the ONLY thing the audit counts.
   const now = unixNow();
-  // Completed tasks on entry 1
-  db.run(`INSERT INTO task_items (user_id, entry_id, label, item_type, started_at, stopped_at, duration_secs) VALUES (?,?,?,?,?,?,?)`,
-    [userId, entry1Id, 'Review Phoenix batch guidelines', 'task', now - 7200, now - 6300, 900]);
-  db.run(`INSERT INTO task_items (user_id, entry_id, label, item_type, started_at, stopped_at, duration_secs) VALUES (?,?,?,?,?,?,?)`,
-    [userId, entry1Id, 'Annotation — set A', 'task', now - 6000, now - 4500, 1500]);
-  db.run(`INSERT INTO task_items (user_id, entry_id, label, item_type, started_at, stopped_at, duration_secs) VALUES (?,?,?,?,?,?,?)`,
-    [userId, entry1Id, 'Morning break', 'break', now - 4500, now - 3600, 900]);
-  // In-progress task (no stopped_at)
-  db.run(`INSERT INTO task_items (user_id, entry_id, label, item_type, started_at, stopped_at, duration_secs) VALUES (?,?,?,?,?,?,?)`,
-    [userId, entry1Id, 'Annotation — set B', 'task', now - 3600, null, 0]);
-  console.log(`✓ Task items seeded (3 completed + 1 in-progress for Dispatch)`);
+  const ti = (entryId, label, type, start, stop, dur) =>
+    db.run(`INSERT INTO task_items (user_id, entry_id, label, item_type, started_at, stopped_at, duration_secs) VALUES (?,?,?,?,?,?,?)`,
+      [userId, entryId, label, type, start, stop, dur]);
 
-  // ── App settings ────────────────────────────────────────────────────────────
+  ti(entry1Id, 'Morning break', 'break', now - 7200, now - 6300, 900);   // 15m break
+  ti(entry1Id, 'Afternoon break', 'break', now - 3600, now - 2700, 900); // 15m break
+  ti(entry1Id, 'Lunch', 'lunch', now - 5400, now - 3600, 1800);          // 30m lunch
+  // Dispatch tasks (2 completed + 1 in-progress) for the Dispatch module
+  ti(entry1Id, 'Review Phoenix guidelines', 'task', now - 7200, now - 6300, 900);
+  ti(entry1Id, 'Annotation — set A', 'task', now - 6000, now - 4500, 1500);
+  ti(entry1Id, 'Annotation — set B (in progress)', 'task', now - 1800, null, 0);
+  console.log('✓ Task items: Entry 1 → 2 break + 1 lunch (compliance) + 2 done + 1 in-progress (Dispatch)');
+
+  // ── App settings — REAL keys (ui_* / win_*) and a REAL theme value ──────────
   const settings = [
-    ['theme',            'arctic'],
-    ['uiScale',          'normal'],
-    ['timeFormat',       '12h'],
-    ['reducedMotion',    'false'],
-    ['highContrast',     'false'],
-    ['colorblindSafe',   'false'],
-    ['autoLockMinutes',  '0'],
-    ['startMaximized',   'true'],
-    ['rememberPosition', 'false'],
+    ['ui_theme',            SEED_THEME],   // valid FF theme (was bare 'theme'='arctic' — invalid)
+    ['ui_scale',            'normal'],
+    ['ui_timeFormat',       '12h'],
+    ['ui_reducedMotion',    'false'],
+    ['ui_highContrast',     'false'],
+    ['ui_colorblind',       'off'],
+    ['ui_focusIndicators',  'false'],
+    ['ui_autoLockMinutes',  '0'],
+    ['ui_autoSaveInterval', '30'],
+    ['win_startMaximized',  'true'],
+    ['win_rememberPosition','false'],
   ];
   for (const [key, value] of settings) {
     db.run('INSERT INTO app_settings (key, value) VALUES (?,?)', [key, value]);
   }
-  console.log('✓ App settings seeded (Arctic theme, Normal scale, 12h time)');
+  console.log(`✓ App settings seeded under real keys (theme=${SEED_THEME}, scale=normal, 12h)`);
 
   // ── Persist DB ─────────────────────────────────────────────────────────────
-  const dbData = db.export();
-  fs.writeFileSync(DB_FILE, Buffer.from(dbData));
+  fs.writeFileSync(DB_FILE, Buffer.from(db.export()));
   console.log(`✓ Database written → ${DB_FILE}`);
 
   // ── Profile manifest ────────────────────────────────────────────────────────
@@ -415,158 +403,223 @@ async function seed() {
   console.log(`✓ Profile manifest written → ${path.join(DATA_DIR, 'profile-manifest.json')}`);
 
   // ═══════════════════════════════════════════════════════════════════════════
-  //  CREDENTIALS
+  //  SELF-CHECK — automated PASS/FAIL on the data just written
   // ═══════════════════════════════════════════════════════════════════════════
-  console.log('\n╔══════════════════════════════════════════════╗');
-  console.log('║           DEV LOGIN CREDENTIALS             ║');
-  console.log('╠══════════════════════════════════════════════╣');
-  console.log('║  Username : devuser                         ║');
-  console.log('║  Password : devpass123                      ║');
-  console.log('║  TOTP     : (leave blank — bypassed)        ║');
-  console.log('║  Recovery : SEED-ABCD-1234-EFGH             ║');
-  console.log('╚══════════════════════════════════════════════╝');
+  const one = (sql) => Number(db.exec(sql)[0].values[0][0]);
+  const checks = [];
+  const expect = (name, expected, actual) =>
+    checks.push({ name, expected, actual, pass: String(expected) === String(actual) });
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  //  MANUAL VERIFICATION CHECKLIST
-  // ═══════════════════════════════════════════════════════════════════════════
+  expect('users.count',                 1, one('SELECT COUNT(*) FROM users'));
+  expect('user.dev_mode',               1, one('SELECT dev_mode FROM users'));
+  expect('companies.count',             2, one('SELECT COUNT(*) FROM companies'));
+  expect('time_entries.count',          6, one('SELECT COUNT(*) FROM time_entries'));
+  expect('task_items.count',            6, one('SELECT COUNT(*) FROM task_items'));
+  expect('task_items.break',            2, one("SELECT COUNT(*) FROM task_items WHERE item_type='break'"));
+  expect('task_items.lunch',            1, one("SELECT COUNT(*) FROM task_items WHERE item_type='lunch'"));
+  expect('app_settings.count', settings.length, one('SELECT COUNT(*) FROM app_settings'));
+  expect('ui_theme.present',            1, one("SELECT COUNT(*) FROM app_settings WHERE key='ui_theme'"));
+  expect('ui_theme.valid', true, VALID_THEMES.includes(
+    db.exec("SELECT value FROM app_settings WHERE key='ui_theme'")[0].values[0][0]));
+  expect('no_bare_setting_keys', 0, one(
+    "SELECT COUNT(*) FROM app_settings WHERE key NOT LIKE 'ui\\_%' ESCAPE '\\' AND key NOT LIKE 'win\\_%' ESCAPE '\\'"));
+  // Encryption round-trips with the derived session key
+  let decOk = false;
+  try {
+    const r = db.exec('SELECT data_enc,data_iv,data_tag FROM companies LIMIT 1')[0].values[0];
+    decOk = JSON.parse(decrypt(r[0], r[1], r[2], sessionKey)).name === 'Zenith Analytics';
+  } catch {}
+  expect('company.decrypt_roundtrip', true, decOk);
+  // Replicate the audit detector to assert the expected count BEFORE the app runs
+  const expectedDiscrepancies = computeExpectedDiscrepancies(db, userId, sessionKey, profileData.work_state);
+  expect('audit.discrepancies', 6, expectedDiscrepancies);
+
+  const failed = checks.filter(c => !c.pass);
+  console.log('\n┌─ SELF-CHECK (data tier) ───────────────────────────────────┐');
+  for (const c of checks) {
+    const tag = c.pass ? 'PASS' : 'FAIL';
+    console.log(`│ [${tag}] ${c.name.padEnd(26)} expected=${String(c.expected).padEnd(6)} got=${c.actual}`);
+  }
+  console.log('└────────────────────────────────────────────────────────────┘');
+  if (failed.length) {
+    console.log(`\n✗ SELF-CHECK FAILED — ${failed.length} bug(s) in the seed data:`);
+    for (const c of failed) console.log(`   • ${c.name}: expected ${c.expected}, got ${c.actual}`);
+    process.exitCode = 1;
+  } else {
+    console.log('\n✓ SELF-CHECK PASSED — all data-tier variables green.');
+  }
+
+  printPacket();
+}
+
+// Mirror of countAuditDiscrepancies() in main.js — kept here ONLY to assert the
+// seed's expected count at seed time. If main.js's detection changes, update both.
+function computeExpectedDiscrepancies(db, userId, sessionKey, workState) {
+  const BREAK = { default: [[210, 0], [360, 1], [600, 2], [Infinity, 3]] };
+  const LUNCH = 300;
+  const reqBreaks = (m) => { for (const [t, c] of BREAK.default) if (m < t) return c; return 0; };
+  const rows = db.exec('SELECT rowid, rows_enc, rows_iv, rows_tag, total_mins FROM time_entries WHERE user_id=' + userId);
+  if (!rows.length) return 0;
+  let count = 0;
+  for (const v of rows[0].values) {
+    const [rid, enc, iv, tag, total] = v;
+    let parsed = [];
+    try { parsed = JSON.parse(decrypt(enc, iv, tag, sessionKey)); } catch {}
+    parsed.forEach((r) => {
+      if (!r.clock_in && !r.clock_out && !r.label && !r.name) return;
+      if (!r.clock_in) count++;
+      else if (!r.clock_out) count++;
+      else if (!r.total_mins) count++;
+      else if (r.total_mins > 720) count++;
+    });
+    const tm = Number(total || 0);
+    const rb = reqBreaks(tm);
+    if (rb > 0) {
+      const bc = Number(db.exec(`SELECT COUNT(*) FROM task_items WHERE entry_id=${rid} AND item_type='break'`)[0].values[0][0]);
+      if (bc < rb) count++;
+    }
+    if (tm > LUNCH) {
+      const hl = Number(db.exec(`SELECT COUNT(*) FROM task_items WHERE entry_id=${rid} AND item_type='lunch'`)[0].values[0][0]);
+      if (!hl) count++;
+    }
+  }
+  return count;
+}
+
+function printPacket() {
   console.log(`
+╔══════════════════════════════════════════════╗
+║           DEV LOGIN CREDENTIALS              ║
+╠══════════════════════════════════════════════╣
+║  Username : devuser                          ║
+║  Password : devpass123                       ║
+║  TOTP     : (leave blank — bypassed in dev)  ║
+║  Recovery : SEED-ABCD-1234-EFGH              ║
+╚══════════════════════════════════════════════╝
+
 ╔══════════════════════════════════════════════════════════════════╗
-║             MANUAL VERIFICATION CHECKLIST                       ║
-║             Run \`npm start\` then work through these.           ║
+║   VERIFICATION PACKET — work top-to-bottom (order of operations)  ║
+║   Run \`npm run dev\`. Mark each line PASS or FAIL.                ║
+║                                                                    ║
+║   Tier A = AUTOMATED  (state/data; also asserted by run-app)       ║
+║   Tier B = MANUAL     (visual/interaction; confirm by eye)         ║
 ╚══════════════════════════════════════════════════════════════════╝
 
-── 1. LOGIN ──────────────────────────────────────────────────────
-  [ ] Login screen loads with animated background grid
-  [ ] Enter devuser / devpass123 — TOTP field can be left blank
-  [ ] Lands on Dashboard (not login loop)
+── 1. LAUNCH & LOGIN ─────────────────────────────────────────────
+  A  splash.theme_aware ........ splash shows branded icon/wordmark/progress
+  B  login.background ......... animated cell grid + hover glow render
+  A  login.auth ............... devuser / devpass123, TOTP blank → Dashboard
+  B  login.view_password ...... eye icon toggles password visibility
 
 ── 2. DASHBOARD ──────────────────────────────────────────────────
-  [ ] Stat chips show data (total time, companies, sessions)
-  [ ] Mini spiderweb renders 2 company nodes
-  [ ] Recent activity list shows today's entry
-  [ ] Quick actions respond to clicks
+  A  dash.stat_chips .......... total time / companies(2) / sessions populated
+  B  dash.mini_spiderweb ...... 2 company nodes render, theme-aware colors
+  A  dash.recent_activity ..... today's Zenith entry listed
+  B  dash.quick_actions ....... buttons navigate correctly
 
-── 3. COMPANIES PAGE ─────────────────────────────────────────────
-  [ ] Both companies appear: Zenith Analytics + Apex Digital
-  [ ] Full spiderweb renders with 2 nodes; click a node selects it
-  [ ] Open each company — verify ALL fields are populated:
-        Name, Job Title, Work Type, Location, Pay Rate, Dates,
+── 3. COMPANIES ──────────────────────────────────────────────────
+  A  comp.count ............... Zenith Analytics + Apex Digital both present
+  B  comp.spiderweb ........... full force-graph, click a node selects it
+  A  comp.fields_zenith ....... open Zenith → ALL fields populated:
+        Name, Job Title, Work Type, Location, Pay Rate, Start/End,
         Hierarchy (Company/Project/Platform), Nav ID,
         Login, Email, URL, Supervisors, Notes
-  [ ] Edit a field → Save → reopen to confirm persistence
-  [ ] Add a 3rd company, fill minimum fields, save, delete it
+  A  comp.persist ............. edit a field → Save → reopen shows the change
+  A  comp.crud ............... add a 3rd company, save, then delete it
 
-── 4. TRACKER ────────────────────────────────────────────────────
-  [ ] Select Zenith Analytics from company dropdown
-  [ ] Clock In button → timestamp appears in clock_in column
-  [ ] Add a label/task name to a row
-  [ ] Clock Out → duration calculates correctly
-  [ ] Add a Break row and a Lunch row
-  [ ] Inline edit: double-click a clock_in time → change it → Tab out
-        Duration should recalculate automatically
-  [ ] Verify 5-row minimum is maintained
-  [ ] Verify table auto-grows when last row is used
-  [ ] Session time summary footer updates (total + per-label chips)
-  [ ] Save Session button → no duplicate entries in Global Log
+── 4. TIME TRACKER ───────────────────────────────────────────────
+  A  trk.company_select ....... pick Zenith; today's entry loads its rows
+  A  trk.clock_in_guard ....... Clock In blocked without Task Label + Name
+  A  trk.clock_in_out ......... clock in → out → duration computes
+  A  trk.manual_entry ......... "+ Manual Entry" adds an editable backfill row
+  A  trk.break_lunch .......... Break / Lunch controls add task_items
+  B  trk.inline_edit .......... double-click a clock time → edit → recalcs
+  B  trk.row_min_grow ......... 5-row floor kept; table auto-grows on last row
+  B  trk.summary_footer ....... total + per-label chips update
+  A  trk.no_dupe_save ......... Save Session → no duplicate rows in Global Log
 
 ── 5. DISPATCH (Task Timer) ──────────────────────────────────────
-  [ ] Navigate to Dispatch page
-  [ ] Pre-seeded tasks visible (3 completed, 1 in-progress)
-  [ ] Start a new task → timer ticks in sidebar
-  [ ] Stop task → duration recorded
-  [ ] Break / Lunch compliance timers appear correctly
-  [ ] Tracker footer preview shows Dispatch data
+  A  disp.seeded_tasks ........ 2 completed + 1 in-progress task visible
+  B  disp.sidebar_timer ....... start a task → sidebar timer ticks
+  A  disp.stop_records ........ stop task → duration recorded
+  A  disp.task_name_link ...... "Log a Task" picks from active session names
 
 ── 6. GLOBAL LOG ─────────────────────────────────────────────────
-  [ ] All 6 seeded entries appear across the log
-  [ ] Filter by Company — Zenith shows 3 entries, Apex shows 3
-  [ ] Filter by date range — narrow to last 7 days
-  [ ] Expand a session row → per-task detail rows visible
-  [ ] CSV Export — file downloads, opens cleanly in Excel
-  [ ] PDF Export — modal/print preview opens; NavID NOT visible
-        (check both company A and company B PDFs)
+  A  log.all_entries .......... all 6 seeded entries appear
+  A  log.filter_company ....... Zenith → 3 entries, Apex → 3 entries
+  A  log.filter_dates ......... narrow to last 7 days filters correctly
+  B  log.expand_detail ........ expand a session → per-row clock detail
+  A  log.open_correct_date .... "Open" loads the session's logged date
+  A  log.csv_export ........... CSV downloads, opens cleanly
+  B  log.pdf_export ........... PDF preview opens; Nav ID NOT shown (both cos.)
 
-── 7. AUDIT ──────────────────────────────────────────────────────
-  [ ] Navigate to Audit page
-  [ ] Entry from 3 days ago (Discrepancy Test Session) shows issues:
-        › Row 1: Missing clock-out flagged
-        › Row 2/3: Overlapping times flagged
-        › Row 4: Duration mismatch flagged
-  [ ] Dismiss a discrepancy → count decreases in toolbar
-  [ ] Apply Fix on a discrepancy → row updates in tracker
-  [ ] Suggest Fix wizard steps through each issue
-  [ ] Acknowledge button marks issue resolved
-  [ ] Dismissed items hidden by default; Show Dismissed reveals them
-  [ ] Clear All Dismissed removes them from the dismissed list
+── 7. REPORTS & AUDIT ────────────────────────────────────────────
+  A  aud.discrepancy_count .... EXACTLY 6 issues, all on the 3-days-ago session:
+        no_clock_in, no_clock_out, zero_duration, over_12h,
+        missing_break, missing_lunch
+  A  aud.clean_sessions ....... the other 5 sessions show NO discrepancies
+  A  aud.dismiss .............. Dismiss an issue → toolbar count drops to 5
+  A  aud.apply_fix ........... Apply Fix on no_clock_out updates the row
+  B  aud.wizard .............. Suggest/Acknowledge wizard steps each issue
+  A  aud.email_me ............ "Email Me" marks acknowledged (needs SMTP cfg)
+  B  rep.smtp_config ......... Reports tab: SMTP config + Send Now + schedule
 
-── 8. SETTINGS ───────────────────────────────────────────────────
-  Open Settings via sidebar button OR Ctrl+,
-
+── 8. SETTINGS  (sidebar gear or Ctrl+,) ─────────────────────────
   APPEARANCE:
-  [ ] Arctic (default) — verify cool blue/navy look ← START HERE
-  [ ] Slate — professional blue-grey
-  [ ] Void — teal on black, glow effects visible
-  [ ] Paper — light mode, soft blue-grey (card should be visible, not blended)
-  [ ] Quartz — light mode, near-black charcoal, stark/legal feel
-  [ ] Return to Arctic before continuing
-
-  SCALE:
-  [ ] Compact — UI shrinks, sidebar stays visible and clickable
-  [ ] Normal — default proportions
-  [ ] Comfortable — slightly larger
-  [ ] Large — enlarged; sidebar MUST still be fully accessible
-  [ ] Return to Normal
-
-  TIME & DISPLAY:
-  [ ] Toggle 12h/24h — timestamps in tracker update display format
-  [ ] Auto-lock: set to 1 min → wait → verify lock fires → set back to Off
-
+  A  set.theme_default ....... opens on Zanarkand (seeded ui_theme)
+  B  set.themes_all .......... Memoria, Zanarkand, Rabanastre, Treno,
+        Nibelheim, Lindblum each apply live (6 themes)
+  B  set.clock_format ........ 12h/24h toggle (under Appearance) updates times
+  A  set.scale ............... Compact/Normal/Comfortable/Large; sidebar stays
+        clickable at Large (scoped to #main-content)
   ACCESSIBILITY:
-  [ ] Reduced Motion — toggle; animations should cease/resume
-  [ ] High Contrast — toggle; verify contrast increases
-  [ ] Colorblind Safe — toggle on/off
-
-  DATA:
-  [ ] Backup Library — list loads; expand an accordion preview
-  [ ] Time Clock Clear — type CONFIRM → clears → verify tracker is empty
-      (re-run seed after this if you want data back)
-
+  B  set.reduced_motion ...... animations cease/resume
+  B  set.high_contrast ....... contrast increases
+  B  set.colorblind .......... mode toggles
   WINDOW:
-  [ ] Preferred Display picker shows your monitor(s)
-  [ ] Start Maximized toggle
-
+  A  set.preferred_display ... monitor picker lists your display(s)
+  B  set.start_maximized ..... toggle persists
+  A  set.launch_at_startup ... toggle on → reflects ON after reopen (OS item)
+  A  set.close_to_tray ....... toggle on → closing hides to tray, session alive
+  DATA:
+  B  set.backup_library ...... list loads; expand an accordion preview
+  A  set.db_clear ............ Time Clock Clear (type CONFIRM) empties tracker
+  SECURITY:
+  B  set.auto_lock .......... set 1 min → idle → returns to login; data intact
   ABOUT:
-  [ ] Version, Electron, Node, Platform all populated
-  [ ] Check for Updates button → shows result (error is OK if not on GitHub)
-  [ ] Credits and changelog visible
+  A  set.about_info ......... Version / Electron / Node / Platform populated
+  B  set.check_updates ...... button returns a result (error OK if offline)
 
-── 9. USER PROFILE ───────────────────────────────────────────────
-  [ ] Click avatar/initials in sidebar → Profile page opens
-  [ ] Pre-seeded fields visible: Dev Tester, dev@conqueredtime.app,
-        555-0100, QA Engineer, descriptor text
-  [ ] Edit display name → save → sidebar avatar/name updates live
-  [ ] Upload an avatar image → appears in sidebar
-  [ ] Password change: enter devpass123 as current → set new → log out
-        → log back in with new password (then reseed to reset)
+── 9. SYSTEM TRAY ────────────────────────────────────────────────
+  B  tray.icon .............. tray icon present with tooltip
+  A  tray.menu .............. Open / Lock Session / Backup Now / Quit work
+  A  tray.restore ........... click / double-click restores the window
 
-── 10. SESSION AUTO-LOCK ────────────────────────────────────────
-  [ ] Settings → Time & Display → Auto-lock: set to 1 min
-  [ ] Leave app idle for 60 seconds
-  [ ] App returns to login screen automatically
-  [ ] Login again → session data still intact
-
-── 11. SPLASH SCREEN ────────────────────────────────────────────
-  [ ] Close and relaunch app (npm start)
-  [ ] Splash screen appears: icon, wordmark, tagline, progress bar
-  [ ] Theme-aware: change theme, relaunch → splash should match
-
-── 12. EASTER EGGS (optional) ───────────────────────────────────
-  [ ] On login screen: press Ctrl+Shift+D → debug overlay labels cells
-  [ ] Click the 3-cell E sequence → ASCII hourglass appears, fades
-  [ ] Dev backdoor: click 5-cell D sequence → styled backdoor screen
+── 10. USER PROFILE ──────────────────────────────────────────────
+  A  prof.fields ............ Dev Tester, dev@conqueredtime.app, 555-0100,
+        QA Engineer, Work State = TX
+  A  prof.avatar ............ seeded animated avatar shows in sidebar
+  A  prof.edit_name ......... change display name → sidebar updates live
+  A  prof.password_change ... current devpass123 → new → re-login works
+        (then \`npm run seed\` to reset)
 
 ══════════════════════════════════════════════════════════════════
-  ⚡ Run \`npm run seed\` at any time to reset to this full state.
+  RESULTS — fill in after the walkthrough
+══════════════════════════════════════════════════════════════════
+  • If EVERYTHING passed → report:  "ALL PASS"  then list every variable
+    above (1.A … 10.prof.password_change) with PASS.
+  • If ANY check failed → report a BUGS list, one per failure:
+        BUG <id>  <variable>
+          page/area : <where>
+          expected  : <what the packet says>
+          actual    : <what happened>
+          severity  : blocker | major | minor
+          repro     : <steps>
+  • Tier A items are also machine-checkable — run the run-app driver to
+    confirm counts/state without clicking.
+
+══════════════════════════════════════════════════════════════════
+  ⚡ \`npm run seed\` resets to this exact state (expected audit count = 6).
 ══════════════════════════════════════════════════════════════════
 `);
 }
