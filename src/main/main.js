@@ -789,6 +789,10 @@ ipcMain.handle('auth:safe-login', async () => {
     persistDB();
     resetIdleTimer();
     migrateTimeEntries();
+    // Catch up any scheduled report missed while the app was closed (session is
+    // now available). Mirrors auth:login — without this, Quick Unlock / Windows
+    // Hello sign-ins never run the on-launch schedule check.
+    setTimeout(runScheduledEmailCheck, 5000);
     return { ok: true, needsEmail: profileEmailMissing() };
   } catch (e) { return { ok: false, error: 'Secure sign-in failed — use password login.' }; }
 });
@@ -820,6 +824,10 @@ ipcMain.handle('auth:quick-unlock', async (_, { password }) => {
     persistDB();
     resetIdleTimer();
     migrateTimeEntries();
+    // Catch up any scheduled report missed while the app was closed (session is
+    // now available). Mirrors auth:login — without this, Quick Unlock / Windows
+    // Hello sign-ins never run the on-launch schedule check.
+    setTimeout(runScheduledEmailCheck, 5000);
     return { ok: true, needsEmail: profileEmailMissing() };
   } catch (e) { return { ok: false, error: e.message }; }
 });
@@ -1683,10 +1691,11 @@ app.on('web-contents-created', (_e, wc) => {
 });
 
 app.whenReady().then(async () => {
-  // Schedule email check fires every 5 minutes (catches sub-hour scheduling windows)
-  setInterval(() => runScheduledEmailCheck().then(() => {
-    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('toast', 'Scheduled report sent!', 'success');
-  }).catch(e => {
+  // Schedule email check fires every 5 minutes (catches sub-hour scheduling windows).
+  // runScheduledEmailCheck() emits its own success toast only when it actually
+  // sends, and re-throws on failure — so here we only surface errors. (Previously
+  // this fired a false "sent!" toast on every tick whether or not anything sent.)
+  setInterval(() => runScheduledEmailCheck().catch(e => {
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('toast', `Scheduled report failed: ${e.message}`, 'error', 8000);
   }), 5 * 60 * 1000);
 
