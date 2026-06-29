@@ -256,6 +256,8 @@ let lockoutInterval = null;
 // ── Profile selector state ──────────────────────────────
 let selectedProfile = null;   // { username, display_name, avatar_thumb_48 }
 let profileMode     = false;  // true when profile selector is active (not dev/legacy)
+let safeCheckPending = false; // true while auth:safe-check is resolving after a profile is picked
+                              // — suppresses the global Enter→doLogin (empty password) flash
 
 function avatarInitials(name) {
   return (name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
@@ -338,6 +340,7 @@ async function showLoginCard(profile) {
   // Check for safeStorage fast-path enrollment
   hideSafeLoginUI();
   if (profile) {
+    safeCheckPending = true;
     try {
       const safe = await api.invoke('auth:safe-check');
       if (safe.available && safe.enrolled) {
@@ -346,6 +349,7 @@ async function showLoginCard(profile) {
         return;
       }
     } catch {}
+    finally { safeCheckPending = false; }
   }
   document.getElementById('login-password').focus();
 }
@@ -528,7 +532,7 @@ window.addEventListener('DOMContentLoaded', async () => {
         // global handler also fire doLogin() against the empty full-login fields
         const safeSection = document.getElementById('safe-login-section');
         const safeVisible = safeSection && safeSection.style.display !== 'none';
-        if (!safeVisible) doLogin();
+        if (!safeVisible && !safeCheckPending) doLogin();
       }
       // Skip global doSetup() if focus is on a field that has its own Enter handler
       if (currentMode === 'setup') {
@@ -637,6 +641,9 @@ async function doSetup() {
 }
 
 async function doLogin() {
+  // Ignore stray triggers while the post-selection safe-check is still resolving
+  // (the password field is empty at that point — would flash a spurious error).
+  if (safeCheckPending) return;
   // If a profile is pre-selected, use that username; otherwise read the field
   const u  = selectedProfile ? selectedProfile.username : document.getElementById('login-username').value.trim();
   const p  = document.getElementById('login-password').value;
@@ -730,7 +737,17 @@ function updateLockoutTimer() {
 
 function showErr(el, msg) { el.textContent = msg; el.style.display = 'block'; }
 
-function postLoginNavigate(res) {
+async function postLoginNavigate(res) {
+  // Seed the user's actual theme/scale into sessionStorage BEFORE navigating, so
+  // the first inner page's theme-init.js paints the correct palette immediately.
+  // Without this, the first page falls back to the default theme (Memoria) for a
+  // split second until Shell.init() loads settings from the vault.
+  try {
+    const theme = await api.invoke('settings:get', 'ui_theme');
+    const scale = await api.invoke('settings:get', 'ui_scale');
+    if (theme) sessionStorage.setItem('ct_theme', theme);
+    if (scale) sessionStorage.setItem('ct_scale', scale);
+  } catch {}
   if (res.needsEmail) {
     sessionStorage.setItem('require_email', '1');
     api.send('navigate', 'profile');
