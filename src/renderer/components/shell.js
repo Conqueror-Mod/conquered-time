@@ -205,6 +205,28 @@ const Shell = (() => {
                   <button class="toggle-switch" id="toggle-remember-position" data-action="applyWinToggle" data-arg="win_rememberPosition"></button>
                 </div>
               </div>
+
+              <div class="settings-group">
+                <div class="settings-group-title">Launch at Startup</div>
+                <div class="toggle-row">
+                  <div class="toggle-info">
+                    <div class="toggle-label">Start with Windows</div>
+                    <div class="toggle-desc">Automatically opens Conquered Time when you sign in to Windows</div>
+                  </div>
+                  <button class="toggle-switch" id="toggle-launch-startup" data-action="applyLaunchStartup"></button>
+                </div>
+              </div>
+
+              <div class="settings-group">
+                <div class="settings-group-title">Close to Tray</div>
+                <div class="toggle-row">
+                  <div class="toggle-info">
+                    <div class="toggle-label">Minimize to tray on close</div>
+                    <div class="toggle-desc">Closing the window hides it to the system tray and keeps your session running, instead of quitting</div>
+                  </div>
+                  <button class="toggle-switch" id="toggle-close-tray" data-action="applyWinToggle" data-arg="win_closeToTray"></button>
+                </div>
+              </div>
             </div><!-- /settings-cat-window -->
 
             <!-- ── DATA ─────────────────────────────────────── -->
@@ -1225,11 +1247,13 @@ async function saveScheduleConfig() {
 async function loadDisplayPicker() {
   const area = document.getElementById('display-picker');
   if (!area) return;
-  const [displays, savedDisp, savedMax, savedRemember] = await Promise.all([
+  const [displays, savedDisp, savedMax, savedRemember, savedLaunch, savedCloseTray] = await Promise.all([
     api.invoke('win:get-displays'),
     api.invoke('settings:get', 'win_preferredDisplay'),
     api.invoke('settings:get', 'win_startMaximized'),
     api.invoke('settings:get', 'win_rememberPosition'),
+    api.invoke('settings:get', 'win_launchAtStartup'),
+    api.invoke('settings:get', 'win_closeToTray'),
   ]);
   const saved = savedDisp || 'primary';
   const btns = [
@@ -1244,6 +1268,10 @@ async function loadDisplayPicker() {
   const trp = document.getElementById('toggle-remember-position');
   if (tsm) tsm.classList.toggle('on', savedMax !== 'false'); // default on
   if (trp) trp.classList.toggle('on', savedRemember === 'true');
+  const tls = document.getElementById('toggle-launch-startup');
+  const tct = document.getElementById('toggle-close-tray');
+  if (tls) tls.classList.toggle('on', savedLaunch === 'true');
+  if (tct) tct.classList.toggle('on', savedCloseTray === 'true');
 }
 
 async function applyPreferredDisplay(displayId) {
@@ -1255,6 +1283,13 @@ async function applyPreferredDisplay(displayId) {
 async function applyWinToggle(key, btn) {
   const newVal = !btn.classList.contains('on');
   await api.invoke('settings:set', { key, value: String(newVal) });
+  btn.classList.toggle('on', newVal);
+}
+
+async function applyLaunchStartup(btn) {
+  const newVal = !btn.classList.contains('on');
+  await api.invoke('settings:set', { key: 'win_launchAtStartup', value: String(newVal) });
+  await api.invoke('win:set-launch-at-startup', newVal);
   btn.classList.toggle('on', newVal);
 }
 
@@ -1477,6 +1512,7 @@ function installShellDelegation() {
     applyColorblind:       a       => applyColorblind(a),
     applyToggle:           (a, el) => applyToggle(a, el),
     applyWinToggle:        (a, el) => applyWinToggle(a, el),
+    applyLaunchStartup:    (a, el) => applyLaunchStartup(el),
     applyPreferredDisplay: a       => applyPreferredDisplay(a),
     showDbaConfirm:        a       => showDbaConfirm(a),
     hideDbaConfirm:        a       => hideDbaConfirm(a),
