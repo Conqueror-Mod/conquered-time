@@ -15,11 +15,12 @@ A secure, locally-encrypted desktop time tracker built for remote professionals 
 - **Multi-user profile selector** — isolated per-user vaults; avatar cards on login screen; auto-migration from legacy single-vault layout
 - **Splash screen** — branded startup screen, theme-aware
 - **Company spiderweb** — force-graph visualization of your client network with inline detail pane
-- **Dynamic time tracker** — clock in/out with task labels and per-company sessions, auto-grows as needed
+- **Dynamic time tracker** — two-module control panel: a Session Clock (Clock In/Out + Break/Lunch) beside task inputs (label, name, description); the entry table auto-grows as needed
 - **Inline editing** — double-click any field to edit; duration recalculates automatically
+- **Manual Entry** — backfill a session you forgot to clock live by adding an editable row and typing the times directly
 - **User Profile** — avatar upload with manual crop modal (drag-to-pan, zoom, circular preview); animated formats (GIF, APNG, WebP) preserved
-- **Dispatch (Task Timer)** — dedicated task timing module with break/lunch compliance, sidebar live timer, description writeback to tracker
-- **Break/lunch compliance** — US state-specific policy (California, New York, federal default); compliance checked in Dispatch and Audit
+- **Dispatch (Task Timer)** — dedicated task timing/counting module with sidebar live timer and description writeback to the tracker; the task list draws from the active session's task names
+- **Break & Lunch punches** — Start/End break and lunch from the Time Tracker's Session Clock module, with inline US-state compliance status (California, New York, federal default); also surfaced in Reports/Audit
 - **Global log** — filterable history across all companies with expandable session detail
 - **Reports & Audit** — period summary, company breakdown, audit log with per-row dismiss/fix/suggest; dismissed items persisted; US state policy named in suggestion text
 - **PDF & CSV export** — clean timesheet format; work type, location, supervisors in header; per-label subtotals; Export All includes summary section; NavID excluded from all exports
@@ -28,7 +29,7 @@ A secure, locally-encrypted desktop time tracker built for remote professionals 
 - **Backup Library** — browse, preview, and restore from any saved backup in Settings; current data safety-saved before any restore
 - **Session auto-lock** — configurable idle timeout (Off / 5 / 15 / 30 / 60 min)
 - **5 themes** — Zanarkand (default), Memoria, Rabanastre, Treno, Nibelheim
-- **Steam-style Settings** — split-panel layout with left category nav (Appearance, Time & Display, Window, Security, Data, Reports, Accessibility, About)
+- **Steam-style Settings** — split-panel layout with left category nav (Appearance, Window, Security, Data, Reports, Accessibility, About)
 - **Manual DB clear** — three-level wipe (Time Clock, Companies, Full) with typed CONFIRM confirmation
 - **Keyboard navigation** — Ctrl+1–5 to switch modules, Ctrl+, for Settings, full modal tab-trapping
 - **Electron security** — contextIsolation enabled, nodeIntegration disabled, sandboxed renderers, whitelisted IPC channels, strict Content-Security-Policy (`script-src 'self'` on every page — no inline scripts or event handlers)
@@ -224,6 +225,13 @@ Login: password + TOTP code
 - Auto-backup on every save and on close; restore via Settings → Data → Backup Library
 - Session auto-lock on configurable idle timeout
 - Strict Content-Security-Policy on every page: `script-src 'self'` with no inline scripts or `on*` event handlers (all logic in external `.js`, all handlers via delegated dispatchers) — defense-in-depth against script injection, on top of `escapeHtml()` output sanitization
+
+---
+
+## Known console messages
+
+- **`network_service_instance_impl.cc(...) Network service crashed, restarting service`** at startup is a benign Chromium-internal message (the network utility process restarts itself). It is not an app error, recovers automatically, and does not affect functionality. Safe to ignore.
+- The app loads its fonts (DM Sans, JetBrains Mono; Inter for PDF export) from Google Fonts at runtime — the only outbound network request. Offline, the UI falls back to system fonts. (Bundling fonts locally is a tracked future improvement.)
 
 ---
 

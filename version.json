@@ -1,5 +1,5 @@
 {
-  "version": "3.6.0",
+  "version": "3.7.0",
   "downloadUrl": "https://github.com/Conqueror-Mod/conquered-time/releases/latest",
-  "notes": "v3.6 — CSP hardening (script-src 'self' on every page; no inline scripts or handlers), faster navigation via a main-process read cache that reuses decrypted data across pages, and a Playwright-based run-app skill for live UI verification."
+  "notes": "v3.7 — Time Tracker redesign: a two-module control panel (Session Clock + task inputs), Break & Lunch moved into the tracker, and Manual Entry for backfilling forgotten sessions. Clock format moved into Appearance. Dispatch's task list now reflects your session's task names. Fixed a double-counting session timer."
 }
