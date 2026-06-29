@@ -28,7 +28,7 @@ A secure, locally-encrypted desktop time tracker built for remote professionals 
 - **Auto-save & backup** — configurable autosave interval; dated `.db` backups on every save (last 30 kept)
 - **Backup Library** — browse, preview, and restore from any saved backup in Settings; current data safety-saved before any restore
 - **Session auto-lock** — configurable idle timeout (Off / 5 / 15 / 30 / 60 min)
-- **5 themes** — Zanarkand (default), Memoria, Rabanastre, Treno, Nibelheim
+- **5 themes** — Final Fantasy city palettes: Memoria (default, light), Zanarkand (dark), Rabanastre (light), Treno (dark), Nibelheim (dark). The startup splash always uses Zanarkand as a brand moment regardless of the selected theme.
 - **Steam-style Settings** — split-panel layout with left category nav (Appearance, Window, Security, Data, Reports, Accessibility, About)
 - **Manual DB clear** — three-level wipe (Time Clock, Companies, Full) with typed CONFIRM confirmation
 - **Keyboard navigation** — Ctrl+1–5 to switch modules, Ctrl+, for Settings, full modal tab-trapping
@@ -89,7 +89,7 @@ conquered-time/
 │       │   └── settings.js       # Theme, scale, accessibility, time format, auto-lock engine
 │       └── styles/
 │           ├── design-system.css # Entry point — imports all partials
-│           ├── themes.css        # 5 theme token sets (imports fonts-local.css)
+│           ├── themes.css        # 5 FF city theme token sets (imports fonts-local.css)
 │           ├── fonts-local.css   # @font-face for bundled DM Sans + JetBrains Mono
 │           ├── fonts/            # Bundled .woff2 files (no remote fetch)
 │           ├── base.css          # Scale, accessibility, reset
