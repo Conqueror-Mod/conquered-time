@@ -30,9 +30,8 @@ window.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('company-select').addEventListener('change', onCompanyChange);
   document.getElementById('btn-clock-in').addEventListener('click', clockIn);
   document.getElementById('btn-clock-out').addEventListener('click', clockOut);
-  document.getElementById('btn-add-row').addEventListener('click', addRowManually);
+  document.getElementById('btn-manual-entry').addEventListener('click', addManualRow);
   document.getElementById('btn-clear-row').addEventListener('click', clearSelectedRow);
-  document.getElementById('btn-save').addEventListener('click', () => saveSession());
   document.getElementById('btn-clear-all').addEventListener('click', () => clearAll());
   document.getElementById('btn-save-session').addEventListener('click', () => saveSession());
   document.getElementById('btn-export-pdf').addEventListener('click', exportPDF);
@@ -217,8 +216,8 @@ async function togglePunch(type) {
 function updateBreakButtons() {
   const b = document.getElementById('btn-break');
   const l = document.getElementById('btn-lunch');
-  if (b) { b.textContent = activeBreakId ? '✓ End Break' : '☕ Start Break'; b.classList.toggle('bl-active', !!activeBreakId); }
-  if (l) { l.textContent = activeLunchId ? '✓ End Lunch' : 'Start Lunch';   l.classList.toggle('bl-active', !!activeLunchId); }
+  if (b) { b.textContent = activeBreakId ? '✓ End Break' : '☕ Break'; b.classList.toggle('bl-active', !!activeBreakId); }
+  if (l) { l.textContent = activeLunchId ? '✓ End Lunch' : '🍽 Lunch';  l.classList.toggle('bl-active', !!activeLunchId); }
 }
 
 // Returns 'ok' | 'warn' | 'over' for break/lunch relative to the US-state policy.
@@ -282,7 +281,9 @@ function renderComplianceFor(type) {
 
 // ── Row data helpers ──
 function emptyRow() { return { label:'', name:'', desc:'', clock_in:'', clock_out:'', total_mins:0 }; }
-function isRowFilled(r) { return !!(r.label || r.name || r.desc || r.clock_in || r.total_mins > 0); }
+// _manual rows are backfill entries: editable + retained even before any field is
+// filled, so the user can type in a session they forgot to clock live.
+function isRowFilled(r) { return !!(r._manual || r.label || r.name || r.desc || r.clock_in || r.total_mins > 0); }
 
 // Ensure: minimum MIN_ROWS rows, exactly one trailing empty "buffer" row, no runs of unused empty rows
 function normalizeRows() {
@@ -314,8 +315,8 @@ function renderTable() {
 function rowHTML(r, idx) {
   const filled = isRowFilled(r);
   const editableText = filled ? 'editable' : '';
-  const editableIn    = r.clock_in  ? 'editable' : '';
-  const editableOut   = r.clock_out ? 'editable' : '';
+  const editableIn    = (r.clock_in  || r._manual) ? 'editable' : '';
+  const editableOut   = (r.clock_out || r._manual) ? 'editable' : '';
   const dotClass = (r.clock_in && !r.clock_out) ? 'status-dot active' : (filled ? 'status-dot done' : 'status-dot');
   const activeCls = selectedIndex === idx ? 'row-active' : '';
   return `<tr data-idx="${idx}" class="${activeCls}">
@@ -333,7 +334,8 @@ function rowHTML(r, idx) {
 function restoreRows(rows) {
   rowsData = (rows||[]).map(r => ({
     label: r.label||'', name: r.name||'', desc: r.desc||'',
-    clock_in: r.clock_in||'', clock_out: r.clock_out||'', total_mins: r.total_mins||0
+    clock_in: r.clock_in||'', clock_out: r.clock_out||'', total_mins: r.total_mins||0,
+    _manual: !!r._manual
   }));
   normalizeRows();
   selectedIndex = null;
@@ -409,10 +411,20 @@ function clockOut() {
   autoSave();
 }
 
-function addRowManually() {
-  rowsData.push(emptyRow());
+// Backfill a session that wasn't clocked live: add an editable row and open the
+// label cell for immediate entry. The row persists (isRowFilled treats _manual
+// as filled) so the dynamic table won't trim it before the user types.
+function addManualRow() {
+  if (!currentCompany) { Shell.toast('Select a company first.', 'warning'); return; }
+  const row = emptyRow();
+  row._manual = true;
+  rowsData.push(row);
   normalizeRows();
+  selectedIndex = rowsData.indexOf(row);
   renderTable();
+  updateTotals();
+  const cell = document.querySelector(`#tbody tr[data-idx="${selectedIndex}"] td[data-field="label"]`);
+  if (cell) startEdit(cell, selectedIndex, 'label');
 }
 
 // ── Inline editing ──
@@ -475,7 +487,9 @@ function startEdit(cell, idx, field) {
   input.addEventListener('blur', commit);
   input.addEventListener('keydown', e => {
     if (e.key === 'Enter')  { input.removeEventListener('blur', commit); commit(); }
-    if (e.key === 'Escape') { cell.innerHTML = original; }
+    // Detach the blur handler first — reverting innerHTML removes the input,
+    // which would otherwise fire blur → commit and save the cancelled value.
+    if (e.key === 'Escape') { input.removeEventListener('blur', commit); cell.innerHTML = original; }
   });
 }
 
