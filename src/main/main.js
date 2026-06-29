@@ -207,6 +207,21 @@ async function initProfileDB(profileDir) {
   try { db.run('ALTER TABLE users ADD COLUMN recovery_key_tag  TEXT'); } catch {}
   try { db.run('ALTER TABLE users ADD COLUMN recovery_key_salt TEXT'); } catch {}
 
+  // Belt-and-suspenders: dev_mode must never be honored in a packaged build.
+  // The TOTP bypass is already gated on IS_DEV (so a stray flag can't skip TOTP),
+  // but scrub the flag from the vault too so it can't linger or mislead. Self-heals
+  // a vault that somehow carries dev_mode=1 into production (corruption, a seed run
+  // pointed at a real profile, hand-tampering).
+  if (app.isPackaged) {
+    try {
+      const stray = dbGet('SELECT COUNT(*) AS n FROM users WHERE dev_mode=1');
+      if (stray && stray.n > 0) {
+        console.warn(`[security] Scrubbing dev_mode flag from ${stray.n} user row(s) in a packaged build.`);
+        db.run('UPDATE users SET dev_mode=0 WHERE dev_mode=1');
+      }
+    } catch (e) { console.error('[security] dev_mode scrub failed:', e.message); }
+  }
+
   persistDB();
 }
 
@@ -911,8 +926,9 @@ ipcMain.handle('auth:login', async (_, { username, password, totpCode }) => {
       return { ok: false, error: 'Invalid credentials.', ...incrementFailed(user) };
     }
 
-    // Dev mode: skip TOTP verification entirely
-    const totpOk = user.dev_mode
+    // Dev mode: skip TOTP verification entirely — gated on IS_DEV so the bypass is
+    // physically impossible in a packaged build, no matter what the vault says.
+    const totpOk = (IS_DEV && user.dev_mode)
       ? true
       : speakeasy.totp.verify({ secret: user.totp_secret, encoding: 'base32', token: totpCode, window: 1 });
 
@@ -1491,7 +1507,7 @@ ipcMain.handle('auth:change-password', async (_, { currentPassword, totpCode, ne
   if (!user) return { ok: false, error: 'User not found.' };
   if (!bcrypt.compareSync(currentPassword, user.password_hash))
     return { ok: false, error: 'Current password is incorrect.' };
-  const totpOk = user.dev_mode ? true :
+  const totpOk = (IS_DEV && user.dev_mode) ? true :
     speakeasy.totp.verify({ secret: user.totp_secret, encoding: 'base32', token: totpCode, window: 1 });
   if (!totpOk) return { ok: false, error: 'Invalid TOTP code.' };
 
