@@ -42,6 +42,8 @@ function installLoginDelegation() {
     paApplyToggle:          (a, el) => paApplyToggle(a, el),
     paApplyColorblind:      a       => paApplyColorblind(a),
     paApplyWinToggle:       (a, el) => paApplyWinToggle(a, el),
+    paApplyLaunchStartup:   (a, el) => paApplyLaunchStartup(el),
+    paApplyCloseToTray:     (a, el) => paApplyCloseToTray(el),
     paApplyPreferredDisplay:a       => paApplyPreferredDisplay(a),
     paArmDelete:            ()      => paArmDelete(),
     paExecuteDelete:        ()      => paExecuteDelete(),
@@ -891,6 +893,16 @@ async function paLoadDisplayPicker() {
     const trp = document.getElementById('pa-toggle-remember-position');
     if (tsm) tsm.classList.toggle('on', savedMax === 'true');
     if (trp) trp.classList.toggle('on', savedRemember === 'true');
+    // Launch-at-startup (OS login item) + close-to-tray (app-global pref) — both
+    // resolved from main, not localStorage, so they match the in-app settings.
+    const [launch, closeTray] = await Promise.all([
+      api.invoke('win:get-launch-at-startup').catch(() => false),
+      api.invoke('win:get-close-to-tray').catch(() => false),
+    ]);
+    const tls = document.getElementById('pa-toggle-launch-startup');
+    const tct = document.getElementById('pa-toggle-close-tray');
+    if (tls) tls.classList.toggle('on', launch === true);
+    if (tct) tct.classList.toggle('on', closeTray === true);
   } catch(e) {
     area.innerHTML = `<div class="settings-row-label" style="color:var(--text-muted)">Display info unavailable.</div>`;
   }
@@ -906,6 +918,19 @@ function paApplyWinToggle(key, btn) {
   const on  = !btn.classList.contains('on');
   const lsKey = key === 'win_startMaximized' ? 'winStartMaximized' : 'winRememberPosition';
   paSet(lsKey, on);
+  btn.classList.toggle('on', on);
+}
+
+// Launch-at-startup + close-to-tray are app-global (not per-profile), so they
+// persist through main (OS login item / app-prefs.json), not localStorage.
+async function paApplyLaunchStartup(btn) {
+  const on = !btn.classList.contains('on');
+  try { await api.invoke('win:set-launch-at-startup', on); } catch {}
+  btn.classList.toggle('on', on);
+}
+async function paApplyCloseToTray(btn) {
+  const on = !btn.classList.contains('on');
+  try { await api.invoke('win:set-close-to-tray', on); } catch {}
   btn.classList.toggle('on', on);
 }
 
