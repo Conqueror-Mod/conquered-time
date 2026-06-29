@@ -89,7 +89,9 @@ conquered-time/
 │       │   └── settings.js       # Theme, scale, accessibility, time format, auto-lock engine
 │       └── styles/
 │           ├── design-system.css # Entry point — imports all partials
-│           ├── themes.css        # 5 theme token sets + Google Fonts import
+│           ├── themes.css        # 5 theme token sets (imports fonts-local.css)
+│           ├── fonts-local.css   # @font-face for bundled DM Sans + JetBrains Mono
+│           ├── fonts/            # Bundled .woff2 files (no remote fetch)
 │           ├── base.css          # Scale, accessibility, reset
 │           ├── shell.css         # Titlebar, sidebar, layout
 │           ├── components.css    # Shared UI components
@@ -231,7 +233,7 @@ Login: password + TOTP code
 ## Known console messages
 
 - **`network_service_instance_impl.cc(...) Network service crashed, restarting service`** at startup is a benign Chromium-internal message (the network utility process restarts itself). It is not an app error, recovers automatically, and does not affect functionality. Safe to ignore.
-- The app loads its fonts (DM Sans, JetBrains Mono; Inter for PDF export) from Google Fonts at runtime — the only outbound network request. Offline, the UI falls back to system fonts. (Bundling fonts locally is a tracked future improvement.)
+- All fonts are bundled locally — DM Sans and JetBrains Mono ship as `.woff2` under `src/renderer/styles/fonts/`, and Inter (for PDF export) is base64-inlined. **The app makes no outbound network requests** and renders identically offline.
 
 ---
 
