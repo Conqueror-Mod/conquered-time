@@ -1483,6 +1483,9 @@ ipcMain.handle('audit:open-wizard', (_, { mode, theme } = {}) => {
   return { ok: true };
 });
 
+// Count of non-dismissed audit discrepancies — used for the at-login notice.
+ipcMain.handle('audit:count', () => countAuditDiscrepancies());
+
 // ── IPC: Database clear operations ────────────────────────────────────────
 // Architecture note: each profile has its own vault.db file, so `db` is
 // always scoped to the active user's vault. All DELETEs still use
