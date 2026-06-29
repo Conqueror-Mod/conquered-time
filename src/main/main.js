@@ -32,6 +32,27 @@ let BACKUP_DIR         = IS_DEV ? path.join(ROOT_DATA_DIR, 'backups') : null;
 fs.mkdirSync(ROOT_DATA_DIR, { recursive: true });
 if (IS_DEV) fs.mkdirSync(BACKUP_DIR, { recursive: true });
 
+// ── App-global prefs ───────────────────────────────────────────────────────
+// Settings that describe how the APP behaves around the OS (not a profile's
+// data): close-to-tray, etc. Stored in one JSON file next to the profiles so
+// main can read them with no profile/vault loaded (e.g. on the login screen or
+// at window-close before any sign-in). Launch-at-startup is NOT stored here —
+// the OS login item (app.getLoginItemSettings) is its own source of truth.
+const APP_PREFS_FILE = path.join(ROOT_DATA_DIR, 'app-prefs.json');
+function readAppPrefs() {
+  try { return JSON.parse(fs.readFileSync(APP_PREFS_FILE, 'utf8')); } catch { return {}; }
+}
+function getAppPref(key, dflt) {
+  const v = readAppPrefs()[key];
+  return v === undefined ? dflt : v;
+}
+function setAppPref(key, val) {
+  const p = readAppPrefs();
+  p[key] = val;
+  try { fs.writeFileSync(APP_PREFS_FILE, JSON.stringify(p, null, 2)); }
+  catch (e) { console.error('[app-prefs] write failed:', e.message); }
+}
+
 // ── In-memory session state ────────────────────────────────────────────────
 let sessionKey  = null;
 let sessionUser = null;
@@ -408,7 +429,7 @@ function createWindow() {
   mainWindow.on('close', (event) => {
     // Close-to-tray: hide the window instead of quitting, keeping the session alive.
     // Bypassed when the user explicitly quits (tray/menu Quit set isQuitting).
-    if (!isQuitting && tray && readStartupSetting('win_closeToTray') === 'true') {
+    if (!isQuitting && tray && getAppPref('closeToTray', false) === true) {
       event.preventDefault();
       mainWindow.hide();
       return;
@@ -670,6 +691,15 @@ ipcMain.handle('win:move-to-display', (_, displayId) => {
 });
 ipcMain.handle('win:set-launch-at-startup', (_, enabled) => {
   applyLaunchAtStartup(enabled);
+  return { ok: true };
+});
+// Source of truth is the OS login item itself — no app storage needed.
+ipcMain.handle('win:get-launch-at-startup', () => {
+  try { return app.getLoginItemSettings().openAtLogin === true; } catch { return false; }
+});
+ipcMain.handle('win:get-close-to-tray', () => getAppPref('closeToTray', false) === true);
+ipcMain.handle('win:set-close-to-tray', (_, enabled) => {
+  setAppPref('closeToTray', !!enabled);
   return { ok: true };
 });
 ipcMain.on('navigate',     (_, page) => navigate(page));
@@ -1778,9 +1808,8 @@ app.whenReady().then(async () => {
   const splash = createSplashWindow('zanarkand');
   createWindow(); // creates hidden (show: false)
   createTray();
-
-  // Keep the OS login item in sync with the stored preference on every launch.
-  applyLaunchAtStartup(readStartupSetting('win_launchAtStartup') === 'true');
+  // No launch-at-startup re-sync needed here: the OS login item is its own
+  // persistent source of truth (toggled via win:set-launch-at-startup).
 
   // Apply window position/size settings before show
   const rememberPos   = readStartupSetting('win_rememberPosition') === 'true';

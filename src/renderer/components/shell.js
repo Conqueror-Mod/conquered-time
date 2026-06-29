@@ -224,7 +224,7 @@ const Shell = (() => {
                     <div class="toggle-label">Minimize to tray on close</div>
                     <div class="toggle-desc">Closing the window hides it to the system tray and keeps your session running, instead of quitting</div>
                   </div>
-                  <button class="toggle-switch" id="toggle-close-tray" data-action="applyWinToggle" data-arg="win_closeToTray"></button>
+                  <button class="toggle-switch" id="toggle-close-tray" data-action="applyCloseToTray"></button>
                 </div>
               </div>
             </div><!-- /settings-cat-window -->
@@ -1252,8 +1252,8 @@ async function loadDisplayPicker() {
     api.invoke('settings:get', 'win_preferredDisplay'),
     api.invoke('settings:get', 'win_startMaximized'),
     api.invoke('settings:get', 'win_rememberPosition'),
-    api.invoke('settings:get', 'win_launchAtStartup'),
-    api.invoke('settings:get', 'win_closeToTray'),
+    api.invoke('win:get-launch-at-startup'),  // OS login item is source of truth
+    api.invoke('win:get-close-to-tray'),       // app-global pref (not per-profile)
   ]);
   const saved = savedDisp || 'primary';
   const btns = [
@@ -1270,8 +1270,8 @@ async function loadDisplayPicker() {
   if (trp) trp.classList.toggle('on', savedRemember === 'true');
   const tls = document.getElementById('toggle-launch-startup');
   const tct = document.getElementById('toggle-close-tray');
-  if (tls) tls.classList.toggle('on', savedLaunch === 'true');
-  if (tct) tct.classList.toggle('on', savedCloseTray === 'true');
+  if (tls) tls.classList.toggle('on', savedLaunch === true);
+  if (tct) tct.classList.toggle('on', savedCloseTray === true);
 }
 
 async function applyPreferredDisplay(displayId) {
@@ -1288,8 +1288,13 @@ async function applyWinToggle(key, btn) {
 
 async function applyLaunchStartup(btn) {
   const newVal = !btn.classList.contains('on');
-  await api.invoke('settings:set', { key: 'win_launchAtStartup', value: String(newVal) });
-  await api.invoke('win:set-launch-at-startup', newVal);
+  await api.invoke('win:set-launch-at-startup', newVal); // OS login item is the store
+  btn.classList.toggle('on', newVal);
+}
+
+async function applyCloseToTray(btn) {
+  const newVal = !btn.classList.contains('on');
+  await api.invoke('win:set-close-to-tray', newVal); // app-global pref (not per-profile)
   btn.classList.toggle('on', newVal);
 }
 
@@ -1513,6 +1518,7 @@ function installShellDelegation() {
     applyToggle:           (a, el) => applyToggle(a, el),
     applyWinToggle:        (a, el) => applyWinToggle(a, el),
     applyLaunchStartup:    (a, el) => applyLaunchStartup(el),
+    applyCloseToTray:      (a, el) => applyCloseToTray(el),
     applyPreferredDisplay: a       => applyPreferredDisplay(a),
     showDbaConfirm:        a       => showDbaConfirm(a),
     hideDbaConfirm:        a       => hideDbaConfirm(a),
