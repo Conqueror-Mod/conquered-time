@@ -745,9 +745,28 @@ async function postLoginNavigate(res) {
   // the first inner page's theme-init.js paints the correct palette immediately.
   // Without this, the first page falls back to the default theme (Memoria) for a
   // split second until Shell.init() loads settings from the vault.
+  //
+  // ALSO mirror the vault appearance settings into the pre-auth ct_pa_* keys so
+  // the login screen itself adopts the profile's theme on the next logout/lock —
+  // otherwise the login screen keeps a stale global pre-auth theme that can
+  // diverge from the profile (e.g. login shows Nibelheim while the app is
+  // Zanarkand). The pre-auth modal can still override; that override is just
+  // re-synced on the next login.
   try {
-    const theme = await api.invoke('settings:get', 'ui_theme');
-    const scale = await api.invoke('settings:get', 'ui_scale');
+    const pairs = [
+      ['ui_theme',           'ct_pa_theme'],
+      ['ui_scale',           'ct_pa_scale'],
+      ['ui_reducedMotion',   'ct_pa_reducedMotion'],
+      ['ui_highContrast',    'ct_pa_highContrast'],
+      ['ui_colorblind',      'ct_pa_colorblind'],
+      ['ui_focusIndicators', 'ct_pa_focusIndicators'],
+    ];
+    for (const [vaultKey, paKey] of pairs) {
+      const v = await api.invoke('settings:get', vaultKey);
+      if (v !== null && v !== undefined) localStorage.setItem(paKey, String(v));
+    }
+    const theme = localStorage.getItem('ct_pa_theme');
+    const scale = localStorage.getItem('ct_pa_scale');
     if (theme) sessionStorage.setItem('ct_theme', theme);
     if (scale) sessionStorage.setItem('ct_scale', scale);
   } catch {}
