@@ -1691,6 +1691,26 @@ ipcMain.handle('db:clear-timeclock', () => {
   return { ok: true };
 });
 
+// Per-company time-clock clear: removes time_entries (and their entry-scoped
+// task_items) for ONE company, leaving the company row and all other companies
+// intact. task_items are entry_id-scoped, so delete them via subquery BEFORE
+// the entries are removed.
+ipcMain.handle('db:clear-timeclock-company', (_, arg) => {
+  if (!sessionKey || !sessionUser) return { ok: false };
+  const companyId = Number(arg && arg.companyId);
+  if (!companyId) return { ok: false, error: 'No company specified' };
+  const uid = sessionUser.id;
+  db.run(
+    'DELETE FROM task_items WHERE user_id=? AND entry_id IN (SELECT rowid FROM time_entries WHERE user_id=? AND company_id=?)',
+    [uid, uid, companyId]
+  );
+  db.run('DELETE FROM time_entries WHERE user_id=? AND company_id=?', [uid, companyId]);
+  activeEntryId = null;
+  persistDB(); performBackup();
+  invalidateEntriesCache();
+  return { ok: true };
+});
+
 ipcMain.handle('db:clear-companies', () => {
   if (!sessionKey || !sessionUser) return { ok: false };
   const uid = sessionUser.id;
