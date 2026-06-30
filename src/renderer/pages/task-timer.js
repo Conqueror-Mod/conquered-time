@@ -126,6 +126,30 @@ async function loadTaskNameOptions() {
   });
 }
 
+// The active session's "current" Task Name: the in-progress (clocked-in, not
+// clocked-out) row's name, else the most recently named row. Used to pre-fill
+// the timer field so restarting the same task doesn't require re-selecting it.
+function getCurrentSessionTaskName() {
+  try {
+    const rows = JSON.parse(activeEntry?.rows_json || '[]');
+    const active = rows.find(r => r.clock_in && !r.clock_out && (r.name || '').trim());
+    if (active) return active.name.trim();
+    const named = rows.filter(r => (r.name || '').trim());
+    if (named.length) return named[named.length - 1].name.trim();
+  } catch {}
+  return '';
+}
+
+// Pre-fill the timer field (when no task is running). Prefers an explicit value
+// (e.g. the task just stopped, for quick restart), falling back to the session's
+// current Task Name. The datalist/quick-picks remain for switching tasks.
+function prefillTaskInput(preferred) {
+  const input = document.getElementById('task-label-input');
+  if (!input || input.disabled) return;
+  const val = (preferred && preferred.trim()) || getCurrentSessionTaskName();
+  if (val) input.value = val;
+}
+
 // ── Task list render ───────────────────────────────────────────────────────
 function renderTaskList() {
   const list = document.getElementById('task-list');
@@ -253,6 +277,10 @@ window.addEventListener('DOMContentLoaded', async () => {
   renderTaskList();
   await loadTaskNameOptions();
 
+  // Pre-fill with the session's current Task Name so Start is one click
+  // (skipped when a task is already running — that path set the field above).
+  if (!inProgressTask) prefillTaskInput();
+
   // ── Banner duration ticker ──
   setInterval(updateBannerDuration, 30000);
 
@@ -309,8 +337,9 @@ window.addEventListener('DOMContentLoaded', async () => {
     timerStart = null;
     resetStopwatch();
     Shell.hideSidebarTimer();
-    document.getElementById('task-label-input').value    = '';
     document.getElementById('task-label-input').disabled = false;
+    // Keep the just-stopped task in the field so restarting it is one click.
+    prefillTaskInput(label);
     document.getElementById('task-label-input').focus();
     document.getElementById('btn-start').style.display  = '';
     document.getElementById('btn-stop').style.display   = 'none';
@@ -330,6 +359,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     Shell.hideSidebarTimer();
     document.getElementById('task-label-input').value    = '';
     document.getElementById('task-label-input').disabled = false;
+    // Cancelled (abandoned), so fall back to the session's current Task Name.
+    prefillTaskInput();
     document.getElementById('btn-start').style.display  = '';
     document.getElementById('btn-stop').style.display   = 'none';
     document.getElementById('btn-cancel').style.display = 'none';
