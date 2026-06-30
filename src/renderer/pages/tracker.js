@@ -74,6 +74,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (e.detail?.key === 'timeFormat') { renderTable(); updateTotals(); }
   });
 
+  await initColResize();
+
   window.addEventListener('beforeunload', clearAutoSaveTimer);
 
   // Date must be applied before onCompanyChange(), which loads the entry for log-date.value.
@@ -329,6 +331,94 @@ function buildRows() {
 function renderTable() {
   const tbody = document.getElementById('tbody');
   tbody.innerHTML = rowsData.map((r, idx) => rowHTML(r, idx)).join('');
+}
+
+// ── Resizable columns ──
+// Widths are stored as percentages summing to 100 so the table keeps its
+// overall size and dragging a divider redistributes width with its neighbour
+// (internal widths change, total stays fixed). Persisted per-profile under
+// ui_trackerColWidths; double-click a divider resets to defaults.
+const COLW_KEY      = 'ui_trackerColWidths';
+const DEFAULT_COLPX = [36, 24, 120, 140, 220, 85, 85, 80]; // #, dot, Label, Name, Desc, In, Out, Total
+const MIN_COL_PCT   = 3;
+let colPcts = null;
+
+function pxToPct(arr) {
+  const sum = arr.reduce((a, b) => a + b, 0);
+  return arr.map(w => (w / sum) * 100);
+}
+
+function applyColWidths() {
+  const cols = document.querySelectorAll('#tracker-table colgroup col');
+  cols.forEach((c, i) => { if (colPcts[i] != null) c.style.width = colPcts[i] + '%'; });
+}
+
+async function initColResize() {
+  let pcts = null;
+  try {
+    const saved = await api.invoke('settings:get', COLW_KEY);
+    if (saved) pcts = JSON.parse(saved);
+  } catch {}
+  if (!Array.isArray(pcts) || pcts.length !== DEFAULT_COLPX.length) pcts = pxToPct(DEFAULT_COLPX);
+  colPcts = pcts;
+  applyColWidths();
+  installColResizers();
+}
+
+function installColResizers() {
+  const ths = document.querySelectorAll('#tracker-table thead th');
+  ths.forEach((th, i) => {
+    if (i >= ths.length - 1) return;              // last column has no right divider
+    if (th.querySelector('.col-resizer')) return; // idempotent
+    const h = document.createElement('div');
+    h.className = 'col-resizer';
+    h.title = 'Drag to resize · double-click to reset';
+    h.addEventListener('mousedown', e => startColDrag(e, i, h));
+    h.addEventListener('dblclick', e => { e.preventDefault(); e.stopPropagation(); resetColWidths(); });
+    th.appendChild(h);
+  });
+}
+
+function startColDrag(e, i, handle) {
+  e.preventDefault(); e.stopPropagation();
+  const table  = document.getElementById('tracker-table');
+  const tableW = table.getBoundingClientRect().width;
+  const startX = e.clientX;
+  const a0 = colPcts[i], b0 = colPcts[i + 1];
+  handle.classList.add('dragging');
+  document.body.style.cursor = 'col-resize';
+  document.body.style.userSelect = 'none';
+
+  const move = ev => {
+    let d = ((ev.clientX - startX) / tableW) * 100;
+    // Clamp so neither the dragged column nor its neighbour drops below the min.
+    d = Math.max(d, MIN_COL_PCT - a0);
+    d = Math.min(d, b0 - MIN_COL_PCT);
+    colPcts[i] = a0 + d;
+    colPcts[i + 1] = b0 - d;
+    applyColWidths();
+  };
+  const up = () => {
+    document.removeEventListener('mousemove', move);
+    document.removeEventListener('mouseup', up);
+    handle.classList.remove('dragging');
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    saveColWidths();
+  };
+  document.addEventListener('mousemove', move);
+  document.addEventListener('mouseup', up);
+}
+
+function resetColWidths() {
+  colPcts = pxToPct(DEFAULT_COLPX);
+  applyColWidths();
+  saveColWidths();
+  Shell.toast('Column widths reset.', 'info', 2000);
+}
+
+function saveColWidths() {
+  try { api.invoke('settings:set', { key: COLW_KEY, value: JSON.stringify(colPcts) }); } catch {}
 }
 
 function rowHTML(r, idx) {

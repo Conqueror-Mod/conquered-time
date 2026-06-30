@@ -91,6 +91,23 @@
   td[data-field].editable { cursor: pointer; }
   td[data-field].editable:hover { background: var(--accent-dim); }
 
+  /* ── Resizable columns (tracker table only) ── */
+  #tracker-table { table-layout: fixed; }
+  /* Fixed layout clips overflow; let cells truncate gracefully rather than
+     spilling. The Description cell keeps its own .desc-clamp behaviour. */
+  #tracker-table td { overflow: hidden; text-overflow: ellipsis; }
+  #tracker-table thead th { position: relative; overflow: hidden; }
+  #tracker-table .col-resizer {
+    position: absolute; top: 0; right: -3px; width: 7px; height: 100%;
+    cursor: col-resize; z-index: 2; user-select: none;
+  }
+  #tracker-table .col-resizer::after {
+    content: ''; position: absolute; top: 25%; right: 3px; width: 1px; height: 50%;
+    background: var(--border-light); transition: background var(--transition);
+  }
+  #tracker-table .col-resizer:hover::after,
+  #tracker-table .col-resizer.dragging::after { background: var(--accent); width: 2px; }
+
   .footer-bar {
     display: flex;
     justify-content: space-between;
@@ -238,17 +255,20 @@
 </div>
 
 <div class="table-wrap">
-  <table>
+  <table id="tracker-table">
+    <colgroup>
+      <col><col><col><col><col><col><col><col>
+    </colgroup>
     <thead>
       <tr>
-        <th style="width:36px;" class="center">#</th>
-        <th style="width:20px;" class="center"></th>
-        <th style="min-width:110px;">Task Label</th>
-        <th style="min-width:130px;">Name</th>
-        <th style="min-width:200px;">Description</th>
-        <th style="min-width:75px;">Clock In</th>
-        <th style="min-width:75px;">Clock Out</th>
-        <th style="min-width:70px;" class="center">Total</th>
+        <th class="center">#</th>
+        <th class="center"></th>
+        <th>Task Label</th>
+        <th>Name</th>
+        <th>Description</th>
+        <th>Clock In</th>
+        <th>Clock Out</th>
+        <th class="center">Total</th>
       </tr>
     </thead>
     <tbody id="tbody"></tbody>
