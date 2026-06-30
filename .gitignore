@@ -1,5 +1,9 @@
 node_modules/
-build/
+# build/ is electron-builder's resources dir — ignore everything except the
+# tracked installer source files the build depends on.
+build/*
+!build/license.txt
+!build/installer.nsh
 dist/
 dev-data/
 *.db
