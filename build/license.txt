@@ -1,0 +1,46 @@
+CONQUERED TIME - END USER LICENSE AGREEMENT (BETA)
+
+Copyright (c) 2026 Chris Bowles - The Conqueror. All rights reserved.
+
+This is a pre-release (beta) build of Conquered Time ("the Software"). By
+installing or using the Software, you agree to the terms below. If you do not
+agree, do not install or use the Software.
+
+1. LICENSE GRANT. You are granted a personal, non-exclusive, non-transferable,
+   revocable license to install and use one copy of the Software on devices you
+   own or control, solely for your personal evaluation of this beta release.
+
+2. RESTRICTIONS. You may not sell, rent, lease, sublicense, distribute, or
+   otherwise make the Software available to others. You may not modify, reverse
+   engineer, decompile, or disassemble the Software, except to the extent that
+   applicable law expressly permits despite this limitation. You may keep a
+   single copy for backup purposes.
+
+3. OWNERSHIP. The Software is licensed, not sold. All title, ownership, and
+   intellectual property rights in and to the Software remain with the author.
+
+4. YOUR DATA. The Software stores your data locally on your device, encrypted
+   at rest. It does not transmit your data to the author or any third party.
+   Optional features you choose to configure (such as emailed reports or the
+   update check) connect only to the services you set up. You are solely
+   responsible for your data and for keeping your own backups and recovery code.
+
+5. BETA SOFTWARE. This is pre-release software provided for evaluation. It may
+   contain errors, may change, and may be discontinued at any time. No feature
+   or level of availability is guaranteed.
+
+6. NO WARRANTY. THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE", WITHOUT
+   WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
+   IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND
+   NON-INFRINGEMENT.
+
+7. LIMITATION OF LIABILITY. TO THE MAXIMUM EXTENT PERMITTED BY LAW, IN NO EVENT
+   SHALL THE AUTHOR BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL,
+   CONSEQUENTIAL, OR EXEMPLARY DAMAGES, OR FOR ANY LOSS OF DATA, PROFITS, OR
+   GOODWILL, ARISING OUT OF OR RELATED TO YOUR USE OF THE SOFTWARE.
+
+8. TERMINATION. This license terminates automatically if you breach its terms.
+   Upon termination you must stop using and delete all copies of the Software.
+
+By selecting "I Agree", you acknowledge that you have read and understood this
+Agreement and agree to be bound by its terms.
