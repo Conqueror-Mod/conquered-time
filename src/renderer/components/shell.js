@@ -537,21 +537,24 @@ const Shell = (() => {
               </div>
 
               <div class="about-section">
-                <div class="about-section-title">What's New — v3.7</div>
+                <div class="about-section-title">What's New — v3.8</div>
+                <ul class="about-changelog">
+                  <li>Roomier Description field — write multi-line task notes in the tracker; they stay tidy in the table and flatten cleanly in PDF/CSV exports</li>
+                  <li>Resize your tracker columns — drag the dividers to set column widths; double-click to reset. Your layout is remembered</li>
+                  <li>Per-company time-clock clear — wipe one company's time entries from Settings → Data without touching the others</li>
+                  <li>Dispatch remembers your task — the timer field pre-fills with your current task, so restarting it is one click</li>
+                  <li>Time format updates everywhere instantly when you switch 12-hour / 24-hour — no refresh needed</li>
+                  <li>First-login note confirming your data is always encrypted, plus clearer Audit dismissed-row styling on dark themes</li>
+                </ul>
+              </div>
+              <div class="about-section">
+                <div class="about-section-title">v3.7</div>
                 <ul class="about-changelog">
                   <li>Redesigned Time Tracker — a single Session Clock module (Clock In/Out, Break, Lunch in one place) beside roomier task fields</li>
                   <li>Break &amp; Lunch now live in the Time Tracker, with at-a-glance compliance status — no need to hop over to Dispatch</li>
                   <li>Manual Entry — backfill a session you forgot to clock by typing the times in directly</li>
                   <li>Dispatch task picks now come from your current session's task names</li>
                   <li>Clock format moved into Appearance settings; fixed a double-counting session timer</li>
-                </ul>
-              </div>
-              <div class="about-section">
-                <div class="about-section-title">v3.6</div>
-                <ul class="about-changelog">
-                  <li>Hardened security — every screen now blocks inline scripts at the browser level (strict Content-Security-Policy), shrinking the attack surface for injected code</li>
-                  <li>Snappier navigation — your data is decrypted once and reused as you move between pages, so the dashboard, companies, and reports load faster</li>
-                  <li>Under the hood — each page's code is now a separate file, making the app easier to maintain and verify</li>
                 </ul>
               </div>
               <div class="about-section">
