@@ -16,10 +16,11 @@ A secure, locally-encrypted desktop time tracker built for remote professionals 
 - **Splash screen** — branded startup screen, theme-aware
 - **Company spiderweb** — force-graph visualization of your client network with inline detail pane
 - **Dynamic time tracker** — two-module control panel: a Session Clock (Clock In/Out + Break/Lunch) beside task inputs (label, name, description); the entry table auto-grows as needed
-- **Inline editing** — double-click any field to edit; duration recalculates automatically
+- **Inline editing** — double-click any field to edit; duration recalculates automatically. The Description field opens a multi-line editor for longer notes (kept tidy in the table, flattened in exports)
+- **Resizable tracker columns** — drag the column dividers to set widths; double-click to reset. Your layout is remembered per profile
 - **Manual Entry** — backfill a session you forgot to clock live by adding an editable row and typing the times directly
 - **User Profile** — avatar upload with manual crop modal (drag-to-pan, zoom, circular preview); animated formats (GIF, APNG, WebP) preserved
-- **Dispatch (Task Timer)** — dedicated task timing/counting module with sidebar live timer and description writeback to the tracker; the task list draws from the active session's task names
+- **Dispatch (Task Timer)** — dedicated task timing/counting module with sidebar live timer and description writeback to the tracker; the task list draws from the active session's task names, and the timer field pre-fills with your current task so restarting it is one click
 - **Break & Lunch punches** — Start/End break and lunch from the Time Tracker's Session Clock module, with inline US-state compliance status (California, New York, federal default); also surfaced in Reports/Audit
 - **Global log** — filterable history across all companies with expandable session detail
 - **Reports & Audit** — period summary, company breakdown, audit log with per-row dismiss/fix/suggest/**email**; dismissed & emailed items persisted (emailed stay visible, badged); a discrepancy notice is shown at login; US state policy named in suggestion text
@@ -30,7 +31,7 @@ A secure, locally-encrypted desktop time tracker built for remote professionals 
 - **Session auto-lock** — configurable idle timeout (Off / 5 / 15 / 30 / 60 min)
 - **5 themes** — Final Fantasy city palettes: Memoria (default, light), Zanarkand (dark), Rabanastre (light), Treno (dark), Nibelheim (dark). The startup splash always uses Zanarkand as a brand moment regardless of the selected theme.
 - **Steam-style Settings** — split-panel layout with left category nav (Appearance, Window, Security, Data, Reports, Accessibility, About)
-- **Manual DB clear** — three-level wipe (Time Clock, Companies, Full) with typed CONFIRM confirmation
+- **Manual DB clear** — scoped wipes with typed CONFIRM confirmation: a single company's time clock, all companies' time clock, all companies, or the full database
 - **Keyboard navigation** — Ctrl+1–5 to switch modules, Ctrl+, for Settings, full modal tab-trapping
 - **Electron security** — contextIsolation enabled, nodeIntegration disabled, sandboxed renderers, whitelisted IPC channels, strict Content-Security-Policy (`script-src 'self'` on every page — no inline scripts or event handlers)
 - **Centralized data layer** — shared Store / IPC / Validator modules give the renderer one source of truth for fetching, record-ID normalization, and input validation

@@ -1,5 +1,5 @@
 {
-  "version": "3.7.0",
+  "version": "3.8.0",
   "downloadUrl": "https://github.com/Conqueror-Mod/conquered-time/releases/latest",
-  "notes": "v3.7 — Time Tracker redesign: a two-module control panel (Session Clock + task inputs), Break & Lunch moved into the tracker, and Manual Entry for backfilling forgotten sessions. Clock format moved into Appearance. Dispatch's task list now reflects your session's task names. Fixed a double-counting session timer."
+  "notes": "v3.8 — Tracker & Dispatch quality-of-life: a multi-line Description editor, drag-to-resize tracker columns, a single-company time-clock clear in Settings → Data, and a Dispatch timer that pre-fills with your current task. Live 12-hour / 24-hour switching now updates already-shown times instantly, a first-login note confirms your data is always encrypted, and the Audit dismissed-row styling is clearer on dark themes."
 }
