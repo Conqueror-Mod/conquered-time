@@ -9,9 +9,12 @@ import path from 'node:path';
 
 const ASSETS = path.resolve('assets');
 
-// 24-bit uncompressed BMP (BITMAPINFOHEADER), bottom-up, BGR, rows padded to 4 bytes.
-function encodeBmp24(rgb, width, height) {
-  const rowSize  = Math.floor((24 * width + 31) / 32) * 4;
+// 24-bit uncompressed BMP (BITMAPINFOHEADER), bottom-up, BGR, rows padded to 4
+// bytes. `src` is raw pixel data with `ch` channels per pixel (3 = RGB, 4 = RGBA;
+// the alpha channel is ignored). Walking by the real channel count is essential —
+// treating 4-channel data as 3 scrambles every row (magenta/green striping).
+function encodeBmp24(src, width, height, ch) {
+  const rowSize   = Math.floor((24 * width + 31) / 32) * 4;
   const imageSize = rowSize * height;
   const fileSize  = 54 + imageSize;
   const buf = Buffer.alloc(fileSize);
@@ -28,12 +31,12 @@ function encodeBmp24(rgb, width, height) {
   buf.writeInt32LE(2835, 42);
   let off = 54;
   for (let y = height - 1; y >= 0; y--) {
-    const rowStart = y * width * 3;
+    const rowStart = y * width * ch;
     for (let x = 0; x < width; x++) {
-      const i = rowStart + x * 3;
-      buf[off++] = rgb[i + 2];          // B
-      buf[off++] = rgb[i + 1];          // G
-      buf[off++] = rgb[i];              // R
+      const i = rowStart + x * ch;
+      buf[off++] = src[i + 2];          // B
+      buf[off++] = src[i + 1];          // G
+      buf[off++] = src[i];              // R
     }
     for (let p = width * 3; p < rowSize; p++) buf[off++] = 0; // row padding
   }
@@ -42,10 +45,9 @@ function encodeBmp24(rgb, width, height) {
 
 async function writeBmp(image, w, h, bg, outName) {
   const { data, info } = await image.flatten({ background: bg }).raw().toBuffer({ resolveWithObject: true });
-  const rgb = info.channels === 3 ? data : Buffer.from(data); // flatten yields 3 channels
-  const bmp = encodeBmp24(rgb, w, h);
+  const bmp = encodeBmp24(data, info.width, info.height, info.channels);
   fs.writeFileSync(path.join(ASSETS, outName), bmp);
-  console.log('wrote', outName, `${w}x${h}`, bmp.length, 'bytes');
+  console.log('wrote', outName, `${info.width}x${info.height}`, `${info.channels}ch`, bmp.length, 'bytes');
 }
 
 // ── Welcome/finish sidebar (164x314) — full Zanarkand-dark brand panel ──
