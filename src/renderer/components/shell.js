@@ -261,24 +261,6 @@ const Shell = (() => {
 
                 <div class="dba-cards">
 
-                  <div class="dba-card" id="dba-card-timeclock">
-                    <div class="dba-card-header">
-                      <div>
-                        <div class="dba-card-title">Time Clock Clear</div>
-                        <div class="dba-card-desc">Removes all time entries and Dispatch task records. Companies are kept.</div>
-                      </div>
-                      <button class="dba-trigger-btn" data-action="showDbaConfirm" data-arg="timeclock">Clear</button>
-                    </div>
-                    <div class="dba-confirm" id="dba-confirm-timeclock" style="display:none;">
-                      <div class="dba-confirm-warning">⚠ This will permanently delete all time entries and task records for your account.</div>
-                      <div class="dba-confirm-row">
-                        <input class="dba-confirm-input" id="dba-input-timeclock" placeholder='Type CONFIRM to proceed' autocomplete="off">
-                        <button class="dba-confirm-btn danger" data-action="executeDbaClear" data-arg="timeclock">Delete</button>
-                        <button class="dba-confirm-btn" data-action="hideDbaConfirm" data-arg="timeclock">Cancel</button>
-                      </div>
-                    </div>
-                  </div>
-
                   <div class="dba-card" id="dba-card-company">
                     <div class="dba-card-header">
                       <div>
@@ -298,6 +280,24 @@ const Shell = (() => {
                         <input class="dba-confirm-input" id="dba-input-company" placeholder='Type CONFIRM to proceed' autocomplete="off">
                         <button class="dba-confirm-btn danger" data-action="executeDbaClear" data-arg="company">Delete</button>
                         <button class="dba-confirm-btn" data-action="hideDbaConfirm" data-arg="company">Cancel</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="dba-card" id="dba-card-timeclock">
+                    <div class="dba-card-header">
+                      <div>
+                        <div class="dba-card-title">Time Clock Clear</div>
+                        <div class="dba-card-desc">Removes all time entries and Dispatch task records. Companies are kept.</div>
+                      </div>
+                      <button class="dba-trigger-btn" data-action="showDbaConfirm" data-arg="timeclock">Clear</button>
+                    </div>
+                    <div class="dba-confirm" id="dba-confirm-timeclock" style="display:none;">
+                      <div class="dba-confirm-warning">⚠ This will permanently delete all time entries and task records for your account.</div>
+                      <div class="dba-confirm-row">
+                        <input class="dba-confirm-input" id="dba-input-timeclock" placeholder='Type CONFIRM to proceed' autocomplete="off">
+                        <button class="dba-confirm-btn danger" data-action="executeDbaClear" data-arg="timeclock">Delete</button>
+                        <button class="dba-confirm-btn" data-action="hideDbaConfirm" data-arg="timeclock">Cancel</button>
                       </div>
                     </div>
                   </div>
