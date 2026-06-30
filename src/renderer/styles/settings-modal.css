@@ -611,14 +611,6 @@
   text-align: left;
 }
 .about-link-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
-.about-link-placeholder {
-  margin-left: auto;
-  font-family: var(--sans);
-  font-size: 10px;
-  font-weight: 400;
-  color: var(--text-muted);
-  font-style: italic;
-}
 
 /* Update check row */
 .about-update-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
