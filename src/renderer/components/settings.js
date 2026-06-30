@@ -63,6 +63,11 @@ const Settings = (() => {
   async function set(key, value) {
     current[key] = value;
     apply(current);
+    // Notify the active page so it can re-render in place (e.g. live 12h/24h
+    // switch of already-drawn rows) — not a SPA, so each page wires its own listener.
+    try {
+      document.dispatchEvent(new CustomEvent('ct:settings-changed', { detail: { key, value } }));
+    } catch (e) {}
     try {
       await api.invoke('settings:set', { key: `ui_${key}`, value: String(value) });
     } catch (e) {

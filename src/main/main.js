@@ -1174,6 +1174,13 @@ ipcMain.handle('companies:save', (_, data) => {
 ipcMain.handle('companies:delete', (_, id) => {
   if (!sessionKey || !sessionUser) return { ok: false };
   const numId = Number(id);
+  // task_items are entry_id-scoped — delete them via subquery BEFORE the
+  // entries are removed, otherwise the company's break/lunch/Dispatch tasks
+  // are orphaned in the DB.
+  db.run(
+    'DELETE FROM task_items WHERE user_id=? AND entry_id IN (SELECT rowid FROM time_entries WHERE user_id=? AND company_id=?)',
+    [sessionUser.id, sessionUser.id, numId]
+  );
   db.run('DELETE FROM time_entries WHERE company_id=? AND user_id=?', [numId, sessionUser.id]);
   db.run('DELETE FROM companies WHERE rowid=? AND user_id=?', [numId, sessionUser.id]);
   persistDB(); performBackup();
@@ -1691,6 +1698,26 @@ ipcMain.handle('db:clear-timeclock', () => {
   return { ok: true };
 });
 
+// Per-company time-clock clear: removes time_entries (and their entry-scoped
+// task_items) for ONE company, leaving the company row and all other companies
+// intact. task_items are entry_id-scoped, so delete them via subquery BEFORE
+// the entries are removed.
+ipcMain.handle('db:clear-timeclock-company', (_, arg) => {
+  if (!sessionKey || !sessionUser) return { ok: false };
+  const companyId = Number(arg && arg.companyId);
+  if (!companyId) return { ok: false, error: 'No company specified' };
+  const uid = sessionUser.id;
+  db.run(
+    'DELETE FROM task_items WHERE user_id=? AND entry_id IN (SELECT rowid FROM time_entries WHERE user_id=? AND company_id=?)',
+    [uid, uid, companyId]
+  );
+  db.run('DELETE FROM time_entries WHERE user_id=? AND company_id=?', [uid, companyId]);
+  activeEntryId = null;
+  persistDB(); performBackup();
+  invalidateEntriesCache();
+  return { ok: true };
+});
+
 ipcMain.handle('db:clear-companies', () => {
   if (!sessionKey || !sessionUser) return { ok: false };
   const uid = sessionUser.id;
@@ -2001,7 +2028,9 @@ async function doSendReport({ htmlContent, subject, recipients, entriesOverride 
     try {
       JSON.parse(e.rows_json || '[]').forEach(r => {
         if (!r.label && !r.name && !r.clock_in) return;
-        csvRows.push([e.log_date, companies[Number(e.company_id)] || '', e.session_label || '', r.label || '', r.name || '', r.desc || r.description || '', r.clock_in || '', r.clock_out || '', r.total_mins || 0]);
+        // Flatten multi-line descriptions so the CSV column stays single-line.
+        const descFlat = String(r.desc || r.description || '').replace(/\s+/g, ' ').trim();
+        csvRows.push([e.log_date, companies[Number(e.company_id)] || '', e.session_label || '', r.label || '', r.name || '', descFlat, r.clock_in || '', r.clock_out || '', r.total_mins || 0]);
       });
     } catch {}
   });

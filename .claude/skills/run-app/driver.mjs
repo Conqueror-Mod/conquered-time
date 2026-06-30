@@ -25,7 +25,15 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 async function waitURL(frag, timeout = 20000) {
   const t0 = Date.now();
   while (Date.now() - t0 < timeout) {
-    if (page && page.url().includes(frag)) return true;
+    if (page && !page.isClosed() && page.url().includes(frag)) return true;
+    // The app uses multiple BrowserWindows (splash precedes login in a separate
+    // window). firstWindow() may have bound `page` to the splash, so scan every
+    // open window and rebind to whichever matches the target URL fragment.
+    if (app) {
+      for (const w of app.windows()) {
+        try { if (!w.isClosed() && w.url().includes(frag)) { page = w; return true; } } catch {}
+      }
+    }
     await sleep(200);
   }
   throw new Error(`TIMEOUT waiting for url to contain "${frag}" (now: ${page && page.url()})`);

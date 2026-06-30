@@ -15,6 +15,15 @@ window.escapeHtml = function (v) {
     .replace(/'/g, '&#39;');
 };
 
+// Collapse newlines + runs of whitespace into single spaces. Used to flatten
+// multi-line Description text for PDF/CSV/email exports so the fixed-layout
+// report tables never break on a long or multi-line description. The stored
+// value keeps its newlines; only the exported rendering is flattened.
+window.flattenText = function (v) {
+  if (v == null) return '';
+  return String(v).replace(/\s+/g, ' ').trim();
+};
+
 const Shell = (() => {
 
   const IC = {
@@ -260,6 +269,29 @@ const Shell = (() => {
                 <div class="settings-row-label">Permanently remove data. These actions cannot be undone.</div>
 
                 <div class="dba-cards">
+
+                  <div class="dba-card" id="dba-card-company">
+                    <div class="dba-card-header">
+                      <div>
+                        <div class="dba-card-title">Time Clock Clear — Single Company</div>
+                        <div class="dba-card-desc">Removes time entries and Dispatch tasks for one selected company only. Other companies are untouched.</div>
+                      </div>
+                      <button class="dba-trigger-btn" data-action="showDbaConfirm" data-arg="company">Clear</button>
+                    </div>
+                    <div style="margin-top:10px;">
+                      <select class="dba-confirm-input" id="dba-company-select" style="width:100%;">
+                        <option value="">Select a company…</option>
+                      </select>
+                    </div>
+                    <div class="dba-confirm" id="dba-confirm-company" style="display:none;">
+                      <div class="dba-confirm-warning">⚠ This will permanently delete all time entries and task records for <strong id="dba-company-name">this company</strong>.</div>
+                      <div class="dba-confirm-row">
+                        <input class="dba-confirm-input" id="dba-input-company" placeholder='Type CONFIRM to proceed' autocomplete="off">
+                        <button class="dba-confirm-btn danger" data-action="executeDbaClear" data-arg="company">Delete</button>
+                        <button class="dba-confirm-btn" data-action="hideDbaConfirm" data-arg="company">Cancel</button>
+                      </div>
+                    </div>
+                  </div>
 
                   <div class="dba-card" id="dba-card-timeclock">
                     <div class="dba-card-header">
@@ -882,11 +914,13 @@ function closeSettingsModal() {
   _safeStorageLoaded  = false;
   _windowSettingsLoaded = false;
   _emailCfgLoaded     = false;
+  _dataCompaniesLoaded = false;
 }
 
 let _aboutInfoLoaded = false;
 let _windowSettingsLoaded = false;
 let _safeStorageLoaded = false;
+let _dataCompaniesLoaded = false;
 async function switchSettingsCategory(cat) {
   document.querySelectorAll('.sn-item').forEach(b => b.classList.toggle('active', b.dataset.cat === cat));
   document.querySelectorAll('.settings-cat-panel').forEach(p => p.style.display = 'none');
@@ -903,6 +937,11 @@ async function switchSettingsCategory(cat) {
   if (cat === 'security' && !_safeStorageLoaded) {
     _safeStorageLoaded = true;
     loadSafeStorageStatus();
+  }
+
+  if (cat === 'data' && !_dataCompaniesLoaded) {
+    _dataCompaniesLoaded = true;
+    loadDbaCompanySelect();
   }
 
   if (cat === 'about' && !_aboutInfoLoaded) {
@@ -948,11 +987,39 @@ async function switchSettingsCategory(cat) {
   }
 }
 
+// Populate the per-company "Time Clock Clear" dropdown. Uses rowid-normalized
+// company IDs (Store.getCompanies → Number(row.rid)); see gotcha #1.
+async function loadDbaCompanySelect() {
+  const sel = document.getElementById('dba-company-select');
+  if (!sel) return;
+  try {
+    const companies = (window.Store ? await Store.getCompanies() : await api.invoke('companies:list')) || [];
+    const opts = ['<option value="">Select a company…</option>'];
+    companies.forEach(c => {
+      const id = c.id ?? c.rid;
+      opts.push(`<option value="${id}">${escapeHtml(c.name) || '(unnamed)'}</option>`);
+    });
+    sel.innerHTML = opts.join('');
+  } catch (e) {
+    sel.innerHTML = '<option value="">Could not load companies</option>';
+  }
+}
+
 function showDbaConfirm(type) {
   // Hide all other confirms first
-  ['timeclock','companies','full'].forEach(t => {
+  ['timeclock','company','companies','full'].forEach(t => {
     if (t !== type) hideDbaConfirm(t);
   });
+  // Per-company clear requires a company to be selected first.
+  if (type === 'company') {
+    const sel = document.getElementById('dba-company-select');
+    if (!sel || !sel.value) {
+      Shell.toast('Choose a company to clear first.', 'error', 3000);
+      return;
+    }
+    const nameEl = document.getElementById('dba-company-name');
+    if (nameEl) nameEl.textContent = sel.options[sel.selectedIndex]?.text || 'this company';
+  }
   const el = document.getElementById(`dba-confirm-${type}`);
   if (el) { el.style.display = ''; document.getElementById(`dba-input-${type}`)?.focus(); }
 }
@@ -972,9 +1039,17 @@ async function executeDbaClear(type) {
     Shell.toast('Type CONFIRM exactly to proceed.', 'error', 3000);
     return;
   }
-  const channel = type === 'full' ? 'db:clear-full' : type === 'companies' ? 'db:clear-companies' : 'db:clear-timeclock';
   try {
-    const res = await api.invoke(channel);
+    let res;
+    if (type === 'company') {
+      const sel = document.getElementById('dba-company-select');
+      const companyId = sel ? Number(sel.value) : NaN;
+      if (!companyId) { Shell.toast('Choose a company to clear first.', 'error', 3000); return; }
+      res = await api.invoke('db:clear-timeclock-company', { companyId });
+    } else {
+      const channel = type === 'full' ? 'db:clear-full' : type === 'companies' ? 'db:clear-companies' : 'db:clear-timeclock';
+      res = await api.invoke(channel);
+    }
     if (!res?.ok) { Shell.toast('Clear failed — check console.', 'error'); return; }
     hideDbaConfirm(type);
     closeSettingsModal();
@@ -982,7 +1057,10 @@ async function executeDbaClear(type) {
       Shell.toast('Profile wiped. Returning to profile selector…', 'info', 2000);
       setTimeout(() => api.send('navigate', 'login'), 2000);
     } else {
-      Shell.toast(type === 'companies' ? 'All companies and time data cleared.' : 'Time clock data cleared.', 'success', 3000);
+      const msg = type === 'companies' ? 'All companies and time data cleared.'
+                : type === 'company'   ? 'Time clock data cleared for the selected company.'
+                : 'Time clock data cleared.';
+      Shell.toast(msg, 'success', 3000);
       setTimeout(() => location.reload(), 1500);
     }
   } catch(e) { Shell.toast('Error: ' + e.message, 'error'); }

@@ -20,6 +20,13 @@ let activeLunchId = null;   // in-progress lunch task_item id, or null
 let auditPolicy   = null;   // US-state break/lunch policy from audit:get-policy
 let complianceTimer = null; // 60s tick refreshing the compliance status lines
 
+// Display-only 12h/24h formatting. Stored/internal value is always 24h HH:MM
+// (gotcha #8); this only affects how an already-stored time is shown.
+function fmtClock(hhmm) {
+  // Settings is a top-level const (not a window property) — guard via typeof.
+  return (hhmm && typeof Settings !== 'undefined') ? Settings.formatTime(hhmm) : hhmm;
+}
+
 document.getElementById('log-date').valueAsDate = new Date();
 
 window.addEventListener('DOMContentLoaded', async () => {
@@ -61,6 +68,13 @@ window.addEventListener('DOMContentLoaded', async () => {
     const tr = td.closest('tr');
     startEdit(td, parseInt(tr.dataset.idx), td.dataset.field);
   });
+
+  // Live 12h/24h switch — re-render already-drawn rows in place (no reload).
+  document.addEventListener('ct:settings-changed', e => {
+    if (e.detail?.key === 'timeFormat') { renderTable(); updateTotals(); }
+  });
+
+  await initColResize();
 
   window.addEventListener('beforeunload', clearAutoSaveTimer);
 
@@ -319,6 +333,94 @@ function renderTable() {
   tbody.innerHTML = rowsData.map((r, idx) => rowHTML(r, idx)).join('');
 }
 
+// ── Resizable columns ──
+// Widths are stored as percentages summing to 100 so the table keeps its
+// overall size and dragging a divider redistributes width with its neighbour
+// (internal widths change, total stays fixed). Persisted per-profile under
+// ui_trackerColWidths; double-click a divider resets to defaults.
+const COLW_KEY      = 'ui_trackerColWidths';
+const DEFAULT_COLPX = [36, 24, 120, 140, 220, 85, 85, 80]; // #, dot, Label, Name, Desc, In, Out, Total
+const MIN_COL_PCT   = 3;
+let colPcts = null;
+
+function pxToPct(arr) {
+  const sum = arr.reduce((a, b) => a + b, 0);
+  return arr.map(w => (w / sum) * 100);
+}
+
+function applyColWidths() {
+  const cols = document.querySelectorAll('#tracker-table colgroup col');
+  cols.forEach((c, i) => { if (colPcts[i] != null) c.style.width = colPcts[i] + '%'; });
+}
+
+async function initColResize() {
+  let pcts = null;
+  try {
+    const saved = await api.invoke('settings:get', COLW_KEY);
+    if (saved) pcts = JSON.parse(saved);
+  } catch {}
+  if (!Array.isArray(pcts) || pcts.length !== DEFAULT_COLPX.length) pcts = pxToPct(DEFAULT_COLPX);
+  colPcts = pcts;
+  applyColWidths();
+  installColResizers();
+}
+
+function installColResizers() {
+  const ths = document.querySelectorAll('#tracker-table thead th');
+  ths.forEach((th, i) => {
+    if (i >= ths.length - 1) return;              // last column has no right divider
+    if (th.querySelector('.col-resizer')) return; // idempotent
+    const h = document.createElement('div');
+    h.className = 'col-resizer';
+    h.title = 'Drag to resize · double-click to reset';
+    h.addEventListener('mousedown', e => startColDrag(e, i, h));
+    h.addEventListener('dblclick', e => { e.preventDefault(); e.stopPropagation(); resetColWidths(); });
+    th.appendChild(h);
+  });
+}
+
+function startColDrag(e, i, handle) {
+  e.preventDefault(); e.stopPropagation();
+  const table  = document.getElementById('tracker-table');
+  const tableW = table.getBoundingClientRect().width;
+  const startX = e.clientX;
+  const a0 = colPcts[i], b0 = colPcts[i + 1];
+  handle.classList.add('dragging');
+  document.body.style.cursor = 'col-resize';
+  document.body.style.userSelect = 'none';
+
+  const move = ev => {
+    let d = ((ev.clientX - startX) / tableW) * 100;
+    // Clamp so neither the dragged column nor its neighbour drops below the min.
+    d = Math.max(d, MIN_COL_PCT - a0);
+    d = Math.min(d, b0 - MIN_COL_PCT);
+    colPcts[i] = a0 + d;
+    colPcts[i + 1] = b0 - d;
+    applyColWidths();
+  };
+  const up = () => {
+    document.removeEventListener('mousemove', move);
+    document.removeEventListener('mouseup', up);
+    handle.classList.remove('dragging');
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    saveColWidths();
+  };
+  document.addEventListener('mousemove', move);
+  document.addEventListener('mouseup', up);
+}
+
+function resetColWidths() {
+  colPcts = pxToPct(DEFAULT_COLPX);
+  applyColWidths();
+  saveColWidths();
+  Shell.toast('Column widths reset.', 'info', 2000);
+}
+
+function saveColWidths() {
+  try { api.invoke('settings:set', { key: COLW_KEY, value: JSON.stringify(colPcts) }); } catch {}
+}
+
 function rowHTML(r, idx) {
   const filled = isRowFilled(r);
   const editableText = filled ? 'editable' : '';
@@ -331,9 +433,9 @@ function rowHTML(r, idx) {
     <td style="text-align:center;"><span class="${dotClass}"></span></td>
     <td class="${r.label?'cell-label':'cell-empty'} ${editableText}" data-field="label" title="${filled?'Double-click to edit':''}">${escapeHtml(r.label)||'—'}</td>
     <td class="${r.name?'cell-text':'cell-empty'} ${editableText}" data-field="name" title="${filled?'Double-click to edit':''}">${escapeHtml(r.name)||'—'}</td>
-    <td class="${r.desc?'cell-desc':'cell-empty'} ${editableText}" data-field="desc" title="${filled?'Double-click to edit':''}">${escapeHtml(r.desc)||'—'}</td>
-    <td class="cell-time ${r.clock_in?'has-time':''} ${editableIn}" data-field="clock_in" title="${r.clock_in?'Double-click to edit':''}">${r.clock_in||'—'}</td>
-    <td class="cell-time ${r.clock_out?'has-time':''} ${editableOut}" data-field="clock_out" title="${r.clock_out?'Double-click to edit':''}">${r.clock_out||'—'}</td>
+    <td class="${r.desc?'cell-desc':'cell-empty'} ${editableText}" data-field="desc" title="${r.desc?escapeHtml(r.desc):(filled?'Double-click to edit':'')}">${r.desc?`<span class="desc-clamp">${escapeHtml(r.desc)}</span>`:'—'}</td>
+    <td class="cell-time ${r.clock_in?'has-time':''} ${editableIn}" data-field="clock_in" title="${r.clock_in?'Double-click to edit':''}">${fmtClock(r.clock_in)||'—'}</td>
+    <td class="cell-time ${r.clock_out?'has-time':''} ${editableOut}" data-field="clock_out" title="${r.clock_out?'Double-click to edit':''}">${fmtClock(r.clock_out)||'—'}</td>
     <td class="cell-duration" data-field="duration">${r.total_mins>0?formatMins(r.total_mins):'—'}</td>
   </tr>`;
 }
@@ -447,9 +549,16 @@ function addManualRow() {
 function startEdit(cell, idx, field) {
   const row = rowsData[idx];
   if (!row) return;
-  const current = cell.textContent === '—' ? '' : cell.textContent;
   const isTime  = field === 'clock_in' || field === 'clock_out';
+  // Time cells display in the 12h/24h preference, but editing is always raw 24h
+  // HH:MM (gotcha #8) — seed from the stored value, not the formatted cell text.
+  const current = isTime ? (row[field] || '')
+                : cell.textContent === '—' ? '' : cell.textContent;
   const isLabel = field === 'label';
+  const isDesc  = field === 'desc';
+  // Description seeds from the raw stored value (may contain newlines), not the
+  // clamped/escaped cell text.
+  const seed = isDesc ? (row.desc || '') : current;
   const original = cell.innerHTML;
 
   let input;
@@ -462,6 +571,17 @@ function startEdit(cell, idx, field) {
       if (opt === current) o.selected = true;
       input.appendChild(o);
     });
+  } else if (isDesc) {
+    // Multi-line, auto-growing editor (Companies-notes style). Enter inserts a
+    // newline; Ctrl/Cmd+Enter or blur commits; Escape cancels.
+    input = document.createElement('textarea');
+    input.value = seed;
+    input.rows = Math.min(8, Math.max(2, seed.split('\n').length));
+    input.placeholder = 'Description… (Enter for new line, Ctrl+Enter to save)';
+    input.style.cssText = 'font-family:var(--sans);font-size:12px;line-height:1.5;background:var(--surface-2);color:var(--text-bright);border:1px solid var(--accent);border-radius:4px;width:100%;padding:4px 6px;resize:vertical;min-height:48px;user-select:text;-webkit-user-select:text;';
+    const grow = () => { input.style.height = 'auto'; input.style.height = Math.min(200, input.scrollHeight) + 'px'; };
+    input.addEventListener('input', grow);
+    setTimeout(grow, 0);
   } else {
     input = document.createElement('input');
     input.type = 'text'; input.value = current;
@@ -502,7 +622,13 @@ function startEdit(cell, idx, field) {
 
   input.addEventListener('blur', commit);
   input.addEventListener('keydown', e => {
-    if (e.key === 'Enter')  { input.removeEventListener('blur', commit); commit(); }
+    // Description is multi-line: plain Enter inserts a newline, Ctrl/Cmd+Enter
+    // commits. Single-line fields commit on plain Enter.
+    if (e.key === 'Enter') {
+      if (isDesc && !(e.ctrlKey || e.metaKey)) return;   // let the newline through
+      e.preventDefault();
+      input.removeEventListener('blur', commit); commit();
+    }
     // Detach the blur handler first — reverting innerHTML removes the input,
     // which would otherwise fire blur → commit and save the cancelled value.
     if (e.key === 'Escape') { input.removeEventListener('blur', commit); cell.innerHTML = original; }
@@ -620,7 +746,7 @@ function exportPDF() {
   let rows = '', total = 0;
   filledRows.forEach((r, i) => {
     total += r.total_mins||0;
-    rows += `<tr><td>${String(i+1).padStart(2,'0')}</td><td>${escapeHtml(r.label)}</td><td>${escapeHtml(r.name)}</td><td>${escapeHtml(r.desc)}</td><td>${r.clock_in||''}</td><td>${r.clock_out||''}</td><td>${formatMins(r.total_mins||0)}</td></tr>`;
+    rows += `<tr><td>${String(i+1).padStart(2,'0')}</td><td>${escapeHtml(r.label)}</td><td>${escapeHtml(r.name)}</td><td>${escapeHtml(flattenText(r.desc))}</td><td>${r.clock_in||''}</td><td>${r.clock_out||''}</td><td>${formatMins(r.total_mins||0)}</td></tr>`;
   });
 
   const breakdown = pdfLabelBreakdown(filledRows);

@@ -234,7 +234,7 @@
   .flag-warn      { background: var(--yellow-dim); color: var(--yellow); border: 1px solid rgba(245,158,11,0.3); }
   .flag-error     { background: var(--red-dim);    color: var(--red);    border: 1px solid rgba(239,68,68,0.3); }
   .flag-info      { background: var(--blue-dim);   color: var(--blue);   border: 1px solid rgba(96,165,250,0.3); }
-  .flag-dismissed { background: var(--surface-2);  color: var(--text-dim); border: 1px solid var(--border); opacity: 0.5; }
+  .flag-dismissed { background: var(--surface-2);  color: var(--text-muted); border: 1px solid var(--border-light); }
 
   .audit-toolbar {
     display: flex; align-items: center; gap: 10px;
@@ -261,8 +261,8 @@
     background: transparent; cursor: pointer; transition: all var(--transition);
     white-space: nowrap;
   }
-  .audit-row-btn.dismiss { color: var(--text-dim); }
-  .audit-row-btn.dismiss:hover { border-color: var(--text-muted); color: var(--text-muted); }
+  .audit-row-btn.dismiss { color: var(--text-muted); }
+  .audit-row-btn.dismiss:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
   .audit-row-btn.fix { color: var(--green); border-color: rgba(16,185,129,0.4); }
   .audit-row-btn.fix:hover { background: var(--green-dim); }
   .audit-suggest {
@@ -270,7 +270,7 @@
     font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     max-width: 200px;
   }
-  tr.audit-dismissed-row td { opacity: 0.4; }
+  tr.audit-dismissed-row td { opacity: 0.7; }
 
   /* ── Tab panels ── */
   .tab-panel { display: none; flex-direction: column; flex: 1; min-height: 0; }
