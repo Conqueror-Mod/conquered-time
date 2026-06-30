@@ -36,7 +36,7 @@ A secure, locally-encrypted desktop time tracker built for remote professionals 
 - **Electron security** — contextIsolation enabled, nodeIntegration disabled, sandboxed renderers, whitelisted IPC channels, strict Content-Security-Policy (`script-src 'self'` on every page — no inline scripts or event handlers)
 - **Centralized data layer** — shared Store / IPC / Validator modules give the renderer one source of truth for fetching, record-ID normalization, and input validation
 - **Cross-navigation caching** — a main-process read cache reuses decrypted company/entry data across page navigations, so the dashboard, companies, and reports don't re-decrypt your history on every visit
-- **Easter egg** — Konami code on the profile selector reveals a hidden ASCII hourglass
+
 
 ---
 
