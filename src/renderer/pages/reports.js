@@ -638,7 +638,7 @@ function exportCSV() {
     try {
       JSON.parse(e.rows_json||'[]').forEach(r => {
         if (!r.clock_in && !r.label && !r.name) return;
-        rows.push([e.log_date, co?.name||`#${e.company_id}`, r.label||'', r.name||'', r.desc||'', r.clock_in||'', r.clock_out||'', r.total_mins||0, fmtM(r.total_mins)]);
+        rows.push([e.log_date, co?.name||`#${e.company_id}`, r.label||'', r.name||'', flattenText(r.desc), r.clock_in||'', r.clock_out||'', r.total_mins||0, fmtM(r.total_mins)]);
       });
     } catch {}
   });

@@ -2021,7 +2021,9 @@ async function doSendReport({ htmlContent, subject, recipients, entriesOverride 
     try {
       JSON.parse(e.rows_json || '[]').forEach(r => {
         if (!r.label && !r.name && !r.clock_in) return;
-        csvRows.push([e.log_date, companies[Number(e.company_id)] || '', e.session_label || '', r.label || '', r.name || '', r.desc || r.description || '', r.clock_in || '', r.clock_out || '', r.total_mins || 0]);
+        // Flatten multi-line descriptions so the CSV column stays single-line.
+        const descFlat = String(r.desc || r.description || '').replace(/\s+/g, ' ').trim();
+        csvRows.push([e.log_date, companies[Number(e.company_id)] || '', e.session_label || '', r.label || '', r.name || '', descFlat, r.clock_in || '', r.clock_out || '', r.total_mins || 0]);
       });
     } catch {}
   });

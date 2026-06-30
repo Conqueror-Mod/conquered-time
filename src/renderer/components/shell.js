@@ -15,6 +15,15 @@ window.escapeHtml = function (v) {
     .replace(/'/g, '&#39;');
 };
 
+// Collapse newlines + runs of whitespace into single spaces. Used to flatten
+// multi-line Description text for PDF/CSV/email exports so the fixed-layout
+// report tables never break on a long or multi-line description. The stored
+// value keeps its newlines; only the exported rendering is flattened.
+window.flattenText = function (v) {
+  if (v == null) return '';
+  return String(v).replace(/\s+/g, ' ').trim();
+};
+
 const Shell = (() => {
 
   const IC = {

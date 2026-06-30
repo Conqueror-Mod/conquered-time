@@ -343,7 +343,7 @@ function rowHTML(r, idx) {
     <td style="text-align:center;"><span class="${dotClass}"></span></td>
     <td class="${r.label?'cell-label':'cell-empty'} ${editableText}" data-field="label" title="${filled?'Double-click to edit':''}">${escapeHtml(r.label)||'—'}</td>
     <td class="${r.name?'cell-text':'cell-empty'} ${editableText}" data-field="name" title="${filled?'Double-click to edit':''}">${escapeHtml(r.name)||'—'}</td>
-    <td class="${r.desc?'cell-desc':'cell-empty'} ${editableText}" data-field="desc" title="${filled?'Double-click to edit':''}">${escapeHtml(r.desc)||'—'}</td>
+    <td class="${r.desc?'cell-desc':'cell-empty'} ${editableText}" data-field="desc" title="${r.desc?escapeHtml(r.desc):(filled?'Double-click to edit':'')}">${r.desc?`<span class="desc-clamp">${escapeHtml(r.desc)}</span>`:'—'}</td>
     <td class="cell-time ${r.clock_in?'has-time':''} ${editableIn}" data-field="clock_in" title="${r.clock_in?'Double-click to edit':''}">${fmtClock(r.clock_in)||'—'}</td>
     <td class="cell-time ${r.clock_out?'has-time':''} ${editableOut}" data-field="clock_out" title="${r.clock_out?'Double-click to edit':''}">${fmtClock(r.clock_out)||'—'}</td>
     <td class="cell-duration" data-field="duration">${r.total_mins>0?formatMins(r.total_mins):'—'}</td>
@@ -465,6 +465,10 @@ function startEdit(cell, idx, field) {
   const current = isTime ? (row[field] || '')
                 : cell.textContent === '—' ? '' : cell.textContent;
   const isLabel = field === 'label';
+  const isDesc  = field === 'desc';
+  // Description seeds from the raw stored value (may contain newlines), not the
+  // clamped/escaped cell text.
+  const seed = isDesc ? (row.desc || '') : current;
   const original = cell.innerHTML;
 
   let input;
@@ -477,6 +481,17 @@ function startEdit(cell, idx, field) {
       if (opt === current) o.selected = true;
       input.appendChild(o);
     });
+  } else if (isDesc) {
+    // Multi-line, auto-growing editor (Companies-notes style). Enter inserts a
+    // newline; Ctrl/Cmd+Enter or blur commits; Escape cancels.
+    input = document.createElement('textarea');
+    input.value = seed;
+    input.rows = Math.min(8, Math.max(2, seed.split('\n').length));
+    input.placeholder = 'Description… (Enter for new line, Ctrl+Enter to save)';
+    input.style.cssText = 'font-family:var(--sans);font-size:12px;line-height:1.5;background:var(--surface-2);color:var(--text-bright);border:1px solid var(--accent);border-radius:4px;width:100%;padding:4px 6px;resize:vertical;min-height:48px;user-select:text;-webkit-user-select:text;';
+    const grow = () => { input.style.height = 'auto'; input.style.height = Math.min(200, input.scrollHeight) + 'px'; };
+    input.addEventListener('input', grow);
+    setTimeout(grow, 0);
   } else {
     input = document.createElement('input');
     input.type = 'text'; input.value = current;
@@ -517,7 +532,13 @@ function startEdit(cell, idx, field) {
 
   input.addEventListener('blur', commit);
   input.addEventListener('keydown', e => {
-    if (e.key === 'Enter')  { input.removeEventListener('blur', commit); commit(); }
+    // Description is multi-line: plain Enter inserts a newline, Ctrl/Cmd+Enter
+    // commits. Single-line fields commit on plain Enter.
+    if (e.key === 'Enter') {
+      if (isDesc && !(e.ctrlKey || e.metaKey)) return;   // let the newline through
+      e.preventDefault();
+      input.removeEventListener('blur', commit); commit();
+    }
     // Detach the blur handler first — reverting innerHTML removes the input,
     // which would otherwise fire blur → commit and save the cancelled value.
     if (e.key === 'Escape') { input.removeEventListener('blur', commit); cell.innerHTML = original; }
@@ -635,7 +656,7 @@ function exportPDF() {
   let rows = '', total = 0;
   filledRows.forEach((r, i) => {
     total += r.total_mins||0;
-    rows += `<tr><td>${String(i+1).padStart(2,'0')}</td><td>${escapeHtml(r.label)}</td><td>${escapeHtml(r.name)}</td><td>${escapeHtml(r.desc)}</td><td>${r.clock_in||''}</td><td>${r.clock_out||''}</td><td>${formatMins(r.total_mins||0)}</td></tr>`;
+    rows += `<tr><td>${String(i+1).padStart(2,'0')}</td><td>${escapeHtml(r.label)}</td><td>${escapeHtml(r.name)}</td><td>${escapeHtml(flattenText(r.desc))}</td><td>${r.clock_in||''}</td><td>${r.clock_out||''}</td><td>${formatMins(r.total_mins||0)}</td></tr>`;
   });
 
   const breakdown = pdfLabelBreakdown(filledRows);

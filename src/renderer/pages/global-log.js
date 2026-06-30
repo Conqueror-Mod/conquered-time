@@ -137,7 +137,7 @@ function renderTable() {
             ${hasDetail ? rows.filter(r=>r.label||r.name).map(r=>`
               <div class="detail-task">
                 <div class="detail-task-label">${escapeHtml(r.label)||'—'}</div>
-                <div class="detail-task-name">${escapeHtml(r.name)}${r.desc?' — '+escapeHtml(r.desc):''}</div>
+                <div class="detail-task-name">${escapeHtml(r.name)}${r.desc?' — '+escapeHtml(flattenText(r.desc)):''}</div>
                 <div class="detail-task-time">${fmtClock(r.clock_in)||''}${r.clock_in&&r.clock_out?' → ':''}${fmtClock(r.clock_out)||''}</div>
                 <div class="detail-task-dur">${fmtHFull(r.total_mins)}</div>
               </div>
@@ -196,7 +196,7 @@ function exportAllPDF() {
     const taskRows=sRows.map((r,i)=>`<tr>
       <td>${String(i+1).padStart(2,'0')}</td>
       <td>${escapeHtml(r.label)}</td><td>${escapeHtml(r.name)}</td>
-      <td>${escapeHtml(r.desc||r.description)}</td>
+      <td>${escapeHtml(flattenText(r.desc||r.description))}</td>
       <td>${r.clock_in||''}</td><td>${r.clock_out||''}</td>
       <td>${fmtHFull(r.total_mins)}</td>
     </tr>`).join('');
@@ -262,7 +262,7 @@ function printTimesheet(co,dateStr,sessionLabel,rows,totalMins) {
   const taskRows=filledRows.map((r,i)=>`<tr>
     <td>${String(i+1).padStart(2,'0')}</td>
     <td>${escapeHtml(r.label)}</td><td>${escapeHtml(r.name)}</td>
-    <td>${escapeHtml(r.desc||r.description)}</td>
+    <td>${escapeHtml(flattenText(r.desc||r.description))}</td>
     <td>${r.clock_in||''}</td><td>${r.clock_out||''}</td>
     <td>${fmtHFull(r.total_mins)}</td>
   </tr>`).join('');
@@ -324,7 +324,7 @@ function exportCSV() {
     const co=compMap[e.company_id];
     safeParseRows(e.rows_json).filter(r=>r.label||r.name).forEach(r => {
       lines.push([csvCell(co?.name),csvCell(e.log_date),csvCell(e.session_label),
-        csvCell(r.label),csvCell(r.name),csvCell(r.desc||r.description),
+        csvCell(r.label),csvCell(r.name),csvCell(flattenText(r.desc||r.description)),
         csvCell(r.clock_in),csvCell(r.clock_out),r.total_mins||0].join(','));
     });
   });
