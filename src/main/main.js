@@ -1174,6 +1174,13 @@ ipcMain.handle('companies:save', (_, data) => {
 ipcMain.handle('companies:delete', (_, id) => {
   if (!sessionKey || !sessionUser) return { ok: false };
   const numId = Number(id);
+  // task_items are entry_id-scoped — delete them via subquery BEFORE the
+  // entries are removed, otherwise the company's break/lunch/Dispatch tasks
+  // are orphaned in the DB.
+  db.run(
+    'DELETE FROM task_items WHERE user_id=? AND entry_id IN (SELECT rowid FROM time_entries WHERE user_id=? AND company_id=?)',
+    [sessionUser.id, sessionUser.id, numId]
+  );
   db.run('DELETE FROM time_entries WHERE company_id=? AND user_id=?', [numId, sessionUser.id]);
   db.run('DELETE FROM companies WHERE rowid=? AND user_id=?', [numId, sessionUser.id]);
   persistDB(); performBackup();
