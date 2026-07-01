@@ -537,7 +537,16 @@ const Shell = (() => {
               </div>
 
               <div class="about-section">
-                <div class="about-section-title">What's New — v3.8</div>
+                <div class="about-section-title">What's New — v3.9</div>
+                <ul class="about-changelog">
+                  <li>Private beta access — new installs now ask for a beta key before account setup; existing installs are unaffected</li>
+                  <li>Branded setup wizard — welcome and finish pages, license agreement, and an install-for-all-users option</li>
+                  <li>Working links — Check for Updates, GitHub, and Support on Ko-fi are all live in Settings → About</li>
+                  <li>The login screen now matches your profile's theme after sign-out (no more mismatched colors)</li>
+                </ul>
+              </div>
+              <div class="about-section">
+                <div class="about-section-title">v3.8</div>
                 <ul class="about-changelog">
                   <li>Roomier Description field — write multi-line task notes in the tracker; they stay tidy in the table and flatten cleanly in PDF/CSV exports</li>
                   <li>Resize your tracker columns — drag the dividers to set column widths; double-click to reset. Your layout is remembered</li>
@@ -545,16 +554,6 @@ const Shell = (() => {
                   <li>Dispatch remembers your task — the timer field pre-fills with your current task, so restarting it is one click</li>
                   <li>Time format updates everywhere instantly when you switch 12-hour / 24-hour — no refresh needed</li>
                   <li>First-login note confirming your data is always encrypted, plus clearer Audit dismissed-row styling on dark themes</li>
-                </ul>
-              </div>
-              <div class="about-section">
-                <div class="about-section-title">v3.7</div>
-                <ul class="about-changelog">
-                  <li>Redesigned Time Tracker — a single Session Clock module (Clock In/Out, Break, Lunch in one place) beside roomier task fields</li>
-                  <li>Break &amp; Lunch now live in the Time Tracker, with at-a-glance compliance status — no need to hop over to Dispatch</li>
-                  <li>Manual Entry — backfill a session you forgot to clock by typing the times in directly</li>
-                  <li>Dispatch task picks now come from your current session's task names</li>
-                  <li>Clock format moved into Appearance settings; fixed a double-counting session timer</li>
                 </ul>
               </div>
               <div class="about-section">
