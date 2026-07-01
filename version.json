@@ -1,5 +1,5 @@
 {
-  "version": "3.8.0",
+  "version": "3.9.0",
   "downloadUrl": "https://github.com/Conqueror-Mod/conquered-time/releases/latest",
-  "notes": "v3.8 — Tracker & Dispatch quality-of-life: a multi-line Description editor, drag-to-resize tracker columns, a single-company time-clock clear in Settings → Data, and a Dispatch timer that pre-fills with your current task. Live 12-hour / 24-hour switching now updates already-shown times instantly, a first-login note confirms your data is always encrypted, and the Audit dismissed-row styling is clearer on dark themes."
+  "notes": "v3.9 — Private beta access: new installs now ask for a beta key before account setup (existing installs are unaffected). Also ships the branded installer introduced in 3.8.x: welcome and finish pages, license agreement, and an install-for-all-users option."
 }
