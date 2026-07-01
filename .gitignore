@@ -11,3 +11,5 @@ dev-data/
 .env
 .claude/settings.local.json
 .tmp-shots/
+# Private beta-key signing secret — never commit (example template IS tracked).
+src/shared/beta-secret.js

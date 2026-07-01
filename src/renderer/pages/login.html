@@ -688,6 +688,28 @@
     </div>
   </div>
 
+  <!-- ── Beta Access Gate (shown only on a fresh install) ── -->
+  <div class="login-card" id="beta-gate" style="display:none;">
+    <div class="login-brand">
+      <div class="login-brand-label">Early Access</div>
+      <div class="login-brand-name">CONQUERED</div>
+      <div class="login-brand-sub">Private Beta</div>
+    </div>
+    <div style="font-family:var(--sans);font-size:13px;color:var(--text);line-height:1.6;margin:4px 2px 14px;text-align:center;">
+      Conquered Time is in private beta. Enter your beta key to get started.
+    </div>
+    <div class="login-form">
+      <input type="text" id="beta-key-input" placeholder="CONQ-XXXXXX-XXXXXX-XXXXXX-XXXXXX"
+             autocomplete="off" spellcheck="false" autocapitalize="characters"
+             style="text-align:center;font-family:var(--mono);letter-spacing:0.5px;text-transform:uppercase;">
+      <div id="beta-error" style="display:none;font-family:var(--sans);font-size:12px;color:var(--red);text-align:center;margin-top:8px;"></div>
+      <button class="btn-primary" id="beta-redeem-btn" data-action="redeemBeta" style="width:100%;margin-top:12px;">⊕ Unlock</button>
+      <div style="font-family:var(--sans);font-size:11px;color:var(--text-muted);text-align:center;margin-top:14px;">
+        Don't have a key? <a href="#" data-action="betaRequestKey" style="color:var(--accent);text-decoration:none;">Request access</a>
+      </div>
+    </div>
+  </div>
+
   <!-- ── Lockout Screen ── -->
   <div class="lockout-screen" id="lockout-screen">
     <div class="lockout-icon">🔒</div>

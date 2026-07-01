@@ -49,6 +49,9 @@ function installLoginDelegation() {
     paArmDelete:            ()      => paArmDelete(),
     paExecuteDelete:        ()      => paExecuteDelete(),
     paDisarmDelete:         ()      => paDisarmDelete(),
+    // beta gate
+    redeemBeta:             ()      => redeemBeta(),
+    betaRequestKey:         ()      => api.send('shell:open-external', 'https://github.com/Conqueror-Mod/conquered-time'),
   };
 
   document.addEventListener('click', e => {
@@ -499,24 +502,13 @@ window.addEventListener('DOMContentLoaded', async () => {
     icon.innerHTML = show ? eyeClosed : eyeOpen;
   });
 
-  const profiles = await api.invoke('profiles:list');
-
-  if (profiles.length > 0) {
-    // Production with existing profiles → show selector
-    profileMode = true;
-    await showProfileSelector();
+  // Beta gate (new installs only) — a fresh machine must redeem a key before
+  // the setup form is offered. Existing installs / dev runs are never gated.
+  const beta = await api.invoke('beta:status');
+  if (beta && beta.required) {
+    showBetaGate();
   } else {
-    // No profiles yet (fresh install or dev mode) → legacy flow
-    const { needsSetup } = await api.invoke('auth:check-setup');
-    if (needsSetup) {
-      document.getElementById('tab-setup').style.display = '';
-      setMode('setup');
-      document.getElementById('gen-totp-btn').style.display = '';
-    } else {
-      document.getElementById('tab-setup').style.display = 'none';
-      showLoginCard(null);
-    }
-    document.getElementById('login-username').focus();
+    await routeInitialScreen();
   }
 
   // Single unified keydown handler
@@ -530,6 +522,9 @@ window.addEventListener('DOMContentLoaded', async () => {
       if (currentMode === 'setup' && profileMode) { goBackToSelector(); return; }
     }
     if (e.key === 'Enter') {
+      // Beta gate has priority while it's the visible card.
+      const betaGate = document.getElementById('beta-gate');
+      if (betaGate && betaGate.style.display !== 'none') { redeemBeta(); return; }
       if (currentMode === 'login') {
         // Quick Unlock / safe-login has its own Enter handling — don't let the
         // global handler also fire doLogin() against the empty full-login fields
@@ -547,6 +542,62 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
   });
 });
+
+// Decide the first screen once the beta gate (if any) is satisfied: profile
+// selector for existing installs, else the setup/login form for a fresh one.
+async function routeInitialScreen() {
+  const profiles = await api.invoke('profiles:list');
+  if (profiles.length > 0) {
+    profileMode = true;
+    await showProfileSelector();
+  } else {
+    const { needsSetup } = await api.invoke('auth:check-setup');
+    if (needsSetup) {
+      document.getElementById('tab-setup').style.display = '';
+      setMode('setup');
+      document.getElementById('gen-totp-btn').style.display = '';
+    } else {
+      document.getElementById('tab-setup').style.display = 'none';
+      showLoginCard(null);
+    }
+    document.getElementById('login-username').focus();
+  }
+}
+
+// ── Beta gate ──────────────────────────────────────────────────────────────
+function showBetaGate() {
+  document.getElementById('profile-selector').style.display = 'none';
+  document.getElementById('login-card').style.display = 'none';
+  document.getElementById('beta-gate').style.display = '';
+  setTimeout(() => document.getElementById('beta-key-input')?.focus(), 60);
+}
+
+function showBetaError(msg) {
+  const el = document.getElementById('beta-error');
+  if (el) { el.textContent = msg; el.style.display = ''; }
+}
+
+async function redeemBeta() {
+  const input = document.getElementById('beta-key-input');
+  const btn   = document.getElementById('beta-redeem-btn');
+  const key   = (input?.value || '').trim();
+  document.getElementById('beta-error').style.display = 'none';
+  if (!key) { showBetaError('Enter your beta key.'); input?.focus(); return; }
+  if (btn) btn.disabled = true;
+  try {
+    const res = await api.invoke('beta:redeem', key);
+    if (!res || !res.ok) {
+      showBetaError((res && res.error) || 'That key isn’t valid.');
+      if (btn) btn.disabled = false;
+      return;
+    }
+    document.getElementById('beta-gate').style.display = 'none';
+    await routeInitialScreen();   // continue to account setup
+  } catch (e) {
+    showBetaError('Something went wrong. Please try again.');
+    if (btn) btn.disabled = false;
+  }
+}
 
 function setMode(mode) {
   currentMode = mode;

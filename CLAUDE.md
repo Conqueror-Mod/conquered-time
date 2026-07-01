@@ -206,7 +206,7 @@ Native `<input type="time">` renders in the OS locale's format (often 12-hour wi
 
 #### Final / Release
 - **Package for multi-platform release** — Windows (done), macOS, Linux, iOS, Android, iOS Mobile; icon assets already prepared for Win/Mac/Linux
-- **Beta Keys** — gating mechanism for early access distribution
+- **Beta Keys** ✅ — offline early-access gate. A key is a Crockford-base32 blob (`CONQ-XXXXXX-XXXXXX-XXXXXX-XXXXXX`) carrying a signed payload: `version|expiryDays(uint16 LE)|nonce` + a 10-byte HMAC-SHA256 truncation (`src/main/beta-keys.js`, pure + 10 unit tests). Shared-secret (HMAC) scheme — the secret lives in `src/shared/beta-secret.js` (**gitignored**; `beta-secret.example.js` is the tracked template) so it ships in builds but never in the public repo; `main.js` fails **open** (gate disabled) if the file is absent. Mint keys with `node scripts/gen-beta-key.mjs --expires YYYY-MM-DD [--count N] [--label ..]`. Gate is **new-installs-only**: `beta:status` returns `required:true` only when `!IS_DEV && secret present && no profiles exist && no redeemed key`; a redeemed key is stored in the app-global `app-prefs.json` (`betaKey`). The login screen shows a branded `#beta-gate` card (login.html/login.js `showBetaGate`/`redeemBeta`, routed through `routeInitialScreen`) before account setup; `beta:redeem` validates + reports a clear expired/invalid message. Dev runs and existing installs are never gated. Note: offline validation can't remotely revoke a single key mid-beta — expiry is the lever; and the check is bypassable by patching the binary (fine for a free beta gate, not DRM).
 - **Contributions / monetization** — Patreon, app purchase, or similar; to be designed once feature set is locked
 
 ---
