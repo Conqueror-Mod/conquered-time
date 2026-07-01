@@ -23,7 +23,8 @@ const ALLOWED_INVOKE = new Set([
   'win:get-displays', 'win:move-to-display',
   'win:set-launch-at-startup', 'win:get-launch-at-startup',
   'win:get-close-to-tray', 'win:set-close-to-tray',
-  'win:get-start-minimized', 'win:set-start-minimized'
+  'win:get-start-minimized', 'win:set-start-minimized',
+  'beta:status', 'beta:redeem'
 ]);
 
 const ALLOWED_SEND = new Set([

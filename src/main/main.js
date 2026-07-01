@@ -8,6 +8,14 @@ const nodemailer = require('nodemailer');
 const { execFile } = require('child_process');
 const { encrypt, decrypt, deriveKey, reEncryptVault: reEncryptVaultCore, migrateTimeEntries: migrateTimeEntriesCore } = require('./vault-crypto');
 const { createReadCache } = require('./read-cache');
+const betaKeys = require('./beta-keys');
+
+// Beta-key signing secret — private, gitignored, bundled into builds. If the
+// file is absent (e.g. a fresh clone), the gate fails OPEN (disabled) so the
+// app still runs; a missing secret must never brick the app.
+let BETA_SECRET = null;
+try { BETA_SECRET = require('../shared/beta-secret'); }
+catch { console.warn('[beta] beta-secret.js not found — beta-key gate disabled.'); }
 
 // ── Single instance lock ───────────────────────────────────────────────────
 const gotLock = app.requestSingleInstanceLock();
@@ -56,6 +64,42 @@ function setAppPref(key, val) {
   try { fs.writeFileSync(APP_PREFS_FILE, JSON.stringify(p, null, 2)); }
   catch (e) { console.error('[app-prefs] write failed:', e.message); }
 }
+
+// ── Beta-key gate ──────────────────────────────────────────────────────────
+// Gate NEW installs only: a fresh machine (no profiles yet, no redeemed key)
+// must enter a valid beta key before account setup. Existing installs (any
+// profile already present) and dev runs are never gated.
+function profilesExist() {
+  if (IS_DEV || !PROFILES_DIR || !fs.existsSync(PROFILES_DIR)) return false;
+  try {
+    return fs.readdirSync(PROFILES_DIR)
+      .some(name => fs.existsSync(path.join(PROFILES_DIR, name, 'profile-manifest.json')));
+  } catch { return false; }
+}
+
+function betaGateRequired() {
+  if (IS_DEV || !BETA_SECRET) return false;          // dev / no-secret → open
+  if (profilesExist()) return false;                  // existing install → grandfathered
+  const stored = getAppPref('betaKey', null);         // already redeemed on this machine?
+  if (stored && betaKeys.verifyKey(BETA_SECRET, stored).valid) return false;
+  return true;
+}
+
+ipcMain.handle('beta:status', () => ({ required: betaGateRequired() }));
+
+ipcMain.handle('beta:redeem', (_, key) => {
+  if (!BETA_SECRET) return { ok: true };              // gate disabled → accept
+  const res = betaKeys.verifyKey(BETA_SECRET, key);
+  if (!res.valid) {
+    const msg = res.reason === 'expired'
+      ? `This beta key expired on ${res.expiry.toISOString().slice(0, 10)}.`
+      : 'That beta key isn’t valid. Check for typos and try again.';
+    return { ok: false, error: msg, reason: res.reason };
+  }
+  setAppPref('betaKey', String(key).trim());
+  setAppPref('betaRedeemedAt', new Date().toISOString());
+  return { ok: true, expiry: res.expiry.toISOString().slice(0, 10) };
+});
 
 // ── In-memory session state ────────────────────────────────────────────────
 let sessionKey  = null;
