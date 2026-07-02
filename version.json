@@ -1,5 +1,5 @@
 {
-  "version": "3.9.0",
+  "version": "3.10.0",
   "downloadUrl": "https://github.com/Conqueror-Mod/conquered-time/releases/latest",
-  "notes": "v3.9 — Private beta access: new installs now ask for a beta key before account setup (existing installs are unaffected). Also ships the branded installer introduced in 3.8.x: welcome and finish pages, license agreement, and an install-for-all-users option."
+  "notes": "v3.10 — Quality release: 14 bug fixes from a full-app stress-test campaign. Highlights: company-web nodes now fit long names, 12-hour time entry (AM/PM) in the tracker, same-date session picker, description-only rows now audited and exported, orphaned running tasks auto-recover at login, and future-dated sessions are badged."
 }
