@@ -296,7 +296,10 @@
   </div>
   <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;">
     <div class="totals">Entries: <span id="rows-done">0</span> filled · <span id="rows-total">0</span> total</div>
-    <div class="session-status" id="session-status"></div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <button class="btn-xs" id="btn-switch-session" style="display:none;" title="This date has multiple sessions">Switch session</button>
+      <div class="session-status" id="session-status"></div>
+    </div>
   </div>
 </div>
 

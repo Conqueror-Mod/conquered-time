@@ -676,3 +676,19 @@ hr.divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; 
 .tt-no-session strong { display: block; font-size: 15px; color: var(--text-white); margin-bottom: 8px; }
 .task-count-chip { cursor: pointer; }
 .task-count-chip:hover { border-color: var(--accent); color: var(--accent); }
+
+/* C6 (D-009): future-dated session badge (Global Log date column) */
+.future-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  font-family: var(--sans);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--yellow);
+  background: var(--yellow-dim);
+  border: 1px solid var(--yellow);
+  border-radius: 3px;
+  vertical-align: 1px;
+}

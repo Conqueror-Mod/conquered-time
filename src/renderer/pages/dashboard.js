@@ -43,7 +43,11 @@ async function loadData() {
   const compMap = {};
   companies.forEach(c => compMap[c.id] = c.name || '—');
 
-  const recent = [...allEntries].sort((a,b) => b.log_date.localeCompare(a.log_date)).slice(0, 8);
+  // C6 (D-009): future-dated entries don't belong in "Recent Activity" —
+  // they'd headline the list indefinitely. They stay visible (badged) in the
+  // Global Log instead.
+  const recent = allEntries.filter(e => e.log_date <= today)
+    .sort((a,b) => b.log_date.localeCompare(a.log_date)).slice(0, 8);
   const list   = document.getElementById('activity-list');
   if (recent.length === 0) return;
 
