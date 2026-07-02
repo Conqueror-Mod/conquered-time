@@ -352,7 +352,7 @@ function renderAuditLog() {
     const entryId = Number(e.id);
     try {
       JSON.parse(e.rows_json||'[]').forEach((r, idx) => {
-        if (!r.clock_in && !r.clock_out && !r.label && !r.name) return;
+        if (!RowUtils.rowHasContent(r)) return; // C3: keep in lockstep with main.js countAuditDiscrepancies
         const type = getAuditType(r);
         const dKey = `${entryId}:${idx}:${type}`;
         items.push({ date: e.log_date, company: co?.name || `#${e.company_id}`, entryId, rowIdx: idx, type, dKey, r });

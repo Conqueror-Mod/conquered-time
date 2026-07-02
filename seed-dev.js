@@ -39,16 +39,15 @@
  *  • App settings under REAL ui_* / win_* keys + ui_encryptionNoticeAck=1 so the
  *    first-login modal doesn't block automated sweeps.
  *
- *  AUDIT EXPECTATION = 6  (unchanged from v3)
+ *  AUDIT EXPECTATION = 7  (6 canonical + 1 desc-only probe)
  *  ─────────────────────
  *    6 canonical, all on the "Discrepancy Test Session":
  *      no_clock_in, no_clock_out, zero_duration, over_12h,
  *      missing_break, missing_lunch
- *    The edge session's desc-only row is a PROBE, not a flag: the audit's
- *    skip-filter checks clocks/label/name but NOT desc, so a row holding a
- *    description with no punch is SILENTLY IGNORED by the audit. Whether it
- *    should be flagged instead is a Define-phase question — the seed measures
- *    today's behaviour (ignored → count stays 6).
+ *    +1: the edge session's desc-only row. As of C3 (PR #44) the shared
+ *    rowHasContent() predicate includes desc, so a row holding a description
+ *    with no punch FLAGS as no_clock_in (it used to be silently unaudited —
+ *    that gap was defect D-004).
  *
  *  OTHER PROBES (not audit-flagged; the audit engine detects only the 6 types)
  *    • midnight-crossing row (23:30 → 00:15) — duration math/display
@@ -94,7 +93,7 @@ const EXPECT = {
   orphanTasks:    2,
   legacyEntries:  1,
   backups:        3,
-  discrepancies:  6,     // all on Entry 3; the desc-only row is IGNORED by the audit (see header)
+  discrepancies:  7,     // 6 on Entry 3 + the edge session's desc-only row (flagged since C3 / D-004 fix)
 };
 
 // ── Crypto (mirrors main.js exactly) ──────────────────────────────────────
@@ -475,9 +474,9 @@ async function seed() {
     'Line three has "double quotes", \'single quotes\', <angle brackets>, and a trailing run of text long enough to guarantee the clamp actually cuts: ' + 'word '.repeat(60)
   ].join('\n');
   const edgeRows = [
-    // AUDIT PROBE (no flag): desc-only row — the audit's skip filter checks
-    // clocks/label/name but NOT desc, so this row is silently ignored.
-    { label: '', name: '', desc: 'Desc-only row — probes the audit skip-filter gap (currently ignored).', total_mins: 0, clock_in: '', clock_out: '' },
+    // AUDIT PROBE (flags no_clock_in since C3): desc-only row — user content
+    // with no punch. rowHasContent() includes desc, so the audit sees it.
+    { label: '', name: '', desc: 'Desc-only row — probes the desc-aware row predicate (audit flags no_clock_in; visible in log detail + exports).', total_mins: 0, clock_in: '', clock_out: '' },
     // Midnight-crossing: display/duration-math probe (audit ignores; total set already)
     { label: 'Other', name: 'Night shift wrap', desc: 'Crosses midnight — 23:30 → 00:15.', total_mins: 45, clock_in: timeStr(23, 30), clock_out: timeStr(0, 15) },
     // Boundary + stored-vs-span drift: 00:00→23:59 span (1439m) but stored 45m
@@ -648,7 +647,7 @@ async function seed() {
   } catch {}
   expect('company.decrypt_roundtrip', true, decOk);
   // Replicate the audit detector to assert the expected count BEFORE the app runs.
-  // Breakdown: 6 canonical (Entry 3) + 1 desc-only probe (edge session) = 7.
+  // Breakdown: 6 canonical (Entry 3) + 1 desc-only probe (edge session, no_clock_in) = 7.
   const expectedDiscrepancies = computeExpectedDiscrepancies(db, userId, sessionKey);
   expect('audit.discrepancies', EXPECT.discrepancies, expectedDiscrepancies);
 
@@ -687,9 +686,11 @@ function computeExpectedDiscrepancies(db, userId, sessionKey) {
     let parsed = [];
     try { parsed = JSON.parse(decrypt(enc, iv, tag, sessionKey)); } catch {}
     parsed.forEach((r) => {
-      // Exact mirror of main.js's skip filter. It does NOT check r.desc, so a
-      // desc-only row is silently ignored — that IS the probe's finding.
-      if (!r.clock_in && !r.clock_out && !r.label && !r.name) return;
+      // Exact mirror of main.js's rowHasContent() (src/renderer/row-utils.js):
+      // any punch, label, name, OR description counts (C3 / D-004).
+      const desc = r.desc || r.description || '';
+      if (!String(r.clock_in||'').trim() && !String(r.clock_out||'').trim() &&
+          !String(r.label||'').trim() && !String(r.name||'').trim() && !String(desc).trim()) return;
       if (!r.clock_in) count++;
       else if (!r.clock_out) count++;
       else if (!r.total_mins) count++;
@@ -788,11 +789,12 @@ function printPacket() {
   B  log.pdf_export ........... PDF: NavID absent; long/unicode names don't break layout
 
 ── 7. REPORTS & AUDIT ────────────────────────────────────────────
-  A  aud.discrepancy_count .... EXACTLY 6 issues, all on 'Discrepancy Test
-        Session': no_clock_in, no_clock_out, zero_duration, over_12h,
-        missing_break, missing_lunch
-  A  aud.desc_only_ignored .... the edge session's desc-only row is NOT
-        flagged (audit skip-filter ignores desc — probe P1; note the finding)
+  A  aud.discrepancy_count .... EXACTLY 7 issues: 6 on 'Discrepancy Test
+        Session' (no_clock_in, no_clock_out, zero_duration, over_12h,
+        missing_break, missing_lunch) + 1 no_clock_in on the edge session's
+        desc-only row (desc-aware predicate — C3/D-004 fix)
+  A  aud.desc_only_flagged .... the edge session's desc-only row IS flagged
+        AND appears in Global Log detail + CSV/PDF exports (probe P1)
   A  aud.clean_sessions ....... volume/canonical clean sessions show NO issues
   A  aud.dismiss .............. Dismiss an issue → count drops to 5
   A  aud.apply_fix ............ Apply Fix on no_clock_out updates the row
@@ -817,8 +819,8 @@ function printPacket() {
   A  prof.avatar .............. seeded animated avatar shows in sidebar
 
 ── STRESS LEDGER — what each probe measures ──────────────────────
-  P1 desc-only row ......... audit filter gap (row with user content is
-        silently IGNORED today — should it flag?)
+  P1 desc-only row ......... desc-aware predicate (C3/D-004: flags
+        no_clock_in; visible in log detail + exports)
   P2 midnight crossing ..... duration math on 23:30→00:15
   P3 stored-vs-span drift .. 00:00→23:59 span vs stored 45m — which shows where?
   P4 custom label .......... fixed <select> vs foreign value — silent data loss?

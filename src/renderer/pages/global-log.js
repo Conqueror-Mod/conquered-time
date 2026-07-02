@@ -118,7 +118,7 @@ function renderTable() {
   tbody.innerHTML=filtered.map((e,idx) => {
     const co=compMap[e.company_id];
     const rows=safeParseRows(e.rows_json);
-    const hasDetail=rows.some(r=>r.label||r.name);
+    const hasDetail=rows.some(r=>RowUtils.rowHasContent(r));
     return `
       <tr data-idx="${idx}" style="cursor:pointer;">
         <td><span class="expand-arrow" id="arrow-${idx}">${hasDetail?'▶':''}</span></td>
@@ -134,7 +134,7 @@ function renderTable() {
       <tr class="detail-row" id="detail-${idx}">
         <td colspan="6">
           <div class="detail-inner">
-            ${hasDetail ? rows.filter(r=>r.label||r.name).map(r=>`
+            ${hasDetail ? rows.filter(r=>RowUtils.rowHasContent(r)).map(r=>`
               <div class="detail-task">
                 <div class="detail-task-label">${escapeHtml(r.label)||'—'}</div>
                 <div class="detail-task-name">${escapeHtml(r.name)}${r.desc?' — '+escapeHtml(flattenText(r.desc)):''}</div>
@@ -181,7 +181,7 @@ function exportAllPDF() {
   const dateFrom=sessions[0]?.log_date;
   const dateTo=sessions[sessions.length-1]?.log_date;
   const allRows=[];
-  sessions.forEach(e=>safeParseRows(e.rows_json).forEach(r=>{if(r.label||r.name)allRows.push(r);}));
+  sessions.forEach(e=>safeParseRows(e.rows_json).forEach(r=>{if(RowUtils.rowHasContent(r))allRows.push(r);}));
   const hierParts=co?[co.hier_company,co.hier_project,co.hier_platform,co.name].filter(Boolean).join(' › '):'—';
   const summaryBreakdown=buildLabelBreakdown(allRows);
   const summaryBdHtml=summaryBreakdown.length>=2?`
@@ -192,7 +192,7 @@ function exportAllPDF() {
       <tr class="total-row"><td>Total</td><td style="text-align:right;">${fmtHFull(grandTotal)}</td></tr></tbody>
     </table>`:'';
   const sessionBlocks=sessions.map(e=>{
-    const sRows=safeParseRows(e.rows_json).filter(r=>r.label||r.name);
+    const sRows=safeParseRows(e.rows_json).filter(r=>RowUtils.rowHasContent(r));
     const taskRows=sRows.map((r,i)=>`<tr>
       <td>${String(i+1).padStart(2,'0')}</td>
       <td>${escapeHtml(r.label)}</td><td>${escapeHtml(r.name)}</td>
@@ -258,7 +258,7 @@ function buildLabelBreakdown(rows) {
 
 function printTimesheet(co,dateStr,sessionLabel,rows,totalMins) {
   const hierParts=co?[co.hier_company,co.hier_project,co.hier_platform,co.name].filter(Boolean).join(' › '):'—';
-  const filledRows=rows.filter(r=>r.label||r.name);
+  const filledRows=rows.filter(r=>RowUtils.rowHasContent(r));
   const taskRows=filledRows.map((r,i)=>`<tr>
     <td>${String(i+1).padStart(2,'0')}</td>
     <td>${escapeHtml(r.label)}</td><td>${escapeHtml(r.name)}</td>
@@ -322,7 +322,7 @@ function exportCSV() {
   const lines=['Company,Date,Session,Task Label,Task Name,Description,Clock In,Clock Out,Duration (mins)'];
   filtered.forEach(e => {
     const co=compMap[e.company_id];
-    safeParseRows(e.rows_json).filter(r=>r.label||r.name).forEach(r => {
+    safeParseRows(e.rows_json).filter(r=>RowUtils.rowHasContent(r)).forEach(r => {
       lines.push([csvCell(co?.name),csvCell(e.log_date),csvCell(e.session_label),
         csvCell(r.label),csvCell(r.name),csvCell(flattenText(r.desc||r.description)),
         csvCell(r.clock_in),csvCell(r.clock_out),r.total_mins||0].join(','));

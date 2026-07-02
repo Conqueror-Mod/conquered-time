@@ -16,9 +16,9 @@ Status: `open` → `confirmed` (reproduced in sweep) → `clustered` → `fixed`
 | D-002 | S3 | Tracker | 12h/24h entry mismatch: display shows "2:30 AM" but the editor accepts only raw 24h with no AM/PM affordance — typing "2:30" meaning PM silently stores 02:30 AM | user-tracked | fixed (PR #41) |
 | D-010 | S2 | Tracker | SILENT DATA LOSS: double-clicking the Task Label of a row whose label isn't in the fixed list opens the select pre-set to "Training"; blurring with NO user choice commits "Training" over the original value | sweep B (probe P4) | fixed (PR #41) |
 | D-003 | S3 | Companies web | Spiderweb nodes don't expand for long company names; long names render badly | user-tracked | fixed (PR #43) |
-| D-004 | S3 | Reports/Audit | Audit skip-filter ignores desc-only rows (user content silently unaudited) — probe P1 | seed build | open |
+| D-004 | S3 | Reports/Audit | Audit skip-filter ignores desc-only rows (user content silently unaudited) — probe P1 | seed build | fixed (PR #44) |
 | D-008 | S3 | Companies | Details pane: long unbroken strings force pane-wide horizontal scrollbar; title lines clip at pane edge with no ellipsis | sweep C | fixed (PR #43) |
-| D-011 | S3 | Global Log/exports | Desc-blind row filters (cluster with D-004): a desc-only row is invisible in Global Log expanded detail AND absent from CSV export (likely PDF too — same `label\|\|name` predicate) | sweep D | confirmed |
+| D-011 | S3 | Global Log/exports | Desc-blind row filters (cluster with D-004): a desc-only row is invisible in Global Log expanded detail AND absent from CSV export (likely PDF too — same `label\|\|name` predicate) | sweep D | fixed (PR #44) |
 | D-012 | S2 | Dispatch | An in-progress task (or break) whose session has no open punch is invisible and unstoppable: entries:get-active returns null → Dispatch shows "No active punch", sidebar timer hidden — no recovery path for the running task | sweep E (probes P8/P9) | confirmed |
 | D-013 | S4 | Profile | Phone Number input is unstyled — stock white system input amid themed fields | sweep G | fixed (PR #42) |
 | D-009 | S4 | Dashboard | Future-dated session headlines "Recent Activity" with no visual distinction (also floats to top of audit/global lists) | sweep C | confirmed |
