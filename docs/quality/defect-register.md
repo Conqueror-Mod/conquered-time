@@ -12,7 +12,7 @@ Status: `open` → `confirmed` (reproduced in sweep) → `clustered` → `fixed`
 |----|-----|------|---------|--------|--------|
 | D-001 | S3 | Reports/Audit | "Email Me" button illegible on darker themes | user-tracked | fixed (PR #42) |
 | D-006 | S4 | Reports | Company Breakdown cards don't clamp long names/hierarchy — 120-char name balloons the card and misaligns its stats row | sweep A | fixed (PR #43) |
-| D-007 | S3 | Reports/Audit | Break/lunch suggestion says "Texas law requires…" for default-policy states — implies a state legal mandate that doesn't exist (TX has no such law; it's the app's default policy) | sweep A | confirmed |
+| D-007 | S3 | Reports/Audit | Break/lunch suggestion says "Texas law requires…" for default-policy states — implies a state legal mandate that doesn't exist (TX has no such law; it's the app's default policy) | sweep A | fixed (PR #45) |
 | D-002 | S3 | Tracker | 12h/24h entry mismatch: display shows "2:30 AM" but the editor accepts only raw 24h with no AM/PM affordance — typing "2:30" meaning PM silently stores 02:30 AM | user-tracked | fixed (PR #41) |
 | D-010 | S2 | Tracker | SILENT DATA LOSS: double-clicking the Task Label of a row whose label isn't in the fixed list opens the select pre-set to "Training"; blurring with NO user choice commits "Training" over the original value | sweep B (probe P4) | fixed (PR #41) |
 | D-003 | S3 | Companies web | Spiderweb nodes don't expand for long company names; long names render badly | user-tracked | fixed (PR #43) |

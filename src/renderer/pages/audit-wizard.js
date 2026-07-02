@@ -44,15 +44,15 @@ function localRequiredBreaks(totalMins, policy) {
 
 function auditMeta(type, r) {
   const p         = auditPolicy;
-  const stateName = p?.stateName || null;
+  const stateName = (p?.hasStatePolicy && p.stateName) || null; // C5 (D-007): law wording only for state-tier policies
   const lunchH    = p ? Math.round(p.lunchThreshMins / 60 * 10) / 10 : 5;
   const breakH    = policyBreakHours(p);
   const breakSugg = stateName
     ? `${stateName} law requires a rest break for shifts over ${breakH}h. Log break(s) in Dispatch.`
-    : `Policy requires rest breaks for shifts over ${breakH}h. Log break(s) in Dispatch.`;
+    : `Standard practice recommends a rest break for shifts over ${breakH}h. Log break(s) in Dispatch.`;
   const lunchSugg = stateName
     ? `A meal break is required after ${lunchH}h worked (${stateName}). Log a lunch in Dispatch.`
-    : `A meal break is required after ${lunchH}h worked. Log a lunch in Dispatch.`;
+    : `Standard practice recommends a meal break after ${lunchH}h worked. Log a lunch in Dispatch.`;
   switch (type) {
     case 'no_clock_in':   return { flag: '⚠ No clock-in',     cls: 'flag-error', suggestion: 'Enter a clock-in time in the Time Tracker.',        fix: null };
     case 'no_clock_out':  return { flag: '● No clock-out',     cls: 'flag-error', suggestion: 'Auto-set clock-out to clock-in + 8h.',              fix: 'set_clock_out' };

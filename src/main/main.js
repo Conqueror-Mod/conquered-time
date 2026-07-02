@@ -1515,6 +1515,10 @@ ipcMain.handle('audit:get-policy', () => {
   const safeThresholds = policy.breakThresholds.map(([t, c]) => [isFinite(t) ? t : null, c]);
   return {
     stateCode, stateName, policyLabel: policy.label,
+    // C5 (D-007): true only when the state has its OWN policy tier. Default-
+    // tier states (e.g. TX) must not get "<State> law requires…" copy — that
+    // implies a legal mandate that doesn't exist.
+    hasStatePolicy: !!(stateCode && STATE_POLICY[stateCode]),
     breakThresholds: safeThresholds,
     lunchThreshMins: policy.lunchThreshMins,
     dispatchBreakWarnMins: isFinite(policy.dispatchBreakWarnMins) ? policy.dispatchBreakWarnMins : null,
