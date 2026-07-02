@@ -4,9 +4,16 @@
 // Normalizes errors consistently so pages never need try/catch around invoke calls.
 window.IPC = (() => {
   // Read calls: return null on failure (callers guard with `|| []` / null-checks).
+  /**
+   * @param {keyof IpcInvokeMap} channel
+   * @param {...*} args
+   * @returns {Promise<any>} handler result, or null on failure
+   */
   async function call(channel, ...args) {
     try {
-      return await window.api.invoke(channel, ...args);
+      // JSDoc any-cast: the generic PreloadApi.invoke signature can't accept a
+      // spread — per-channel typing is enforced at the IpcWrapper surface instead.
+      return await /** @type {any} */ (window.api).invoke(channel, ...args);
     } catch (err) {
       console.error('[IPC]', channel, err);
       return null;
@@ -16,9 +23,14 @@ window.IPC = (() => {
   // Mutation calls: always resolve to an { ok, ... } object so callers can safely
   // do `if (res.ok)` without risking a `null.ok` TypeError when the invoke rejects
   // or a handler returns nothing.
+  /**
+   * @param {keyof IpcInvokeMap} channel
+   * @param {...*} args
+   * @returns {Promise<MutResult>}
+   */
   async function callMut(channel, ...args) {
     try {
-      const res = await window.api.invoke(channel, ...args);
+      const res = await /** @type {any} */ (window.api).invoke(channel, ...args);
       return (res && typeof res === 'object') ? res : { ok: false, error: 'No response from ' + channel };
     } catch (err) {
       console.error('[IPC]', channel, err);

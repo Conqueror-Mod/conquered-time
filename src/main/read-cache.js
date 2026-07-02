@@ -17,12 +17,24 @@
 //  session reset can never leak one profile's plaintext into another's session.
 // ════════════════════════════════════════════════════════════════════════════
 
+/**
+ * @returns {{ get: <T>(key: string, ownerId: unknown, compute: () => T) => T,
+ *             invalidate: (...keys: string[]) => void,
+ *             clear: () => void }}
+ */
 function createReadCache() {
   let owner = null;   // ownerId the cached values belong to
   let store = {};     // key → memoized value
 
   // Return the cached value for `key`, computing (and storing) it on a miss.
   // If `ownerId` differs from the cached owner, drop everything first.
+  /**
+   * @template T
+   * @param {string} key
+   * @param {unknown} ownerId
+   * @param {() => T} compute
+   * @returns {T}
+   */
   function get(key, ownerId, compute) {
     if (ownerId !== owner) { store = {}; owner = ownerId; }
     if (!(key in store)) store[key] = compute();
@@ -30,6 +42,7 @@ function createReadCache() {
   }
 
   // Drop specific keys (next read recomputes). Unknown keys are ignored.
+  /** @param {...string} keys */
   function invalidate(...keys) {
     for (const k of keys) delete store[k];
   }

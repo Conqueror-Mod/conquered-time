@@ -199,6 +199,7 @@ function syncSlider() {
   const slider = document.getElementById('crop-zoom-slider');
   const maxScale = cropMinScale * 4;
   const t = (cropScale - cropMinScale) / (maxScale - cropMinScale);
+  // @ts-ignore — number assigned to input value; DOM stringifies.
   slider.value = Math.round(t * 100);
 }
 
@@ -244,6 +245,7 @@ function handleAvatarUpload(e) {
     } else {
       const img = new Image();
       img.onload = () => openCropModal(img);
+      // @ts-ignore — FileReader was started with readAsDataURL, so result is a string.
       img.src = evt.target.result;
     }
   };
@@ -292,6 +294,7 @@ function initCropModal() {
 
   // Slider
   slider.addEventListener('input', () => {
+    // @ts-ignore — string/number division coerces; Phase 3 should Number() this.
     const t = slider.value / 100;
     const maxScale = cropMinScale * 4;
     const newScale = cropMinScale + t * (maxScale - cropMinScale);

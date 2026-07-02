@@ -170,6 +170,7 @@ function renderTaskList() {
     });
   }
   const count = completed.length;
+  // @ts-ignore — number assigned to textContent; DOM stringifies.
   document.getElementById('counter-num').textContent = count;
 
   const preview = document.getElementById('desc-preview');

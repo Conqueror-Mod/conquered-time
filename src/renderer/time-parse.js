@@ -12,6 +12,10 @@
   // parseClockInput('2:30 PM') → { ok:true, hhmm:'14:30' }
   // parseClockInput('14:30')   → { ok:true, hhmm:'14:30' }
   // parseClockInput('25:00')   → { ok:false }
+  /**
+   * @param {unknown} raw
+   * @returns {ParseClockResult}
+   */
   function parseClockInput(raw) {
     const m = String(raw || '').trim().match(/^(\d{1,2}):([0-5]\d)\s*([AaPp])\.?[Mm]?\.?$|^(\d{1,2}):([0-5]\d)$/);
     if (!m) return { ok: false };

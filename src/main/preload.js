@@ -38,8 +38,14 @@ const ALLOWED_RECEIVE = new Set([
   'audit:close-warning', 'audit:wizard-done'
 ]);
 
+// The exposed surface is typed as PreloadApi in types/globals.d.ts — the
+// IpcInvokeMap there is the single source of truth for channel payload shapes.
 contextBridge.exposeInMainWorld('api', {
   // Secure invoke (request/response)
+  /**
+   * @param {string} channel
+   * @param {...*} args
+   */
   invoke: (channel, ...args) => {
     if (!ALLOWED_INVOKE.has(channel)) {
       throw new Error(`Blocked IPC invoke: ${channel}`);
@@ -48,6 +54,10 @@ contextBridge.exposeInMainWorld('api', {
   },
 
   // Secure fire-and-forget
+  /**
+   * @param {string} channel
+   * @param {...*} args
+   */
   send: (channel, ...args) => {
     if (!ALLOWED_SEND.has(channel)) {
       throw new Error(`Blocked IPC send: ${channel}`);
@@ -56,6 +66,11 @@ contextBridge.exposeInMainWorld('api', {
   },
 
   // Secure event listener (main → renderer)
+  /**
+   * @param {string} channel
+   * @param {(...args: any[]) => void} callback
+   * @returns {() => void} unsubscribe
+   */
   on: (channel, callback) => {
     if (!ALLOWED_RECEIVE.has(channel)) {
       throw new Error(`Blocked IPC receive: ${channel}`);

@@ -17,7 +17,8 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
-    "test": "node --test",
+    "test": "node --test && npm run typecheck",
+    "typecheck": "tsc --noEmit",
     "seed": "node seed-dev.js",
     "build": "electron-builder --win --x64",
     "build:mac": "electron-builder --mac",
@@ -98,10 +99,12 @@
     "uuid": "^9.0.0"
   },
   "devDependencies": {
+    "@types/node": "^20.19.43",
     "electron": "^29.0.0",
     "electron-builder": "^24.9.1",
     "playwright-core": "^1.61.1",
     "png2icons": "^2.0.1",
-    "sharp": "^0.35.2"
+    "sharp": "^0.35.2",
+    "typescript": "^6.0.3"
   }
 }
