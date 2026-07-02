@@ -15,6 +15,16 @@ const {
   dbGet, dbAll, dbRun, dbInsert,
 } = require('./db');
 const { BREAK_POLICIES, STATE_POLICY, STATE_NAMES, getPolicy, requiredBreaks } = require('./policies');
+const {
+  session, initSession, decryptEntry,
+  lockSession, clearIdleTimer, resetIdleTimer, sweepOrphanTaskItems,
+} = require('./session');
+const { getDismissedSet, countAuditDiscrepancies } = require('./audit');
+const { setBackupDir, getBackupDir, performBackup } = require('./backups');
+const {
+  initEmail, getProfileEmail, profileEmailMissing, getEmailSmtpConfig,
+  doSendReport, computeNextSendDate, runScheduledEmailCheck,
+} = require('./email');
 const { rowHasContent } = require('../renderer/row-utils'); // shared "is this row real?" predicate (C3)
 const betaKeys = require('./beta-keys');
 
@@ -54,11 +64,11 @@ const PROFILES_DIR  = IS_DEV ? null : path.join(ROOT_DATA_DIR, 'profiles');
 // Mutable — set when a profile is selected via profiles:select (or auto-set in dev)
 // The vault file path itself lives in ./db (setDbFile/getDbFile) next to the handle.
 let ACTIVE_PROFILE_DIR = IS_DEV ? ROOT_DATA_DIR : null;
-let BACKUP_DIR         = IS_DEV ? path.join(ROOT_DATA_DIR, 'backups') : null;
+setBackupDir(IS_DEV ? path.join(ROOT_DATA_DIR, 'backups') : null);
 setDbFile(IS_DEV ? path.join(ROOT_DATA_DIR, 'dev-vault.db') : null);
 
 fs.mkdirSync(ROOT_DATA_DIR, { recursive: true });
-if (IS_DEV) fs.mkdirSync(BACKUP_DIR, { recursive: true });
+if (IS_DEV) fs.mkdirSync(getBackupDir(), { recursive: true });
 
 // ── App-global prefs ───────────────────────────────────────────────────────
 // Settings that describe how the APP behaves around the OS (not a profile's
@@ -118,24 +128,31 @@ ipcMain.handle('beta:redeem', (_, key) => {
 });
 
 // ── In-memory session state ────────────────────────────────────────────────
-let sessionKey  = null;
-let sessionUser = null;
+// session.key / session.user / session.session.activeEntryId + the idle-lock timer
+// live in ./session (imported above); mutate through that shared object only.
 let mainWindow  = null;
-let idleTimer    = null;   // auto-lock timeout handle
 let forceClose   = false;  // set true after user confirms close through audit prompt
-let activeEntryId = null;  // rowid of the currently live time_entries row
 let tray         = null;   // system tray icon (created on whenReady)
 let isQuitting   = false;  // set true when the user really means to quit (tray/menu Quit)
 
+// Wire the acyclic deps: session needs the window, the audit count, and the
+// renderer dir (for the lock navigation); email needs the window for toasts.
+initSession({
+  getMainWindow: () => mainWindow,
+  countAuditDiscrepancies,
+  rendererDir: RENDERER_DIR,
+});
+initEmail({ getMainWindow: () => mainWindow });
+
 // Memoizes decrypted session-wide reads (companies:list / entries:all /
 // entries:summary) across page navigations — see read-cache.js. Keyed on
-// sessionUser.id; mutations invalidate, session resets clear().
+// session.user.id; mutations invalidate, session resets clear().
 const readCache = createReadCache();
-// Cache owner token. NOTE: sessionUser.id is the user's rowid, which is 1 in
+// Cache owner token. NOTE: session.user.id is the user's rowid, which is 1 in
 // every profile vault — so it alone can't tell two profiles apart. Compose it
 // with ACTIVE_PROFILE_DIR (unique per profile) so switching profiles changes
 // the owner and the cache auto-clears before serving another profile's data.
-const cacheOwner = () => `${ACTIVE_PROFILE_DIR}#${sessionUser && sessionUser.id}`;
+const cacheOwner = () => `${ACTIVE_PROFILE_DIR}#${session.user && session.user.id}`;
 // Both entry views (full + summary) go stale together — mirrors the renderer
 // Store's coupled invalidation (store.js).
 const invalidateEntriesCache = () => readCache.invalidate('entriesAll', 'entriesSummary');
@@ -200,8 +217,8 @@ async function initProfileDB(profileDir) {
   ACTIVE_PROFILE_DIR = profileDir;
   const dbFile = path.join(profileDir, IS_DEV ? 'dev-vault.db' : 'vault.db');
   setDbFile(dbFile);
-  BACKUP_DIR = path.join(profileDir, 'backups');
-  fs.mkdirSync(BACKUP_DIR, { recursive: true });
+  setBackupDir(path.join(profileDir, 'backups'));
+  fs.mkdirSync(getBackupDir(), { recursive: true });
 
   await loadSqlJs();
 
@@ -306,31 +323,11 @@ async function initProfileDB(profileDir) {
   persistDB();
 }
 
-// ── Backup ─────────────────────────────────────────────────────────────────
-function performBackup() {
-  const dbFile = getDbFile();
-  if (!dbFile || !fs.existsSync(dbFile)) return;
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-  const dest  = path.join(BACKUP_DIR, `vault-${stamp}.db`);
-  fs.copyFileSync(dbFile, dest);
-  const files = fs.readdirSync(BACKUP_DIR)
-    .filter(f => f.startsWith('vault-') && f.endsWith('.db')).sort();
-  if (files.length > 30)
-    files.slice(0, files.length - 30).forEach(f => fs.unlinkSync(path.join(BACKUP_DIR, f)));
-}
-
 // ── AES-256-GCM ────────────────────────────────────────────────────────────
 // encrypt / decrypt / deriveKey live in ./vault-crypto (imported above) so they
 // can be unit-tested without Electron. Do not redefine them here.
-
-function decryptEntry(row) {
-  if (row.rows_enc && row.rows_iv && row.rows_tag) {
-    try {
-      row.rows_json = decrypt({ data: row.rows_enc, iv: row.rows_iv, tag: row.rows_tag }, sessionKey);
-    } catch { row.rows_json = '[]'; }
-  }
-  return row;
-}
+// decryptEntry (session-key decryption of rows_json) lives in ./session.
+// performBackup + the backups/ dir live in ./backups.
 
 // Thin wrapper over the testable core in ./vault-crypto. Injects the live SQL
 // module + db handle, and adopts the handle the core returns — on a write-phase
@@ -343,9 +340,9 @@ function reEncryptVault(opts) {
 }
 
 function migrateTimeEntries() {
-  if (!sessionKey || !sessionUser) return;
+  if (!session.key || !session.user) return;
   try {
-    const migrated = migrateTimeEntriesCore({ db: getDb(), key: sessionKey, userId: sessionUser.id });
+    const migrated = migrateTimeEntriesCore({ db: getDb(), key: session.key, userId: session.user.id });
     if (migrated > 0) { persistDB(); invalidateEntriesCache(); }
   } catch (e) { console.warn('[migrateTimeEntries] failed:', e.message); }
 }
@@ -424,7 +421,7 @@ function createWindow() {
       mainWindow.hide();
       return;
     }
-    if (sessionUser && !forceClose) {
+    if (session.user && !forceClose) {
       const count = countAuditDiscrepancies();
       if (count > 0) {
         event.preventDefault();
@@ -434,7 +431,7 @@ function createWindow() {
     }
     forceClose = false;
     clearIdleTimer(); persistDB(); performBackup();
-    sessionKey = null; sessionUser = null;
+    session.key = null; session.user = null;
   });
 }
 
@@ -524,135 +521,14 @@ function applyLaunchAtStartup(enabled) {
 }
 
 function navigate(page) {
-  if (!sessionUser && page !== 'login') return;
+  if (!session.user && page !== 'login') return;
   mainWindow.loadFile(path.join(RENDERER_DIR, `pages/${page}.html`));
 }
 
 // Break/lunch policy tiers live in ./policies (imported above) — pure data,
 // unit-testable without Electron.
 
-function getDismissedSet() {
-  if (!sessionUser) return new Set();
-  return new Set(
-    dbAll('SELECT entry_id, row_idx, type FROM audit_dismissed WHERE user_id=?', [sessionUser.id])
-      .map(d => `${d.entry_id}:${d.row_idx}:${d.type}`)
-  );
-}
-
-function countAuditDiscrepancies() {
-  if (!sessionUser) return 0;
-  const dismissed = getDismissedSet();
-  const entries = dbAll('SELECT rowid as rid, rows_json, rows_enc, rows_iv, rows_tag, total_mins FROM time_entries WHERE user_id=?', [sessionUser.id]);
-  let count = 0;
-  entries.forEach(e => {
-    decryptEntry(e);
-    const entryId = Number(e.rid);
-    try {
-      JSON.parse(e.rows_json || '[]').forEach((r, idx) => {
-        // C3 (D-004): shared predicate includes desc — a desc-only row holds
-        // user content with no punch and now flags (no_clock_in) instead of
-        // being silently unaudited.
-        if (!rowHasContent(r)) return;
-        if (!r.clock_in) {
-          if (!dismissed.has(`${entryId}:${idx}:no_clock_in`)) count++;
-        } else if (!r.clock_out) {
-          if (!dismissed.has(`${entryId}:${idx}:no_clock_out`)) count++;
-        } else if (!r.total_mins) {
-          if (!dismissed.has(`${entryId}:${idx}:zero_duration`)) count++;
-        } else if (r.total_mins > 720) {
-          if (!dismissed.has(`${entryId}:${idx}:over_12h`)) count++;
-        }
-      });
-    } catch {}
-
-    const totalMins = Number(e.total_mins || 0);
-    const policy = getPolicy(sessionUser.work_state);
-    const reqBreaks = requiredBreaks(totalMins, policy);
-    if (reqBreaks > 0) {
-      const breakCount = (dbGet('SELECT COUNT(*) as c FROM task_items WHERE entry_id=? AND user_id=? AND item_type=?',
-        [entryId, sessionUser.id, 'break']) || {}).c || 0;
-      if (breakCount < reqBreaks && !dismissed.has(`${entryId}:-1:missing_break`)) count++;
-    }
-    if (totalMins > policy.lunchThreshMins) {
-      const hasLunch = dbGet('SELECT id FROM task_items WHERE entry_id=? AND user_id=? AND item_type=? LIMIT 1',
-        [entryId, sessionUser.id, 'lunch']);
-      if (!hasLunch && !dismissed.has(`${entryId}:-1:missing_lunch`)) count++;
-    }
-  });
-  return count;
-}
-
-// C6 (D-012): recovery sweep for orphaned running task_items. A task/break/
-// lunch left running when its session has no open punch (crash, close-to-tray
-// quit, or a clock-out that predates the auto-stop fix) is invisible in
-// Dispatch (entries:get-active → null) and unstoppable. On every login, stop
-// any such item: at the entry's last clock_out when that's after started_at,
-// else at started_at (zero duration — the punch closed before it started).
-// Runs after migrateTimeEntries() in ALL login handlers (auth:login,
-// auth:quick-unlock, auth:safe-login) — same rule as the report catch-up
-// (gotcha #9): add it to any future session-establishing path too.
-function sweepOrphanTaskItems() {
-  if (!sessionKey || !sessionUser) return 0;
-  let fixed = 0;
-  try {
-    const open = dbAll('SELECT rowid as rid, * FROM task_items WHERE user_id=? AND stopped_at IS NULL', [sessionUser.id]);
-    for (const t of open) {
-      const e = dbGet('SELECT rowid as rid, * FROM time_entries WHERE rowid=? AND user_id=?', [Number(t.entry_id), sessionUser.id]);
-      let hasOpenPunch = false, lastOutMs = 0;
-      if (e) {
-        try {
-          decryptEntry(e);
-          const rows = JSON.parse(e.rows_json || '[]');
-          hasOpenPunch = rows.some(r => r.clock_in && !r.clock_out);
-          rows.forEach(r => {
-            if (!r.clock_out) return;
-            const ms = new Date(`${e.log_date}T${r.clock_out}:00`).getTime();
-            if (ms > lastOutMs) lastOutMs = ms;
-          });
-        } catch {}
-      }
-      if (hasOpenPunch) continue; // legitimately running inside an open punch
-      const startedAt = Number(t.started_at) || Date.now();
-      const stopAt = lastOutMs > startedAt ? lastOutMs : startedAt;
-      dbRun('UPDATE task_items SET stopped_at=?, duration_secs=? WHERE rowid=? AND user_id=?',
-        [stopAt, Math.max(0, Math.floor((stopAt - startedAt) / 1000)), Number(t.rid), sessionUser.id]);
-      fixed++;
-    }
-    if (fixed > 0) {
-      persistDB();
-      console.log(`[sweep] stopped ${fixed} orphaned running task item(s)`);
-    }
-  } catch (err) { console.warn('[sweep] orphan task sweep failed:', err.message); }
-  return fixed;
-}
-
-function lockSession(skipAuditCheck = false) {
-  if (!skipAuditCheck && sessionUser) {
-    const count = countAuditDiscrepancies();
-    if (count > 0) {
-      mainWindow.webContents.send('audit:close-warning', { count, action: 'lock' });
-      return;
-    }
-  }
-  clearIdleTimer();
-  sessionKey = null; sessionUser = null; activeEntryId = null;
-  mainWindow.loadFile(path.join(RENDERER_DIR, 'pages/login.html'));
-}
-
-function clearIdleTimer() {
-  if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
-}
-
-function resetIdleTimer() {
-  clearIdleTimer();
-  const row = dbGet('SELECT value FROM app_settings WHERE key=?', ['ui_autoLockMinutes']);
-  const minutes = parseInt(row?.value || '0', 10);
-  if (!minutes || !sessionUser) return;
-  idleTimer = setTimeout(() => {
-    mainWindow.webContents.send('toast', { msg: 'Session locked due to inactivity.', type: 'info' });
-    setTimeout(() => lockSession(true), 1200); // let toast render briefly before navigating
-  }, minutes * 60 * 1000);
-}
+// Session state + idle lock live in ./session; the audit engine in ./audit.
 
 // ── IPC: Window controls ───────────────────────────────────────────────────
 ipcMain.on('win:minimize', () => mainWindow.minimize());
@@ -755,8 +631,8 @@ ipcMain.handle('profiles:load', async (_, { username }) => {
 
 ipcMain.handle('profiles:deselect', () => {
   closeDb();
-  ACTIVE_PROFILE_DIR = null; setDbFile(null); BACKUP_DIR = null;
-  sessionKey = null; sessionUser = null;
+  ACTIVE_PROFILE_DIR = null; setDbFile(null); setBackupDir(null);
+  session.key = null; session.user = null;
   return { ok: true };
 });
 
@@ -778,8 +654,8 @@ ipcMain.handle('profiles:delete', async (_, { password }) => {
 
     // Close DB and clear all session state before deleting files
     closeDb();
-    ACTIVE_PROFILE_DIR = null; setDbFile(null); BACKUP_DIR = null;
-    sessionKey = null; sessionUser = null; activeEntryId = null;
+    ACTIVE_PROFILE_DIR = null; setDbFile(null); setBackupDir(null);
+    session.key = null; session.user = null; session.activeEntryId = null;
 
     if (profileDir && fs.existsSync(profileDir))
       fs.rmSync(profileDir, { recursive: true, force: true });
@@ -792,7 +668,7 @@ ipcMain.handle('profiles:delete', async (_, { password }) => {
 
 // ── IPC: safeStorage fast-path (Windows Hello bridge) ─────────────────────
 // safe_key.json lives in the profile directory alongside vault.db.
-// It stores the vault sessionKey encrypted with Electron safeStorage (DPAPI
+// It stores the vault session.key encrypted with Electron safeStorage (DPAPI
 // on Windows), plus an AES-256-GCM canary to verify the key on decryption.
 // Password + TOTP login is always available as a fallback — these handlers
 // only add / verify / remove the fast-path layer.
@@ -876,12 +752,12 @@ ipcMain.handle('auth:safe-login', async () => {
     const user = dbGet('SELECT rowid as rid, * FROM users LIMIT 1');
     if (!user) return { ok: false, error: 'No account found in this profile.' };
 
-    sessionKey  = key;
-    sessionUser = { id: Number(user.rid), username: user.username, display_name: user.display_name || null, work_state: null };
+    session.key  = key;
+    session.user = { id: Number(user.rid), username: user.username, display_name: user.display_name || null, work_state: null };
     if (user.profile_enc && user.profile_iv && user.profile_tag) {
       try {
         const pd = JSON.parse(decrypt({ data: user.profile_enc, iv: user.profile_iv, tag: user.profile_tag }, key));
-        sessionUser.work_state = pd?.work_state || null;
+        session.user.work_state = pd?.work_state || null;
       } catch {}
     }
     dbRun('UPDATE users SET failed_attempts=0, locked_until=NULL WHERE rowid=?', [Number(user.rid)]);
@@ -912,12 +788,12 @@ ipcMain.handle('auth:quick-unlock', async (_, { password }) => {
     const key    = Buffer.from(keyHex, 'hex');
     const canaryPlain = decrypt(stored.canary, key);
     if (canaryPlain !== 'conquered-time-v1') return { ok: false, error: 'Key mismatch — use full login.' };
-    sessionKey  = key;
-    sessionUser = { id: Number(user.rid), username: user.username, display_name: user.display_name || null, work_state: null };
+    session.key  = key;
+    session.user = { id: Number(user.rid), username: user.username, display_name: user.display_name || null, work_state: null };
     if (user.profile_enc && user.profile_iv && user.profile_tag) {
       try {
         const pd = JSON.parse(decrypt({ data: user.profile_enc, iv: user.profile_iv, tag: user.profile_tag }, key));
-        sessionUser.work_state = pd?.work_state || null;
+        session.user.work_state = pd?.work_state || null;
       } catch {}
     }
     dbRun('UPDATE users SET failed_attempts=0, locked_until=NULL WHERE rowid=?', [Number(user.rid)]);
@@ -1025,9 +901,9 @@ ipcMain.handle('auth:login', async (_, { username, password, totpCode }) => {
 
     // Derive key from password + stored stable salt (never the rotating TOTP code)
     const salt  = user.key_salt || user.totp_secret;
-    sessionKey  = deriveKey(password, salt);
+    session.key  = deriveKey(password, salt);
     // Always use rowid — sql.js AUTOINCREMENT id columns return null through our query helper
-    sessionUser = { id: Number(user.rid), username: user.username, display_name: user.display_name || null, work_state: null };
+    session.user = { id: Number(user.rid), username: user.username, display_name: user.display_name || null, work_state: null };
     dbRun('UPDATE users SET failed_attempts=0, locked_until=NULL WHERE rowid=?', [Number(user.rid)]);
     persistDB();
     resetIdleTimer();
@@ -1035,8 +911,8 @@ ipcMain.handle('auth:login', async (_, { username, password, totpCode }) => {
     // Decrypt profile blob once to backfill avatar_thumb and extract work_state
     if (user.profile_enc && user.profile_iv && user.profile_tag) {
       try {
-        const profileData = JSON.parse(decrypt({ data: user.profile_enc, iv: user.profile_iv, tag: user.profile_tag }, sessionKey));
-        sessionUser.work_state = profileData?.work_state || null;
+        const profileData = JSON.parse(decrypt({ data: user.profile_enc, iv: user.profile_iv, tag: user.profile_tag }, session.key));
+        session.user.work_state = profileData?.work_state || null;
         if (ACTIVE_PROFILE_DIR && !IS_DEV) {
           const manifest = readManifest(ACTIVE_PROFILE_DIR);
           if (manifest && !manifest.avatar_thumb_48 && profileData?.avatar) {
@@ -1113,21 +989,21 @@ ipcMain.handle('totp:generate', async () => {
   return { secret: secret.base32, qrUrl };
 });
 
-ipcMain.handle('session:get', () => sessionUser ? { id: sessionUser.id, username: sessionUser.username, display_name: sessionUser.display_name || null, work_state: sessionUser.work_state || null } : null);
-ipcMain.handle('session:heartbeat', () => { if (sessionUser) resetIdleTimer(); return null; });
+ipcMain.handle('session:get', () => session.user ? { id: session.user.id, username: session.user.username, display_name: session.user.display_name || null, work_state: session.user.work_state || null } : null);
+ipcMain.handle('session:heartbeat', () => { if (session.user) resetIdleTimer(); return null; });
 ipcMain.on('session:request-lock',   () => lockSession(false));
 ipcMain.on('session:confirm-close',  () => { forceClose = true; mainWindow.close(); });
 ipcMain.on('session:confirm-lock',   () => lockSession(true));
 
 // ── IPC: Companies ─────────────────────────────────────────────────────────
 ipcMain.handle('companies:list', () => {
-  if (!sessionKey || !sessionUser) return [];
+  if (!session.key || !session.user) return [];
   return readCache.get('companies', cacheOwner(), () => {
-    const rows = dbAll('SELECT rowid as rid, * FROM companies WHERE user_id=? ORDER BY rowid ASC', [sessionUser.id]);
+    const rows = dbAll('SELECT rowid as rid, * FROM companies WHERE user_id=? ORDER BY rowid ASC', [session.user.id]);
     return rows.map(r => {
       const id = (r.id != null && r.id !== 0) ? Number(r.id) : Number(r.rid);
       try {
-        const plain = decrypt({ iv: r.data_iv, tag: r.data_tag, data: r.data_enc }, sessionKey);
+        const plain = decrypt({ iv: r.data_iv, tag: r.data_tag, data: r.data_enc }, session.key);
         const parsed = JSON.parse(plain);
         // Ensure id is never null/NaN — always a real positive integer
         const finalId = (id && !isNaN(id)) ? id : Number(r.rid);
@@ -1138,15 +1014,15 @@ ipcMain.handle('companies:list', () => {
 });
 
 ipcMain.handle('companies:save', (_, data) => {
-  if (!sessionKey || !sessionUser) return { ok: false, error: 'Not authenticated' };
+  if (!session.key || !session.user) return { ok: false, error: 'Not authenticated' };
   try {
-    const { iv, tag, data: enc } = encrypt(JSON.stringify(data), sessionKey);
+    const { iv, tag, data: enc } = encrypt(JSON.stringify(data), session.key);
     if (data.id) {
       dbRun('UPDATE companies SET data_enc=?,data_iv=?,data_tag=?,updated_at=strftime(\'%s\',\'now\') WHERE rowid=? AND user_id=?',
-        [enc, iv, tag, data.id, sessionUser.id]);
+        [enc, iv, tag, data.id, session.user.id]);
     } else {
       dbRun('INSERT INTO companies (user_id,data_enc,data_iv,data_tag) VALUES (?,?,?,?)',
-        [sessionUser.id, enc, iv, tag]);
+        [session.user.id, enc, iv, tag]);
     }
     persistDB(); performBackup();
     readCache.invalidate('companies');
@@ -1155,17 +1031,17 @@ ipcMain.handle('companies:save', (_, data) => {
 });
 
 ipcMain.handle('companies:delete', (_, id) => {
-  if (!sessionKey || !sessionUser) return { ok: false };
+  if (!session.key || !session.user) return { ok: false };
   const numId = Number(id);
   // task_items are entry_id-scoped — delete them via subquery BEFORE the
   // entries are removed, otherwise the company's break/lunch/Dispatch tasks
   // are orphaned in the DB.
   dbRun(
     'DELETE FROM task_items WHERE user_id=? AND entry_id IN (SELECT rowid FROM time_entries WHERE user_id=? AND company_id=?)',
-    [sessionUser.id, sessionUser.id, numId]
+    [session.user.id, session.user.id, numId]
   );
-  dbRun('DELETE FROM time_entries WHERE company_id=? AND user_id=?', [numId, sessionUser.id]);
-  dbRun('DELETE FROM companies WHERE rowid=? AND user_id=?', [numId, sessionUser.id]);
+  dbRun('DELETE FROM time_entries WHERE company_id=? AND user_id=?', [numId, session.user.id]);
+  dbRun('DELETE FROM companies WHERE rowid=? AND user_id=?', [numId, session.user.id]);
   persistDB(); performBackup();
   // Deletes the company AND its time_entries → both caches go stale.
   readCache.invalidate('companies');
@@ -1175,32 +1051,32 @@ ipcMain.handle('companies:delete', (_, id) => {
 
 // ── IPC: Time entries ──────────────────────────────────────────────────────
 ipcMain.handle('entries:list', (_, companyId) => {
-  if (!sessionKey || !sessionUser) return [];
+  if (!session.key || !session.user) return [];
   return dbAll('SELECT rowid as rid, * FROM time_entries WHERE user_id=? AND company_id=? ORDER BY log_date DESC',
-    [sessionUser.id, companyId]).map(r => ({...decryptEntry(r), id: Number(r.rid)}));
+    [session.user.id, companyId]).map(r => ({...decryptEntry(r), id: Number(r.rid)}));
 });
 
 ipcMain.handle('entries:save', (_, entry) => {
-  if (!sessionKey || !sessionUser) return { ok: false };
+  if (!session.key || !session.user) return { ok: false };
   try {
-    const enc = encrypt(entry.rows_json || '[]', sessionKey);
+    const enc = encrypt(entry.rows_json || '[]', session.key);
     if (entry.id) {
       dbRun(
         'UPDATE time_entries SET rows_enc=?,rows_iv=?,rows_tag=?,rows_json=?,total_mins=?,session_label=?,updated_at=strftime(\'%s\',\'now\') WHERE rowid=? AND user_id=?',
-        [enc.data, enc.iv, enc.tag, '', entry.total_mins, entry.session_label || '', entry.id, sessionUser.id]
+        [enc.data, enc.iv, enc.tag, '', entry.total_mins, entry.session_label || '', entry.id, session.user.id]
       );
-      activeEntryId = Number(entry.id);
+      session.activeEntryId = Number(entry.id);
       persistDB(); performBackup();
       invalidateEntriesCache();
       return { ok: true, id: entry.id };
     } else {
       dbRun(
         'INSERT INTO time_entries (user_id,company_id,log_date,session_label,rows_json,rows_enc,rows_iv,rows_tag,total_mins) VALUES (?,?,?,?,?,?,?,?,?)',
-        [sessionUser.id, entry.company_id, entry.log_date, entry.session_label || '', '', enc.data, enc.iv, enc.tag, entry.total_mins]
+        [session.user.id, entry.company_id, entry.log_date, entry.session_label || '', '', enc.data, enc.iv, enc.tag, entry.total_mins]
       );
-      const maxRow = dbGet('SELECT MAX(rowid) as rid FROM time_entries WHERE user_id=?', [sessionUser.id]);
+      const maxRow = dbGet('SELECT MAX(rowid) as rid FROM time_entries WHERE user_id=?', [session.user.id]);
       const newId = (maxRow && maxRow.rid != null) ? Number(maxRow.rid) : null;
-      activeEntryId = newId;
+      session.activeEntryId = newId;
       persistDB(); performBackup();
       invalidateEntriesCache();
       return { ok: true, id: newId };
@@ -1209,9 +1085,9 @@ ipcMain.handle('entries:save', (_, entry) => {
 });
 
 ipcMain.handle('entries:all', () => {
-  if (!sessionKey || !sessionUser) return [];
+  if (!session.key || !session.user) return [];
   return readCache.get('entriesAll', cacheOwner(), () =>
-    dbAll('SELECT rowid as rid, * FROM time_entries WHERE user_id=? ORDER BY log_date DESC', [sessionUser.id])
+    dbAll('SELECT rowid as rid, * FROM time_entries WHERE user_id=? ORDER BY log_date DESC', [session.user.id])
       .map(r => ({...decryptEntry(r), id: Number(r.rid)})));
 });
 
@@ -1221,21 +1097,21 @@ ipcMain.handle('entries:all', () => {
 // entire entry history every page load. Anything needing per-row clock detail
 // (global log, audit, reports) must keep using entries:all.
 ipcMain.handle('entries:summary', () => {
-  if (!sessionKey || !sessionUser) return [];
+  if (!session.key || !session.user) return [];
   return readCache.get('entriesSummary', cacheOwner(), () =>
-    dbAll('SELECT rowid as rid, company_id, log_date, session_label, total_mins FROM time_entries WHERE user_id=? ORDER BY log_date DESC', [sessionUser.id])
+    dbAll('SELECT rowid as rid, company_id, log_date, session_label, total_mins FROM time_entries WHERE user_id=? ORDER BY log_date DESC', [session.user.id])
       .map(r => ({ ...r, id: Number(r.rid) })));
 });
 
 ipcMain.handle('entries:get-active', () => {
-  if (!sessionKey || !sessionUser) return null;
+  if (!session.key || !session.user) return null;
 
   let row = null;
 
-  // Fast path: use in-memory activeEntryId if set
-  if (activeEntryId) {
+  // Fast path: use in-memory session.activeEntryId if set
+  if (session.activeEntryId) {
     row = dbGet('SELECT rowid as rid, * FROM time_entries WHERE rowid=? AND user_id=?',
-      [activeEntryId, sessionUser.id]);
+      [session.activeEntryId, session.user.id]);
   }
 
   // Fallback: find today's entry that has a clocked-in but not clocked-out row
@@ -1243,7 +1119,7 @@ ipcMain.handle('entries:get-active', () => {
     const today = new Date().toISOString().slice(0, 10);
     const candidates = dbAll(
       'SELECT rowid as rid, * FROM time_entries WHERE user_id=? AND log_date=? ORDER BY updated_at DESC',
-      [sessionUser.id, today]
+      [session.user.id, today]
     );
     for (const c of candidates) {
       try {
@@ -1257,7 +1133,7 @@ ipcMain.handle('entries:get-active', () => {
       const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
       const prev = dbAll(
         'SELECT rowid as rid, * FROM time_entries WHERE user_id=? AND log_date=? ORDER BY updated_at DESC',
-        [sessionUser.id, yesterday]
+        [session.user.id, yesterday]
       );
       for (const c of prev) {
         try {
@@ -1267,7 +1143,7 @@ ipcMain.handle('entries:get-active', () => {
         } catch {}
       }
     }
-    if (row) activeEntryId = Number(row.rid);
+    if (row) session.activeEntryId = Number(row.rid);
   }
 
   if (!row) return null;
@@ -1277,9 +1153,9 @@ ipcMain.handle('entries:get-active', () => {
   let company_name = null;
   try {
     const co = dbGet('SELECT rowid as rid, * FROM companies WHERE rowid=? AND user_id=?',
-      [Number(row.company_id), sessionUser.id]);
+      [Number(row.company_id), session.user.id]);
     if (co) {
-      const plain = decrypt({ iv: co.data_iv, tag: co.data_tag, data: co.data_enc }, sessionKey);
+      const plain = decrypt({ iv: co.data_iv, tag: co.data_tag, data: co.data_enc }, session.key);
       company_name = JSON.parse(plain).name || null;
     }
   } catch {}
@@ -1287,40 +1163,40 @@ ipcMain.handle('entries:get-active', () => {
 });
 
 ipcMain.handle('entries:get', (_, id) => {
-  if (!sessionKey || !sessionUser) return null;
+  if (!session.key || !session.user) return null;
   const row = dbGet('SELECT rowid as rid, * FROM time_entries WHERE rowid=? AND user_id=?',
-    [Number(id), sessionUser.id]);
+    [Number(id), session.user.id]);
   if (!row) return null;
   return { ...decryptEntry(row), id: Number(row.rid) };
 });
 
 // ── IPC: Task items ────────────────────────────────────────────────────────
 ipcMain.handle('tasks:list', (_, entryId) => {
-  if (!sessionKey || !sessionUser) return [];
+  if (!session.key || !session.user) return [];
   return dbAll(
     'SELECT rowid as rid, * FROM task_items WHERE entry_id=? AND user_id=? ORDER BY started_at ASC',
-    [Number(entryId), sessionUser.id]
+    [Number(entryId), session.user.id]
   ).map(r => ({ ...r, id: Number(r.rid) }));
 });
 
 ipcMain.handle('tasks:save', (_, item) => {
-  if (!sessionKey || !sessionUser) return { ok: false };
+  if (!session.key || !session.user) return { ok: false };
   try {
     if (item.id) {
       dbRun(
         'UPDATE task_items SET label=?,item_type=?,stopped_at=?,duration_secs=? WHERE rowid=? AND user_id=?',
         [item.label, item.item_type || 'task', item.stopped_at ?? null,
-         item.duration_secs || 0, Number(item.id), sessionUser.id]
+         item.duration_secs || 0, Number(item.id), session.user.id]
       );
       persistDB();
       return { ok: true, id: Number(item.id) };
     } else {
       dbRun(
         'INSERT INTO task_items (user_id,entry_id,label,item_type,started_at,stopped_at,duration_secs) VALUES (?,?,?,?,?,?,?)',
-        [sessionUser.id, Number(item.entry_id), item.label,
+        [session.user.id, Number(item.entry_id), item.label,
          item.item_type || 'task', item.started_at, item.stopped_at ?? null, item.duration_secs || 0]
       );
-      const maxRow = dbGet('SELECT MAX(rowid) as rid FROM task_items WHERE user_id=?', [sessionUser.id]);
+      const maxRow = dbGet('SELECT MAX(rowid) as rid FROM task_items WHERE user_id=?', [session.user.id]);
       const newId = (maxRow && maxRow.rid != null) ? Number(maxRow.rid) : null;
       persistDB();
       return { ok: true, id: newId };
@@ -1329,31 +1205,31 @@ ipcMain.handle('tasks:save', (_, item) => {
 });
 
 ipcMain.handle('tasks:delete', (_, id) => {
-  if (!sessionKey || !sessionUser) return { ok: false };
-  dbRun('DELETE FROM task_items WHERE rowid=? AND user_id=?', [Number(id), sessionUser.id]);
+  if (!session.key || !session.user) return { ok: false };
+  dbRun('DELETE FROM task_items WHERE rowid=? AND user_id=?', [Number(id), session.user.id]);
   persistDB();
   return { ok: true };
 });
 
 ipcMain.handle('tasks:recent-labels', () => {
-  if (!sessionKey || !sessionUser) return [];
+  if (!session.key || !session.user) return [];
   const rows = dbAll(
     `SELECT label FROM task_items
      WHERE user_id=? AND item_type='task'
      GROUP BY label
      ORDER BY MAX(started_at) DESC LIMIT 10`,
-    [sessionUser.id]
+    [session.user.id]
   );
   return rows.map(r => r.label);
 });
 
 ipcMain.handle('tasks:summary', () => {
-  if (!sessionKey || !sessionUser) return {};
+  if (!session.key || !session.user) return {};
   const rows = dbAll(
     `SELECT entry_id, item_type, COUNT(*) as cnt
      FROM task_items WHERE user_id=? AND item_type IN ('break','lunch')
      GROUP BY entry_id, item_type`,
-    [sessionUser.id]
+    [session.user.id]
   );
   const map = {};
   (rows || []).forEach(r => {
@@ -1367,22 +1243,22 @@ ipcMain.handle('tasks:summary', () => {
 // ── IPC: Settings ──────────────────────────────────────────────────────────
 // ── IPC: Backup library ───────────────────────────────────────────────────
 ipcMain.handle('backup:list', () => {
-  if (!sessionUser) return [];
-  if (!fs.existsSync(BACKUP_DIR)) return [];
-  const files = fs.readdirSync(BACKUP_DIR)
+  if (!session.user) return [];
+  if (!fs.existsSync(getBackupDir())) return [];
+  const files = fs.readdirSync(getBackupDir())
     .filter(f => f.startsWith('vault-') && f.endsWith('.db'))
     .sort().reverse();
   return files.map(f => {
-    const stat = fs.statSync(path.join(BACKUP_DIR, f));
+    const stat = fs.statSync(path.join(getBackupDir(), f));
     const ts = f.replace('vault-', '').replace('.db', '').replace(/T(\d{2})-(\d{2})-(\d{2})/, 'T$1:$2:$3');
     return { filename: f, timestamp: ts, sizeKB: Math.round(stat.size / 1024) };
   });
 });
 
 ipcMain.handle('backup:preview', (_, filename) => {
-  if (!sessionUser) return { error: 'No session' };
+  if (!session.user) return { error: 'No session' };
   if (!/^vault-[\d\-T]+\.db$/.test(filename)) return { error: 'Invalid filename' };
-  const filepath = path.join(BACKUP_DIR, filename);
+  const filepath = path.join(getBackupDir(), filename);
   if (!fs.existsSync(filepath)) return { error: 'File not found' };
   try {
     const buf     = fs.readFileSync(filepath);
@@ -1399,9 +1275,9 @@ ipcMain.handle('backup:preview', (_, filename) => {
 });
 
 ipcMain.handle('backup:restore', (_, filename) => {
-  if (!sessionUser) return { ok: false, error: 'No session' };
+  if (!session.user) return { ok: false, error: 'No session' };
   if (!/^vault-[\d\-T]+\.db$/.test(filename)) return { ok: false, error: 'Invalid filename' };
-  const filepath = path.join(BACKUP_DIR, filename);
+  const filepath = path.join(getBackupDir(), filename);
   if (!fs.existsSync(filepath)) return { ok: false, error: 'File not found' };
   try {
     performBackup(); // safety-save current state before overwriting
@@ -1414,7 +1290,7 @@ ipcMain.handle('backup:restore', (_, filename) => {
     readCache.clear();
     // Clear session
     clearIdleTimer();
-    sessionKey = null; sessionUser = null; activeEntryId = null;
+    session.key = null; session.user = null; session.activeEntryId = null;
     mainWindow.loadFile(path.join(RENDERER_DIR, 'pages/login.html'));
     return { ok: true };
   } catch(e) { return { ok: false, error: e.message }; }
@@ -1436,7 +1312,7 @@ ipcMain.handle('auth:browse-backup', async () => {
     fs.copyFileSync(src, dbFile);
     const buf = fs.readFileSync(dbFile);
     replaceDb(buf);
-    clearIdleTimer(); sessionKey = null; sessionUser = null; activeEntryId = null;
+    clearIdleTimer(); session.key = null; session.user = null; session.activeEntryId = null;
     mainWindow.loadFile(path.join(RENDERER_DIR, 'pages/login.html'));
     return { ok: true };
   } catch(e) { return { ok: false, error: e.message }; }
@@ -1444,7 +1320,7 @@ ipcMain.handle('auth:browse-backup', async () => {
 
 // ── IPC: Audit policy ────────────────────────────────────────────────────
 ipcMain.handle('audit:get-policy', () => {
-  const stateCode = sessionUser?.work_state || null;
+  const stateCode = session.user?.work_state || null;
   const policy    = getPolicy(stateCode);
   const stateName = stateCode ? (STATE_NAMES[stateCode] || stateCode) : null;
   // Replace Infinity with null so serialization is safe across IPC boundary
@@ -1464,37 +1340,37 @@ ipcMain.handle('audit:get-policy', () => {
 
 // ── IPC: Audit dismissed ──────────────────────────────────────────────────
 ipcMain.handle('audit:get-dismissed', () => {
-  if (!sessionUser) return [];
-  return dbAll('SELECT entry_id, row_idx, type, emailed_at FROM audit_dismissed WHERE user_id=?', [sessionUser.id]);
+  if (!session.user) return [];
+  return dbAll('SELECT entry_id, row_idx, type, emailed_at FROM audit_dismissed WHERE user_id=?', [session.user.id]);
 });
 
 ipcMain.handle('audit:dismiss', (_, { entry_id, row_idx, type }) => {
-  if (!sessionUser) return { ok: false };
+  if (!session.user) return { ok: false };
   dbRun(
     'INSERT OR IGNORE INTO audit_dismissed (user_id, entry_id, row_idx, type) VALUES (?,?,?,?)',
-    [sessionUser.id, Number(entry_id), Number(row_idx), type]
+    [session.user.id, Number(entry_id), Number(row_idx), type]
   );
   persistDB();
   return { ok: true };
 });
 
 ipcMain.handle('audit:undismiss', (_, { entry_id, row_idx, type }) => {
-  if (!sessionUser) return { ok: false };
+  if (!session.user) return { ok: false };
   dbRun('DELETE FROM audit_dismissed WHERE user_id=? AND entry_id=? AND row_idx=? AND type=?',
-    [sessionUser.id, Number(entry_id), Number(row_idx), type]);
+    [session.user.id, Number(entry_id), Number(row_idx), type]);
   persistDB();
   return { ok: true };
 });
 
 ipcMain.handle('audit:clear-dismissed', () => {
-  if (!sessionUser) return { ok: false };
-  dbRun('DELETE FROM audit_dismissed WHERE user_id=?', [sessionUser.id]);
+  if (!session.user) return { ok: false };
+  dbRun('DELETE FROM audit_dismissed WHERE user_id=?', [session.user.id]);
   persistDB();
   return { ok: true };
 });
 
 ipcMain.handle('audit:apply-fix', (_, { entry_id, row_idx, fix_type }) => {
-  if (!sessionKey || !sessionUser) return { ok: false };
+  if (!session.key || !session.user) return { ok: false };
   // Only these discrepancy types have an automated fix. Everything else
   // (e.g. missing_break / missing_lunch) is acknowledge-only by design — reject
   // explicitly so the dismiss-only guarantee can't be bypassed by a forged call.
@@ -1503,7 +1379,7 @@ ipcMain.handle('audit:apply-fix', (_, { entry_id, row_idx, fix_type }) => {
     return { ok: false, error: `No automated fix for "${fix_type}" — this discrepancy is acknowledge-only.` };
   }
   const row = dbGet('SELECT rowid as rid, * FROM time_entries WHERE rowid=? AND user_id=?',
-    [Number(entry_id), sessionUser.id]);
+    [Number(entry_id), session.user.id]);
   if (!row) return { ok: false, error: 'Entry not found' };
   try {
     decryptEntry(row);
@@ -1530,60 +1406,40 @@ ipcMain.handle('audit:apply-fix', (_, { entry_id, row_idx, fix_type }) => {
     rows[row_idx] = r;
     const newJson  = JSON.stringify(rows);
     const newTotal = rows.reduce((s, row) => s + (row.total_mins || 0), 0);
-    const enc      = encrypt(newJson, sessionKey);
+    const enc      = encrypt(newJson, session.key);
     dbRun(
       'UPDATE time_entries SET rows_enc=?,rows_iv=?,rows_tag=?,rows_json=?,total_mins=?,updated_at=strftime(\'%s\',\'now\') WHERE rowid=? AND user_id=?',
-      [enc.data, enc.iv, enc.tag, '', newTotal, Number(entry_id), sessionUser.id]
+      [enc.data, enc.iv, enc.tag, '', newTotal, Number(entry_id), session.user.id]
     );
     persistDB(); performBackup();
     return { ok: true };
   } catch (e) { return { ok: false, error: e.message }; }
 });
 
-// Returns the logged-in user's saved profile email, or '' if none.
-function getProfileEmail() {
-  if (!sessionKey || !sessionUser) return '';
-  try {
-    const user = dbGet('SELECT rowid as rid, * FROM users WHERE rowid=?', [sessionUser.id]);
-    if (!user || !user.profile_enc) return '';
-    const data = JSON.parse(decrypt({ data: user.profile_enc, iv: user.profile_iv, tag: user.profile_tag }, sessionKey));
-    return (data?.email || '').trim();
-  } catch { return ''; }
-}
-
-// Returns true when the logged-in user has no email saved in their profile blob.
-function profileEmailMissing() {
-  if (!sessionKey || !sessionUser) return false;
-  try {
-    const user = dbGet('SELECT rowid as rid, * FROM users WHERE rowid=?', [sessionUser.id]);
-    if (!user || !user.profile_enc) return true;
-    const data = JSON.parse(decrypt({ data: user.profile_enc, iv: user.profile_iv, tag: user.profile_tag }, sessionKey));
-    return !data?.email?.trim();
-  } catch { return true; }
-}
+// getProfileEmail / profileEmailMissing live in ./email.
 
 // ── IPC: User Profile ─────────────────────────────────────────────────────
 ipcMain.handle('profile:get', () => {
-  if (!sessionKey || !sessionUser) return null;
-  const user = dbGet('SELECT rowid as rid, * FROM users WHERE rowid=?', [sessionUser.id]);
+  if (!session.key || !session.user) return null;
+  const user = dbGet('SELECT rowid as rid, * FROM users WHERE rowid=?', [session.user.id]);
   if (!user) return null;
   let profileData = { full_name: '', email: '', phone: '', job_title: '', avatar: null };
   if (user.profile_enc && user.profile_iv && user.profile_tag) {
     try {
-      profileData = JSON.parse(decrypt({ data: user.profile_enc, iv: user.profile_iv, tag: user.profile_tag }, sessionKey));
+      profileData = JSON.parse(decrypt({ data: user.profile_enc, iv: user.profile_iv, tag: user.profile_tag }, session.key));
     } catch {}
   }
   return { display_name: user.display_name || '', ...profileData };
 });
 
 ipcMain.handle('profile:save', (_, { display_name, full_name, email, phone, job_title, work_state, avatar, avatar_thumb_48 }) => {
-  if (!sessionKey || !sessionUser) return { ok: false };
+  if (!session.key || !session.user) return { ok: false };
   try {
-    const blob = encrypt(JSON.stringify({ full_name: full_name || '', email: email || '', phone: phone || '', job_title: job_title || '', work_state: work_state || null, avatar: avatar || null }), sessionKey);
+    const blob = encrypt(JSON.stringify({ full_name: full_name || '', email: email || '', phone: phone || '', job_title: job_title || '', work_state: work_state || null, avatar: avatar || null }), session.key);
     dbRun('UPDATE users SET display_name=?, profile_enc=?, profile_iv=?, profile_tag=? WHERE rowid=?',
-      [display_name || null, blob.data, blob.iv, blob.tag, sessionUser.id]);
-    sessionUser.display_name = display_name || null;
-    sessionUser.work_state   = work_state   || null;
+      [display_name || null, blob.data, blob.iv, blob.tag, session.user.id]);
+    session.user.display_name = display_name || null;
+    session.user.work_state   = work_state   || null;
     persistDB();
     // Keep profile selector card in sync
     if (ACTIVE_PROFILE_DIR && !IS_DEV) {
@@ -1599,10 +1455,10 @@ ipcMain.handle('profile:save', (_, { display_name, full_name, email, phone, job_
 });
 
 ipcMain.handle('auth:change-password', async (_, { currentPassword, totpCode, newPassword }) => {
-  if (!sessionKey || !sessionUser) return { ok: false, error: 'No active session.' };
+  if (!session.key || !session.user) return { ok: false, error: 'No active session.' };
   const bcrypt    = require('bcryptjs');
   const speakeasy = require('speakeasy');
-  const user = dbGet('SELECT rowid as rid, * FROM users WHERE rowid=?', [sessionUser.id]);
+  const user = dbGet('SELECT rowid as rid, * FROM users WHERE rowid=?', [session.user.id]);
   if (!user) return { ok: false, error: 'User not found.' };
   if (!bcrypt.compareSync(currentPassword, user.password_hash))
     return { ok: false, error: 'Current password is incorrect.' };
@@ -1613,13 +1469,13 @@ ipcMain.handle('auth:change-password', async (_, { currentPassword, totpCode, ne
   const newKey = deriveKey(newPassword, user.key_salt);
 
   const res = reEncryptVault({
-    oldKey: sessionKey, newKey, userId: sessionUser.id, user,
+    oldKey: session.key, newKey, userId: session.user.id, user,
     onCommit: () => dbRun('UPDATE users SET password_hash=? WHERE rowid=?',
-      [bcrypt.hashSync(newPassword, 12), sessionUser.id]),
+      [bcrypt.hashSync(newPassword, 12), session.user.id]),
   });
   if (!res.ok) return res;
 
-  sessionKey = newKey;
+  session.key = newKey;
   persistDB(); performBackup();
   return { ok: true };
 });
@@ -1637,7 +1493,7 @@ ipcMain.handle('audit:count', () => countAuditDiscrepancies());
 // discrepancy is recorded as emailed (emailed_at) so it's silenced on close/lock
 // but kept visible in the audit log.
 ipcMain.handle('audit:email-notify', async (_, { entry_id, row_idx, type, subject, message }: Record<string, any> = {}) => {
-  if (!sessionKey || !sessionUser) return { ok: false, error: 'Not logged in.' };
+  if (!session.key || !session.user) return { ok: false, error: 'Not logged in.' };
   const to = getProfileEmail();
   if (!to) return { ok: false, error: 'Add an email to your profile first (Profile screen).' };
   const cfg = getEmailSmtpConfig();
@@ -1661,7 +1517,7 @@ ipcMain.handle('audit:email-notify', async (_, { entry_id, row_idx, type, subjec
              <p style="color:#9ca3af;font-size:12px">Sent ${new Date().toLocaleString()} · CONFIDENTIAL</p>`,
     });
     // Record as emailed/acknowledged (silenced on close, kept in the log).
-    const args = [sessionUser.id, Number(entry_id), Number(row_idx), type];
+    const args = [session.user.id, Number(entry_id), Number(row_idx), type];
     dbRun('INSERT OR IGNORE INTO audit_dismissed (user_id, entry_id, row_idx, type) VALUES (?,?,?,?)', args);
     dbRun('UPDATE audit_dismissed SET emailed_at=strftime(\'%s\',\'now\') WHERE user_id=? AND entry_id=? AND row_idx=? AND type=?', args);
     persistDB();
@@ -1676,11 +1532,11 @@ ipcMain.handle('audit:email-notify', async (_, { entry_id, row_idx, type, subjec
 // stays safe if vault sharing is ever introduced.
 
 ipcMain.handle('db:clear-timeclock', () => {
-  if (!sessionKey || !sessionUser) return { ok: false };
-  const uid = sessionUser.id;
+  if (!session.key || !session.user) return { ok: false };
+  const uid = session.user.id;
   dbRun('DELETE FROM task_items   WHERE user_id=?', [uid]);
   dbRun('DELETE FROM time_entries WHERE user_id=?', [uid]);
-  activeEntryId = null;
+  session.activeEntryId = null;
   persistDB(); performBackup();
   invalidateEntriesCache();
   return { ok: true };
@@ -1691,28 +1547,28 @@ ipcMain.handle('db:clear-timeclock', () => {
 // intact. task_items are entry_id-scoped, so delete them via subquery BEFORE
 // the entries are removed.
 ipcMain.handle('db:clear-timeclock-company', (_, arg) => {
-  if (!sessionKey || !sessionUser) return { ok: false };
+  if (!session.key || !session.user) return { ok: false };
   const companyId = Number(arg && arg.companyId);
   if (!companyId) return { ok: false, error: 'No company specified' };
-  const uid = sessionUser.id;
+  const uid = session.user.id;
   dbRun(
     'DELETE FROM task_items WHERE user_id=? AND entry_id IN (SELECT rowid FROM time_entries WHERE user_id=? AND company_id=?)',
     [uid, uid, companyId]
   );
   dbRun('DELETE FROM time_entries WHERE user_id=? AND company_id=?', [uid, companyId]);
-  activeEntryId = null;
+  session.activeEntryId = null;
   persistDB(); performBackup();
   invalidateEntriesCache();
   return { ok: true };
 });
 
 ipcMain.handle('db:clear-companies', () => {
-  if (!sessionKey || !sessionUser) return { ok: false };
-  const uid = sessionUser.id;
+  if (!session.key || !session.user) return { ok: false };
+  const uid = session.user.id;
   dbRun('DELETE FROM task_items   WHERE user_id=?', [uid]);
   dbRun('DELETE FROM time_entries WHERE user_id=?', [uid]);
   dbRun('DELETE FROM companies    WHERE user_id=?', [uid]);
-  activeEntryId = null;
+  session.activeEntryId = null;
   persistDB(); performBackup();
   readCache.invalidate('companies');
   invalidateEntriesCache();
@@ -1725,8 +1581,8 @@ ipcMain.handle('db:clear-companies', () => {
 // renderer is expected to navigate to login, which will show the selector
 // with only surviving profiles.
 ipcMain.handle('db:clear-full', () => {
-  if (!sessionKey || !sessionUser) return { ok: false };
-  const uid        = sessionUser.id;
+  if (!session.key || !session.user) return { ok: false };
+  const uid        = session.user.id;
   const profileDir = ACTIVE_PROFILE_DIR; // capture before clearing session state
 
   // Wipe in-memory DB rows first so persistDB() writes a clean file
@@ -1736,14 +1592,14 @@ ipcMain.handle('db:clear-full', () => {
   dbRun('DELETE FROM companies       WHERE user_id=?', [uid]);
   dbRun('DELETE FROM audit_dismissed WHERE user_id=?', [uid]);
   dbRun('DELETE FROM app_settings');   // vault-level; no user_id column
-  dbRun('DELETE FROM users           WHERE rowid=?',   [uid]); // sessionUser.id is the rowid (see line 606)
+  dbRun('DELETE FROM users           WHERE rowid=?',   [uid]); // session.user.id is the rowid (see line 606)
 
-  activeEntryId      = null;
-  sessionKey         = null;
-  sessionUser        = null;
+  session.activeEntryId      = null;
+  session.key         = null;
+  session.user        = null;
   ACTIVE_PROFILE_DIR = null;
   setDbFile(null);
-  BACKUP_DIR         = null;
+  setBackupDir(null);
 
   // Delete the profile directory so profiles:list won't surface a ghost card
   if (!IS_DEV && profileDir && fs.existsSync(profileDir)) {
@@ -1903,47 +1759,10 @@ app.whenReady().then(async () => {
   }
 });
 
-// ── Email helpers ─────────────────────────────────────────────────────────
-
-// Render an HTML string to a PDF buffer using a hidden BrowserWindow.
-function generatePDF(htmlContent) {
-  return new Promise((resolve, reject) => {
-    const tmp = path.join(app.getPath('temp'), `ct-report-${Date.now()}.html`);
-    fs.writeFileSync(tmp, htmlContent, 'utf8');
-    const win = new BrowserWindow({ show: false, webPreferences: { contextIsolation: true, nodeIntegration: false } });
-    // Use loadFile() — avoids Windows backslash issues with file:// URLs
-    win.loadFile(tmp);
-    const cleanup = () => { try { fs.unlinkSync(tmp); } catch {} };
-    win.webContents.once('did-finish-load', () => {
-      win.webContents.printToPDF({ printBackground: true, pageSize: 'Letter' })
-        .then(buf => { win.close(); cleanup(); resolve(buf); })
-        .catch(e  => { win.close(); cleanup(); reject(e); });
-    });
-    win.webContents.once('did-fail-load', (_, code, desc) => {
-      win.close(); cleanup(); reject(new Error(`PDF window failed to load: ${desc} (${code})`));
-    });
-  });
-}
-
-function getEmailSmtpConfig() {
-  const get = k => (dbGet('SELECT value FROM app_settings WHERE key=?', [k]) || {}).value || '';
-  const host     = get('email_smtp_host');
-  const port     = parseInt(get('email_smtp_port') || '587', 10);
-  const username = get('email_smtp_username');
-  const fromName = get('email_smtp_from_name');
-  const defaultTo = get('email_smtp_default_to');
-  const enc  = get('email_smtp_password_enc');
-  const iv   = get('email_smtp_password_iv');
-  const tag  = get('email_smtp_password_tag');
-  let password = '';
-  if (enc && iv && tag && sessionKey) {
-    try { password = decrypt({ data: enc, iv, tag }, sessionKey); } catch {}
-  }
-  return { host, port, username, password, fromName, defaultTo };
-}
+// generatePDF / getEmailSmtpConfig live in ./email.
 
 ipcMain.handle('email:save-config', (_, { host, port, username, password, fromName, defaultTo }) => {
-  if (!sessionKey) return { ok: false, error: 'Not logged in.' };
+  if (!session.key) return { ok: false, error: 'Not logged in.' };
   try {
     const set = (k, v) => dbRun('INSERT OR REPLACE INTO app_settings (key,value) VALUES (?,?)', [k, String(v || '')]);
     set('email_smtp_host', host);
@@ -1952,7 +1771,7 @@ ipcMain.handle('email:save-config', (_, { host, port, username, password, fromNa
     set('email_smtp_from_name', fromName);
     set('email_smtp_default_to', defaultTo);
     if (password) {
-      const enc = encrypt(password, sessionKey);
+      const enc = encrypt(password, session.key);
       set('email_smtp_password_enc', enc.data);
       set('email_smtp_password_iv',  enc.iv);
       set('email_smtp_password_tag', enc.tag);
@@ -1978,7 +1797,7 @@ ipcMain.handle('email:get-config', () => {
 });
 
 ipcMain.handle('email:test-smtp', async () => {
-  if (!sessionKey) return { ok: false, error: 'Not logged in.' };
+  if (!session.key) return { ok: false, error: 'Not logged in.' };
   try {
     const cfg = getEmailSmtpConfig();
     if (!cfg.host || !cfg.username) return { ok: false, error: 'SMTP host and username are required.' };
@@ -1998,68 +1817,10 @@ ipcMain.handle('email:test-smtp', async () => {
   } catch (e) { return { ok: false, error: e.message }; }
 });
 
-// Render and email a report PDF+CSV via the configured SMTP transport.
-// entriesOverride is only set by the scheduled-report path; the manual
-// email:send-report path omits it.
-async function doSendReport({ htmlContent, subject, recipients, entriesOverride }: {
-  htmlContent: string; subject?: string; recipients?: string; entriesOverride?: Array<Record<string, any>>;
-}) {
-  const cfg = getEmailSmtpConfig();
-  if (!cfg.host || !cfg.username || !cfg.password) throw new Error('Email not configured. Open Settings → Data to add SMTP credentials.');
-
-  const toList = Array.isArray(recipients)
-    ? recipients.filter(Boolean)
-    : (recipients || cfg.defaultTo || '').split(/[,;\s]+/).map(s => s.trim()).filter(Boolean);
-  if (!toList.length) throw new Error('No recipients specified.');
-
-  const entries = entriesOverride || dbAll('SELECT rowid as rid, * FROM time_entries WHERE user_id=? ORDER BY log_date DESC', [sessionUser.id])
-    .map(r => ({ ...r, id: Number(r.rid) }));
-  const companies = dbAll('SELECT rowid as rid, * FROM companies WHERE user_id=?', [sessionUser.id])
-    .reduce((m, co) => {
-      try { const d = JSON.parse(decrypt({ data: co.data_enc, iv: co.data_iv, tag: co.data_tag }, sessionKey)); m[Number(co.rid)] = d.name || ''; } catch {} return m;
-    }, {});
-
-  const csvHeader = ['Date','Company','Session','Task Label','Task Name','Description','Clock In','Clock Out','Minutes'];
-  const csvRows = [];
-  entries.forEach(e => {
-    try {
-      JSON.parse(e.rows_json || '[]').forEach(r => {
-        if (!rowHasContent(r)) return; // C3 (D-011): desc-only rows export too
-        // Flatten multi-line descriptions so the CSV column stays single-line.
-        const descFlat = String(r.desc || r.description || '').replace(/\s+/g, ' ').trim();
-        csvRows.push([e.log_date, companies[Number(e.company_id)] || '', e.session_label || '', r.label || '', r.name || '', descFlat, r.clock_in || '', r.clock_out || '', r.total_mins || 0]);
-      });
-    } catch {}
-  });
-  // Quote every field, double embedded quotes, and neutralize CSV formula
-  // injection (leading = + - @ tab CR) by prefixing a single quote.
-  const csvCell = (v) => {
-    let s = v == null ? '' : String(v);
-    if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
-    return '"' + s.replace(/"/g, '""') + '"';
-  };
-  const csv = [csvHeader, ...csvRows].map(r => r.map(csvCell).join(',')).join('\n');
-
-  const pdfBuf = await generatePDF(htmlContent);
-  const dateTag = new Date().toISOString().slice(0, 10);
-  const transport = nodemailer.createTransport({
-    host: cfg.host, port: cfg.port, secure: cfg.port === 465,
-    auth: { user: cfg.username, pass: cfg.password },
-  });
-  const fromAddr = cfg.fromName ? `"${cfg.fromName}" <${cfg.username}>` : cfg.username;
-  await transport.sendMail({
-    from: fromAddr, to: toList.join(', '),
-    subject: subject || `Conquered Time Report — ${dateTag}`,
-    html: `<p>Please find your Conquered Time report attached.</p><p style="color:#6b7280;font-size:12px">Generated ${new Date().toLocaleString()} · CONFIDENTIAL</p>`,
-    attachments: [
-      { filename: `conquered-time-report-${dateTag}.pdf`, content: pdfBuf, contentType: 'application/pdf' },
-      { filename: `conquered-time-report-${dateTag}.csv`, content: csv,    contentType: 'text/csv' },
-    ],
-  });
-}
+// doSendReport lives in ./email.
 
 ipcMain.handle('email:send-report', async (_, { htmlContent, subject, recipients }) => {
-  if (!sessionKey || !sessionUser) return { ok: false, error: 'Not logged in.' };
+  if (!session.key || !session.user) return { ok: false, error: 'Not logged in.' };
   try {
     await doSendReport({ htmlContent, subject, recipients });
     return { ok: true };
@@ -2072,7 +1833,7 @@ ipcMain.handle('email:trigger-schedule-check', async () => {
 });
 
 ipcMain.handle('email:send-scheduled-now', async () => {
-  if (!sessionKey || !sessionUser) return { ok: false, error: 'Not logged in.' };
+  if (!session.key || !session.user) return { ok: false, error: 'Not logged in.' };
   try {
     const result = await runScheduledEmailCheck(true);
     if (result === false) return { ok: false, error: 'Schedule is set to Off — enable a frequency first.' };
@@ -2096,104 +1857,7 @@ ipcMain.handle('email:get-schedule-status', () => {
 });
 
 // ── Email schedule check ──────────────────────────────────────────────────
-
-function computeNextSendDate(freq, lastSent) {
-  const now  = new Date();
-  const last = lastSent ? new Date(lastSent) : null;
-  if (freq === 'daily')     return last ? new Date(last.getTime() + 86400000) : now;
-  if (freq === 'weekly')    return last ? new Date(last.getTime() + 7 * 86400000) : now;
-  if (freq === 'monthly') {
-    const d = last ? new Date(last) : new Date(now);
-    d.setMonth(d.getMonth() + 1); d.setDate(1); return d;
-  }
-  if (freq === 'quarterly') {
-    const d = last ? new Date(last) : new Date(now);
-    d.setMonth(d.getMonth() + 3); d.setDate(1); return d;
-  }
-  if (freq === 'annually') {
-    const d = last ? new Date(last) : new Date(now);
-    d.setFullYear(d.getFullYear() + 1); d.setMonth(0); d.setDate(1); return d;
-  }
-  return null;
-}
-
-async function runScheduledEmailCheck(force = false) {
-  if (!hasDb() || !sessionKey || !sessionUser) return;
-  try {
-    const get = k => (dbGet('SELECT value FROM app_settings WHERE key=?', [k]) || {}).value || '';
-    const freq = get('email_schedule_freq');
-    if (!freq || freq === 'off') return false;
-
-    const lastSent  = get('email_schedule_last_sent') || null;
-    const sendTime  = get('email_schedule_time') || '08:00';
-    const nextSend  = computeNextSendDate(freq, lastSent);
-    if (!nextSend) return;
-
-    const [sh, sm] = sendTime.split(':').map(Number);
-    nextSend.setHours(sh, sm, 0, 0);
-    if (!force && new Date() < nextSend) return;
-
-    // Time to send — build report covering since lastSent
-    const fromDate = lastSent ? lastSent.slice(0, 10) : new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
-    const toDate   = new Date().toISOString().slice(0, 10);
-
-    const entries: Array<Record<string, any>> = dbAll(
-      'SELECT rowid as rid, * FROM time_entries WHERE user_id=? AND log_date>=? AND log_date<=? ORDER BY log_date',
-      [sessionUser.id, fromDate, toDate]
-    ).map(r => ({ ...r, id: Number(r.rid) }));
-
-    const companyRows = dbAll('SELECT rowid as rid, * FROM companies WHERE user_id=?', [sessionUser.id]);
-    const companies = {};
-    companyRows.forEach(co => {
-      try { companies[Number(co.rid)] = JSON.parse(decrypt({ data: co.data_enc, iv: co.data_iv, tag: co.data_tag }, sessionKey)).name || ''; } catch {}
-    });
-
-    const totalMins = entries.reduce((s, e) => s + (e.total_mins || 0), 0);
-    const fmtM = m => { const h = Math.floor(m/60), mn = m%60; return `${h}h ${mn}m`; };
-
-    const byLabel: Record<string, number> = {};
-    entries.forEach(e => { try { JSON.parse(e.rows_json||'[]').forEach(r => { if (r.total_mins > 0) { const l = r.label||'Other'; byLabel[l]=(byLabel[l]||0)+r.total_mins; } }); } catch {} });
-    const labelRows = Object.entries(byLabel).sort((a,b)=>b[1]-a[1])
-      .map(([l,m]) => `<tr><td>${l}</td><td style="text-align:right">${fmtM(m)}</td></tr>`).join('');
-
-    const htmlContent = `<!DOCTYPE html><html><head><title>Scheduled Report</title>
-<style>body{font-family:Arial,sans-serif;font-size:12px;color:#111;padding:40px;max-width:900px;margin:0 auto;}
-h1{font-size:20px;font-weight:600;margin:0 0 4px;}h2{font-size:13px;font-weight:600;color:#374151;margin:20px 0 8px;border-bottom:1px solid #e5e7eb;padding-bottom:4px;}
-.meta{color:#666;font-size:11px;margin-bottom:20px;}table{width:100%;border-collapse:collapse;}
-th{background:#f1f5f9;border-bottom:2px solid #2563eb;padding:8px;text-align:left;font-size:11px;font-weight:600;}
-td{padding:7px 8px;border-bottom:1px solid #e5e7eb;}
-.footer{margin-top:32px;color:#9ca3af;font-size:10px;border-top:1px solid #e5e7eb;padding-top:10px;}
-</style></head><body>
-<h1>Conquered Time — Scheduled Report</h1>
-<div class="meta">Period: ${fromDate} → ${toDate} · Total: ${fmtM(totalMins)}</div>
-<h2>Task Label Breakdown</h2>
-<table><thead><tr><th>Label</th><th style="text-align:right">Duration</th></tr></thead>
-<tbody>${labelRows}</tbody></table>
-<div class="footer">Generated by Conquered Time · ${new Date().toLocaleString()} · CONFIDENTIAL</div>
-</body></html>`;
-
-    const cfg = getEmailSmtpConfig();
-    if (!cfg.host || !cfg.password) throw new Error('SMTP not configured.');
-    const toList = (cfg.defaultTo || '').split(/[,;\s]+/).map(s => s.trim()).filter(Boolean);
-    if (!toList.length) throw new Error('No default recipient set. Add one in Settings → Data → Email Reports.');
-
-    await doSendReport({
-      htmlContent,
-      subject: `Conquered Time Scheduled Report — ${toDate}`,
-      recipients: toList,
-      entriesOverride: entries,
-    });
-
-    dbRun("INSERT OR REPLACE INTO app_settings (key,value) VALUES ('email_schedule_last_sent',?)", [new Date().toISOString()]);
-    dbRun("INSERT OR REPLACE INTO app_settings (key,value) VALUES ('email_schedule_last_error','')", []);
-    persistDB();
-    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('toast', 'Scheduled report sent successfully!', 'success');
-  } catch (e) {
-    console.error('[schedule-email]', e.message);
-    if (hasDb()) { try { dbRun("INSERT OR REPLACE INTO app_settings (key,value) VALUES ('email_schedule_last_error',?)", [e.message]); persistDB(); } catch {} }
-    throw e; // re-throw so IPC handler / interval caller can surface the error
-  }
-}
+// computeNextSendDate / runScheduledEmailCheck live in ./email (gotcha #9).
 
 app.on('window-all-closed', () => {
   // With close-to-tray the main window can be hidden (not closed), so this won't
