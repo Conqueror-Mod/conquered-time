@@ -537,23 +537,24 @@ const Shell = (() => {
               </div>
 
               <div class="about-section">
-                <div class="about-section-title">What's New — v3.9</div>
+                <div class="about-section-title">What's New — v3.10</div>
+                <ul class="about-changelog">
+                  <li>Company web nodes now grow to fit long company names — no more clipped labels on either web</li>
+                  <li>Type times the way you read them — the tracker's inline time editor accepts 2:30 PM when you're in 12-hour mode</li>
+                  <li>Two sessions on one date? A picker now lets you choose, and the Global Log opens the exact session you clicked</li>
+                  <li>Rows holding only a description are no longer invisible — they show in the Global Log, exports, and the audit</li>
+                  <li>A task or break left running after its session ended is now stopped automatically at your next sign-in</li>
+                  <li>Future-dated sessions are badged in the Global Log and no longer crowd Recent Activity</li>
+                  <li>Plus: break/lunch suggestions no longer cite state law where none applies, themed phone input, and clearer audit buttons on dark themes</li>
+                </ul>
+              </div>
+              <div class="about-section">
+                <div class="about-section-title">v3.9</div>
                 <ul class="about-changelog">
                   <li>Private beta access — new installs now ask for a beta key before account setup; existing installs are unaffected</li>
                   <li>Branded setup wizard — welcome and finish pages, license agreement, and an install-for-all-users option</li>
                   <li>Working links — Check for Updates, GitHub, and Support on Ko-fi are all live in Settings → About</li>
                   <li>The login screen now matches your profile's theme after sign-out (no more mismatched colors)</li>
-                </ul>
-              </div>
-              <div class="about-section">
-                <div class="about-section-title">v3.8</div>
-                <ul class="about-changelog">
-                  <li>Roomier Description field — write multi-line task notes in the tracker; they stay tidy in the table and flatten cleanly in PDF/CSV exports</li>
-                  <li>Resize your tracker columns — drag the dividers to set column widths; double-click to reset. Your layout is remembered</li>
-                  <li>Per-company time-clock clear — wipe one company's time entries from Settings → Data without touching the others</li>
-                  <li>Dispatch remembers your task — the timer field pre-fills with your current task, so restarting it is one click</li>
-                  <li>Time format updates everywhere instantly when you switch 12-hour / 24-hour — no refresh needed</li>
-                  <li>First-login note confirming your data is always encrypted, plus clearer Audit dismissed-row styling on dark themes</li>
                 </ul>
               </div>
               <div class="about-section">
