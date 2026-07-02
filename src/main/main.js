@@ -8,6 +8,7 @@ const nodemailer = require('nodemailer');
 const { execFile } = require('child_process');
 const { encrypt, decrypt, deriveKey, reEncryptVault: reEncryptVaultCore, migrateTimeEntries: migrateTimeEntriesCore } = require('./vault-crypto');
 const { createReadCache } = require('./read-cache');
+const { rowHasContent } = require('../renderer/row-utils'); // shared "is this row real?" predicate (C3)
 const betaKeys = require('./beta-keys');
 
 // Beta-key signing secret — private, gitignored, bundled into builds. If the
@@ -660,7 +661,10 @@ function countAuditDiscrepancies() {
     const entryId = Number(e.rid);
     try {
       JSON.parse(e.rows_json || '[]').forEach((r, idx) => {
-        if (!r.clock_in && !r.clock_out && !r.label && !r.name) return;
+        // C3 (D-004): shared predicate includes desc — a desc-only row holds
+        // user content with no punch and now flags (no_clock_in) instead of
+        // being silently unaudited.
+        if (!rowHasContent(r)) return;
         if (!r.clock_in) {
           if (!dismissed.has(`${entryId}:${idx}:no_clock_in`)) count++;
         } else if (!r.clock_out) {
@@ -2071,7 +2075,7 @@ async function doSendReport({ htmlContent, subject, recipients, entriesOverride 
   entries.forEach(e => {
     try {
       JSON.parse(e.rows_json || '[]').forEach(r => {
-        if (!r.label && !r.name && !r.clock_in) return;
+        if (!rowHasContent(r)) return; // C3 (D-011): desc-only rows export too
         // Flatten multi-line descriptions so the CSV column stays single-line.
         const descFlat = String(r.desc || r.description || '').replace(/\s+/g, ' ').trim();
         csvRows.push([e.log_date, companies[Number(e.company_id)] || '', e.session_label || '', r.label || '', r.name || '', descFlat, r.clock_in || '', r.clock_out || '', r.total_mins || 0]);
