@@ -185,14 +185,17 @@ function getCanvasColors() {
   const theme = document.documentElement.getAttribute('data-theme') || 'memoria';
   const isLight = theme === 'memoria' || theme === 'rabanastre';
   if (isLight) return {
-    center: { g1:'rgba(30,58,138,0.95)', g2:'rgba(15,23,80,0.9)', border:'#1d4ed8', label:'#ffffff', glow:'rgba(29,78,216,0.2)' },
-    node:   { g1:'rgba(49,46,129,0.95)', g2:'rgba(30,27,90,0.9)', border:'#4338ca', label:'#ffffff' },
+    center: { g1:'rgba(30,58,138,0.95)', g2:'rgba(15,23,80,0.9)', border:'#1d4ed8', label:'#ffffff', glow:'rgba(29,78,216,0.2)', rim:'rgba(8,18,70,1)' },
+    // Mid-indigo fills (the old near-black ones read as black blobs on light
+    // backgrounds), soft rim, and a DARK label — company names render on the
+    // page background below the node, not inside the sphere.
+    node:   { g1:'rgba(129,140,248,0.95)', g2:'rgba(79,70,229,0.92)', border:'#4338ca', label:'#312e81', rim:'rgba(49,46,129,0.35)' },
     edge1:'rgba(29,78,216,0.7)', edge2:'rgba(67,56,202,0.2)',
     grid:'rgba(0,0,0,0.06)', hours:'#92400e'
   };
   return {
-    center: { base:'#0f2060', g1:'rgba(80,130,255,1)', g2:'rgba(25,55,175,1)', border:'#3b82f6', label:'#bfdbfe', glow:'rgba(59,130,246,0.12)' },
-    node:   { g1:'rgba(129,140,248,0.22)', g2:'rgba(67,56,202,0.14)', border:'#6366f1', label:'#e0e7ff' },
+    center: { base:'#0f2060', g1:'rgba(80,130,255,1)', g2:'rgba(25,55,175,1)', border:'#3b82f6', label:'#bfdbfe', glow:'rgba(59,130,246,0.12)', rim:'rgba(8,18,70,1)' },
+    node:   { g1:'rgba(129,140,248,0.22)', g2:'rgba(67,56,202,0.14)', border:'#6366f1', label:'#e0e7ff', rim:'rgba(0,0,0,0.35)' },
     edge1:'rgba(59,130,246,0.5)', edge2:'rgba(99,102,241,0.08)',
     grid:'rgba(255,255,255,0.025)', hours:'rgba(245,158,11,0.9)'
   };
@@ -212,7 +215,7 @@ function drawSphereNode(ctx, x, y, r, isCenter, pulse, label) {
     }
   }
   const grad = ctx.createRadialGradient(x-pR*0.3,y-pR*0.3,pR*0.1,x,y,pR);
-  grad.addColorStop(0, nc.g1); grad.addColorStop(0.6, nc.g2); grad.addColorStop(1, isCenter ? 'rgba(8,18,70,1)' : 'rgba(0,0,0,0.35)');
+  grad.addColorStop(0, nc.g1); grad.addColorStop(0.6, nc.g2); grad.addColorStop(1, nc.rim);
   ctx.beginPath(); ctx.arc(x,y,pR,0,Math.PI*2);
   ctx.fillStyle=grad; ctx.fill();
   ctx.strokeStyle=nc.border; ctx.lineWidth=isCenter?2:1.5; ctx.stroke();
