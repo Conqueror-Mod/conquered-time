@@ -59,6 +59,7 @@ async function loadData() {
   const sel = document.getElementById('filter-company');
   companies.forEach(co => {
     const opt=document.createElement('option');
+    // @ts-ignore — number assigned to option value; DOM stringifies.
     opt.value=co.id; opt.textContent=co.name;
     sel.appendChild(opt);
   });
@@ -102,8 +103,10 @@ function renderSummary() {
   const totalMins=filtered.reduce((s,e)=>s+e.total_mins,0);
   const coSet=new Set(filtered.map(e=>e.company_id));
   const avgMins=filtered.length?totalMins/filtered.length:0;
+  // @ts-ignore — number assigned to textContent; DOM stringifies.
   document.getElementById('chip-sessions').textContent=filtered.length;
   document.getElementById('chip-hours').textContent=fmtH(totalMins);
+  // @ts-ignore — number assigned to textContent; DOM stringifies.
   document.getElementById('chip-companies').textContent=coSet.size;
   document.getElementById('chip-avg').textContent=fmtH(avgMins);
 }

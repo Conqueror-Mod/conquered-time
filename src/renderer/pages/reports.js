@@ -102,6 +102,7 @@ async function loadData() {
   const sel = document.getElementById('period-company');
   companies.forEach(c => {
     const o = document.createElement('option');
+    // @ts-ignore — number assigned to option value; DOM stringifies.
     o.value = c.id; o.textContent = c.name;
     sel.appendChild(o);
   });
@@ -168,6 +169,7 @@ function renderPeriod() {
   const totalMins  = entries.reduce((s,e) => s + (e.total_mins||0), 0);
   const from       = new Date(document.getElementById('period-from').value);
   const to         = new Date(document.getElementById('period-to').value);
+  // @ts-ignore — Date subtraction via valueOf() is intended here.
   const daySpan    = Math.max(1, Math.round((to-from)/86400000)+1);
 
   const byCompany = {};

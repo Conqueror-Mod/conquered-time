@@ -38,6 +38,7 @@ async function loadData() {
   document.getElementById('stat-today').textContent     = fmtH(todayMins);
   document.getElementById('stat-week').textContent      = fmtH(weekMins);
   document.getElementById('stat-alltime').textContent   = fmtH(allTimeMins);
+  // @ts-ignore — number assigned to textContent; DOM stringifies.
   document.getElementById('stat-companies').textContent = companies.length;
 
   const compMap = {};

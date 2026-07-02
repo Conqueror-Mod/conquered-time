@@ -11,12 +11,20 @@
 // require()-able from main.js and the unit tests.
 (function (root) {
 
+  /**
+   * @param {EntryRow | null | undefined} r
+   * @returns {string}
+   */
   function rowDesc(r) {
     return (r && (r.desc || r.description)) || '';
   }
 
   // True when the row carries any user content: a punch, a label, a name, or
   // a description. Whitespace-only strings don't count.
+  /**
+   * @param {EntryRow | null | undefined} r
+   * @returns {boolean}
+   */
   function rowHasContent(r) {
     if (!r) return false;
     return !!(

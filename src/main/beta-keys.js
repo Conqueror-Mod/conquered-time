@@ -31,6 +31,10 @@ const DECODE = (() => {
   return m;
 })();
 
+/**
+ * @param {Buffer | Uint8Array} buf
+ * @returns {string}
+ */
 function base32Encode(buf) {
   let bits = 0, value = 0, out = '';
   for (const byte of buf) {
@@ -41,6 +45,10 @@ function base32Encode(buf) {
   return out;
 }
 
+/**
+ * @param {string} str
+ * @returns {Buffer}
+ */
 function base32Decode(str) {
   let bits = 0, value = 0;
   const out = [];
@@ -73,6 +81,10 @@ function normalize(keyStr) {
 }
 
 // Convert a Date or 'YYYY-MM-DD' string to whole days since the unix epoch (UTC).
+/**
+ * @param {Date | string} expiry
+ * @returns {number}
+ */
 function toExpiryDays(expiry) {
   const d = expiry instanceof Date ? expiry : new Date(`${expiry}T00:00:00Z`);
   if (isNaN(d.getTime())) throw new Error('invalid expiry date');
@@ -82,6 +94,12 @@ function toExpiryDays(expiry) {
 }
 
 // Mint a key valid through the end of the given expiry day.
+/**
+ * @param {string | Buffer} secret
+ * @param {Date | string} expiry
+ * @param {Buffer} [nonce] 2 bytes; random when omitted
+ * @returns {string} formatted CONQ-XXXXXX-XXXXXX-XXXXXX-XXXXXX key
+ */
 function makeKey(secret, expiry, nonce) {
   if (!secret) throw new Error('missing secret');
   const days = toExpiryDays(expiry);
@@ -92,6 +110,11 @@ function makeKey(secret, expiry, nonce) {
 }
 
 // Verify a key. Returns { valid, reason?, expiry?(Date), expired? }.
+/**
+ * @param {string | Buffer | null | undefined} secret
+ * @param {unknown} keyStr
+ * @returns {{ valid: boolean, reason?: string, expiry?: Date, expired?: boolean }}
+ */
 function verifyKey(secret, keyStr) {
   if (!secret) return { valid: false, reason: 'no-secret' };
   let bytes;

@@ -111,6 +111,7 @@ async function loadCompanies() {
     const id = Number(co.id);
     if (!id || isNaN(id)) return;
     const opt = document.createElement('option');
+    // @ts-ignore — number assigned to option value; DOM stringifies.
     opt.value = id; opt.textContent = co.name || `Company #${id}`;
     sel.appendChild(opt);
   });
@@ -699,6 +700,8 @@ function startEdit(cell, idx, field) {
   }
 
   cell.innerHTML = ''; cell.appendChild(input);
+  // @ts-ignore — the `if (input.select)` guard covers the select-element branch
+  // of the union, which has no .select().
   input.focus(); if (input.select) input.select();
 
   const commit = () => {
@@ -755,7 +758,9 @@ function updateTotals() {
     }
   });
   document.getElementById('total-time').textContent = total>0 ? formatMins(total) : '0h 00m';
+  // @ts-ignore — number assigned to textContent; DOM stringifies.
   document.getElementById('rows-done').textContent  = rowsData.filter(isRowFilled).length;
+  // @ts-ignore — number assigned to textContent; DOM stringifies.
   document.getElementById('rows-total').textContent = rowsData.length;
 
   const breakdownEl = document.getElementById('breakdown-row');

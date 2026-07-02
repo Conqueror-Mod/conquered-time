@@ -1,0 +1,28 @@
+{
+  // Phase 1 of the TypeScript refactor (docs/refactor-plan.md): typecheck the
+  // existing JS in place — no emit, no build step, zero runtime change.
+  // `strict` starts false and is tightened as the error inventory shrinks.
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "strict": false,
+    // Electron 29 = Chromium 122 / Node 20 — ES2022 everywhere.
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    "types": ["node"],
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": [
+    "types/**/*.d.ts",
+    "src/**/*.js",
+    "seed-dev.js",
+    "test/**/*.js",
+    "scripts/**/*.mjs"
+  ],
+  "exclude": ["node_modules", "dist", "build"]
+}

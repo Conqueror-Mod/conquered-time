@@ -781,7 +781,7 @@ const Shell = (() => {
           document.getElementById('audit-warn-dismiss'),
           document.getElementById('audit-warn-view'),
         ].filter(Boolean);
-        const idx = btns.indexOf(document.activeElement);
+        const idx = btns.indexOf(/** @type {HTMLElement} */ (document.activeElement));
         if (e.key === 'ArrowLeft')  btns[Math.max(0, idx <= 0 ? btns.length - 1 : idx - 1)].focus();
         if (e.key === 'ArrowRight') btns[idx >= btns.length - 1 ? 0 : idx + 1].focus();
         return;

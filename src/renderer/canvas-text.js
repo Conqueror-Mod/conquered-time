@@ -11,6 +11,12 @@
 
   // Trim `text` so it fits maxWidth in the ctx's CURRENT font, appending a
   // real ellipsis when trimmed. Never returns a bare '…' for non-empty input.
+  /**
+   * @param {MeasuringCtx} ctx
+   * @param {unknown} text
+   * @param {number} maxWidth
+   * @returns {string}
+   */
   function ellipsizeToWidth(ctx, text, maxWidth) {
     const s = String(text == null ? '' : text);
     if (!s || ctx.measureText(s).width <= maxWidth) return s;
@@ -27,6 +33,15 @@
   // Node radius that accommodates `text` in `font`: half the measured width
   // plus padding, clamped to [baseR, maxR]. Sets and restores nothing — the
   // caller's font is temporarily switched for measurement.
+  /**
+   * @param {MeasuringCtx} ctx
+   * @param {unknown} text
+   * @param {string} font
+   * @param {number} baseR
+   * @param {number} maxR
+   * @param {number | null} [padding]
+   * @returns {number}
+   */
   function radiusForLabel(ctx, text, font, baseR, maxR, padding) {
     const pad = padding == null ? 10 : padding;
     const prev = ctx.font;

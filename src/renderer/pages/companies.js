@@ -47,6 +47,7 @@ async function loadCompanies() {
   companies = await Store.getCompanies();
   entries   = await Store.getEntriesSummary();
   renderList();
+  // @ts-ignore — number assigned to textContent; DOM stringifies.
   document.getElementById('company-count').textContent = companies.length;
   if (selectedId) {
     const co = companies.find(c => c.id === selectedId);
@@ -287,6 +288,7 @@ function drawWeb() {
     const REPEL    = count <= 1  ? 500  : count <= 3 ? 3500 : count <= 6 ? 6500 : 9500;
     const steps    = count <= 2  ? 60   : count <= 5 ? 160  : 260;
 
+    /** @type {Array<Record<string, any>>} — heterogeneous node objects (center vs company). */
     const ns = [{ x: cx, y: cy, r: 36, label: (window.__currentUsername || 'YOU'), isCenter: true, co: null, fixed: true }];
     // D-003: nodes size themselves to the measured label (bounded), and the
     // draw step ellipsizes anything that still can't fit — no more bare

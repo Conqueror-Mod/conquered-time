@@ -11,7 +11,14 @@
 
 const crypto = require('crypto');
 
+/** @typedef {{ iv: string, tag: string, data: string }} EncBlob hex-encoded AES-256-GCM ciphertext */
+
 // AES-256-GCM. Returns hex-encoded { iv, tag, data } for storage in TEXT columns.
+/**
+ * @param {string} plaintext
+ * @param {Buffer} key 32-byte AES-256 key
+ * @returns {EncBlob}
+ */
 function encrypt(plaintext, key) {
   const iv     = crypto.randomBytes(12);
   const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
@@ -22,6 +29,11 @@ function encrypt(plaintext, key) {
 
 // Throws on auth-tag mismatch / wrong key — callers rely on this to detect
 // undecryptable blobs.
+/**
+ * @param {EncBlob} encObj
+ * @param {Buffer} key
+ * @returns {string}
+ */
 function decrypt(encObj, key) {
   const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(encObj.iv, 'hex'));
   decipher.setAuthTag(Buffer.from(encObj.tag, 'hex'));
@@ -33,11 +45,22 @@ function decrypt(encObj, key) {
 
 // Key derived from password + stable stored salt ONLY. TOTP authenticates login
 // but must never feed key derivation (it rotates every 30s — see gotcha #2).
+/**
+ * @param {string} password
+ * @param {string | Buffer} salt
+ * @returns {Buffer} 32-byte AES-256 key
+ */
 function deriveKey(password, salt) {
   return crypto.pbkdf2Sync(password, salt, 310000, 32, 'sha256');
 }
 
 // ── tiny sql.js row helpers (kept local so this module has no other deps) ──
+/**
+ * @param {*} db sql.js Database handle
+ * @param {string} sql
+ * @param {unknown[]} [params]
+ * @returns {Array<Record<string, any>>}
+ */
 function all(db, sql, params = []) {
   const res = db.exec(sql, params);
   if (!res || !res[0]) return [];
@@ -48,6 +71,12 @@ function all(db, sql, params = []) {
     return o;
   });
 }
+/**
+ * @param {*} db sql.js Database handle
+ * @param {string} sql
+ * @param {unknown[]} [params]
+ * @returns {Record<string, any> | null}
+ */
 function get(db, sql, params = []) {
   return all(db, sql, params)[0] || null;
 }
@@ -68,6 +97,11 @@ function get(db, sql, params = []) {
 // Returns { ok, db, error }. The caller MUST adopt the returned `db` handle
 // (on rollback it is a fresh instance restored from the snapshot), and should
 // persist to disk only when ok === true.
+/**
+ * @param {{ SQL: *, db: *, oldKey: Buffer, newKey: Buffer, userId: number,
+ *           user?: Record<string, any> | null, onCommit?: (db: *) => void }} opts
+ * @returns {{ ok: boolean, db: *, error?: string }}
+ */
 function reEncryptVault({ SQL, db, oldKey, newKey, userId, user, onCommit }) {
   const writes = [];
   try {
@@ -136,6 +170,10 @@ function reEncryptVault({ SQL, db, oldKey, newKey, userId, user, onCommit }) {
 // Not wrapped in the snapshot/rollback machinery on purpose — it only ever adds
 // ciphertext to previously-plaintext rows and never re-keys existing ciphertext,
 // so a crash mid-run simply leaves the remaining rows for the next pass.
+/**
+ * @param {{ db: *, key: Buffer, userId: number }} opts
+ * @returns {number} rows migrated
+ */
 function migrateTimeEntries({ db, key, userId }) {
   const plain = all(db, 'SELECT rowid as rid, rows_json FROM time_entries WHERE user_id=? AND rows_enc IS NULL', [userId]);
   for (const r of plain) {

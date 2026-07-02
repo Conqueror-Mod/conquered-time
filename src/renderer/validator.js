@@ -5,6 +5,10 @@
 window.Validator = (() => {
   const TIME_RE = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
 
+  /**
+   * @param {string} t
+   * @returns {string}
+   */
   function pad(t) {
     if (!t) return t;
     const [h, m] = t.split(':');
@@ -13,6 +17,10 @@ window.Validator = (() => {
 
   // Company save payload (see companies.html saveCompany). The display `name`
   // is derived from an alias or the hierarchy company field, so it must exist.
+  /**
+   * @param {Partial<Company>} data — trimmed in place
+   * @returns {ValidatorResult}
+   */
   function validateCompany(data) {
     if (!data || !data.name || !data.name.trim()) {
       return { ok: false, error: 'Company name is required.' };
@@ -27,6 +35,10 @@ window.Validator = (() => {
 
   // Time-entry save payload (see tracker.html saveSession). Per-row clock times
   // live inside rows_json — validate each row's HH:MM and the rolled-up total.
+  /**
+   * @param {Partial<TimeEntry>} data — rows_json re-serialized with padded times
+   * @returns {ValidatorResult}
+   */
   function validateEntry(data) {
     if (data.total_mins != null && (isNaN(data.total_mins) || data.total_mins < 0)) {
       return { ok: false, error: 'Session duration must be a non-negative number.' };

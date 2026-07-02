@@ -498,9 +498,13 @@ function createWindow() {
 }
 
 function buildMenu() {
+  /** @type {import('electron').MenuItemConstructorOptions[]} */
   const template = [
     { label: 'File', submenu: [
-      { label: 'Lock Session',   accelerator: 'CmdOrCtrl+L', click: lockSession },
+      // Wrapped: Electron invokes click with (menuItem, window, event), and a bare
+      // `click: lockSession` fed the MenuItem into skipAuditCheck — truthy — so
+      // menu/Ctrl+L locking silently bypassed the audit-discrepancy warning.
+      { label: 'Lock Session',   accelerator: 'CmdOrCtrl+L', click: () => lockSession() },
       { type: 'separator' },
       { label: 'Export PDF...',  accelerator: 'CmdOrCtrl+P', click: () => mainWindow.webContents.send('menu:export-pdf') },
       { label: 'Export CSV...',  click: () => mainWindow.webContents.send('menu:export-csv') },
@@ -1922,6 +1926,7 @@ ipcMain.handle('settings:set', (_, { key, value }) => {
 // This restores a standard edit menu (cut/copy/paste/select-all) on all windows.
 app.on('web-contents-created', (_e, wc) => {
   wc.on('context-menu', (_ev, params) => {
+    /** @type {import('electron').MenuItemConstructorOptions[]} */
     const items = [];
     if (params.isEditable) {
       if (params.selectionText) items.push({ label: 'Cut',  role: 'cut'  });
@@ -1932,6 +1937,9 @@ app.on('web-contents-created', (_e, wc) => {
     } else if (params.selectionText) {
       items.push({ label: 'Copy', role: 'copy' });
     }
+    // @ts-ignore — getOwnerBrowserWindow exists at runtime but is missing from
+    // Electron 29's WebContents typings; Phase 2 should switch this to
+    // BrowserWindow.fromWebContents(wc).
     if (items.length) Menu.buildFromTemplate(items).popup({ window: wc.getOwnerBrowserWindow() });
   });
 });
@@ -2105,6 +2113,12 @@ ipcMain.handle('email:test-smtp', async () => {
   } catch (e) { return { ok: false, error: e.message }; }
 });
 
+/**
+ * Render and email a report PDF+CSV via the configured SMTP transport.
+ * @param {{ htmlContent: string, subject?: string, recipients?: string,
+ *           entriesOverride?: object[] }} opts — entriesOverride is only set by
+ *   the scheduled-report path; the manual email:send-report path omits it.
+ */
 async function doSendReport({ htmlContent, subject, recipients, entriesOverride }) {
   const cfg = getEmailSmtpConfig();
   if (!cfg.host || !cfg.username || !cfg.password) throw new Error('Email not configured. Open Settings → Data to add SMTP credentials.');

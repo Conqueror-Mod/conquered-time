@@ -11,11 +11,20 @@ window.Store = (() => {
   const _cache = { companies: null, entries: null, entriesSummary: null };
   const _listeners = { companies: [], entries: [] };
 
+  /**
+   * @param {Company} row
+   * @returns {Company}
+   */
   function _normalizeCompany(row) {
     if (row && row.rid != null) row.id = Number(row.rid);
     return row;
   }
 
+  /**
+   * @template {{ rid?: number, id?: number }} T
+   * @param {T} row
+   * @returns {T}
+   */
   function _normalizeEntry(row) {
     if (row && row.rid != null) row.id = Number(row.rid);
     return row;
@@ -50,6 +59,7 @@ window.Store = (() => {
     return _cache.entriesSummary;
   }
 
+  /** @param {'all' | 'companies' | 'entries'} key */
   function invalidate(key) {
     if (key === 'all') {
       _cache.companies = null;
@@ -67,10 +77,18 @@ window.Store = (() => {
     }
   }
 
+  /**
+   * @param {'companies' | 'entries'} event
+   * @param {() => void} fn
+   */
   function subscribe(event, fn) {
     if (_listeners[event]) _listeners[event].push(fn);
   }
 
+  /**
+   * @param {'companies' | 'entries'} event
+   * @param {() => void} fn
+   */
   function unsubscribe(event, fn) {
     if (_listeners[event]) _listeners[event] = _listeners[event].filter(f => f !== fn);
   }
