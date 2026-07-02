@@ -8,6 +8,13 @@ const nodemailer = require('nodemailer');
 const { execFile } = require('child_process');
 const { encrypt, decrypt, deriveKey, reEncryptVault: reEncryptVaultCore, migrateTimeEntries: migrateTimeEntriesCore } = require('./vault-crypto');
 const { createReadCache } = require('./read-cache');
+const {
+  loadSqlJs, getSql, newDatabase,
+  openDb, replaceDb, closeDb, hasDb, getDb, adoptDb,
+  setDbFile, getDbFile, persistDB,
+  dbGet, dbAll, dbRun, dbInsert,
+} = require('./db');
+const { BREAK_POLICIES, STATE_POLICY, STATE_NAMES, getPolicy, requiredBreaks } = require('./policies');
 const { rowHasContent } = require('../renderer/row-utils'); // shared "is this row real?" predicate (C3)
 const betaKeys = require('./beta-keys');
 
@@ -45,9 +52,10 @@ const ROOT_DATA_DIR = IS_DEV
 const PROFILES_DIR  = IS_DEV ? null : path.join(ROOT_DATA_DIR, 'profiles');
 
 // Mutable — set when a profile is selected via profiles:select (or auto-set in dev)
+// The vault file path itself lives in ./db (setDbFile/getDbFile) next to the handle.
 let ACTIVE_PROFILE_DIR = IS_DEV ? ROOT_DATA_DIR : null;
-let DB_FILE            = IS_DEV ? path.join(ROOT_DATA_DIR, 'dev-vault.db') : null;
 let BACKUP_DIR         = IS_DEV ? path.join(ROOT_DATA_DIR, 'backups') : null;
+setDbFile(IS_DEV ? path.join(ROOT_DATA_DIR, 'dev-vault.db') : null);
 
 fs.mkdirSync(ROOT_DATA_DIR, { recursive: true });
 if (IS_DEV) fs.mkdirSync(BACKUP_DIR, { recursive: true });
@@ -113,8 +121,6 @@ ipcMain.handle('beta:redeem', (_, key) => {
 let sessionKey  = null;
 let sessionUser = null;
 let mainWindow  = null;
-let SQL         = null;   // sql.js module
-let db          = null;   // sql.js Database instance
 let idleTimer    = null;   // auto-lock timeout handle
 let forceClose   = false;  // set true after user confirms close through audit prompt
 let activeEntryId = null;  // rowid of the currently live time_entries row
@@ -148,7 +154,7 @@ function readManifest(profileDir) {
 // In dev mode (db already loaded), reads directly. In prod, peeks into the
 // first available profile's vault to pull startup prefs (theme, window pos).
 function readStartupSetting(key) {
-  if (db) {
+  if (hasDb()) {
     const row = dbGet('SELECT value FROM app_settings WHERE key=?', [key]);
     return row?.value ?? null;
   }
@@ -159,7 +165,7 @@ function readStartupSetting(key) {
   if (!dirs.length) return null;
   try {
     const buf  = fs.readFileSync(path.join(PROFILES_DIR, dirs[0], 'vault.db'));
-    const tmpDb = new SQL.Database(buf);
+    const tmpDb = newDatabase(buf);
     const res   = tmpDb.exec(`SELECT value FROM app_settings WHERE key='${key.replace(/'/g, "''")}'`);
     tmpDb.close();
     return res[0]?.values?.[0]?.[0] ?? null;
@@ -172,7 +178,7 @@ function migrateFromLegacyVault() {
   if (!fs.existsSync(legacyDb) || fs.existsSync(PROFILES_DIR)) return;
   try {
     const buf   = fs.readFileSync(legacyDb);
-    const tmpDb = new SQL.Database(buf);
+    const tmpDb = newDatabase(buf);
     const res   = tmpDb.exec('SELECT username FROM users LIMIT 1');
     tmpDb.close();
     if (!res.length || !res[0].values.length) return;
@@ -192,22 +198,18 @@ function migrateFromLegacyVault() {
 // ── sql.js init ────────────────────────────────────────────────────────────
 async function initProfileDB(profileDir) {
   ACTIVE_PROFILE_DIR = profileDir;
-  DB_FILE   = path.join(profileDir, IS_DEV ? 'dev-vault.db' : 'vault.db');
+  const dbFile = path.join(profileDir, IS_DEV ? 'dev-vault.db' : 'vault.db');
+  setDbFile(dbFile);
   BACKUP_DIR = path.join(profileDir, 'backups');
   fs.mkdirSync(BACKUP_DIR, { recursive: true });
 
-  if (!SQL) SQL = await require('sql.js')();
+  await loadSqlJs();
 
-  if (fs.existsSync(DB_FILE)) {
-    const buf = fs.readFileSync(DB_FILE);
-    db = new SQL.Database(buf);
-  } else {
-    db = new SQL.Database();
-  }
+  openDb(fs.existsSync(dbFile) ? fs.readFileSync(dbFile) : undefined);
 
-  db.run(`PRAGMA foreign_keys = ON;`);
+  dbRun(`PRAGMA foreign_keys = ON;`);
 
-  db.run(`
+  dbRun(`
     CREATE TABLE IF NOT EXISTS users (
       id              INTEGER PRIMARY KEY AUTOINCREMENT,
       username        TEXT    NOT NULL UNIQUE,
@@ -268,23 +270,23 @@ async function initProfileDB(profileDir) {
 
   // audit_dismissed: emailed_at marks discrepancies the user was emailed about
   // (acknowledged) — silenced on close like a dismiss, but kept visible in the log.
-  try { db.run('ALTER TABLE audit_dismissed ADD COLUMN emailed_at INTEGER'); } catch {}
+  try { dbRun('ALTER TABLE audit_dismissed ADD COLUMN emailed_at INTEGER'); } catch {}
 
   // time_entries encryption columns
-  try { db.run('ALTER TABLE time_entries ADD COLUMN rows_enc TEXT'); } catch {}
-  try { db.run('ALTER TABLE time_entries ADD COLUMN rows_iv  TEXT'); } catch {}
-  try { db.run('ALTER TABLE time_entries ADD COLUMN rows_tag TEXT'); } catch {}
+  try { dbRun('ALTER TABLE time_entries ADD COLUMN rows_enc TEXT'); } catch {}
+  try { dbRun('ALTER TABLE time_entries ADD COLUMN rows_iv  TEXT'); } catch {}
+  try { dbRun('ALTER TABLE time_entries ADD COLUMN rows_tag TEXT'); } catch {}
 
   // Profile column migrations — safe to run on every startup
-  try { db.run('ALTER TABLE users ADD COLUMN display_name TEXT'); } catch {}
-  try { db.run('ALTER TABLE users ADD COLUMN profile_enc  TEXT'); } catch {}
-  try { db.run('ALTER TABLE users ADD COLUMN profile_iv   TEXT'); } catch {}
-  try { db.run('ALTER TABLE users ADD COLUMN profile_tag  TEXT'); } catch {}
+  try { dbRun('ALTER TABLE users ADD COLUMN display_name TEXT'); } catch {}
+  try { dbRun('ALTER TABLE users ADD COLUMN profile_enc  TEXT'); } catch {}
+  try { dbRun('ALTER TABLE users ADD COLUMN profile_iv   TEXT'); } catch {}
+  try { dbRun('ALTER TABLE users ADD COLUMN profile_tag  TEXT'); } catch {}
   // Recovery key packet — seals the session key under the recovery code so password reset is possible
-  try { db.run('ALTER TABLE users ADD COLUMN recovery_key_enc  TEXT'); } catch {}
-  try { db.run('ALTER TABLE users ADD COLUMN recovery_key_iv   TEXT'); } catch {}
-  try { db.run('ALTER TABLE users ADD COLUMN recovery_key_tag  TEXT'); } catch {}
-  try { db.run('ALTER TABLE users ADD COLUMN recovery_key_salt TEXT'); } catch {}
+  try { dbRun('ALTER TABLE users ADD COLUMN recovery_key_enc  TEXT'); } catch {}
+  try { dbRun('ALTER TABLE users ADD COLUMN recovery_key_iv   TEXT'); } catch {}
+  try { dbRun('ALTER TABLE users ADD COLUMN recovery_key_tag  TEXT'); } catch {}
+  try { dbRun('ALTER TABLE users ADD COLUMN recovery_key_salt TEXT'); } catch {}
 
   // Belt-and-suspenders: dev_mode must never be honored in a packaged build.
   // The TOTP bypass is already gated on IS_DEV (so a stray flag can't skip TOTP),
@@ -296,7 +298,7 @@ async function initProfileDB(profileDir) {
       const stray = dbGet('SELECT COUNT(*) AS n FROM users WHERE dev_mode=1');
       if (stray && stray.n > 0) {
         console.warn(`[security] Scrubbing dev_mode flag from ${stray.n} user row(s) in a packaged build.`);
-        db.run('UPDATE users SET dev_mode=0 WHERE dev_mode=1');
+        dbRun('UPDATE users SET dev_mode=0 WHERE dev_mode=1');
       }
     } catch (e) { console.error('[security] dev_mode scrub failed:', e.message); }
   }
@@ -304,85 +306,17 @@ async function initProfileDB(profileDir) {
   persistDB();
 }
 
-// ── Persist sql.js DB to disk ──────────────────────────────────────────────
-// Atomic write: dump to a sibling temp file, flush it to disk, then rename
-// over the live vault. rename(2) is atomic on the same volume (and Windows
-// MoveFileEx replaces atomically), so a crash or power loss mid-write can
-// never leave the vault truncated — on disk you always have either the
-// complete old file or the complete new one, never a half-written blob.
-function persistDB() {
-  if (!db || !DB_FILE) return;
-  const data = Buffer.from(db.export());
-  const tmp  = DB_FILE + '.tmp';
-  const fd = fs.openSync(tmp, 'w');
-  try {
-    fs.writeSync(fd, data);
-    fs.fsyncSync(fd);       // force kernel buffers to physical disk before swap
-  } finally {
-    fs.closeSync(fd);
-  }
-  try {
-    fs.renameSync(tmp, DB_FILE);
-  } catch (e) {
-    try { fs.unlinkSync(tmp); } catch {}  // don't leave a stale .tmp behind
-    throw e;
-  }
-}
-
 // ── Backup ─────────────────────────────────────────────────────────────────
 function performBackup() {
-  if (!fs.existsSync(DB_FILE)) return;
+  const dbFile = getDbFile();
+  if (!dbFile || !fs.existsSync(dbFile)) return;
   const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const dest  = path.join(BACKUP_DIR, `vault-${stamp}.db`);
-  fs.copyFileSync(DB_FILE, dest);
+  fs.copyFileSync(dbFile, dest);
   const files = fs.readdirSync(BACKUP_DIR)
     .filter(f => f.startsWith('vault-') && f.endsWith('.db')).sort();
   if (files.length > 30)
     files.slice(0, files.length - 30).forEach(f => fs.unlinkSync(path.join(BACKUP_DIR, f)));
-}
-
-// ── sql.js helpers ─────────────────────────────────────────────────────────
-function dbGet(sql: string, params: unknown[] = []): Record<string, any> | null {
-  const result = db.exec(sql, params);
-  if (result && result[0] && result[0].values && result[0].values[0]) {
-    const cols = result[0].columns;
-    const vals = result[0].values[0];
-    const row: Record<string, any> = {};
-    cols.forEach((col, i) => { row[col] = vals[i] !== undefined ? vals[i] : null; });
-    return row;
-  }
-  return null;
-}
-
-function dbAll(sql: string, params: unknown[] = []): Array<Record<string, any>> {
-  const result = db.exec(sql, params);
-  if (!result || !result[0]) return [];
-  const cols = result[0].columns;
-  return result[0].values.map(vals => {
-    const row: Record<string, any> = {};
-    cols.forEach((col, i) => { row[col] = vals[i] !== undefined ? vals[i] : null; });
-    return row;
-  });
-}
-
-function dbRun(sql, params = []) {
-  db.run(sql, params);
-  return db.getRowsModified();
-}
-
-function dbInsert(sql, params = []) {
-  db.run(sql, params);
-  // sql.js last_insert_rowid() can be unreliable — use max(id) from the table instead
-  // Extract the table name from the INSERT statement
-  const tableMatch = sql.match(/INSERT\s+INTO\s+(\w+)/i);
-  if (tableMatch) {
-    const table = tableMatch[1];
-    const result = db.exec(`SELECT MAX(id) as id FROM ${table}`);
-    if (result && result[0] && result[0].values && result[0].values[0]) {
-      return Number(result[0].values[0][0]);
-    }
-  }
-  return null;
 }
 
 // ── AES-256-GCM ────────────────────────────────────────────────────────────
@@ -403,15 +337,15 @@ function decryptEntry(row) {
 // rollback that is a fresh instance restored from the pre-write snapshot, so the
 // module-level `db` must be reassigned to it. Caller persists only when ok.
 function reEncryptVault(opts) {
-  const res = reEncryptVaultCore({ SQL, db, ...opts });
-  db = res.db;
+  const res = reEncryptVaultCore({ SQL: getSql(), db: getDb(), ...opts });
+  adoptDb(res.db);
   return res.ok ? { ok: true } : { ok: false, error: res.error };
 }
 
 function migrateTimeEntries() {
   if (!sessionKey || !sessionUser) return;
   try {
-    const migrated = migrateTimeEntriesCore({ db, key: sessionKey, userId: sessionUser.id });
+    const migrated = migrateTimeEntriesCore({ db: getDb(), key: sessionKey, userId: sessionUser.id });
     if (migrated > 0) { persistDB(); invalidateEntriesCache(); }
   } catch (e) { console.warn('[migrateTimeEntries] failed:', e.message); }
 }
@@ -594,65 +528,8 @@ function navigate(page) {
   mainWindow.loadFile(path.join(RENDERER_DIR, `pages/${page}.html`));
 }
 
-const BREAK_POLICIES = {
-  default: {
-    label: 'General recommendation',
-    breakThresholds: [[210, 0], [360, 1], [600, 2], [Infinity, 3]],
-    lunchThreshMins: 300,
-    dispatchBreakWarnMins: 150,
-    dispatchLunchWarnMins: 270,
-  },
-  strict_breaks: {
-    label: 'Strict rest breaks (per 4h)',
-    breakThresholds: [[120, 0], [360, 1], [600, 2], [Infinity, 3]],
-    lunchThreshMins: 300,
-    dispatchBreakWarnMins: 90,
-    dispatchLunchWarnMins: 270,
-  },
-  meal_only: {
-    label: 'Meal break required (no rest break mandate)',
-    breakThresholds: [[Infinity, 0]],
-    lunchThreshMins: 360,
-    dispatchBreakWarnMins: Infinity,
-    dispatchLunchWarnMins: 300,
-  },
-};
-
-const STATE_POLICY = {
-  CA:'strict_breaks', CO:'strict_breaks', IL:'strict_breaks', KY:'strict_breaks',
-  ME:'strict_breaks', MN:'strict_breaks', NE:'strict_breaks', NV:'strict_breaks',
-  NH:'strict_breaks', ND:'strict_breaks', OR:'strict_breaks', VT:'strict_breaks',
-  WA:'strict_breaks', WV:'strict_breaks',
-  CT:'meal_only', DE:'meal_only', MA:'meal_only', NM:'meal_only',
-  NY:'meal_only', RI:'meal_only', TN:'meal_only',
-};
-
-const STATE_NAMES = {
-  AL:'Alabama', AK:'Alaska', AZ:'Arizona', AR:'Arkansas', CA:'California',
-  CO:'Colorado', CT:'Connecticut', DE:'Delaware', DC:'Washington D.C.', FL:'Florida',
-  GA:'Georgia', HI:'Hawaii', ID:'Idaho', IL:'Illinois', IN:'Indiana',
-  IA:'Iowa', KS:'Kansas', KY:'Kentucky', LA:'Louisiana', ME:'Maine',
-  MD:'Maryland', MA:'Massachusetts', MI:'Michigan', MN:'Minnesota', MS:'Mississippi',
-  MO:'Missouri', MT:'Montana', NE:'Nebraska', NV:'Nevada', NH:'New Hampshire',
-  NJ:'New Jersey', NM:'New Mexico', NY:'New York', NC:'North Carolina', ND:'North Dakota',
-  OH:'Ohio', OK:'Oklahoma', OR:'Oregon', PA:'Pennsylvania', RI:'Rhode Island',
-  SC:'South Carolina', SD:'South Dakota', TN:'Tennessee', TX:'Texas', UT:'Utah',
-  VT:'Vermont', VA:'Virginia', WA:'Washington', WV:'West Virginia', WI:'Wisconsin',
-  WY:'Wyoming',
-};
-
-function getPolicy(workState) {
-  const key = workState ? (STATE_POLICY[workState] || 'default') : 'default';
-  return BREAK_POLICIES[key];
-}
-
-function requiredBreaks(totalMins, policy) {
-  const thresholds = (policy || BREAK_POLICIES.default).breakThresholds;
-  for (const [threshold, count] of thresholds) {
-    if (totalMins < threshold) return count;
-  }
-  return 0;
-}
+// Break/lunch policy tiers live in ./policies (imported above) — pure data,
+// unit-testable without Electron.
 
 function getDismissedSet() {
   if (!sessionUser) return new Set();
@@ -851,7 +728,7 @@ ipcMain.handle('profiles:select', async (_, { username }) => {
   const profileDir = path.join(PROFILES_DIR, safeName);
   // Guard: if folder + vault + user already exist, reject as duplicate
   if (fs.existsSync(path.join(profileDir, 'vault.db'))) {
-    const tmpDb = new SQL.Database(fs.readFileSync(path.join(profileDir, 'vault.db')));
+    const tmpDb = newDatabase(fs.readFileSync(path.join(profileDir, 'vault.db')));
     const res   = tmpDb.exec('SELECT COUNT(*) FROM users');
     tmpDb.close();
     const count = res[0]?.values?.[0]?.[0] || 0;
@@ -877,8 +754,8 @@ ipcMain.handle('profiles:load', async (_, { username }) => {
 });
 
 ipcMain.handle('profiles:deselect', () => {
-  if (db) { db.close(); db = null; }
-  ACTIVE_PROFILE_DIR = null; DB_FILE = null; BACKUP_DIR = null;
+  closeDb();
+  ACTIVE_PROFILE_DIR = null; setDbFile(null); BACKUP_DIR = null;
   sessionKey = null; sessionUser = null;
   return { ok: true };
 });
@@ -889,7 +766,7 @@ ipcMain.handle('profiles:deselect', () => {
 // Returns { ok, error } — on success the profile directory is removed from disk
 // and the caller should navigate back to login (profile selector).
 ipcMain.handle('profiles:delete', async (_, { password }) => {
-  if (!db) return { ok: false, error: 'No profile loaded.' };
+  if (!hasDb()) return { ok: false, error: 'No profile loaded.' };
   try {
     const bcrypt = require('bcryptjs');
     const user   = dbGet('SELECT rowid as rid, password_hash FROM users LIMIT 1');
@@ -900,8 +777,8 @@ ipcMain.handle('profiles:delete', async (_, { password }) => {
     const profileDir = ACTIVE_PROFILE_DIR;
 
     // Close DB and clear all session state before deleting files
-    db.close(); db = null;
-    ACTIVE_PROFILE_DIR = null; DB_FILE = null; BACKUP_DIR = null;
+    closeDb();
+    ACTIVE_PROFILE_DIR = null; setDbFile(null); BACKUP_DIR = null;
     sessionKey = null; sessionUser = null; activeEntryId = null;
 
     if (profileDir && fs.existsSync(profileDir))
@@ -931,7 +808,7 @@ ipcMain.handle('auth:safe-check', () => {
 });
 
 ipcMain.handle('auth:safe-setup', async (_, { password }) => {
-  if (!db) return { ok: false, error: 'No profile loaded.' };
+  if (!hasDb()) return { ok: false, error: 'No profile loaded.' };
   if (!safeStorage.isEncryptionAvailable()) return { ok: false, error: 'Secure sign-in is not available on this device.' };
   try {
     const bcrypt = require('bcryptjs');
@@ -978,7 +855,7 @@ function requestWindowsHelloConsent() {
 }
 
 ipcMain.handle('auth:safe-login', async () => {
-  if (!db) return { ok: false, error: 'No profile loaded.' };
+  if (!hasDb()) return { ok: false, error: 'No profile loaded.' };
   const skPath = safeKeyPath();
   if (!skPath || !fs.existsSync(skPath)) return { ok: false, error: 'Secure sign-in not enrolled for this profile.' };
   try {
@@ -1007,7 +884,7 @@ ipcMain.handle('auth:safe-login', async () => {
         sessionUser.work_state = pd?.work_state || null;
       } catch {}
     }
-    db.run('UPDATE users SET failed_attempts=0, locked_until=NULL WHERE rowid=?', [Number(user.rid)]);
+    dbRun('UPDATE users SET failed_attempts=0, locked_until=NULL WHERE rowid=?', [Number(user.rid)]);
     persistDB();
     resetIdleTimer();
     migrateTimeEntries();
@@ -1021,7 +898,7 @@ ipcMain.handle('auth:safe-login', async () => {
 });
 
 ipcMain.handle('auth:quick-unlock', async (_, { password }) => {
-  if (!db) return { ok: false, error: 'No profile loaded.' };
+  if (!hasDb()) return { ok: false, error: 'No profile loaded.' };
   const skPath = safeKeyPath();
   if (!skPath || !fs.existsSync(skPath)) return { ok: false, error: 'Secure sign-in not enrolled.' };
   try {
@@ -1043,7 +920,7 @@ ipcMain.handle('auth:quick-unlock', async (_, { password }) => {
         sessionUser.work_state = pd?.work_state || null;
       } catch {}
     }
-    db.run('UPDATE users SET failed_attempts=0, locked_until=NULL WHERE rowid=?', [Number(user.rid)]);
+    dbRun('UPDATE users SET failed_attempts=0, locked_until=NULL WHERE rowid=?', [Number(user.rid)]);
     persistDB();
     resetIdleTimer();
     migrateTimeEntries();
@@ -1057,7 +934,7 @@ ipcMain.handle('auth:quick-unlock', async (_, { password }) => {
 });
 
 ipcMain.handle('auth:safe-disable', async (_, { password }) => {
-  if (!db) return { ok: false, error: 'No profile loaded.' };
+  if (!hasDb()) return { ok: false, error: 'No profile loaded.' };
   try {
     const bcrypt = require('bcryptjs');
     const user   = dbGet('SELECT rowid as rid, password_hash FROM users LIMIT 1');
@@ -1081,7 +958,7 @@ ipcMain.handle('auth:safe-disable', async (_, { password }) => {
 
 // ── IPC: Auth ──────────────────────────────────────────────────────────────
 ipcMain.handle('auth:check-setup', () => {
-  if (!db) return { needsSetup: true };
+  if (!hasDb()) return { needsSetup: true };
   const row = dbGet('SELECT COUNT(*) as c FROM users');
   return { needsSetup: (row?.c || 0) === 0 };
 });
@@ -1151,7 +1028,7 @@ ipcMain.handle('auth:login', async (_, { username, password, totpCode }) => {
     sessionKey  = deriveKey(password, salt);
     // Always use rowid — sql.js AUTOINCREMENT id columns return null through our query helper
     sessionUser = { id: Number(user.rid), username: user.username, display_name: user.display_name || null, work_state: null };
-    db.run('UPDATE users SET failed_attempts=0, locked_until=NULL WHERE rowid=?', [Number(user.rid)]);
+    dbRun('UPDATE users SET failed_attempts=0, locked_until=NULL WHERE rowid=?', [Number(user.rid)]);
     persistDB();
     resetIdleTimer();
 
@@ -1184,11 +1061,11 @@ function incrementFailed(user) {
   const uid = Number(user.rid || user.id);
   if (attempts >= 3) {
     const lockUntil = Date.now() + 86400000;
-    db.run('UPDATE users SET failed_attempts=?, locked_until=? WHERE rowid=?', [attempts, lockUntil, uid]);
+    dbRun('UPDATE users SET failed_attempts=?, locked_until=? WHERE rowid=?', [attempts, lockUntil, uid]);
     persistDB();
     return { locked: true, attemptsLeft: 0 };
   }
-  db.run('UPDATE users SET failed_attempts=? WHERE rowid=?', [attempts, uid]);
+  dbRun('UPDATE users SET failed_attempts=? WHERE rowid=?', [attempts, uid]);
   persistDB();
   return { locked: false, attemptsLeft: 3 - attempts };
 }
@@ -1201,7 +1078,7 @@ ipcMain.handle('auth:recover', async (_, { username, recoveryCode, newPassword }
 
   // Path A — unlock only (no newPassword supplied)
   if (!newPassword) {
-    db.run('UPDATE users SET failed_attempts=0, locked_until=NULL WHERE rowid=?', [Number(user.rid)]);
+    dbRun('UPDATE users SET failed_attempts=0, locked_until=NULL WHERE rowid=?', [Number(user.rid)]);
     persistDB();
     return { ok: true };
   }
@@ -1218,7 +1095,7 @@ ipcMain.handle('auth:recover', async (_, { username, recoveryCode, newPassword }
 
     const res = reEncryptVault({
       oldKey, newKey, userId: Number(user.rid), user,
-      onCommit: () => db.run('UPDATE users SET password_hash=?, failed_attempts=0, locked_until=NULL WHERE rowid=?',
+      onCommit: () => dbRun('UPDATE users SET password_hash=?, failed_attempts=0, locked_until=NULL WHERE rowid=?',
         [bcrypt.hashSync(newPassword, 12), Number(user.rid)]),
     });
     if (!res.ok) return res;
@@ -1265,10 +1142,10 @@ ipcMain.handle('companies:save', (_, data) => {
   try {
     const { iv, tag, data: enc } = encrypt(JSON.stringify(data), sessionKey);
     if (data.id) {
-      db.run('UPDATE companies SET data_enc=?,data_iv=?,data_tag=?,updated_at=strftime(\'%s\',\'now\') WHERE rowid=? AND user_id=?',
+      dbRun('UPDATE companies SET data_enc=?,data_iv=?,data_tag=?,updated_at=strftime(\'%s\',\'now\') WHERE rowid=? AND user_id=?',
         [enc, iv, tag, data.id, sessionUser.id]);
     } else {
-      db.run('INSERT INTO companies (user_id,data_enc,data_iv,data_tag) VALUES (?,?,?,?)',
+      dbRun('INSERT INTO companies (user_id,data_enc,data_iv,data_tag) VALUES (?,?,?,?)',
         [sessionUser.id, enc, iv, tag]);
     }
     persistDB(); performBackup();
@@ -1283,12 +1160,12 @@ ipcMain.handle('companies:delete', (_, id) => {
   // task_items are entry_id-scoped — delete them via subquery BEFORE the
   // entries are removed, otherwise the company's break/lunch/Dispatch tasks
   // are orphaned in the DB.
-  db.run(
+  dbRun(
     'DELETE FROM task_items WHERE user_id=? AND entry_id IN (SELECT rowid FROM time_entries WHERE user_id=? AND company_id=?)',
     [sessionUser.id, sessionUser.id, numId]
   );
-  db.run('DELETE FROM time_entries WHERE company_id=? AND user_id=?', [numId, sessionUser.id]);
-  db.run('DELETE FROM companies WHERE rowid=? AND user_id=?', [numId, sessionUser.id]);
+  dbRun('DELETE FROM time_entries WHERE company_id=? AND user_id=?', [numId, sessionUser.id]);
+  dbRun('DELETE FROM companies WHERE rowid=? AND user_id=?', [numId, sessionUser.id]);
   persistDB(); performBackup();
   // Deletes the company AND its time_entries → both caches go stale.
   readCache.invalidate('companies');
@@ -1308,7 +1185,7 @@ ipcMain.handle('entries:save', (_, entry) => {
   try {
     const enc = encrypt(entry.rows_json || '[]', sessionKey);
     if (entry.id) {
-      db.run(
+      dbRun(
         'UPDATE time_entries SET rows_enc=?,rows_iv=?,rows_tag=?,rows_json=?,total_mins=?,session_label=?,updated_at=strftime(\'%s\',\'now\') WHERE rowid=? AND user_id=?',
         [enc.data, enc.iv, enc.tag, '', entry.total_mins, entry.session_label || '', entry.id, sessionUser.id]
       );
@@ -1317,12 +1194,12 @@ ipcMain.handle('entries:save', (_, entry) => {
       invalidateEntriesCache();
       return { ok: true, id: entry.id };
     } else {
-      db.run(
+      dbRun(
         'INSERT INTO time_entries (user_id,company_id,log_date,session_label,rows_json,rows_enc,rows_iv,rows_tag,total_mins) VALUES (?,?,?,?,?,?,?,?,?)',
         [sessionUser.id, entry.company_id, entry.log_date, entry.session_label || '', '', enc.data, enc.iv, enc.tag, entry.total_mins]
       );
-      const result = db.exec('SELECT MAX(rowid) as rid FROM time_entries WHERE user_id=?', [sessionUser.id]);
-      const newId = (result && result[0] && result[0].values[0]) ? Number(result[0].values[0][0]) : null;
+      const maxRow = dbGet('SELECT MAX(rowid) as rid FROM time_entries WHERE user_id=?', [sessionUser.id]);
+      const newId = (maxRow && maxRow.rid != null) ? Number(maxRow.rid) : null;
       activeEntryId = newId;
       persistDB(); performBackup();
       invalidateEntriesCache();
@@ -1430,7 +1307,7 @@ ipcMain.handle('tasks:save', (_, item) => {
   if (!sessionKey || !sessionUser) return { ok: false };
   try {
     if (item.id) {
-      db.run(
+      dbRun(
         'UPDATE task_items SET label=?,item_type=?,stopped_at=?,duration_secs=? WHERE rowid=? AND user_id=?',
         [item.label, item.item_type || 'task', item.stopped_at ?? null,
          item.duration_secs || 0, Number(item.id), sessionUser.id]
@@ -1438,13 +1315,13 @@ ipcMain.handle('tasks:save', (_, item) => {
       persistDB();
       return { ok: true, id: Number(item.id) };
     } else {
-      db.run(
+      dbRun(
         'INSERT INTO task_items (user_id,entry_id,label,item_type,started_at,stopped_at,duration_secs) VALUES (?,?,?,?,?,?,?)',
         [sessionUser.id, Number(item.entry_id), item.label,
          item.item_type || 'task', item.started_at, item.stopped_at ?? null, item.duration_secs || 0]
       );
-      const result = db.exec('SELECT MAX(rowid) as rid FROM task_items WHERE user_id=?', [sessionUser.id]);
-      const newId = (result && result[0] && result[0].values[0]) ? Number(result[0].values[0][0]) : null;
+      const maxRow = dbGet('SELECT MAX(rowid) as rid FROM task_items WHERE user_id=?', [sessionUser.id]);
+      const newId = (maxRow && maxRow.rid != null) ? Number(maxRow.rid) : null;
       persistDB();
       return { ok: true, id: newId };
     }
@@ -1453,7 +1330,7 @@ ipcMain.handle('tasks:save', (_, item) => {
 
 ipcMain.handle('tasks:delete', (_, id) => {
   if (!sessionKey || !sessionUser) return { ok: false };
-  db.run('DELETE FROM task_items WHERE rowid=? AND user_id=?', [Number(id), sessionUser.id]);
+  dbRun('DELETE FROM task_items WHERE rowid=? AND user_id=?', [Number(id), sessionUser.id]);
   persistDB();
   return { ok: true };
 });
@@ -1509,7 +1386,7 @@ ipcMain.handle('backup:preview', (_, filename) => {
   if (!fs.existsSync(filepath)) return { error: 'File not found' };
   try {
     const buf     = fs.readFileSync(filepath);
-    const preview = new SQL.Database(buf);
+    const preview = newDatabase(buf);
     const get1    = (q) => { const r = preview.exec(q); return r[0]?.values[0]?.[0] ?? null; };
     const username    = get1('SELECT username FROM users LIMIT 1') || 'Unknown';
     const companyCount = Number(get1('SELECT COUNT(*) FROM companies') || 0);
@@ -1528,10 +1405,10 @@ ipcMain.handle('backup:restore', (_, filename) => {
   if (!fs.existsSync(filepath)) return { ok: false, error: 'File not found' };
   try {
     performBackup(); // safety-save current state before overwriting
-    fs.copyFileSync(filepath, DB_FILE);
+    fs.copyFileSync(filepath, getDbFile());
     // Reload the DB in memory
-    const buf = fs.readFileSync(DB_FILE);
-    db = new SQL.Database(buf);
+    const buf = fs.readFileSync(getDbFile());
+    replaceDb(buf);
     // Vault replaced in place (same profile dir + user id ⇒ owner unchanged),
     // so the owner guard won't auto-clear — drop the cache explicitly.
     readCache.clear();
@@ -1554,10 +1431,11 @@ ipcMain.handle('auth:browse-backup', async () => {
   if (result.canceled || !result.filePaths.length) return { ok: false, canceled: true };
   const src = result.filePaths[0];
   try {
-    if (fs.existsSync(DB_FILE)) fs.copyFileSync(DB_FILE, DB_FILE + '.pre-restore.bak');
-    fs.copyFileSync(src, DB_FILE);
-    const buf = fs.readFileSync(DB_FILE);
-    db = new SQL.Database(buf);
+    const dbFile = getDbFile();
+    if (fs.existsSync(dbFile)) fs.copyFileSync(dbFile, dbFile + '.pre-restore.bak');
+    fs.copyFileSync(src, dbFile);
+    const buf = fs.readFileSync(dbFile);
+    replaceDb(buf);
     clearIdleTimer(); sessionKey = null; sessionUser = null; activeEntryId = null;
     mainWindow.loadFile(path.join(RENDERER_DIR, 'pages/login.html'));
     return { ok: true };
@@ -1592,7 +1470,7 @@ ipcMain.handle('audit:get-dismissed', () => {
 
 ipcMain.handle('audit:dismiss', (_, { entry_id, row_idx, type }) => {
   if (!sessionUser) return { ok: false };
-  db.run(
+  dbRun(
     'INSERT OR IGNORE INTO audit_dismissed (user_id, entry_id, row_idx, type) VALUES (?,?,?,?)',
     [sessionUser.id, Number(entry_id), Number(row_idx), type]
   );
@@ -1602,7 +1480,7 @@ ipcMain.handle('audit:dismiss', (_, { entry_id, row_idx, type }) => {
 
 ipcMain.handle('audit:undismiss', (_, { entry_id, row_idx, type }) => {
   if (!sessionUser) return { ok: false };
-  db.run('DELETE FROM audit_dismissed WHERE user_id=? AND entry_id=? AND row_idx=? AND type=?',
+  dbRun('DELETE FROM audit_dismissed WHERE user_id=? AND entry_id=? AND row_idx=? AND type=?',
     [sessionUser.id, Number(entry_id), Number(row_idx), type]);
   persistDB();
   return { ok: true };
@@ -1610,7 +1488,7 @@ ipcMain.handle('audit:undismiss', (_, { entry_id, row_idx, type }) => {
 
 ipcMain.handle('audit:clear-dismissed', () => {
   if (!sessionUser) return { ok: false };
-  db.run('DELETE FROM audit_dismissed WHERE user_id=?', [sessionUser.id]);
+  dbRun('DELETE FROM audit_dismissed WHERE user_id=?', [sessionUser.id]);
   persistDB();
   return { ok: true };
 });
@@ -1653,7 +1531,7 @@ ipcMain.handle('audit:apply-fix', (_, { entry_id, row_idx, fix_type }) => {
     const newJson  = JSON.stringify(rows);
     const newTotal = rows.reduce((s, row) => s + (row.total_mins || 0), 0);
     const enc      = encrypt(newJson, sessionKey);
-    db.run(
+    dbRun(
       'UPDATE time_entries SET rows_enc=?,rows_iv=?,rows_tag=?,rows_json=?,total_mins=?,updated_at=strftime(\'%s\',\'now\') WHERE rowid=? AND user_id=?',
       [enc.data, enc.iv, enc.tag, '', newTotal, Number(entry_id), sessionUser.id]
     );
@@ -1702,7 +1580,7 @@ ipcMain.handle('profile:save', (_, { display_name, full_name, email, phone, job_
   if (!sessionKey || !sessionUser) return { ok: false };
   try {
     const blob = encrypt(JSON.stringify({ full_name: full_name || '', email: email || '', phone: phone || '', job_title: job_title || '', work_state: work_state || null, avatar: avatar || null }), sessionKey);
-    db.run('UPDATE users SET display_name=?, profile_enc=?, profile_iv=?, profile_tag=? WHERE rowid=?',
+    dbRun('UPDATE users SET display_name=?, profile_enc=?, profile_iv=?, profile_tag=? WHERE rowid=?',
       [display_name || null, blob.data, blob.iv, blob.tag, sessionUser.id]);
     sessionUser.display_name = display_name || null;
     sessionUser.work_state   = work_state   || null;
@@ -1736,7 +1614,7 @@ ipcMain.handle('auth:change-password', async (_, { currentPassword, totpCode, ne
 
   const res = reEncryptVault({
     oldKey: sessionKey, newKey, userId: sessionUser.id, user,
-    onCommit: () => db.run('UPDATE users SET password_hash=? WHERE rowid=?',
+    onCommit: () => dbRun('UPDATE users SET password_hash=? WHERE rowid=?',
       [bcrypt.hashSync(newPassword, 12), sessionUser.id]),
   });
   if (!res.ok) return res;
@@ -1784,8 +1662,8 @@ ipcMain.handle('audit:email-notify', async (_, { entry_id, row_idx, type, subjec
     });
     // Record as emailed/acknowledged (silenced on close, kept in the log).
     const args = [sessionUser.id, Number(entry_id), Number(row_idx), type];
-    db.run('INSERT OR IGNORE INTO audit_dismissed (user_id, entry_id, row_idx, type) VALUES (?,?,?,?)', args);
-    db.run('UPDATE audit_dismissed SET emailed_at=strftime(\'%s\',\'now\') WHERE user_id=? AND entry_id=? AND row_idx=? AND type=?', args);
+    dbRun('INSERT OR IGNORE INTO audit_dismissed (user_id, entry_id, row_idx, type) VALUES (?,?,?,?)', args);
+    dbRun('UPDATE audit_dismissed SET emailed_at=strftime(\'%s\',\'now\') WHERE user_id=? AND entry_id=? AND row_idx=? AND type=?', args);
     persistDB();
     return { ok: true, to };
   } catch (e) { return { ok: false, error: e.message }; }
@@ -1800,8 +1678,8 @@ ipcMain.handle('audit:email-notify', async (_, { entry_id, row_idx, type, subjec
 ipcMain.handle('db:clear-timeclock', () => {
   if (!sessionKey || !sessionUser) return { ok: false };
   const uid = sessionUser.id;
-  db.run('DELETE FROM task_items   WHERE user_id=?', [uid]);
-  db.run('DELETE FROM time_entries WHERE user_id=?', [uid]);
+  dbRun('DELETE FROM task_items   WHERE user_id=?', [uid]);
+  dbRun('DELETE FROM time_entries WHERE user_id=?', [uid]);
   activeEntryId = null;
   persistDB(); performBackup();
   invalidateEntriesCache();
@@ -1817,11 +1695,11 @@ ipcMain.handle('db:clear-timeclock-company', (_, arg) => {
   const companyId = Number(arg && arg.companyId);
   if (!companyId) return { ok: false, error: 'No company specified' };
   const uid = sessionUser.id;
-  db.run(
+  dbRun(
     'DELETE FROM task_items WHERE user_id=? AND entry_id IN (SELECT rowid FROM time_entries WHERE user_id=? AND company_id=?)',
     [uid, uid, companyId]
   );
-  db.run('DELETE FROM time_entries WHERE user_id=? AND company_id=?', [uid, companyId]);
+  dbRun('DELETE FROM time_entries WHERE user_id=? AND company_id=?', [uid, companyId]);
   activeEntryId = null;
   persistDB(); performBackup();
   invalidateEntriesCache();
@@ -1831,9 +1709,9 @@ ipcMain.handle('db:clear-timeclock-company', (_, arg) => {
 ipcMain.handle('db:clear-companies', () => {
   if (!sessionKey || !sessionUser) return { ok: false };
   const uid = sessionUser.id;
-  db.run('DELETE FROM task_items   WHERE user_id=?', [uid]);
-  db.run('DELETE FROM time_entries WHERE user_id=?', [uid]);
-  db.run('DELETE FROM companies    WHERE user_id=?', [uid]);
+  dbRun('DELETE FROM task_items   WHERE user_id=?', [uid]);
+  dbRun('DELETE FROM time_entries WHERE user_id=?', [uid]);
+  dbRun('DELETE FROM companies    WHERE user_id=?', [uid]);
   activeEntryId = null;
   persistDB(); performBackup();
   readCache.invalidate('companies');
@@ -1853,18 +1731,18 @@ ipcMain.handle('db:clear-full', () => {
 
   // Wipe in-memory DB rows first so persistDB() writes a clean file
   // (belt-and-suspenders: the whole directory is deleted right after)
-  db.run('DELETE FROM task_items      WHERE user_id=?', [uid]);
-  db.run('DELETE FROM time_entries    WHERE user_id=?', [uid]);
-  db.run('DELETE FROM companies       WHERE user_id=?', [uid]);
-  db.run('DELETE FROM audit_dismissed WHERE user_id=?', [uid]);
-  db.run('DELETE FROM app_settings');   // vault-level; no user_id column
-  db.run('DELETE FROM users           WHERE rowid=?',   [uid]); // sessionUser.id is the rowid (see line 606)
+  dbRun('DELETE FROM task_items      WHERE user_id=?', [uid]);
+  dbRun('DELETE FROM time_entries    WHERE user_id=?', [uid]);
+  dbRun('DELETE FROM companies       WHERE user_id=?', [uid]);
+  dbRun('DELETE FROM audit_dismissed WHERE user_id=?', [uid]);
+  dbRun('DELETE FROM app_settings');   // vault-level; no user_id column
+  dbRun('DELETE FROM users           WHERE rowid=?',   [uid]); // sessionUser.id is the rowid (see line 606)
 
   activeEntryId      = null;
   sessionKey         = null;
   sessionUser        = null;
   ACTIVE_PROFILE_DIR = null;
-  DB_FILE            = null;
+  setDbFile(null);
   BACKUP_DIR         = null;
 
   // Delete the profile directory so profiles:list won't surface a ghost card
@@ -1916,12 +1794,12 @@ ipcMain.handle('app:check-update', () => new Promise((resolve) => {
 }));
 
 ipcMain.handle('settings:get', (_, key) => {
-  if (!db) return null;
+  if (!hasDb()) return null;
   const row = dbGet('SELECT value FROM app_settings WHERE key=?', [key]);
   return row ? row.value : null;
 });
 ipcMain.handle('settings:set', (_, { key, value }) => {
-  if (!db) return { ok: false };
+  if (!hasDb()) return { ok: false };
   dbRun('INSERT OR REPLACE INTO app_settings (key,value) VALUES (?,?)', [key, String(value)]);
   persistDB();
   return { ok: true };
@@ -1961,7 +1839,7 @@ app.whenReady().then(async () => {
   }), 5 * 60 * 1000);
 
   // Load the sql.js WASM module once (needed for migration peek reads too)
-  SQL = await require('sql.js')();
+  await loadSqlJs();
 
   // Prod only: migrate old flat vault.db → profiles/<username>/vault.db
   if (!IS_DEV) migrateFromLegacyVault();
@@ -2000,10 +1878,10 @@ app.whenReady().then(async () => {
 
   // Track window bounds when Remember Last Position is enabled
   function saveWindowBounds() {
-    if (!db) return;
+    if (!hasDb()) return;
     if (dbGet("SELECT value FROM app_settings WHERE key='win_rememberPosition'")?.value !== 'true') return;
     const b = mainWindow.getBounds();
-    db.run("INSERT OR REPLACE INTO app_settings (key,value) VALUES ('win_lastBounds',?)", [JSON.stringify(b)]);
+    dbRun("INSERT OR REPLACE INTO app_settings (key,value) VALUES ('win_lastBounds',?)", [JSON.stringify(b)]);
     persistDB();
   }
   mainWindow.on('moved',   saveWindowBounds);
@@ -2067,7 +1945,7 @@ function getEmailSmtpConfig() {
 ipcMain.handle('email:save-config', (_, { host, port, username, password, fromName, defaultTo }) => {
   if (!sessionKey) return { ok: false, error: 'Not logged in.' };
   try {
-    const set = (k, v) => db.run('INSERT OR REPLACE INTO app_settings (key,value) VALUES (?,?)', [k, String(v || '')]);
+    const set = (k, v) => dbRun('INSERT OR REPLACE INTO app_settings (key,value) VALUES (?,?)', [k, String(v || '')]);
     set('email_smtp_host', host);
     set('email_smtp_port', port || 587);
     set('email_smtp_username', username);
@@ -2085,7 +1963,7 @@ ipcMain.handle('email:save-config', (_, { host, port, username, password, fromNa
 });
 
 ipcMain.handle('email:get-config', () => {
-  if (!db) return {};
+  if (!hasDb()) return {};
   const get = k => (dbGet('SELECT value FROM app_settings WHERE key=?', [k]) || {}).value || '';
   const hasPassword = !!(get('email_smtp_password_enc'));
   return {
@@ -2203,7 +2081,7 @@ ipcMain.handle('email:send-scheduled-now', async () => {
 });
 
 ipcMain.handle('email:get-schedule-status', () => {
-  if (!db) return {};
+  if (!hasDb()) return {};
   const get = k => (dbGet('SELECT value FROM app_settings WHERE key=?', [k]) || {}).value || '';
   const freq      = get('email_schedule_freq') || 'off';
   const lastSent  = get('email_schedule_last_sent') || null;
@@ -2240,7 +2118,7 @@ function computeNextSendDate(freq, lastSent) {
 }
 
 async function runScheduledEmailCheck(force = false) {
-  if (!db || !sessionKey || !sessionUser) return;
+  if (!hasDb() || !sessionKey || !sessionUser) return;
   try {
     const get = k => (dbGet('SELECT value FROM app_settings WHERE key=?', [k]) || {}).value || '';
     const freq = get('email_schedule_freq');
@@ -2306,13 +2184,13 @@ td{padding:7px 8px;border-bottom:1px solid #e5e7eb;}
       entriesOverride: entries,
     });
 
-    db.run("INSERT OR REPLACE INTO app_settings (key,value) VALUES ('email_schedule_last_sent',?)", [new Date().toISOString()]);
-    db.run("INSERT OR REPLACE INTO app_settings (key,value) VALUES ('email_schedule_last_error','')", []);
+    dbRun("INSERT OR REPLACE INTO app_settings (key,value) VALUES ('email_schedule_last_sent',?)", [new Date().toISOString()]);
+    dbRun("INSERT OR REPLACE INTO app_settings (key,value) VALUES ('email_schedule_last_error','')", []);
     persistDB();
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('toast', 'Scheduled report sent successfully!', 'success');
   } catch (e) {
     console.error('[schedule-email]', e.message);
-    if (db) { try { db.run("INSERT OR REPLACE INTO app_settings (key,value) VALUES ('email_schedule_last_error',?)", [e.message]); persistDB(); } catch {} }
+    if (hasDb()) { try { dbRun("INSERT OR REPLACE INTO app_settings (key,value) VALUES ('email_schedule_last_error',?)", [e.message]); persistDB(); } catch {} }
     throw e; // re-throw so IPC handler / interval caller can surface the error
   }
 }
