@@ -22,6 +22,13 @@ catch { console.warn('[beta] beta-secret.js not found — beta-key gate disabled
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) { app.quit(); process.exit(0); }
 
+// ── Source paths ────────────────────────────────────────────────────────────
+// The compiled main process runs from dist-main/main/, but the renderer pages
+// stay plain JS under src/renderer (loaded straight by loadFile — no build).
+// Resolve them from the app root — the project dir in dev, the asar root when
+// packaged — instead of __dirname-relative hops that would land in dist-main.
+const RENDERER_DIR = path.join(app.getAppPath(), 'src', 'renderer');
+
 // ── Data paths ─────────────────────────────────────────────────────────────
 // --dev flag: uses ./dev-data/dev-vault.db; skips profile selector entirely.
 // Production: each user lives in conquered-data/profiles/<username>/vault.db.
@@ -335,24 +342,24 @@ function performBackup() {
 }
 
 // ── sql.js helpers ─────────────────────────────────────────────────────────
-function dbGet(sql, params = []) {
+function dbGet(sql: string, params: unknown[] = []): Record<string, any> | null {
   const result = db.exec(sql, params);
   if (result && result[0] && result[0].values && result[0].values[0]) {
     const cols = result[0].columns;
     const vals = result[0].values[0];
-    const row = {};
+    const row: Record<string, any> = {};
     cols.forEach((col, i) => { row[col] = vals[i] !== undefined ? vals[i] : null; });
     return row;
   }
   return null;
 }
 
-function dbAll(sql, params = []) {
+function dbAll(sql: string, params: unknown[] = []): Array<Record<string, any>> {
   const result = db.exec(sql, params);
   if (!result || !result[0]) return [];
   const cols = result[0].columns;
   return result[0].values.map(vals => {
-    const row = {};
+    const row: Record<string, any> = {};
     cols.forEach((col, i) => { row[col] = vals[i] !== undefined ? vals[i] : null; });
     return row;
   });
@@ -425,7 +432,7 @@ function createSplashWindow(theme) {
       sandbox: true,
     }
   });
-  splash.loadFile(path.join(__dirname, '../renderer/pages/splash.html'), {
+  splash.loadFile(path.join(RENDERER_DIR, 'pages/splash.html'), {
     query: { theme: theme || 'zanarkand' }
   });
   return splash;
@@ -447,7 +454,7 @@ function createAuditWizardWindow(mode, theme) {
       sandbox:          true,
     }
   });
-  wizard.loadFile(path.join(__dirname, '../renderer/pages/audit-wizard.html'), {
+  wizard.loadFile(path.join(RENDERER_DIR, 'pages/audit-wizard.html'), {
     query: { mode: mode || 'fix', theme: theme || 'arctic' }
   });
   wizard.on('closed', () => {
@@ -474,7 +481,7 @@ function createWindow() {
     }
   });
   buildMenu();
-  mainWindow.loadFile(path.join(__dirname, '../renderer/pages/login.html'));
+  mainWindow.loadFile(path.join(RENDERER_DIR, 'pages/login.html'));
   mainWindow.on('close', (event) => {
     // Close-to-tray: hide the window instead of quitting, keeping the session alive.
     // Bypassed when the user explicitly quits (tray/menu Quit set isQuitting).
@@ -565,7 +572,7 @@ function createTray() {
 // path. The SAME opts must be used to read back, or Windows' getLoginItemSettings
 // won't match the entry and reports openAtLogin:false. Packaged: execPath IS the
 // real app exe and needs no args.
-function loginItemOpts(extra) {
+function loginItemOpts(extra?: object) {
   // --startup lets the launched instance know it was auto-started (vs manual),
   // so "start minimized to tray" can apply only then. The same args are used to
   // read the item back, so the marker doesn't break openAtLogin detection.
@@ -584,7 +591,7 @@ function applyLaunchAtStartup(enabled) {
 
 function navigate(page) {
   if (!sessionUser && page !== 'login') return;
-  mainWindow.loadFile(path.join(__dirname, `../renderer/pages/${page}.html`));
+  mainWindow.loadFile(path.join(RENDERER_DIR, `pages/${page}.html`));
 }
 
 const BREAK_POLICIES = {
@@ -752,7 +759,7 @@ function lockSession(skipAuditCheck = false) {
   }
   clearIdleTimer();
   sessionKey = null; sessionUser = null; activeEntryId = null;
-  mainWindow.loadFile(path.join(__dirname, '../renderer/pages/login.html'));
+  mainWindow.loadFile(path.join(RENDERER_DIR, 'pages/login.html'));
 }
 
 function clearIdleTimer() {
@@ -1531,7 +1538,7 @@ ipcMain.handle('backup:restore', (_, filename) => {
     // Clear session
     clearIdleTimer();
     sessionKey = null; sessionUser = null; activeEntryId = null;
-    mainWindow.loadFile(path.join(__dirname, '../renderer/pages/login.html'));
+    mainWindow.loadFile(path.join(RENDERER_DIR, 'pages/login.html'));
     return { ok: true };
   } catch(e) { return { ok: false, error: e.message }; }
 });
@@ -1552,7 +1559,7 @@ ipcMain.handle('auth:browse-backup', async () => {
     const buf = fs.readFileSync(DB_FILE);
     db = new SQL.Database(buf);
     clearIdleTimer(); sessionKey = null; sessionUser = null; activeEntryId = null;
-    mainWindow.loadFile(path.join(__dirname, '../renderer/pages/login.html'));
+    mainWindow.loadFile(path.join(RENDERER_DIR, 'pages/login.html'));
     return { ok: true };
   } catch(e) { return { ok: false, error: e.message }; }
 });
@@ -1739,7 +1746,7 @@ ipcMain.handle('auth:change-password', async (_, { currentPassword, totpCode, ne
   return { ok: true };
 });
 
-ipcMain.handle('audit:open-wizard', (_, { mode, theme } = {}) => {
+ipcMain.handle('audit:open-wizard', (_, { mode, theme }: { mode?: string; theme?: string } = {}) => {
   createAuditWizardWindow(mode, theme);
   return { ok: true };
 });
@@ -1751,7 +1758,7 @@ ipcMain.handle('audit:count', () => countAuditDiscrepancies());
 // modifies a punch — fixes still require an explicit Apply Fix). On success the
 // discrepancy is recorded as emailed (emailed_at) so it's silenced on close/lock
 // but kept visible in the audit log.
-ipcMain.handle('audit:email-notify', async (_, { entry_id, row_idx, type, subject, message } = {}) => {
+ipcMain.handle('audit:email-notify', async (_, { entry_id, row_idx, type, subject, message }: Record<string, any> = {}) => {
   if (!sessionKey || !sessionUser) return { ok: false, error: 'Not logged in.' };
   const to = getProfileEmail();
   if (!to) return { ok: false, error: 'Add an email to your profile first (Profile screen).' };
@@ -2113,13 +2120,12 @@ ipcMain.handle('email:test-smtp', async () => {
   } catch (e) { return { ok: false, error: e.message }; }
 });
 
-/**
- * Render and email a report PDF+CSV via the configured SMTP transport.
- * @param {{ htmlContent: string, subject?: string, recipients?: string,
- *           entriesOverride?: object[] }} opts — entriesOverride is only set by
- *   the scheduled-report path; the manual email:send-report path omits it.
- */
-async function doSendReport({ htmlContent, subject, recipients, entriesOverride }) {
+// Render and email a report PDF+CSV via the configured SMTP transport.
+// entriesOverride is only set by the scheduled-report path; the manual
+// email:send-report path omits it.
+async function doSendReport({ htmlContent, subject, recipients, entriesOverride }: {
+  htmlContent: string; subject?: string; recipients?: string; entriesOverride?: Array<Record<string, any>>;
+}) {
   const cfg = getEmailSmtpConfig();
   if (!cfg.host || !cfg.username || !cfg.password) throw new Error('Email not configured. Open Settings → Data to add SMTP credentials.');
 
@@ -2253,7 +2259,7 @@ async function runScheduledEmailCheck(force = false) {
     const fromDate = lastSent ? lastSent.slice(0, 10) : new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
     const toDate   = new Date().toISOString().slice(0, 10);
 
-    const entries = dbAll(
+    const entries: Array<Record<string, any>> = dbAll(
       'SELECT rowid as rid, * FROM time_entries WHERE user_id=? AND log_date>=? AND log_date<=? ORDER BY log_date',
       [sessionUser.id, fromDate, toDate]
     ).map(r => ({ ...r, id: Number(r.rid) }));
@@ -2267,7 +2273,7 @@ async function runScheduledEmailCheck(force = false) {
     const totalMins = entries.reduce((s, e) => s + (e.total_mins || 0), 0);
     const fmtM = m => { const h = Math.floor(m/60), mn = m%60; return `${h}h ${mn}m`; };
 
-    const byLabel = {};
+    const byLabel: Record<string, number> = {};
     entries.forEach(e => { try { JSON.parse(e.rows_json||'[]').forEach(r => { if (r.total_mins > 0) { const l = r.label||'Other'; byLabel[l]=(byLabel[l]||0)+r.total_mins; } }); } catch {} });
     const labelRows = Object.entries(byLabel).sort((a,b)=>b[1]-a[1])
       .map(([l,m]) => `<tr><td>${l}</td><td style="text-align:right">${fmtM(m)}</td></tr>`).join('');

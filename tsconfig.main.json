@@ -1,0 +1,33 @@
+{
+  // Phase 2 of the TypeScript refactor (docs/refactor-plan.md): compile the
+  // main process to dist-main/. rootDir "src" preserves directory depth, so
+  // every ../.. relative path in main.ts (assets, dev-data) still resolves,
+  // and the .js modules main.ts requires (vault-crypto, read-cache, beta-keys,
+  // beta-secret, row-utils) are copied alongside via allowJs.
+  //
+  // dist-main/
+  // ├── main/       main.js, preload.js, vault-crypto.js, read-cache.js, beta-keys.js
+  // ├── shared/     beta-secret.js (gitignored source; absent on fresh clones — gate fails open)
+  // └── renderer/   row-utils.js (shared predicate required by main)
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    "allowJs": true,
+    "checkJs": false,
+    "strict": false,
+    "outDir": "dist-main",
+    "rootDir": "src",
+    "types": ["node"],
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": [
+    "src/main/**/*",
+    "src/shared/**/*",
+    "src/renderer/row-utils.js"
+  ],
+  "exclude": ["node_modules", "dist", "dist-main"]
+}
