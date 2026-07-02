@@ -84,7 +84,31 @@ unstoppable). *Why:* implicit invariants ("one session per day", "no future
 dates", "tasks only run inside punches") never enforced nor handled. Each fix
 needs a small design decision — options in the fix plan.
 
-## Proposed fix order (Improve phase — awaiting approval)
+## Control — campaign close-out (2026-07-02)
+
+**All 14 defects fixed** (D-001..D-014; D-014 found during the C4/C6 Check
+loops). Improve ran as 6 PDCA batches, one branch/PR per RCA cluster:
+
+| Cluster | PR | Defects | Regression lock |
+|---|---|---|---|
+| C1 theme-blind component styling | #42 | D-001, D-013 | shared .audit-row-btn/.email classes; input selector widened |
+| C2 time-entry parsing | #41 | D-002, D-010 | test/time-parse.test.js (6) |
+| C4 unbounded text in fixed layouts | #43 | D-003, D-006, D-008 | test/canvas-text.test.js (11) |
+| C3 desc-blind row predicates | #44 | D-004, D-011 | test/row-utils.test.js (8) + seed audit-count assert (7) |
+| C5 policy wording | #45 | D-007 | hasStatePolicy gate in audit:get-policy |
+| C6 temporal/state edges | #46 | D-005, D-009, D-012, D-014 | login orphan sweep + seed P8/P9/P12 re-documented; driver-verified |
+
+Test suite: 30 → 49 passing. Seed v4 is the permanent measurement
+instrument: `npm run seed` re-asserts the expected audit count (7), decrypt
+round-trip, and all volume/probe counts on every reseed. C6's main-process
+sweep (sweepOrphanTaskItems) and the tracker picker are integration-level —
+covered by the seeded driver scripts, not unit tests.
+
+Deliberately NOT fixed (observations O-1..O-5 stand as designed/healthy;
+coverage gaps in the Measure section remain honest gaps — email/SMTP send,
+packaged-build paths, and multi-profile concurrency were out of scope).
+
+## Fix order (Improve phase — as executed)
 
 1. **C1** — S2 data loss, small change, user-tracked area
 2. **C2** — trivial, includes user-tracked D-001
