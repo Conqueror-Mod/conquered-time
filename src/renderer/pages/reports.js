@@ -414,7 +414,7 @@ function renderAuditLog() {
       ? `<button class="audit-row-btn dismiss" data-act="restore" data-dkey="${dKey}" data-eid="${entryId}" data-ridx="${rowIdx}" data-type="${type}">Restore</button>`
       : [
           fix ? `<button class="audit-row-btn fix" data-act="fix" data-eid="${entryId}" data-ridx="${rowIdx}" data-fix="${fix}" data-dkey="${dKey}">Apply Fix</button>` : '',
-          `<button class="audit-row-btn" data-act="email" data-dkey="${dKey}" data-eid="${entryId}" data-ridx="${rowIdx}" data-type="${type}">Email Me</button>`,
+          `<button class="audit-row-btn email" data-act="email" data-dkey="${dKey}" data-eid="${entryId}" data-ridx="${rowIdx}" data-type="${type}">Email Me</button>`,
           `<button class="audit-row-btn dismiss" data-act="dismiss" data-dkey="${dKey}" data-eid="${entryId}" data-ridx="${rowIdx}" data-type="${type}">Dismiss</button>`
         ].filter(Boolean).join(' ');
 

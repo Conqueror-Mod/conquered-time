@@ -260,11 +260,14 @@
     border: 1px solid var(--border-light); border-radius: var(--radius-sm);
     background: transparent; cursor: pointer; transition: all var(--transition);
     white-space: nowrap;
+    color: var(--text-muted); /* base fallback — a variant without a color rule must never fall to UA black (D-001) */
   }
   .audit-row-btn.dismiss { color: var(--text-muted); }
   .audit-row-btn.dismiss:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
   .audit-row-btn.fix { color: var(--green); border-color: rgba(16,185,129,0.4); }
   .audit-row-btn.fix:hover { background: var(--green-dim); }
+  .audit-row-btn.email { color: var(--blue); border-color: rgba(96,165,250,0.4); }
+  .audit-row-btn.email:hover { background: var(--blue-dim); }
   .audit-suggest {
     font-family: var(--sans); font-size: 10px; color: var(--text-muted);
     font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
