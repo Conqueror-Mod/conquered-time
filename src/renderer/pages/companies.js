@@ -288,6 +288,12 @@ function drawWeb() {
     const steps    = count <= 2  ? 60   : count <= 5 ? 160  : 260;
 
     const ns = [{ x: cx, y: cy, r: 36, label: (window.__currentUsername || 'YOU'), isCenter: true, co: null, fixed: true }];
+    // D-003: nodes size themselves to the measured label (bounded), and the
+    // draw step ellipsizes anything that still can't fit — no more bare
+    // character slices ("Zenith Analy") with no ellipsis.
+    const mctx = document.getElementById('web-canvas').getContext('2d');
+    const LABEL_FONT = '500 10px DM Sans, system-ui, sans-serif';
+    const maxR = Math.min(48, nodeR + 22);
     companies.forEach((co, i) => {
       const a = (Math.PI * 2 * i / count) - Math.PI / 2;
       const d = Math.min(W, H) * ringFrac;
@@ -295,9 +301,9 @@ function drawWeb() {
         x: cx + Math.cos(a) * d,
         y: cy + Math.sin(a) * d,
         vx: 0, vy: 0,
-        r: nodeR,
-        label:    (co.name || '?').slice(0, 12),
-        sublabel: co.hier_project ? co.hier_project.slice(0, 10) : '',
+        r: CanvasText.radiusForLabel(mctx, co.name || '?', LABEL_FONT, nodeR, maxR),
+        label:    co.name || '?',
+        sublabel: co.hier_project || '',
         isCenter: false,
         co,
         hours: mins[co.id] || 0,
@@ -450,19 +456,22 @@ function drawSphereNode(ctx, x, y, r, isCenter, label, sublabel) {
   hl.addColorStop(0, 'rgba(255,255,255,0.16)'); hl.addColorStop(1, 'rgba(255,255,255,0)');
   ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = hl; ctx.fill();
 
+  // D-003: labels ellipsize to the node's actual diameter (the node was sized
+  // for the name at build; anything still over the bound gets a real '…').
+  const fitW = 2 * r - 8;
   if (sublabel) {
     ctx.fillStyle = nc.label;
     ctx.font = `${isCenter ? '600 ' : '500 '}${isCenter ? 11 : 10}px DM Sans, system-ui, sans-serif`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(label, x, y - 5);
+    ctx.fillText(CanvasText.ellipsizeToWidth(ctx, label, fitW), x, y - 5);
     ctx.fillStyle = nc.sublabel;
     ctx.font = '400 9px DM Sans, system-ui, sans-serif';
-    ctx.fillText(sublabel, x, y + 6);
+    ctx.fillText(CanvasText.ellipsizeToWidth(ctx, sublabel, fitW), x, y + 6);
   } else {
     ctx.fillStyle = nc.label;
     ctx.font = `${isCenter ? '600 ' : '500 '}${isCenter ? 11 : 10}px DM Sans, system-ui, sans-serif`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(label, x, y);
+    ctx.fillText(CanvasText.ellipsizeToWidth(ctx, label, fitW), x, y);
   }
 }
 

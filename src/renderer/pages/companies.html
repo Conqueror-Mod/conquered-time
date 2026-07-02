@@ -153,6 +153,12 @@
     font-weight: 600;
     color: var(--text-bright);
     line-height: 1.3;
+    /* D-008: long names clamp to 2 lines instead of x-scrolling the pane */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    overflow-wrap: anywhere;
   }
   .detail-close-btn {
     background: none;
@@ -171,6 +177,7 @@
     color: var(--accent);
     font-family: var(--mono);
     margin-top: 2px;
+    overflow-wrap: anywhere; /* D-008 */
   }
   .detail-stats {
     display: flex;
@@ -461,6 +468,7 @@
 
 <script src="../components/settings.js"></script>
 <script src="../components/shell.js"></script>
+<script src="../canvas-text.js"></script>
 <script src="companies.js"></script>
 </body>
 </html>

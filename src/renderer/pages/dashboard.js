@@ -165,7 +165,7 @@ function startRender() {
     companies.forEach((co,i) => {
       const a = step*i - Math.PI/2;
       const nx = cx + Math.cos(a)*radius, ny = cy + Math.sin(a)*radius;
-      drawSphereNode(ctx, nx, ny, nodeR, false, pulse, (co.name||'?').slice(0,7));
+      drawSphereNode(ctx, nx, ny, nodeR, false, pulse, co.name || '?');
     });
 
     // Center node on top
@@ -214,12 +214,17 @@ function drawSphereNode(ctx, x, y, r, isCenter, pulse, label) {
   const hl=ctx.createRadialGradient(x-pR*0.35,y-pR*0.35,0,x-pR*0.35,y-pR*0.35,pR*0.6);
   hl.addColorStop(0,'rgba(255,255,255,0.14)'); hl.addColorStop(1,'rgba(255,255,255,0)');
   ctx.beginPath(); ctx.arc(x,y,pR,0,Math.PI*2); ctx.fillStyle=hl; ctx.fill();
-  ctx.fillStyle=nc.label;
-  ctx.font=`${isCenter?'600 ':'500 '}${isCenter?10:9}px DM Sans, system-ui, sans-serif`;
-  ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillText(label,x,y);
-  if (!isCenter) {
+  // D-003: company nodes label ONCE below the node (the old code drew the same
+  // clipped text twice — inside AND below), ellipsized instead of char-sliced.
+  ctx.textAlign='center';
+  if (isCenter) {
+    ctx.fillStyle=nc.label;
+    ctx.font='600 10px DM Sans, system-ui, sans-serif';
+    ctx.textBaseline='middle';
+    ctx.fillText(CanvasText.ellipsizeToWidth(ctx, label, 2*pR-6), x, y);
+  } else {
     ctx.fillStyle=nc.label; ctx.font='10px DM Sans, system-ui, sans-serif';
-    ctx.textBaseline='top'; ctx.fillText(label,x,y+pR+5);
+    ctx.textBaseline='top';
+    ctx.fillText(CanvasText.ellipsizeToWidth(ctx, label, 84), x, y+pR+5);
   }
 }
