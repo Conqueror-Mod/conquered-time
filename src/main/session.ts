@@ -24,9 +24,11 @@ interface SessionState {
   user: Record<string, any> | null;
   /** rowid of the currently live time_entries row. */
   activeEntryId: number | null;
+  /** Active profile directory (unique per profile — the cache-owner salt). */
+  profileDir: string | null;
 }
 
-const session: SessionState = { key: null, user: null, activeEntryId: null };
+const session: SessionState = { key: null, user: null, activeEntryId: null, profileDir: null };
 
 let idleTimer: ReturnType<typeof setTimeout> | null = null;
 
