@@ -565,7 +565,12 @@ function startEdit(cell, idx, field) {
   if (isLabel) {
     input = document.createElement('select');
     input.style.cssText = 'font-family:var(--sans);font-size:12px;background:var(--surface-2);color:var(--text-bright);border:1px solid var(--accent);border-radius:4px;width:100%;';
-    ['Training','Evaluation','Review','Annotation','QA','Research','Admin','Communication','Other'].forEach(opt => {
+    const FIXED = ['Training','Evaluation','Review','Annotation','QA','Research','Admin','Communication','Other'];
+    // D-010: a stored label that isn't in the fixed list (imported/legacy/custom
+    // data) must be PRESERVED — inject it as the selected first option, otherwise
+    // opening the editor silently re-labels the row to the first fixed entry.
+    const opts = (current && !FIXED.includes(current)) ? [current, ...FIXED] : FIXED;
+    opts.forEach(opt => {
       const o = document.createElement('option');
       o.value = opt; o.textContent = opt;
       if (opt === current) o.selected = true;
@@ -586,8 +591,14 @@ function startEdit(cell, idx, field) {
     input = document.createElement('input');
     input.type = 'text'; input.value = current;
     if (isTime) {
-      input.placeholder = 'HH:MM'; input.maxLength = 5;
-      input.addEventListener('input', () => { input.value = input.value.replace(/[^0-9:]/g,''); });
+      // D-002: with the 12h display pref the cells read "2:30 PM" but the editor
+      // only took raw 24h — typing "2:30" meaning PM silently stored 02:30 AM.
+      // The editor now accepts BOTH forms (parseClockInput normalizes to 24h for
+      // storage) and the placeholder advertises the accepted formats.
+      const is12h = typeof Settings !== 'undefined' && Settings.get('timeFormat') === '12h';
+      input.placeholder = is12h ? 'h:mm AM/PM or HH:MM' : 'HH:MM';
+      input.maxLength = 8;
+      input.addEventListener('input', () => { input.value = input.value.replace(/[^0-9:AaPpMm.\s]/g,''); });
     }
     input.style.cssText = 'font-family:var(--sans);font-size:12px;background:var(--surface-2);color:var(--text-bright);border:1px solid var(--accent);border-radius:4px;width:100%;padding:2px 6px;user-select:text;-webkit-user-select:text;';
   }
@@ -597,15 +608,17 @@ function startEdit(cell, idx, field) {
 
   const commit = () => {
     const val = input.value.trim();
+    // D-010 guard: an untouched editor (open → blur, no change) must be a no-op,
+    // never a write. Compare against the value the editor was seeded with.
+    if (val === (isDesc ? seed : current)) { cell.innerHTML = original; return; }
     if (isTime) {
       if (!val) { cell.innerHTML = original; return; }
-      if (!/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(val)) {
-        Shell.toast('Use HH:MM 24-hour format', 'error');
+      const parsed = parseClockInput(val);
+      if (!parsed.ok) {
+        Shell.toast('Use HH:MM (24h) or h:mm AM/PM', 'error');
         cell.innerHTML = original; return;
       }
-      const [h,m] = val.split(':');
-      const norm = `${String(parseInt(h)).padStart(2,'0')}:${m}`;
-      row[field] = norm;
+      row[field] = parsed.hhmm;
       if (row.clock_in && row.clock_out) {
         row.total_mins = computeDiffMins(row.clock_in, row.clock_out);
       }
