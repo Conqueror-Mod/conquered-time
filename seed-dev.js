@@ -551,6 +551,9 @@ async function seed() {
   ti(entry1Id, 'Lunch',           'lunch', now - 5400, now - 3600, 1800);
   ti(entry1Id, 'Review Phoenix guidelines',        'task', now - 7200, now - 6300, 900);
   ti(entry1Id, 'Annotation — set A',               'task', now - 6000, now - 4500, 1500);
+  // NOTE (C6/D-012): entry 1 has no open punch, so this "in progress" task is
+  // an ORPHAN — the login-time sweep (sweepOrphanTaskItems) stops it at first
+  // sign-in. Seed-time counts below are pre-sweep.
   ti(entry1Id, 'Annotation — set B (in progress)', 'task', now - 1800, null, 0);
   console.log('✓ Task items: Entry 1 → 2 break + 1 lunch + 2 done + 1 in-progress (Dispatch)');
 
@@ -771,7 +774,8 @@ function printPacket() {
   A  trk.no_dupe_save ......... Save Session → no duplicate rows in Global Log
 
 ── 5. DISPATCH (Task Timer) ──────────────────────────────────────
-  A  disp.seeded_tasks ........ entry-1 tasks visible (2 done + 1 in-progress)
+  A  disp.seeded_tasks ........ entry-1 tasks visible (3 done — the seeded
+        in-progress one is auto-stopped by the login orphan sweep, C6/D-012)
   B  disp.sidebar_timer ....... start a task → sidebar timer ticks
   A  disp.stop_records ........ stop task → duration recorded
   A  disp.prefill ............. timer field pre-fills active session task name
@@ -827,11 +831,14 @@ function printPacket() {
   P5 long multiline desc ... clamp/tooltip/export flattening
   P6 XSS canary ............ document.title === 'XSS-FIRED' means an unescaped sink
   P7 legacy plaintext ...... at-login migration encrypts it; entry then readable
-  P8 orphan task_items ..... summaries/joins with a dead parent entry
-  P9 stale open break ...... old entry with a never-ended break — UI state?
+  P8 orphan task_items ..... dead-parent items; login sweep stops the
+        in-progress one (C6/D-012)
+  P9 stale open break ...... never-ended break on a punchless entry — login
+        sweep stops it at the entry's last clock-out (C6/D-012)
   P10 volume (92) .......... perf of log/reports/dashboard aggregation
   P11 future date .......... sort/filter/aggregation placement
-  P12 same-date pair ....... tracker loads WHICH one? (first match wins today)
+  P12 same-date pair ....... session picker (C6/D-005): picker on load,
+        Global Log Open targets the exact session, Switch button
 
 ══════════════════════════════════════════════════════════════════
   ⚡ \`npm run seed\` resets to this exact state (expected audit count = 6).

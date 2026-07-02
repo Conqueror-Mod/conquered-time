@@ -694,6 +694,50 @@ function countAuditDiscrepancies() {
   return count;
 }
 
+// C6 (D-012): recovery sweep for orphaned running task_items. A task/break/
+// lunch left running when its session has no open punch (crash, close-to-tray
+// quit, or a clock-out that predates the auto-stop fix) is invisible in
+// Dispatch (entries:get-active → null) and unstoppable. On every login, stop
+// any such item: at the entry's last clock_out when that's after started_at,
+// else at started_at (zero duration — the punch closed before it started).
+// Runs after migrateTimeEntries() in ALL login handlers (auth:login,
+// auth:quick-unlock, auth:safe-login) — same rule as the report catch-up
+// (gotcha #9): add it to any future session-establishing path too.
+function sweepOrphanTaskItems() {
+  if (!sessionKey || !sessionUser) return 0;
+  let fixed = 0;
+  try {
+    const open = dbAll('SELECT rowid as rid, * FROM task_items WHERE user_id=? AND stopped_at IS NULL', [sessionUser.id]);
+    for (const t of open) {
+      const e = dbGet('SELECT rowid as rid, * FROM time_entries WHERE rowid=? AND user_id=?', [Number(t.entry_id), sessionUser.id]);
+      let hasOpenPunch = false, lastOutMs = 0;
+      if (e) {
+        try {
+          decryptEntry(e);
+          const rows = JSON.parse(e.rows_json || '[]');
+          hasOpenPunch = rows.some(r => r.clock_in && !r.clock_out);
+          rows.forEach(r => {
+            if (!r.clock_out) return;
+            const ms = new Date(`${e.log_date}T${r.clock_out}:00`).getTime();
+            if (ms > lastOutMs) lastOutMs = ms;
+          });
+        } catch {}
+      }
+      if (hasOpenPunch) continue; // legitimately running inside an open punch
+      const startedAt = Number(t.started_at) || Date.now();
+      const stopAt = lastOutMs > startedAt ? lastOutMs : startedAt;
+      dbRun('UPDATE task_items SET stopped_at=?, duration_secs=? WHERE rowid=? AND user_id=?',
+        [stopAt, Math.max(0, Math.floor((stopAt - startedAt) / 1000)), Number(t.rid), sessionUser.id]);
+      fixed++;
+    }
+    if (fixed > 0) {
+      persistDB();
+      console.log(`[sweep] stopped ${fixed} orphaned running task item(s)`);
+    }
+  } catch (err) { console.warn('[sweep] orphan task sweep failed:', err.message); }
+  return fixed;
+}
+
 function lockSession(skipAuditCheck = false) {
   if (!skipAuditCheck && sessionUser) {
     const count = countAuditDiscrepancies();
@@ -956,6 +1000,7 @@ ipcMain.handle('auth:safe-login', async () => {
     persistDB();
     resetIdleTimer();
     migrateTimeEntries();
+    sweepOrphanTaskItems(); // C6 (D-012): stop orphaned running tasks/breaks
     // Catch up any scheduled report missed while the app was closed (session is
     // now available). Mirrors auth:login — without this, Quick Unlock / Windows
     // Hello sign-ins never run the on-launch schedule check.
@@ -991,6 +1036,7 @@ ipcMain.handle('auth:quick-unlock', async (_, { password }) => {
     persistDB();
     resetIdleTimer();
     migrateTimeEntries();
+    sweepOrphanTaskItems(); // C6 (D-012): stop orphaned running tasks/breaks
     // Catch up any scheduled report missed while the app was closed (session is
     // now available). Mirrors auth:login — without this, Quick Unlock / Windows
     // Hello sign-ins never run the on-launch schedule check.
@@ -1113,6 +1159,7 @@ ipcMain.handle('auth:login', async (_, { username, password, totpCode }) => {
     }
 
     migrateTimeEntries();
+    sweepOrphanTaskItems(); // C6 (D-012): stop orphaned running tasks/breaks
 
     // Fire scheduled email check shortly after login (session now available)
     setTimeout(runScheduledEmailCheck, 5000);

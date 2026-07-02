@@ -45,6 +45,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('btn-break').addEventListener('click', () => togglePunch('break'));
   document.getElementById('btn-lunch').addEventListener('click', () => togglePunch('lunch'));
   document.getElementById('log-date').addEventListener('change', () => { if (currentCompany) loadTodayEntry(); });
+  document.getElementById('btn-switch-session').addEventListener('click', switchSession); // C6 (D-005)
 
   // Break/lunch compliance policy + status ticker
   try { auditPolicy = await api.invoke('audit:get-policy'); } catch { auditPolicy = null; }
@@ -95,7 +96,10 @@ window.addEventListener('DOMContentLoaded', async () => {
     } catch {}
   }
 
-  buildRows();
+  // Only build the blank 5-row table when nothing was restored above —
+  // buildRows() unconditionally wipes rowsData, which erased the loaded
+  // session on the Global-Log-Open / dashboard-node path (found during C6).
+  if (!currentEntryId) buildRows();
 });
 
 // ── Companies ──
@@ -135,22 +139,90 @@ function updateHierarchyBar() {
   bar.innerHTML = parts.length ? parts.join('') : `<span class="hier-seg">${escapeHtml(co.name)}</span>`;
 }
 
+// C6 (D-005): the data model allows several sessions on the same date, but the
+// tracker used to load the FIRST match only — the second session was
+// unreachable. Now: an explicit target (Global Log "Open" → tracker_entry)
+// wins; otherwise multiple matches open a session picker; a "Switch session"
+// button re-opens it after load.
+let sameDateEntries = [];
+
 async function loadTodayEntry() {
   if (!currentCompany) return;
   const today   = document.getElementById('log-date').value;
   const entries = await api.invoke('entries:list', currentCompany.id);
-  const existing = entries.find(e => e.log_date === today);
+  const matches = entries.filter(e => e.log_date === today);
+  sameDateEntries = matches;
+
+  let existing = null;
+  const preferId = Number(sessionStorage.getItem('tracker_entry') || 0);
+  sessionStorage.removeItem('tracker_entry'); // one-shot, like tracker_date
+  if (preferId) existing = matches.find(e => e.id === preferId) || null;
+  if (!existing && matches.length > 1) existing = await pickSession(matches);
+  if (!existing) existing = matches[0] || null;
+
+  await loadEntryIntoTracker(existing);
+}
+
+async function loadEntryIntoTracker(existing) {
   if (existing) {
     currentEntryId = existing.id;
     document.getElementById('log-notes').value = existing.session_label || '';
     restoreRows(JSON.parse(existing.rows_json || '[]'));
-    document.getElementById('session-status').textContent = 'Session loaded';
+    document.getElementById('session-status').textContent =
+      sameDateEntries.length > 1
+        ? `Session ${sameDateEntries.findIndex(e => e.id === existing.id) + 1} of ${sameDateEntries.length} loaded`
+        : 'Session loaded';
     await loadTaskItems(existing.id);
   } else {
     currentEntryId = null;
     clearAll(true);
     await loadTaskItems(null);
   }
+  const sw = document.getElementById('btn-switch-session');
+  if (sw) sw.style.display = sameDateEntries.length > 1 ? '' : 'none';
+}
+
+// Modal session picker for same-date sessions. Resolves with the chosen entry
+// (or the first one if dismissed). Built via DOM + addEventListener (CSP-safe).
+function pickSession(matches) {
+  return new Promise(resolve => {
+    const backdrop = document.createElement('div');
+    backdrop.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:2000;display:flex;align-items:center;justify-content:center;';
+    const card = document.createElement('div');
+    card.style.cssText = 'background:var(--bg-panel,var(--bg-card,#111));border:1px solid var(--border);border-radius:var(--radius-lg,10px);box-shadow:var(--shadow-3);padding:18px 20px;min-width:340px;max-width:460px;';
+    const h = document.createElement('div');
+    h.textContent = `${matches.length} sessions on this date`;
+    h.style.cssText = 'font-family:var(--sans);font-size:14px;font-weight:600;color:var(--text-bright);margin-bottom:4px;';
+    const sub = document.createElement('div');
+    sub.textContent = 'Choose which session to open in the tracker.';
+    sub.style.cssText = 'font-family:var(--sans);font-size:11px;color:var(--text-muted);margin-bottom:12px;';
+    card.append(h, sub);
+    const done = (entry) => { backdrop.remove(); resolve(entry); };
+    matches.forEach((e, i) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.style.cssText = 'display:flex;justify-content:space-between;gap:14px;width:100%;text-align:left;background:var(--bg-input,transparent);border:1px solid var(--border);border-radius:6px;padding:9px 12px;margin-bottom:8px;cursor:pointer;color:var(--text);font-family:var(--sans);font-size:12px;flex-shrink:0;';
+      const lbl = document.createElement('span');
+      lbl.textContent = e.session_label || `(no label — session ${i + 1})`;
+      const dur = document.createElement('span');
+      dur.textContent = `${((e.total_mins || 0) / 60).toFixed(1)}h`;
+      dur.style.cssText = 'font-family:var(--mono);color:var(--text-muted);flex-shrink:0;';
+      btn.append(lbl, dur);
+      btn.addEventListener('click', () => done(e));
+      card.appendChild(btn);
+    });
+    backdrop.appendChild(card);
+    backdrop.addEventListener('click', ev => { if (ev.target === backdrop) done(matches[0]); });
+    document.body.appendChild(backdrop);
+  });
+}
+
+// "Switch session" button (visible only when the date has >1 session).
+async function switchSession() {
+  if (sameDateEntries.length < 2) return;
+  await saveSession(true);
+  const chosen = await pickSession(sameDateEntries);
+  await loadEntryIntoTracker(chosen);
 }
 
 // Load the current entry's task_items (Dispatch tasks + break/lunch punches),
@@ -527,6 +599,29 @@ function clockOut() {
   renderTable();
   updateTotals();
   autoSave();
+
+  // C6 (D-012): a task/break/lunch can't keep running once the session has no
+  // open punch — it would become invisible in Dispatch (entries:get-active →
+  // null) and unstoppable. If this clock-out closed the last open row, stop
+  // every running task item at the punch.
+  if (!rowsData.some(r => r.clock_in && !r.clock_out)) stopRunningTaskItems();
+}
+
+// C6 (D-012): stop all in-progress task_items (Dispatch task, break, lunch)
+// for the current entry — called when the last open punch clocks out. The
+// login-time sweep in main.js (sweepOrphanTaskItems) is the backstop for
+// crashes/quits that skip this path.
+async function stopRunningTaskItems() {
+  if (!currentEntryId) return;
+  const open = taskItems.filter(t => t.started_at && !t.stopped_at);
+  if (!open.length) return;
+  for (const t of open) {
+    const durationSecs = Math.max(0, Math.floor((Date.now() - t.started_at) / 1000));
+    await api.invoke('tasks:save', { id: t.id, label: t.label, item_type: t.item_type, stopped_at: Date.now(), duration_secs: durationSecs });
+  }
+  await loadTaskItems(currentEntryId);
+  if (window.Shell && Shell.hideSidebarTimer) Shell.hideSidebarTimer();
+  Shell.toast(`Clock-out stopped ${open.length} running ${open.length === 1 ? 'item' : 'items'} (task/break).`, 'info');
 }
 
 // Backfill a session that wasn't clocked live: add an editable row and open the

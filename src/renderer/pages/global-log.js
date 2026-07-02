@@ -33,7 +33,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     const btn = e.target.closest('.btn-xs');
     if (btn) {
       e.stopPropagation();
-      if (btn.dataset.act === 'open') openInTracker(Number(btn.dataset.co), btn.dataset.date);
+      if (btn.dataset.act === 'open') openInTracker(Number(btn.dataset.co), btn.dataset.date, Number(btn.dataset.entry)||0);
       else if (btn.dataset.act === 'pdf') exportSessionPDF(Number(btn.dataset.idx));
       return;
     }
@@ -115,6 +115,7 @@ function renderTable() {
     tbody.innerHTML=`<tr><td colspan="6"><div class="empty-state">No sessions match the current filters.</div></td></tr>`;
     return;
   }
+  const todayStr=new Date().toISOString().slice(0,10); // C6 (D-009): badge future-dated sessions
   tbody.innerHTML=filtered.map((e,idx) => {
     const co=compMap[e.company_id];
     const rows=safeParseRows(e.rows_json);
@@ -123,11 +124,11 @@ function renderTable() {
       <tr data-idx="${idx}" style="cursor:pointer;">
         <td><span class="expand-arrow" id="arrow-${idx}">${hasDetail?'▶':''}</span></td>
         <td class="log-company">${escapeHtml(co?.name)||'—'}</td>
-        <td class="log-date">${escapeHtml(e.log_date)}</td>
+        <td class="log-date">${escapeHtml(e.log_date)}${e.log_date>todayStr?' <span class="future-badge" title="This session is dated in the future">FUTURE</span>':''}</td>
         <td class="log-session">${e.session_label?escapeHtml(e.session_label):'<span style="color:var(--text-dim);font-style:italic;">No label</span>'}</td>
         <td class="log-hours">${fmtHFull(e.total_mins)}</td>
         <td class="log-actions">
-          <button class="btn-xs" data-act="open" data-co="${e.company_id}" data-date="${escapeHtml(e.log_date)}">Open</button>
+          <button class="btn-xs" data-act="open" data-co="${e.company_id}" data-date="${escapeHtml(e.log_date)}" data-entry="${e.id}">Open</button>
           <button class="btn-xs" data-act="pdf" data-idx="${idx}">PDF</button>
         </td>
       </tr>
@@ -157,11 +158,13 @@ function toggleDetail(idx) {
   if (arrow) arrow.textContent=row.classList.contains('open')?'▼':'▶';
 }
 
-function openInTracker(companyId, date) {
+function openInTracker(companyId, date, entryId) {
   const co=compMap[companyId];
   if (!co) return;
   sessionStorage.setItem('active_company',JSON.stringify(co));
   sessionStorage.setItem('tracker_date',date);
+  // C6 (D-005): open THIS session, not just the first one on the date
+  if (entryId) sessionStorage.setItem('tracker_entry',String(entryId));
   api.send('navigate','tracker');
 }
 
