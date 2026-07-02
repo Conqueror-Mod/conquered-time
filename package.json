@@ -2,7 +2,7 @@
   "name": "conquered-time",
   "version": "3.10.0",
   "description": "Conquered Time — Professional Time Tracker",
-  "main": "src/main/main.js",
+  "main": "dist-main/main/main.js",
   "author": {
     "name": "Chris Bowles - The Conqueror",
     "email": "bowles.s.chris@gmail.com"
@@ -15,15 +15,16 @@
   "license": "UNLICENSED",
   "private": true,
   "scripts": {
-    "start": "electron .",
-    "dev": "electron . --dev",
+    "start": "npm run build:main && electron .",
+    "dev": "npm run build:main && electron . --dev",
     "test": "node --test && npm run typecheck",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.main.json --noEmit",
+    "build:main": "tsc -p tsconfig.main.json",
     "seed": "node seed-dev.js",
-    "build": "electron-builder --win --x64",
-    "build:mac": "electron-builder --mac",
-    "build:linux": "electron-builder --linux",
-    "pack": "electron-builder --dir"
+    "build": "npm run build:main && electron-builder --win --x64",
+    "build:mac": "npm run build:main && electron-builder --mac",
+    "build:linux": "npm run build:main && electron-builder --linux",
+    "pack": "npm run build:main && electron-builder --dir"
   },
   "build": {
     "appId": "com.conquered.time",
@@ -81,7 +82,8 @@
       "include": "build/installer.nsh"
     },
     "files": [
-      "src/**/*",
+      "dist-main/**/*",
+      "src/renderer/**/*",
       "assets/**/*",
       "package.json"
     ],

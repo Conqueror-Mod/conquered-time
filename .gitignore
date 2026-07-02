@@ -5,6 +5,8 @@ build/*
 !build/license.txt
 !build/installer.nsh
 dist/
+# Compiled main process (tsc -p tsconfig.main.json) — generated, never commit.
+dist-main/
 dev-data/
 *.db
 *.db-backup-*
