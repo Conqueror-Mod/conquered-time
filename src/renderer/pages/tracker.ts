@@ -4,48 +4,64 @@
 // under a strict script-src 'self' CSP. Depends on globals injected by shell.js
 // (Shell, Store, IPC, Validator, Settings, escapeHtml, api) — must load after
 // shell.js.
+//
+// IIFE-wrapped (Phase 3 pattern) — see tsconfig.renderer.json. The two shell
+// hooks (onExportPDF, onAutoSaveSettingChanged) that shell.js probes as globals
+// are assigned onto window explicitly at the end.
+(() => {
 
-let companies = [], currentCompany = null, currentEntryId = null;
-let rowsData = [];          // [{label,name,desc,clock_in,clock_out,total_mins}]
-let selectedIndex = null;
-let autoSaveTimer = null;
+interface RowData {
+  label: string; name: string; desc: string;
+  clock_in: string; clock_out: string; total_mins: number;
+  _manual?: boolean;
+}
+// Editable string-valued fields (duration is display-only, never edited).
+type StrField = 'label' | 'name' | 'desc' | 'clock_in' | 'clock_out';
+
+const $id = (id: string): HTMLElement => document.getElementById(id)!;
+const $input = (id: string): HTMLInputElement => document.getElementById(id) as HTMLInputElement;
+
+let companies: Company[] = [], currentCompany: Company | null = null;
+let currentEntryId: number | null = null;
+let rowsData: RowData[] = [];          // [{label,name,desc,clock_in,clock_out,total_mins}]
+let selectedIndex: number | null = null;
+let autoSaveTimer: ReturnType<typeof setInterval> | null = null;
 const MIN_ROWS = 5;
 
 // ── Break & Lunch (relocated from Dispatch) ──────────────────────────────────
 // Stored as task_items (entry_id-scoped, item_type 'break'|'lunch') — same data
 // model as before; only the controls + compliance display now live here.
-let taskItems     = [];     // task_items for the current entry (breaks/lunches/tasks)
-let activeBreakId = null;   // in-progress break task_item id, or null
-let activeLunchId = null;   // in-progress lunch task_item id, or null
-let auditPolicy   = null;   // US-state break/lunch policy from audit:get-policy
-let complianceTimer = null; // 60s tick refreshing the compliance status lines
+let taskItems: TaskItem[] = [];     // task_items for the current entry (breaks/lunches/tasks)
+let activeBreakId: number | null = null;   // in-progress break task_item id, or null
+let activeLunchId: number | null = null;   // in-progress lunch task_item id, or null
+let auditPolicy: AuditPolicy | null = null;   // US-state break/lunch policy from audit:get-policy
 
 // Display-only 12h/24h formatting. Stored/internal value is always 24h HH:MM
 // (gotcha #8); this only affects how an already-stored time is shown.
-function fmtClock(hhmm) {
+function fmtClock(hhmm: string | undefined): string {
   // Settings is a top-level const (not a window property) — guard via typeof.
-  return (hhmm && typeof Settings !== 'undefined') ? Settings.formatTime(hhmm) : hhmm;
+  return (hhmm && typeof Settings !== 'undefined') ? Settings.formatTime(hhmm) : (hhmm || '');
 }
 
-document.getElementById('log-date').valueAsDate = new Date();
+$input('log-date').valueAsDate = new Date();
 
 window.addEventListener('DOMContentLoaded', async () => {
   await Shell.init('tracker');
   document.documentElement.style.visibility = '';
   await loadCompanies();
 
-  document.getElementById('company-select').addEventListener('change', onCompanyChange);
-  document.getElementById('btn-clock-in').addEventListener('click', clockIn);
-  document.getElementById('btn-clock-out').addEventListener('click', clockOut);
-  document.getElementById('btn-manual-entry').addEventListener('click', addManualRow);
-  document.getElementById('btn-clear-row').addEventListener('click', clearSelectedRow);
-  document.getElementById('btn-clear-all').addEventListener('click', () => clearAll());
-  document.getElementById('btn-save-session').addEventListener('click', () => saveSession());
-  document.getElementById('btn-export-pdf').addEventListener('click', exportPDF);
-  document.getElementById('btn-break').addEventListener('click', () => togglePunch('break'));
-  document.getElementById('btn-lunch').addEventListener('click', () => togglePunch('lunch'));
-  document.getElementById('log-date').addEventListener('change', () => { if (currentCompany) loadTodayEntry(); });
-  document.getElementById('btn-switch-session').addEventListener('click', switchSession); // C6 (D-005)
+  $id('company-select').addEventListener('change', onCompanyChange);
+  $id('btn-clock-in').addEventListener('click', clockIn);
+  $id('btn-clock-out').addEventListener('click', clockOut);
+  $id('btn-manual-entry').addEventListener('click', addManualRow);
+  $id('btn-clear-row').addEventListener('click', clearSelectedRow);
+  $id('btn-clear-all').addEventListener('click', () => clearAll());
+  $id('btn-save-session').addEventListener('click', () => saveSession());
+  $id('btn-export-pdf').addEventListener('click', exportPDF);
+  $id('btn-break').addEventListener('click', () => togglePunch('break'));
+  $id('btn-lunch').addEventListener('click', () => togglePunch('lunch'));
+  $id('log-date').addEventListener('change', () => { if (currentCompany) loadTodayEntry(); });
+  $id('btn-switch-session').addEventListener('click', switchSession); // C6 (D-005)
 
   // Break/lunch compliance policy + status ticker
   try { auditPolicy = await api.invoke('audit:get-policy'); } catch { auditPolicy = null; }
@@ -57,22 +73,22 @@ window.addEventListener('DOMContentLoaded', async () => {
   });
 
   // Event delegation for row selection + inline editing
-  const tbody = document.getElementById('tbody');
+  const tbody = $id('tbody');
   tbody.addEventListener('click', e => {
-    const tr = e.target.closest('tr');
+    const tr = (e.target as HTMLElement).closest<HTMLElement>('tr');
     if (!tr) return;
-    selectRow(parseInt(tr.dataset.idx));
+    selectRow(parseInt(tr.dataset.idx || ''));
   });
   tbody.addEventListener('dblclick', e => {
-    const td = e.target.closest('td[data-field]');
+    const td = (e.target as HTMLElement).closest<HTMLElement>('td[data-field]');
     if (!td || !td.classList.contains('editable')) return;
-    const tr = td.closest('tr');
-    startEdit(td, parseInt(tr.dataset.idx), td.dataset.field);
+    const tr = td.closest('tr') as HTMLElement;
+    startEdit(td, parseInt(tr.dataset.idx || ''), td.dataset.field as StrField);
   });
 
   // Live 12h/24h switch — re-render already-drawn rows in place (no reload).
   document.addEventListener('ct:settings-changed', e => {
-    if (e.detail?.key === 'timeFormat') { renderTable(); updateTotals(); }
+    if ((e as CustomEvent).detail?.key === 'timeFormat') { renderTable(); updateTotals(); }
   });
 
   await initColResize();
@@ -82,7 +98,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   // Date must be applied before onCompanyChange(), which loads the entry for log-date.value.
   const targetDate = sessionStorage.getItem('tracker_date');
   if (targetDate) {
-    document.getElementById('log-date').value = targetDate;
+    $input('log-date').value = targetDate;
     sessionStorage.removeItem('tracker_date');
   }
 
@@ -90,7 +106,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   if (saved) {
     try {
       const co = JSON.parse(saved);
-      document.getElementById('company-select').value = co.id;
+      $input('company-select').value = co.id;
       await onCompanyChange();
       sessionStorage.removeItem('active_company');
     } catch {}
@@ -103,36 +119,35 @@ window.addEventListener('DOMContentLoaded', async () => {
 });
 
 // ── Companies ──
-async function loadCompanies() {
+async function loadCompanies(): Promise<void> {
   companies = await Store.getCompanies();
-  const sel = document.getElementById('company-select');
+  const sel = $id('company-select');
   sel.innerHTML = '<option value="">— Select Company —</option>';
   companies.forEach(co => {
     const id = Number(co.id);
     if (!id || isNaN(id)) return;
     const opt = document.createElement('option');
-    // @ts-ignore — number assigned to option value; DOM stringifies.
-    opt.value = id; opt.textContent = co.name || `Company #${id}`;
+    opt.value = String(id); opt.textContent = co.name || `Company #${id}`;
     sel.appendChild(opt);
   });
 }
 
-async function onCompanyChange() {
-  const id = parseInt(document.getElementById('company-select').value);
+async function onCompanyChange(): Promise<void> {
+  const id = parseInt($input('company-select').value);
   if (!id) { currentCompany = null; clearAutoSaveTimer(); updateHierarchyBar(); return; }
-  currentCompany = companies.find(c => parseInt(c.id) === id) || null;
+  currentCompany = companies.find(c => Number(c.id) === id) || null;
   currentEntryId = null;
   updateHierarchyBar();
-  if (!document.getElementById('log-date').value)
-    document.getElementById('log-date').valueAsDate = new Date();
+  if (!$input('log-date').value)
+    $input('log-date').valueAsDate = new Date();
   if (currentCompany) { await loadTodayEntry(); startAutoSaveTimer(); }
 }
 
-function updateHierarchyBar() {
-  const bar = document.getElementById('hierarchy-bar');
+function updateHierarchyBar(): void {
+  const bar = $id('hierarchy-bar');
   if (!currentCompany) { bar.innerHTML=''; return; }
   const co = currentCompany;
-  const parts = [];
+  const parts: string[] = [];
   if (co.hier_company)  parts.push(`<span class="hier-seg">${escapeHtml(co.hier_company)}</span>`);
   if (co.hier_project)  parts.push(`<span class="hier-sep">›</span><span class="hier-seg">${escapeHtml(co.hier_project)}</span>`);
   if (co.hier_platform) parts.push(`<span class="hier-sep">›</span><span class="hier-seg">${escapeHtml(co.hier_platform)}</span>`);
@@ -145,16 +160,16 @@ function updateHierarchyBar() {
 // unreachable. Now: an explicit target (Global Log "Open" → tracker_entry)
 // wins; otherwise multiple matches open a session picker; a "Switch session"
 // button re-opens it after load.
-let sameDateEntries = [];
+let sameDateEntries: TimeEntry[] = [];
 
-async function loadTodayEntry() {
+async function loadTodayEntry(): Promise<void> {
   if (!currentCompany) return;
-  const today   = document.getElementById('log-date').value;
-  const entries = await api.invoke('entries:list', currentCompany.id);
+  const today   = $input('log-date').value;
+  const entries = await api.invoke('entries:list', currentCompany.id) || [];
   const matches = entries.filter(e => e.log_date === today);
   sameDateEntries = matches;
 
-  let existing = null;
+  let existing: TimeEntry | null = null;
   const preferId = Number(sessionStorage.getItem('tracker_entry') || 0);
   sessionStorage.removeItem('tracker_entry'); // one-shot, like tracker_date
   if (preferId) existing = matches.find(e => e.id === preferId) || null;
@@ -164,14 +179,14 @@ async function loadTodayEntry() {
   await loadEntryIntoTracker(existing);
 }
 
-async function loadEntryIntoTracker(existing) {
+async function loadEntryIntoTracker(existing: TimeEntry | null): Promise<void> {
   if (existing) {
     currentEntryId = existing.id;
-    document.getElementById('log-notes').value = existing.session_label || '';
+    $input('log-notes').value = existing.session_label || '';
     restoreRows(JSON.parse(existing.rows_json || '[]'));
-    document.getElementById('session-status').textContent =
+    $id('session-status').textContent =
       sameDateEntries.length > 1
-        ? `Session ${sameDateEntries.findIndex(e => e.id === existing.id) + 1} of ${sameDateEntries.length} loaded`
+        ? `Session ${sameDateEntries.findIndex(e => e.id === existing!.id) + 1} of ${sameDateEntries.length} loaded`
         : 'Session loaded';
     await loadTaskItems(existing.id);
   } else {
@@ -185,7 +200,7 @@ async function loadEntryIntoTracker(existing) {
 
 // Modal session picker for same-date sessions. Resolves with the chosen entry
 // (or the first one if dismissed). Built via DOM + addEventListener (CSP-safe).
-function pickSession(matches) {
+function pickSession(matches: TimeEntry[]): Promise<TimeEntry> {
   return new Promise(resolve => {
     const backdrop = document.createElement('div');
     backdrop.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:2000;display:flex;align-items:center;justify-content:center;';
@@ -198,7 +213,7 @@ function pickSession(matches) {
     sub.textContent = 'Choose which session to open in the tracker.';
     sub.style.cssText = 'font-family:var(--sans);font-size:11px;color:var(--text-muted);margin-bottom:12px;';
     card.append(h, sub);
-    const done = (entry) => { backdrop.remove(); resolve(entry); };
+    const done = (entry: TimeEntry) => { backdrop.remove(); resolve(entry); };
     matches.forEach((e, i) => {
       const btn = document.createElement('button');
       btn.type = 'button';
@@ -219,7 +234,7 @@ function pickSession(matches) {
 }
 
 // "Switch session" button (visible only when the date has >1 session).
-async function switchSession() {
+async function switchSession(): Promise<void> {
   if (sameDateEntries.length < 2) return;
   await saveSession(true);
   const chosen = await pickSession(sameDateEntries);
@@ -229,7 +244,7 @@ async function switchSession() {
 // Load the current entry's task_items (Dispatch tasks + break/lunch punches),
 // derive active break/lunch state, and refresh both the Dispatch chip and the
 // break/lunch strip. Single fetch shared by both UIs.
-async function loadTaskItems(entryId) {
+async function loadTaskItems(entryId: number | null): Promise<void> {
   taskItems = entryId ? (await api.invoke('tasks:list', entryId) || []) : [];
   activeBreakId = taskItems.find(t => t.item_type === 'break' && !t.stopped_at)?.id || null;
   activeLunchId = taskItems.find(t => t.item_type === 'lunch' && !t.stopped_at)?.id || null;
@@ -240,7 +255,7 @@ async function loadTaskItems(entryId) {
 
 // Footer Dispatch preview — task count + per-label chips (break/lunch now live
 // in the control-panel strip, not here).
-function updateDispatchChip() {
+function updateDispatchChip(): void {
   const preview = document.getElementById('dispatch-preview');
   if (!preview) return;
   if (!currentEntryId) { preview.style.display = 'none'; return; }
@@ -248,14 +263,14 @@ function updateDispatchChip() {
   const completed = taskItems.filter(t => t.item_type === 'task' && t.stopped_at);
   preview.style.display = 'block';
 
-  const countLabel = document.getElementById('dispatch-count-label');
+  const countLabel = $id('dispatch-count-label');
   countLabel.textContent = completed.length > 0
     ? `${completed.length} task${completed.length === 1 ? '' : 's'}`
     : 'Dispatch';
 
-  const chipsEl = document.getElementById('dispatch-task-chips');
+  const chipsEl = $id('dispatch-task-chips');
   if (completed.length > 0) {
-    const counts = {};
+    const counts: Record<string, number> = {};
     completed.forEach(t => { counts[t.label] = (counts[t.label] || 0) + 1; });
     chipsEl.innerHTML = Object.entries(counts)
       .sort((a, b) => b[1] - a[1])
@@ -269,7 +284,7 @@ function updateDispatchChip() {
 // ── Break & Lunch ────────────────────────────────────────────────────────────
 // ms at the start of the active (clocked-in, not clocked-out) row, used as the
 // "since clock-in" anchor for compliance. null when nothing is clocked in.
-function sessionStartMs() {
+function sessionStartMs(): number | null {
   const active = rowsData.find(r => r.clock_in && !r.clock_out);
   if (!active) return null;
   const [h, m] = active.clock_in.split(':').map(Number);
@@ -277,14 +292,14 @@ function sessionStartMs() {
   return d.getTime();
 }
 
-function elapsedSince(ms) {
+function elapsedSince(ms: number): string {
   const diff = Date.now() - ms;
   const h = Math.floor(diff / 3600000);
   const m = Math.floor((diff % 3600000) / 60000);
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
-async function togglePunch(type) {
+async function togglePunch(type: 'break' | 'lunch'): Promise<void> {
   if (!currentCompany) { Shell.toast('Select a company first.', 'warning'); return; }
   if (sessionStartMs() === null && !(type === 'break' ? activeBreakId : activeLunchId)) {
     Shell.toast('Clock in before starting a break or lunch.', 'warning');
@@ -301,13 +316,13 @@ async function togglePunch(type) {
     await api.invoke('tasks:save', { id: activeId, label, item_type: type, stopped_at: Date.now(), duration_secs: durationSecs });
     Shell.toast(`${label} ended.`, 'success');
   } else {
-    await api.invoke('tasks:save', { entry_id: currentEntryId, label, item_type: type, started_at: Date.now(), duration_secs: 0 });
+    await api.invoke('tasks:save', { entry_id: currentEntryId!, label, item_type: type, started_at: Date.now(), duration_secs: 0 });
     Shell.toast(`${label} started.`, 'success');
   }
   await loadTaskItems(currentEntryId);
 }
 
-function updateBreakButtons() {
+function updateBreakButtons(): void {
   const b = document.getElementById('btn-break');
   const l = document.getElementById('btn-lunch');
   if (b) { b.textContent = activeBreakId ? '✓ End Break' : '☕ Break'; b.classList.toggle('bl-active', !!activeBreakId); }
@@ -315,9 +330,9 @@ function updateBreakButtons() {
 }
 
 // Returns 'ok' | 'warn' | 'over' for break/lunch relative to the US-state policy.
-function checkComplianceStatus(type) {
+function checkComplianceStatus(type: 'break' | 'lunch'): 'ok' | 'warn' | 'over' {
   const p = auditPolicy;
-  let thresholdMs, warnMs;
+  let thresholdMs: number, warnMs: number;
   if (type === 'break') {
     const rawDue  = p?.breakThresholds?.[0]?.[0];
     thresholdMs   = (rawDue != null) ? rawDue * 60000 : Infinity;
@@ -331,7 +346,7 @@ function checkComplianceStatus(type) {
   if ((type === 'break' ? activeBreakId : activeLunchId)) return 'ok'; // currently on it
   const relevant = taskItems.filter(t => t.item_type === type && t.stopped_at);
   const start = sessionStartMs();
-  const lastStop = relevant.length ? Math.max(...relevant.map(t => t.stopped_at)) : (start || Date.now());
+  const lastStop = relevant.length ? Math.max(...relevant.map(t => t.stopped_at as number)) : (start || Date.now());
   const elapsed = Date.now() - lastStop;
   if (elapsed >= thresholdMs) return 'over';
   if (elapsed >= warnMs) return 'warn';
@@ -340,12 +355,12 @@ function checkComplianceStatus(type) {
 
 const DOT_SVG = '<svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><circle cx="5" cy="5" r="5"/></svg>';
 
-function renderCompliance() {
+function renderCompliance(): void {
   renderComplianceFor('break');
   renderComplianceFor('lunch');
 }
 
-function renderComplianceFor(type) {
+function renderComplianceFor(type: 'break' | 'lunch'): void {
   const el = document.getElementById(`compliance-${type}`);
   if (!el) return;
   const status = checkComplianceStatus(type);
@@ -367,20 +382,20 @@ function renderComplianceFor(type) {
     else                        el.innerHTML = `${DOT_SVG} No ${type} yet — ${elStr} since clock-in`;
     return;
   }
-  const elStr = elapsedSince(Math.max(...relevant.map(t => t.stopped_at)));
+  const elStr = elapsedSince(Math.max(...relevant.map(t => t.stopped_at as number)));
   el.innerHTML = status === 'over'
     ? `${DOT_SVG} ⚠ ${type === 'break' ? 'Break' : 'Lunch'} overdue — last ${type} ${elStr} ago`
     : `${DOT_SVG} Last ${type}: ${elStr} ago ✓`;
 }
 
 // ── Row data helpers ──
-function emptyRow() { return { label:'', name:'', desc:'', clock_in:'', clock_out:'', total_mins:0 }; }
+function emptyRow(): RowData { return { label:'', name:'', desc:'', clock_in:'', clock_out:'', total_mins:0 }; }
 // _manual rows are backfill entries: editable + retained even before any field is
 // filled, so the user can type in a session they forgot to clock live.
-function isRowFilled(r) { return !!(r._manual || r.label || r.name || r.desc || r.clock_in || r.total_mins > 0); }
+function isRowFilled(r: RowData): boolean { return !!(r._manual || r.label || r.name || r.desc || r.clock_in || r.total_mins > 0); }
 
 // Ensure: minimum MIN_ROWS rows, exactly one trailing empty "buffer" row, no runs of unused empty rows
-function normalizeRows() {
+function normalizeRows(): void {
   while (rowsData.length < MIN_ROWS) rowsData.push(emptyRow());
   // Trim extra trailing empty rows beyond a single buffer (never below MIN_ROWS)
   while (rowsData.length > MIN_ROWS) {
@@ -394,15 +409,15 @@ function normalizeRows() {
 }
 
 // ── Build / render ──
-function buildRows() {
+function buildRows(): void {
   rowsData = [];
   normalizeRows();
   renderTable();
   updateTotals();
 }
 
-function renderTable() {
-  const tbody = document.getElementById('tbody');
+function renderTable(): void {
+  const tbody = $id('tbody');
   tbody.innerHTML = rowsData.map((r, idx) => rowHTML(r, idx)).join('');
 }
 
@@ -414,20 +429,20 @@ function renderTable() {
 const COLW_KEY      = 'ui_trackerColWidths';
 const DEFAULT_COLPX = [36, 24, 120, 140, 220, 85, 85, 80]; // #, dot, Label, Name, Desc, In, Out, Total
 const MIN_COL_PCT   = 3;
-let colPcts = null;
+let colPcts: number[] = [];
 
-function pxToPct(arr) {
+function pxToPct(arr: number[]): number[] {
   const sum = arr.reduce((a, b) => a + b, 0);
   return arr.map(w => (w / sum) * 100);
 }
 
-function applyColWidths() {
-  const cols = document.querySelectorAll('#tracker-table colgroup col');
+function applyColWidths(): void {
+  const cols = document.querySelectorAll<HTMLElement>('#tracker-table colgroup col');
   cols.forEach((c, i) => { if (colPcts[i] != null) c.style.width = colPcts[i] + '%'; });
 }
 
-async function initColResize() {
-  let pcts = null;
+async function initColResize(): Promise<void> {
+  let pcts: number[] | null = null;
   try {
     const saved = await api.invoke('settings:get', COLW_KEY);
     if (saved) pcts = JSON.parse(saved);
@@ -438,8 +453,8 @@ async function initColResize() {
   installColResizers();
 }
 
-function installColResizers() {
-  const ths = document.querySelectorAll('#tracker-table thead th');
+function installColResizers(): void {
+  const ths = document.querySelectorAll<HTMLElement>('#tracker-table thead th');
   ths.forEach((th, i) => {
     if (i >= ths.length - 1) return;              // last column has no right divider
     if (th.querySelector('.col-resizer')) return; // idempotent
@@ -452,9 +467,9 @@ function installColResizers() {
   });
 }
 
-function startColDrag(e, i, handle) {
+function startColDrag(e: MouseEvent, i: number, handle: HTMLElement): void {
   e.preventDefault(); e.stopPropagation();
-  const table  = document.getElementById('tracker-table');
+  const table  = $id('tracker-table');
   const tableW = table.getBoundingClientRect().width;
   const startX = e.clientX;
   const a0 = colPcts[i], b0 = colPcts[i + 1];
@@ -462,7 +477,7 @@ function startColDrag(e, i, handle) {
   document.body.style.cursor = 'col-resize';
   document.body.style.userSelect = 'none';
 
-  const move = ev => {
+  const move = (ev: MouseEvent) => {
     let d = ((ev.clientX - startX) / tableW) * 100;
     // Clamp so neither the dragged column nor its neighbour drops below the min.
     d = Math.max(d, MIN_COL_PCT - a0);
@@ -483,18 +498,18 @@ function startColDrag(e, i, handle) {
   document.addEventListener('mouseup', up);
 }
 
-function resetColWidths() {
+function resetColWidths(): void {
   colPcts = pxToPct(DEFAULT_COLPX);
   applyColWidths();
   saveColWidths();
   Shell.toast('Column widths reset.', 'info', 2000);
 }
 
-function saveColWidths() {
+function saveColWidths(): void {
   try { api.invoke('settings:set', { key: COLW_KEY, value: JSON.stringify(colPcts) }); } catch {}
 }
 
-function rowHTML(r, idx) {
+function rowHTML(r: RowData, idx: number): string {
   const filled = isRowFilled(r);
   const editableText = filled ? 'editable' : '';
   const editableIn    = (r.clock_in  || r._manual) ? 'editable' : '';
@@ -513,7 +528,7 @@ function rowHTML(r, idx) {
   </tr>`;
 }
 
-function restoreRows(rows) {
+function restoreRows(rows: EntryRow[]): void {
   rowsData = (rows||[]).map(r => ({
     label: r.label||'', name: r.name||'', desc: r.desc||'',
     clock_in: r.clock_in||'', clock_out: r.clock_out||'', total_mins: r.total_mins||0,
@@ -525,25 +540,25 @@ function restoreRows(rows) {
   updateTotals();
 }
 
-function selectRow(idx) {
+function selectRow(idx: number): void {
   selectedIndex = idx;
-  document.querySelectorAll('#tbody tr').forEach(tr => {
-    tr.classList.toggle('row-active', parseInt(tr.dataset.idx) === idx);
+  document.querySelectorAll<HTMLElement>('#tbody tr').forEach(tr => {
+    tr.classList.toggle('row-active', parseInt(tr.dataset.idx || '') === idx);
   });
 }
 
-function nowTime() {
+function nowTime(): string {
   const n = new Date();
   return `${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`;
 }
 
-function formatMins(total) {
+function formatMins(total: number): string {
   if (total <= 0) return '—';
   const h = Math.floor(total/60), m = total%60;
   return h>0 ? `${h}h ${String(m).padStart(2,'0')}m` : `${m}m`;
 }
 
-function computeDiffMins(inT, outT) {
+function computeDiffMins(inT: string, outT: string): number {
   const [ih,im] = inT.split(':').map(Number);
   const [oh,om] = outT.split(':').map(Number);
   let diff = (oh*60+om) - (ih*60+im);
@@ -552,18 +567,18 @@ function computeDiffMins(inT, outT) {
 }
 
 // ── Clock in/out ──
-function clockIn() {
+function clockIn(): void {
   if (!currentCompany) { Shell.toast('Select a company first.', 'warning'); return; }
-  const label = document.getElementById('input-label').value;
-  const name  = document.getElementById('input-name').value.trim();
-  const desc  = document.getElementById('input-desc').value.trim();
+  const label = $input('input-label').value;
+  const name  = $input('input-name').value.trim();
+  const desc  = $input('input-desc').value.trim();
   // Both a Task Label and a Task Name are required to clock in. Clock Out is
   // implicitly covered (it acts on a row that was clocked in with both). Only
   // "+ Manual Entry" bypasses this, for backfilling a forgotten session.
   if (!label || !name) {
     Shell.toast('A Task Label and Task Name are required to clock in.', 'warning');
-    if (!label) document.getElementById('input-label').focus();
-    else document.getElementById('input-name').focus();
+    if (!label) $input('input-label').focus();
+    else $input('input-name').focus();
     return;
   }
   const t = nowTime();
@@ -583,7 +598,7 @@ function clockIn() {
   autoSave();
 }
 
-function clockOut() {
+function clockOut(): void {
   let idx = -1;
   if (selectedIndex != null && rowsData[selectedIndex] && rowsData[selectedIndex].clock_in && !rowsData[selectedIndex].clock_out) idx = selectedIndex;
   if (idx === -1) idx = rowsData.findIndex(r => r.clock_in && !r.clock_out);
@@ -610,9 +625,9 @@ function clockOut() {
 
 // C6 (D-012): stop all in-progress task_items (Dispatch task, break, lunch)
 // for the current entry — called when the last open punch clocks out. The
-// login-time sweep in main.js (sweepOrphanTaskItems) is the backstop for
-// crashes/quits that skip this path.
-async function stopRunningTaskItems() {
+// login-time sweep in src/main/session.ts (sweepOrphanTaskItems) is the
+// backstop for crashes/quits that skip this path.
+async function stopRunningTaskItems(): Promise<void> {
   if (!currentEntryId) return;
   const open = taskItems.filter(t => t.started_at && !t.stopped_at);
   if (!open.length) return;
@@ -621,14 +636,14 @@ async function stopRunningTaskItems() {
     await api.invoke('tasks:save', { id: t.id, label: t.label, item_type: t.item_type, stopped_at: Date.now(), duration_secs: durationSecs });
   }
   await loadTaskItems(currentEntryId);
-  if (window.Shell && Shell.hideSidebarTimer) Shell.hideSidebarTimer();
+  if (typeof Shell !== 'undefined' && Shell.hideSidebarTimer) Shell.hideSidebarTimer();
   Shell.toast(`Clock-out stopped ${open.length} running ${open.length === 1 ? 'item' : 'items'} (task/break).`, 'info');
 }
 
 // Backfill a session that wasn't clocked live: add an editable row and open the
 // label cell for immediate entry. The row persists (isRowFilled treats _manual
 // as filled) so the dynamic table won't trim it before the user types.
-function addManualRow() {
+function addManualRow(): void {
   if (!currentCompany) { Shell.toast('Select a company first.', 'warning'); return; }
   const row = emptyRow();
   row._manual = true;
@@ -637,19 +652,19 @@ function addManualRow() {
   selectedIndex = rowsData.indexOf(row);
   renderTable();
   updateTotals();
-  const cell = document.querySelector(`#tbody tr[data-idx="${selectedIndex}"] td[data-field="label"]`);
+  const cell = document.querySelector<HTMLElement>(`#tbody tr[data-idx="${selectedIndex}"] td[data-field="label"]`);
   if (cell) startEdit(cell, selectedIndex, 'label');
 }
 
 // ── Inline editing ──
-function startEdit(cell, idx, field) {
+function startEdit(cell: HTMLElement, idx: number, field: StrField): void {
   const row = rowsData[idx];
   if (!row) return;
   const isTime  = field === 'clock_in' || field === 'clock_out';
   // Time cells display in the 12h/24h preference, but editing is always raw 24h
   // HH:MM (gotcha #8) — seed from the stored value, not the formatted cell text.
   const current = isTime ? (row[field] || '')
-                : cell.textContent === '—' ? '' : cell.textContent;
+                : cell.textContent === '—' ? '' : (cell.textContent || '');
   const isLabel = field === 'label';
   const isDesc  = field === 'desc';
   // Description seeds from the raw stored value (may contain newlines), not the
@@ -657,10 +672,10 @@ function startEdit(cell, idx, field) {
   const seed = isDesc ? (row.desc || '') : current;
   const original = cell.innerHTML;
 
-  let input;
+  let input: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
   if (isLabel) {
-    input = document.createElement('select');
-    input.style.cssText = 'font-family:var(--sans);font-size:12px;background:var(--surface-2);color:var(--text-bright);border:1px solid var(--accent);border-radius:4px;width:100%;';
+    const select = document.createElement('select');
+    select.style.cssText = 'font-family:var(--sans);font-size:12px;background:var(--surface-2);color:var(--text-bright);border:1px solid var(--accent);border-radius:4px;width:100%;';
     const FIXED = ['Training','Evaluation','Review','Annotation','QA','Research','Admin','Communication','Other'];
     // D-010: a stored label that isn't in the fixed list (imported/legacy/custom
     // data) must be PRESERVED — inject it as the selected first option, otherwise
@@ -670,39 +685,41 @@ function startEdit(cell, idx, field) {
       const o = document.createElement('option');
       o.value = opt; o.textContent = opt;
       if (opt === current) o.selected = true;
-      input.appendChild(o);
+      select.appendChild(o);
     });
+    input = select;
   } else if (isDesc) {
     // Multi-line, auto-growing editor (Companies-notes style). Enter inserts a
     // newline; Ctrl/Cmd+Enter or blur commits; Escape cancels.
-    input = document.createElement('textarea');
-    input.value = seed;
-    input.rows = Math.min(8, Math.max(2, seed.split('\n').length));
-    input.placeholder = 'Description… (Enter for new line, Ctrl+Enter to save)';
-    input.style.cssText = 'font-family:var(--sans);font-size:12px;line-height:1.5;background:var(--surface-2);color:var(--text-bright);border:1px solid var(--accent);border-radius:4px;width:100%;padding:4px 6px;resize:vertical;min-height:48px;user-select:text;-webkit-user-select:text;';
-    const grow = () => { input.style.height = 'auto'; input.style.height = Math.min(200, input.scrollHeight) + 'px'; };
-    input.addEventListener('input', grow);
+    const ta = document.createElement('textarea');
+    ta.value = seed;
+    ta.rows = Math.min(8, Math.max(2, seed.split('\n').length));
+    ta.placeholder = 'Description… (Enter for new line, Ctrl+Enter to save)';
+    ta.style.cssText = 'font-family:var(--sans);font-size:12px;line-height:1.5;background:var(--surface-2);color:var(--text-bright);border:1px solid var(--accent);border-radius:4px;width:100%;padding:4px 6px;resize:vertical;min-height:48px;user-select:text;-webkit-user-select:text;';
+    const grow = () => { ta.style.height = 'auto'; ta.style.height = Math.min(200, ta.scrollHeight) + 'px'; };
+    ta.addEventListener('input', grow);
     setTimeout(grow, 0);
+    input = ta;
   } else {
-    input = document.createElement('input');
-    input.type = 'text'; input.value = current;
+    const text = document.createElement('input');
+    text.type = 'text'; text.value = current;
     if (isTime) {
       // D-002: with the 12h display pref the cells read "2:30 PM" but the editor
       // only took raw 24h — typing "2:30" meaning PM silently stored 02:30 AM.
       // The editor now accepts BOTH forms (parseClockInput normalizes to 24h for
       // storage) and the placeholder advertises the accepted formats.
       const is12h = typeof Settings !== 'undefined' && Settings.get('timeFormat') === '12h';
-      input.placeholder = is12h ? 'h:mm AM/PM or HH:MM' : 'HH:MM';
-      input.maxLength = 8;
-      input.addEventListener('input', () => { input.value = input.value.replace(/[^0-9:AaPpMm.\s]/g,''); });
+      text.placeholder = is12h ? 'h:mm AM/PM or HH:MM' : 'HH:MM';
+      text.maxLength = 8;
+      text.addEventListener('input', () => { text.value = text.value.replace(/[^0-9:AaPpMm.\s]/g,''); });
     }
-    input.style.cssText = 'font-family:var(--sans);font-size:12px;background:var(--surface-2);color:var(--text-bright);border:1px solid var(--accent);border-radius:4px;width:100%;padding:2px 6px;user-select:text;-webkit-user-select:text;';
+    text.style.cssText = 'font-family:var(--sans);font-size:12px;background:var(--surface-2);color:var(--text-bright);border:1px solid var(--accent);border-radius:4px;width:100%;padding:2px 6px;user-select:text;-webkit-user-select:text;';
+    input = text;
   }
 
   cell.innerHTML = ''; cell.appendChild(input);
-  // @ts-ignore — the `if (input.select)` guard covers the select-element branch
-  // of the union, which has no .select().
-  input.focus(); if (input.select) input.select();
+  input.focus();
+  if (input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement) input.select();
 
   const commit = () => {
     const val = input.value.trim();
@@ -716,7 +733,7 @@ function startEdit(cell, idx, field) {
         Shell.toast('Use HH:MM (24h) or h:mm AM/PM', 'error');
         cell.innerHTML = original; return;
       }
-      row[field] = parsed.hhmm;
+      row[field] = parsed.hhmm!;
       if (row.clock_in && row.clock_out) {
         row.total_mins = computeDiffMins(row.clock_in, row.clock_out);
       }
@@ -732,7 +749,9 @@ function startEdit(cell, idx, field) {
   };
 
   input.addEventListener('blur', commit);
-  input.addEventListener('keydown', e => {
+  // Cast to HTMLElement: addEventListener on the input|select|textarea union
+  // falls back to the generic (Event) overload, losing the KeyboardEvent map.
+  (input as HTMLElement).addEventListener('keydown', (e: KeyboardEvent) => {
     // Description is multi-line: plain Enter inserts a newline, Ctrl/Cmd+Enter
     // commits. Single-line fields commit on plain Enter.
     if (e.key === 'Enter') {
@@ -747,9 +766,9 @@ function startEdit(cell, idx, field) {
 }
 
 // ── Totals + breakdown ──
-function updateTotals() {
+function updateTotals(): void {
   let total = 0;
-  const byLabel = {};
+  const byLabel: Record<string, number> = {};
   rowsData.forEach(r => {
     if (r.total_mins > 0) {
       total += r.total_mins;
@@ -757,13 +776,11 @@ function updateTotals() {
       byLabel[l] = (byLabel[l]||0) + r.total_mins;
     }
   });
-  document.getElementById('total-time').textContent = total>0 ? formatMins(total) : '0h 00m';
-  // @ts-ignore — number assigned to textContent; DOM stringifies.
-  document.getElementById('rows-done').textContent  = rowsData.filter(isRowFilled).length;
-  // @ts-ignore — number assigned to textContent; DOM stringifies.
-  document.getElementById('rows-total').textContent = rowsData.length;
+  $id('total-time').textContent = total>0 ? formatMins(total) : '0h 00m';
+  $id('rows-done').textContent  = String(rowsData.filter(isRowFilled).length);
+  $id('rows-total').textContent = String(rowsData.length);
 
-  const breakdownEl = document.getElementById('breakdown-row');
+  const breakdownEl = $id('breakdown-row');
   const entries = Object.entries(byLabel);
   breakdownEl.innerHTML = entries.length
     ? entries.map(([l,m]) => `<span class="breakdown-chip">${l} <span class="bc-time">${formatMins(m)}</span></span>`).join('')
@@ -771,7 +788,7 @@ function updateTotals() {
 }
 
 // ── Auto-save timer ──
-function startAutoSaveTimer() {
+function startAutoSaveTimer(): void {
   clearAutoSaveTimer();
   const secs = parseInt(Settings.get('autoSaveInterval') ?? 60, 10);
   if (!secs || !currentCompany) { updateStatusDot(); return; }
@@ -781,12 +798,12 @@ function startAutoSaveTimer() {
   updateStatusDot();
 }
 
-function clearAutoSaveTimer() {
+function clearAutoSaveTimer(): void {
   if (autoSaveTimer) { clearInterval(autoSaveTimer); autoSaveTimer = null; }
   updateStatusDot();
 }
 
-function updateStatusDot() {
+function updateStatusDot(): void {
   const badge = document.getElementById('live-badge');
   if (!badge) return;
   const secs = parseInt(Settings.get('autoSaveInterval') ?? 60, 10);
@@ -794,42 +811,37 @@ function updateStatusDot() {
   badge.style.display = isLive ? 'flex' : 'none';
 }
 
-// Called by shell.js applyAutoSave when user changes the setting
-function onAutoSaveSettingChanged(seconds) {
-  startAutoSaveTimer();
-}
-
 // ── Save / clear ──
-async function autoSave(fromTimer = false) { if (currentCompany) await saveSession(true, fromTimer); }
+async function autoSave(fromTimer = false): Promise<void> { if (currentCompany) await saveSession(true, fromTimer); }
 
-async function saveSession(silent=false, fromTimer=false) {
+async function saveSession(silent = false, fromTimer = false): Promise<void> {
   if (!currentCompany) { if(!silent) Shell.toast('Select a company first.','warning'); return; }
   let total = 0;
   rowsData.forEach(r => total += (r.total_mins||0));
   const entry = {
     id: currentEntryId,
     company_id: currentCompany.id,
-    log_date: document.getElementById('log-date').value,
-    session_label: document.getElementById('log-notes').value.trim(),
+    log_date: $input('log-date').value,
+    session_label: $input('log-notes').value.trim(),
     rows_json: JSON.stringify(rowsData),
     total_mins: total
   };
-  const valid = Validator.validateEntry(entry);
-  if (!valid.ok) { if (!silent) Shell.toast(valid.error, 'error'); return; }
-  const res = await IPC.entries.save(entry);
+  const valid = Validator.validateEntry(entry as Partial<TimeEntry>);
+  if (!valid.ok) { if (!silent) Shell.toast(valid.error || 'Invalid entry.', 'error'); return; }
+  const res = await IPC.entries.save(entry as Partial<TimeEntry>);
   if (res.ok) {
     if (!currentEntryId && res.id) currentEntryId = res.id;
     Store.invalidate('entries');
     loadTaskItems(currentEntryId);
     if (!silent) Shell.toast('Session saved.', 'success');
     const label = fromTimer ? `Auto-saved at ${nowTime()}` : `Saved at ${nowTime()}`;
-    document.getElementById('session-status').textContent = label;
+    $id('session-status').textContent = label;
     // Restore live dot label after a delay if timer is active
     setTimeout(updateStatusDot, 4000);
   } else if (!silent) Shell.toast(res.error || 'Save failed.', 'error');
 }
 
-function clearSelectedRow() {
+function clearSelectedRow(): void {
   if (selectedIndex == null || !rowsData[selectedIndex]) return;
   rowsData[selectedIndex] = emptyRow();
   normalizeRows();
@@ -838,7 +850,7 @@ function clearSelectedRow() {
   autoSave();
 }
 
-function clearAll(silent=false) {
+function clearAll(silent = false): void {
   if (!silent && !confirm('Clear all entries?')) return;
   rowsData = [];
   normalizeRows();
@@ -848,11 +860,11 @@ function clearAll(silent=false) {
 }
 
 // ── PDF Export ──
-function exportPDF() {
+function exportPDF(): void {
   if (!currentCompany) { Shell.toast('Select a company first.','warning'); return; }
   const co = currentCompany;
-  const date = document.getElementById('log-date').value;
-  const note = document.getElementById('log-notes').value;
+  const date = $input('log-date').value;
+  const note = $input('log-notes').value;
   const hierParts = [co.hier_company,co.hier_project,co.hier_platform,co.name].filter(Boolean).join(' › ');
 
   const filledRows = rowsData.filter(r => isRowFilled(r));
@@ -877,7 +889,7 @@ function exportPDF() {
     co.supervisors ? `<div class="meta">Submitted to: ${escapeHtml(co.supervisors)}</div>` : '',
   ].join('');
 
-  const win = window.open('','_blank');
+  const win = window.open('','_blank')!;
   win.document.write(`<!DOCTYPE html><html><head><title>Timesheet</title>
   <style>${window.PDF_FONT_CSS || ''}</style>
   <style>
@@ -905,10 +917,16 @@ function exportPDF() {
   win.document.close(); win.print();
 }
 
-function pdfLabelBreakdown(rows) {
-  const map = {};
+function pdfLabelBreakdown(rows: RowData[]): Array<[string, number]> {
+  const map: Record<string, number> = {};
   rows.filter(r => r.label).forEach(r => { map[r.label] = (map[r.label]||0) + (r.total_mins||0); });
   return Object.entries(map).sort((a,b) => b[1]-a[1]);
 }
 
-function onExportPDF() { exportPDF(); }
+// ── Shell hooks ──
+// shell.js probes these as globals (typeof onExportPDF === 'function'); since
+// this module is IIFE-scoped, publish them onto window explicitly.
+(window as any).onExportPDF = () => exportPDF();
+(window as any).onAutoSaveSettingChanged = (_seconds: number) => startAutoSaveTimer();
+
+})();

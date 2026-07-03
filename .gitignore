@@ -29,3 +29,4 @@ src/renderer/pages/reports.js
 src/renderer/pages/companies.js
 src/renderer/pages/profile.js
 src/renderer/pages/audit-wizard.js
+src/renderer/pages/tracker.js
