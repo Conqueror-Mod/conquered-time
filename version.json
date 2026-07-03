@@ -1,5 +1,5 @@
 {
-  "version": "3.11.2",
+  "version": "3.11.3",
   "downloadUrl": "https://github.com/Conqueror-Mod/conquered-time/releases/latest",
-  "notes": "v3.11.2 — The Dashboard's company web now matches the full Companies web: an organic, force-simulated layout with names and roles inside each sphere, hours below, and hover tooltips. The About page is now a single shared panel, so the login screen and in-app Settings always show the same version notes, Check for Updates, and GitHub / Ko-fi links."
+  "notes": "v3.11.3 — The two sidebar counters are now labelled: “Active Punch” (your live session clock) and “Dispatch Timer” (the running task), so it’s clear at a glance which timer is which."
 }
