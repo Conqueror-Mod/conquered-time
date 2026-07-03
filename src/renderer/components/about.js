@@ -24,6 +24,9 @@ const About = (() => {
   // Changelog — newest first. Edit HERE and both About surfaces update. The two
   // most recent entries render in-panel; older notes live on GitHub Releases.
   const CHANGELOG = [
+    { version: 'v3.11.3', items: [
+      'The two sidebar counters are now labelled — “Active Punch” (your live session clock) and “Dispatch Timer” (the running task) — so it’s clear at a glance which is which',
+    ] },
     { version: 'v3.11.2', items: [
       'The Dashboard’s company web now matches the full Companies web — organic force-simulated layout, names and roles rendered inside each sphere, hours below, and hover tooltips',
       'The About page is now one shared panel — the login screen and the in-app Settings show identical version notes, Check for Updates, and GitHub / Ko-fi links',

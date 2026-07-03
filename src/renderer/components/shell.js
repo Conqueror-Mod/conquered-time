@@ -87,10 +87,12 @@ const Shell = (() => {
             <span class="sidebar-live-label">Live</span>
           </div>
           <span id="sidebar-live-time" class="sidebar-live-time">00:00</span>
+          <span class="sidebar-timer-caption">Active Punch</span>
         </div>
         <div id="sidebar-task-timer" style="display:none;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:12px 0;">
           <div class="sidebar-timer-dot"></div>
           <div id="sidebar-task-time" class="sidebar-timer-display">00:00</div>
+          <span class="sidebar-timer-caption">Dispatch Timer</span>
         </div>
       </div>
 
