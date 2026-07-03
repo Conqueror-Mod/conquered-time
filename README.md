@@ -14,7 +14,8 @@ A secure, locally-encrypted desktop time tracker built for remote professionals 
 - **Local recovery code** — one-time printable backup key; enables full password reset with automatic key re-encryption, no data loss
 - **Multi-user profile selector** — isolated per-user vaults; avatar cards on login screen; auto-migration from legacy single-vault layout
 - **Splash screen** — branded startup screen, theme-aware
-- **Company spiderweb** — force-graph visualization of your client network with inline detail pane
+- **Company spiderweb** — force-graph visualization of your client network with inline detail pane and hover tooltips; guaranteed clean spacing (spheres never overlap, even in a dense network). The Dashboard mini-web mirrors the full Companies web.
+- **Live session indicators** — a `LIVE` badge lights up while a punch is open (clocked in, not out); the sidebar shows two labeled counters, **Active Punch** (the open session clock) and **Dispatch Timer** (the running task)
 - **Dynamic time tracker** — two-module control panel: a Session Clock (Clock In/Out + Break/Lunch) beside task inputs (label, name, description); the entry table auto-grows as needed
 - **Inline editing** — double-click any field to edit; duration recalculates automatically. The Description field opens a multi-line editor for longer notes (kept tidy in the table, flattened in exports)
 - **Resizable tracker columns** — drag the column dividers to set widths; double-click to reset. Your layout is remembered per profile
@@ -42,7 +43,8 @@ A secure, locally-encrypted desktop time tracker built for remote professionals 
 
 ## Tech Stack
 
-- **Electron** v29 (Windows 11 x64)
+- **Electron** v29 (Windows 11 x64 primary target; macOS & Linux on the roadmap)
+- **TypeScript** (dev-only) — the main process is `strict` TS compiled to `dist-main/`; renderer pages are TS compiled to sibling `.js`; the hand-written shell/login/settings/about stay JSDoc-typed JS. `npm run typecheck` gates all of it. No bundler, no runtime TS.
 - **sql.js** — pure JS/WASM SQLite, no native compilation required
 - **speakeasy** — TOTP generation and verification
 - **qrcode** — QR code generation for TOTP setup
@@ -51,60 +53,57 @@ A secure, locally-encrypted desktop time tracker built for remote professionals 
 - **electron-builder** — NSIS installer
 - **Node.js v20.11.1** via NVM for Windows (required — v24 breaks Electron prebuilds)
 
+A companion **Discord community bot** (`discord-bot/`, discord.js + TypeScript) handles beta-key distribution, welcome/roles, bug & feedback intake, and release announcements. It's a standalone project with its own dependencies — see `discord-bot/README.md`.
+
 ---
 
 ## Project Structure
 
 ```
 conquered-time/
-├── seed-dev.js                   # Dev seed script (bypasses TOTP)
-├── version.json                  # Version manifest for Check for Updates
+├── seed-dev.js                   # Dev seed script (bypasses TOTP) — 10-company / 103-entry stress fixture
+├── version.json                  # Version manifest read by Check for Updates
+├── tsconfig.json                 # checkJs project (renderer JS + types/)
+├── tsconfig.main.json            # main-process TS build → dist-main/ (strict)
+├── tsconfig.renderer.json        # renderer page TS → sibling .js
+├── dist-main/                    # compiled main process (generated; gitignored; ships in builds)
+├── types/
+│   ├── globals.d.ts              # renderer globals, data shapes, IPC channel source of truth
+│   └── phase1-dom-compat.d.ts    # DOM-narrowing shim (removed as pages finish converting)
 ├── src/
-│   ├── main/
-│   │   ├── main.js               # Main process: window, IPC, DB, TOTP, backup, audit
+│   ├── main/                     # TypeScript (strict), compiled by `npm run build:main`
+│   │   ├── main.ts               # App lifecycle: window/splash/tray/menu, app-prefs, profile boot
+│   │   ├── preload.ts            # contextBridge — whitelisted IPC channels only
+│   │   ├── db.ts                 # sql.js lifecycle + query helpers; owns handle + vault path
+│   │   ├── session.ts            # session key/user/activeEntry, idle lock, orphan sweep
+│   │   ├── cache.ts              # main-process read cache singleton
+│   │   ├── policies.ts           # break/lunch compliance tiers (pure data)
+│   │   ├── audit.ts backups.ts email.ts   # audit counting, backups, SMTP + schedule engine
 │   │   ├── vault-crypto.js       # Pure AES-256-GCM / PBKDF2 + atomic re-encryption (unit-tested)
 │   │   ├── read-cache.js         # Pure main-process read cache (owner-keyed; unit-tested)
-│   │   └── preload.js            # Secure contextBridge API whitelist
-│   └── renderer/
-│       ├── store.js              # In-memory data cache + pub/sub invalidation, ID normalization
-│       ├── ipc.js                # Thin typed wrapper over the preload IPC channels
-│       ├── validator.js          # Input validation/normalization before save
-│       ├── pages/
-│       │   │                     # Each page is <name>.html + a sibling <name>.js
-│       │   │                     # (no inline scripts/handlers — strict CSP)
-│       │   ├── splash.html/.js   # Branded startup splash (theme-aware)
-│       │   ├── login.html/.js    # Profile selector, TOTP login, setup wizard, recovery, pre-auth settings
-│       │   ├── dashboard.html/.js# Stats, mini spiderweb, recent activity
-│       │   ├── companies.html/.js# Full spiderweb force graph, company CRUD
-│       │   ├── tracker.html/.js  # Dynamic time entry table, clock in/out
-│       │   ├── task-timer.html/.js # Dispatch: task timer, break compliance, live sidebar timer
-│       │   ├── global-log.html/.js # Cross-company history, CSV/PDF export
-│       │   ├── reports.html/.js  # Audit log with dismiss/fix/suggest, period summary, email
-│       │   ├── audit-wizard.html/.js # Step-through discrepancy resolution wizard
-│       │   ├── profile.html/.js  # Avatar upload, display name, password change, work state
-│       │   ├── theme-init.js     # Pre-paint theme guard (inner pages, sessionStorage)
-│       │   ├── login-theme-init.js  # Pre-paint theme guard (login, localStorage ct_pa_*)
-│       │   └── audit-theme-init.js  # Pre-paint theme guard (audit wizard, query-param)
-│       ├── components/
-│       │   ├── shell.js          # Titlebar, sidebar, toast, settings modal, backup library, delegated event dispatcher
-│       │   └── settings.js       # Theme, scale, accessibility, time format, auto-lock engine
-│       └── styles/
-│           ├── design-system.css # Entry point — imports all partials
-│           ├── themes.css        # 5 FF city theme token sets (imports fonts-local.css)
-│           ├── fonts-local.css   # @font-face for bundled DM Sans + JetBrains Mono
-│           ├── fonts/            # Bundled .woff2 files (no remote fetch)
-│           ├── base.css          # Scale, accessibility, reset
-│           ├── shell.css         # Titlebar, sidebar, layout
-│           ├── components.css    # Shared UI components
-│           ├── settings-modal.css # Steam-style split settings, backup library, DB clear
-│           ├── login.css
-│           └── print.css
-├── assets/
-│   └── icon.ico                  # App icon
-├── test/
-│   ├── vault-crypto.test.js      # node --test suite for crypto + re-encryption
-│   └── read-cache.test.js        # node --test suite for the main-process read cache
+│   │   ├── beta-keys.js          # Pure beta-key mint/verify (HMAC; unit-tested)
+│   │   └── ipc/                  # one register(ctx) module per surface
+│   │       ├── auth.ts           # profiles/auth/totp/beta:*, profile get/save
+│   │       ├── companies.ts entries.ts audit.ts settings.ts email.ts
+│   ├── renderer/                 # pages are TS → sibling .js (loaded directly, no bundler)
+│   │   ├── pages/                # <name>.html + <name>.ts (compiled to <name>.js); strict CSP, no inline scripts
+│   │   │   ├── splash · login · dashboard · companies · tracker
+│   │   │   ├── task-timer (Dispatch) · global-log · reports · profile · audit-wizard
+│   │   │   └── theme-init / login-theme-init / audit-theme-init  # pre-paint theme guards
+│   │   ├── components/
+│   │   │   ├── shell.js          # Titlebar, sidebar, toast, settings modal, backup library, delegated dispatcher
+│   │   │   ├── settings.js       # Theme, scale, accessibility, time format, auto-lock engine
+│   │   │   └── about.js          # Shared About panel — mounted by BOTH login & in-app settings
+│   │   └── styles/               # design-system.css entry + themes.css (5 FF palettes) + partials + bundled fonts
+│   └── shared/
+│       ├── beta-secret.example.js # template (real beta-secret.js is gitignored)
+│       └── BETA-KEYS.md          # beta-key scheme + minting docs
+├── discord-bot/                  # Standalone Discord community bot (own package.json; see its README)
+├── assets/                       # icon set (icon.ico / .icns / icon-16…1024.png) + installer bitmaps
+├── test/                         # node --test suites: vault-crypto, read-cache, beta-keys,
+│                                 #   canvas-text, row-utils, time-parse
 ├── .claude/skills/run-app/       # Playwright REPL driver for launching/driving the app (dev tooling)
+├── CLAUDE.md · DEV_NOTES.md      # full context + quick-reference dev docs
 ├── package.json
 └── README.md
 ```
@@ -144,13 +143,14 @@ Credentials: `devuser` / `devpass123`
 npm test
 ```
 
-Uses the built-in `node --test` runner (no extra dependencies). Covers the
+Uses the built-in `node --test` runner (no extra dependencies), plus
+`npm run typecheck` (both TS projects + the checkJs renderer). Suites cover the
 security-critical paths in `src/main/vault-crypto.js` (AES-256-GCM round-trips,
 PBKDF2 key separation, and the all-or-nothing re-encryption used by password
-change / recovery — read-phase abort and write-phase rollback) and the
-main-process read cache in `src/main/read-cache.js` (hit/miss memoization,
-targeted/full invalidation, and the owner-change auto-clear that prevents
-cross-profile data leaks).
+change / recovery), the main-process read cache in `src/main/read-cache.js`
+(memoization, invalidation, owner-change auto-clear against cross-profile
+leaks), the beta-key mint/verify scheme (`beta-keys`), and the shared renderer
+utilities (`canvas-text`, `row-utils`, `time-parse`).
 
 ### Build installer
 
@@ -158,7 +158,15 @@ cross-profile data leaks).
 npm run build
 ```
 
-Output: `dist/Conquered Time Setup.exe`
+Output: `dist/Conquered Time Setup <version>.exe` (NSIS). `npm run build` runs `npm run compile` (both TS projects) first. Signed installers for each version are published on GitHub Releases.
+
+---
+
+## Beta access & community
+
+The app is in **private beta**. New installs open a beta-gate screen and require a redeemable key before account setup; existing installs and dev runs are never gated (see `src/shared/BETA-KEYS.md`). Keys are offline-verifiable — a signed HMAC blob, no server.
+
+A Discord community bot (`discord-bot/`) distributes keys (`/betakey`), greets and roles new members, collects `/bug` and `/feedback`, and announces new releases from GitHub. Setup and hosting notes are in `discord-bot/README.md`.
 
 ---
 
