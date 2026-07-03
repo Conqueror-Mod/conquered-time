@@ -20,7 +20,7 @@ function getDismissedSet(): Set<string> {
   if (!session.user) return new Set();
   return new Set(
     dbAll('SELECT entry_id, row_idx, type FROM audit_dismissed WHERE user_id=?', [session.user.id])
-      .map(d => `${d.entry_id}:${d.row_idx}:${d.type}`)
+      .map((d: any) => `${d.entry_id}:${d.row_idx}:${d.type}`)
   );
 }
 
@@ -29,11 +29,11 @@ function countAuditDiscrepancies(): number {
   const dismissed = getDismissedSet();
   const entries = dbAll('SELECT rowid as rid, rows_json, rows_enc, rows_iv, rows_tag, total_mins FROM time_entries WHERE user_id=?', [session.user.id]);
   let count = 0;
-  entries.forEach(e => {
+  entries.forEach((e: any) => {
     decryptEntry(e);
     const entryId = Number(e.rid);
     try {
-      JSON.parse(e.rows_json || '[]').forEach((r, idx) => {
+      JSON.parse(e.rows_json || '[]').forEach((r: any, idx: any) => {
         // C3 (D-004): shared predicate includes desc — a desc-only row holds
         // user content with no punch and now flags (no_clock_in) instead of
         // being silently unaudited.

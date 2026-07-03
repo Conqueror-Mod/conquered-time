@@ -65,11 +65,11 @@ const APP_PREFS_FILE = path.join(ROOT_DATA_DIR, 'app-prefs.json');
 function readAppPrefs() {
   try { return JSON.parse(fs.readFileSync(APP_PREFS_FILE, 'utf8')); } catch { return {}; }
 }
-function getAppPref(key, dflt) {
+function getAppPref(key: string, dflt: any) {
   const v = readAppPrefs()[key];
   return v === undefined ? dflt : v;
 }
-function setAppPref(key, val) {
+function setAppPref(key: string, val: any) {
   const p = readAppPrefs();
   p[key] = val;
   try { fs.writeFileSync(APP_PREFS_FILE, JSON.stringify(p, null, 2)); }
@@ -81,9 +81,9 @@ function setAppPref(key, val) {
 // ── In-memory session state ────────────────────────────────────────────────
 // session.key / session.user / session.activeEntryId + the idle-lock timer
 // live in ./session (imported above); mutate through that shared object only.
-let mainWindow  = null;
+let mainWindow: any = null;
 let forceClose   = false;  // set true after user confirms close through audit prompt
-let tray         = null;   // system tray icon (created on whenReady)
+let tray: any        = null;   // system tray icon (created on whenReady)
 let isQuitting   = false;  // set true when the user really means to quit (tray/menu Quit)
 
 // Wire the acyclic deps: session needs the window, the audit count, and the
@@ -117,11 +117,11 @@ require('./ipc/auth').register({
 // The main-process read cache (memoized decrypted reads) lives in ./cache.
 
 // ── Profile manifest helpers ───────────────────────────────────────────────
-function writeManifest(profileDir, data) {
+function writeManifest(profileDir: string, data: any) {
   fs.writeFileSync(path.join(profileDir, 'profile-manifest.json'), JSON.stringify(data, null, 2));
 }
 
-function readManifest(profileDir) {
+function readManifest(profileDir: string) {
   try { return JSON.parse(fs.readFileSync(path.join(profileDir, 'profile-manifest.json'), 'utf8')); }
   catch { return null; }
 }
@@ -129,14 +129,14 @@ function readManifest(profileDir) {
 // Read a single app_settings value without requiring an active session.
 // In dev mode (db already loaded), reads directly. In prod, peeks into the
 // first available profile's vault to pull startup prefs (theme, window pos).
-function readStartupSetting(key) {
+function readStartupSetting(key: string) {
   if (hasDb()) {
     const row = dbGet('SELECT value FROM app_settings WHERE key=?', [key]);
     return row?.value ?? null;
   }
   if (!PROFILES_DIR || !fs.existsSync(PROFILES_DIR)) return null;
   const dirs = fs.readdirSync(PROFILES_DIR).filter(
-    n => fs.existsSync(path.join(PROFILES_DIR, n, 'vault.db'))
+    (n: string) => fs.existsSync(path.join(PROFILES_DIR, n, 'vault.db'))
   );
   if (!dirs.length) return null;
   try {
@@ -172,7 +172,7 @@ function migrateFromLegacyVault() {
 }
 
 // ── sql.js init ────────────────────────────────────────────────────────────
-async function initProfileDB(profileDir) {
+async function initProfileDB(profileDir: string) {
   session.profileDir = profileDir;
   const dbFile = path.join(profileDir, IS_DEV ? 'dev-vault.db' : 'vault.db');
   setDbFile(dbFile);
@@ -291,7 +291,7 @@ async function initProfileDB(profileDir) {
 // reEncryptVault / migrateTimeEntries wrappers live in ./ipc/auth.
 
 // ── Window ─────────────────────────────────────────────────────────────────
-function createSplashWindow(theme) {
+function createSplashWindow(theme: string) {
   const splash = new BrowserWindow({
     width: 600, height: 400,
     frame: false,
@@ -312,7 +312,7 @@ function createSplashWindow(theme) {
   return splash;
 }
 
-function createAuditWizardWindow(mode, theme) {
+function createAuditWizardWindow(mode?: string, theme?: string) {
   const wizard = new BrowserWindow({
     width: 680, height: 520,
     frame: false,
@@ -356,7 +356,7 @@ function createWindow() {
   });
   buildMenu();
   mainWindow.loadFile(path.join(RENDERER_DIR, 'pages/login.html'));
-  mainWindow.on('close', (event) => {
+  mainWindow.on('close', (event: any) => {
     // Close-to-tray: hide the window instead of quitting, keeping the session alive.
     // Bypassed when the user explicitly quits (tray/menu Quit set isQuitting).
     if (!isQuitting && tray && getAppPref('closeToTray', false) === true) {
@@ -455,7 +455,7 @@ function loginItemOpts(extra?: object) {
     : { path: process.execPath, args: [app.getAppPath(), '--startup'] };
   return Object.assign(o, extra);
 }
-function applyLaunchAtStartup(enabled) {
+function applyLaunchAtStartup(enabled: boolean) {
   try {
     app.setLoginItemSettings(loginItemOpts({ openAtLogin: !!enabled }));
   } catch (e) {
@@ -463,7 +463,7 @@ function applyLaunchAtStartup(enabled) {
   }
 }
 
-function navigate(page) {
+function navigate(page: string) {
   if (!session.user && page !== 'login') return;
   mainWindow.loadFile(path.join(RENDERER_DIR, `pages/${page}.html`));
 }
@@ -477,14 +477,14 @@ function navigate(page) {
 ipcMain.on('win:minimize', () => mainWindow.minimize());
 ipcMain.on('win:maximize', () => mainWindow.isMaximized() ? mainWindow.unmaximize() : mainWindow.maximize());
 ipcMain.on('win:close',    () => mainWindow.close());
-ipcMain.on('shell:open-external', (_, url) => {
+ipcMain.on('shell:open-external', (_: unknown, url: any) => {
   const { shell } = require('electron');
   // Only allow http/https URLs to prevent protocol abuse
   if (/^https?:\/\//.test(url)) shell.openExternal(url);
 });
 
 // win:* preference handlers live in ./ipc/settings.
-ipcMain.on('navigate',     (_, page) => navigate(page));
+ipcMain.on('navigate',     (_: unknown, page: any) => navigate(page));
 
 // profiles:* / auth:* / totp:generate live in ./ipc/auth.
 
@@ -515,8 +515,8 @@ ipcMain.on('session:confirm-lock',   () => lockSession(true));
 // ── Context menu (right-click) ─────────────────────────────────────────────
 // Electron disables the browser's built-in context menu by default.
 // This restores a standard edit menu (cut/copy/paste/select-all) on all windows.
-app.on('web-contents-created', (_e, wc) => {
-  wc.on('context-menu', (_ev, params) => {
+app.on('web-contents-created', (_e: any, wc: any) => {
+  wc.on('context-menu', (_ev: any, params: any) => {
     /** @type {import('electron').MenuItemConstructorOptions[]} */
     const items = [];
     if (params.isEditable) {
@@ -540,7 +540,7 @@ app.whenReady().then(async () => {
   // runScheduledEmailCheck() emits its own success toast only when it actually
   // sends, and re-throws on failure — so here we only surface errors. (Previously
   // this fired a false "sent!" toast on every tick whether or not anything sent.)
-  setInterval(() => runScheduledEmailCheck().catch(e => {
+  setInterval(() => runScheduledEmailCheck().catch((e: any) => {
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('toast', `Scheduled report failed: ${e.message}`, 'error', 8000);
   }), 5 * 60 * 1000);
 
@@ -578,7 +578,7 @@ app.whenReady().then(async () => {
     } catch {}
   } else if (prefDisplay !== 'primary') {
     // Move onto the preferred display; always maximize to avoid off-screen issues
-    const target = screen.getAllDisplays().find(d => d.id === Number(prefDisplay)) || screen.getPrimaryDisplay();
+    const target = screen.getAllDisplays().find((d: any) => d.id === Number(prefDisplay)) || screen.getPrimaryDisplay();
     mainWindow.setPosition(target.bounds.x + 10, target.bounds.y + 10);
   }
 

@@ -52,9 +52,9 @@ function decryptEntry(row: Record<string, any>): Record<string, any> {
 }
 
 function lockSession(skipAuditCheck = false): void {
-  const mainWindow = deps.getMainWindow();
+  const mainWindow = deps!.getMainWindow();
   if (!skipAuditCheck && session.user) {
-    const count = deps.countAuditDiscrepancies();
+    const count = deps!.countAuditDiscrepancies();
     if (count > 0) {
       mainWindow.webContents.send('audit:close-warning', { count, action: 'lock' });
       return;
@@ -62,7 +62,7 @@ function lockSession(skipAuditCheck = false): void {
   }
   clearIdleTimer();
   session.key = null; session.user = null; session.activeEntryId = null;
-  mainWindow.loadFile(path.join(deps.rendererDir, 'pages/login.html'));
+  mainWindow.loadFile(path.join(deps!.rendererDir, 'pages/login.html'));
 }
 
 function clearIdleTimer(): void {
@@ -75,7 +75,7 @@ function resetIdleTimer(): void {
   const minutes = parseInt(row?.value || '0', 10);
   if (!minutes || !session.user) return;
   idleTimer = setTimeout(() => {
-    deps.getMainWindow().webContents.send('toast', { msg: 'Session locked due to inactivity.', type: 'info' });
+    deps!.getMainWindow().webContents.send('toast', { msg: 'Session locked due to inactivity.', type: 'info' });
     setTimeout(() => lockSession(true), 1200); // let toast render briefly before navigating
   }, minutes * 60 * 1000);
 }
@@ -101,8 +101,8 @@ function sweepOrphanTaskItems(): number {
         try {
           decryptEntry(e);
           const rows = JSON.parse(e.rows_json || '[]');
-          hasOpenPunch = rows.some(r => r.clock_in && !r.clock_out);
-          rows.forEach(r => {
+          hasOpenPunch = rows.some((r: any) => r.clock_in && !r.clock_out);
+          rows.forEach((r: any) => {
             if (!r.clock_out) return;
             const ms = new Date(`${e.log_date}T${r.clock_out}:00`).getTime();
             if (ms > lastOutMs) lastOutMs = ms;

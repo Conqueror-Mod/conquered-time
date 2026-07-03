@@ -25,9 +25,9 @@ function performBackup(): void {
   const dest  = path.join(backupDir, `vault-${stamp}.db`);
   fs.copyFileSync(dbFile, dest);
   const files = fs.readdirSync(backupDir)
-    .filter(f => f.startsWith('vault-') && f.endsWith('.db')).sort();
+    .filter((f: any) => f.startsWith('vault-') && f.endsWith('.db')).sort();
   if (files.length > 30)
-    files.slice(0, files.length - 30).forEach(f => fs.unlinkSync(path.join(backupDir, f)));
+    files.slice(0, files.length - 30).forEach((f: any) => fs.unlinkSync(path.join(backupDir, f)));
 }
 
 module.exports = { setBackupDir, getBackupDir, performBackup };

@@ -48,7 +48,7 @@ function profileEmailMissing(): boolean {
 }
 
 function getEmailSmtpConfig() {
-  const get = k => (dbGet('SELECT value FROM app_settings WHERE key=?', [k]) || {}).value || '';
+  const get = (k: string) => (dbGet('SELECT value FROM app_settings WHERE key=?', [k]) || {}).value || '';
   const host     = get('email_smtp_host');
   const port     = parseInt(get('email_smtp_port') || '587', 10);
   const username = get('email_smtp_username');
@@ -75,10 +75,10 @@ function generatePDF(htmlContent: string): Promise<Buffer> {
     const cleanup = () => { try { fs.unlinkSync(tmp); } catch {} };
     win.webContents.once('did-finish-load', () => {
       win.webContents.printToPDF({ printBackground: true, pageSize: 'Letter' })
-        .then(buf => { win.close(); cleanup(); resolve(buf); })
-        .catch(e  => { win.close(); cleanup(); reject(e); });
+        .then((buf: Buffer) => { win.close(); cleanup(); resolve(buf); })
+        .catch((e: any)  => { win.close(); cleanup(); reject(e); });
     });
-    win.webContents.once('did-fail-load', (_, code, desc) => {
+    win.webContents.once('did-fail-load', (_: any, code: any, desc: any) => {
       win.close(); cleanup(); reject(new Error(`PDF window failed to load: ${desc} (${code})`));
     });
   });
@@ -95,21 +95,21 @@ async function doSendReport({ htmlContent, subject, recipients, entriesOverride 
 
   const toList = Array.isArray(recipients)
     ? recipients.filter(Boolean)
-    : (recipients || cfg.defaultTo || '').split(/[,;\s]+/).map(s => s.trim()).filter(Boolean);
+    : (recipients || cfg.defaultTo || '').split(/[,;\s]+/).map((s: any) => s.trim()).filter(Boolean);
   if (!toList.length) throw new Error('No recipients specified.');
 
   const entries = entriesOverride || dbAll('SELECT rowid as rid, * FROM time_entries WHERE user_id=? ORDER BY log_date DESC', [session.user.id])
-    .map(r => ({ ...r, id: Number(r.rid) }));
+    .map((r: any) => ({ ...r, id: Number(r.rid) }));
   const companies = dbAll('SELECT rowid as rid, * FROM companies WHERE user_id=?', [session.user.id])
-    .reduce((m, co) => {
+    .reduce((m: any, co: any) => {
       try { const d = JSON.parse(decrypt({ data: co.data_enc, iv: co.data_iv, tag: co.data_tag }, session.key)); m[Number(co.rid)] = d.name || ''; } catch {} return m;
     }, {});
 
   const csvHeader = ['Date','Company','Session','Task Label','Task Name','Description','Clock In','Clock Out','Minutes'];
-  const csvRows = [];
-  entries.forEach(e => {
+  const csvRows: any[] = [];
+  entries.forEach((e: any) => {
     try {
-      JSON.parse(e.rows_json || '[]').forEach(r => {
+      JSON.parse(e.rows_json || '[]').forEach((r: any) => {
         if (!rowHasContent(r)) return; // C3 (D-011): desc-only rows export too
         // Flatten multi-line descriptions so the CSV column stays single-line.
         const descFlat = String(r.desc || r.description || '').replace(/\s+/g, ' ').trim();
@@ -119,12 +119,12 @@ async function doSendReport({ htmlContent, subject, recipients, entriesOverride 
   });
   // Quote every field, double embedded quotes, and neutralize CSV formula
   // injection (leading = + - @ tab CR) by prefixing a single quote.
-  const csvCell = (v) => {
+  const csvCell = (v: any) => {
     let s = v == null ? '' : String(v);
     if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
     return '"' + s.replace(/"/g, '""') + '"';
   };
-  const csv = [csvHeader, ...csvRows].map(r => r.map(csvCell).join(',')).join('\n');
+  const csv = [csvHeader, ...csvRows].map((r: any) => r.map(csvCell).join(',')).join('\n');
 
   const pdfBuf = await generatePDF(htmlContent);
   const dateTag = new Date().toISOString().slice(0, 10);
@@ -167,7 +167,7 @@ function computeNextSendDate(freq: string, lastSent: string | null): Date | null
 async function runScheduledEmailCheck(force = false) {
   if (!hasDb() || !session.key || !session.user) return;
   try {
-    const get = k => (dbGet('SELECT value FROM app_settings WHERE key=?', [k]) || {}).value || '';
+    const get = (k: string) => (dbGet('SELECT value FROM app_settings WHERE key=?', [k]) || {}).value || '';
     const freq = get('email_schedule_freq');
     if (!freq || freq === 'off') return false;
 
@@ -187,19 +187,19 @@ async function runScheduledEmailCheck(force = false) {
     const entries: Array<Record<string, any>> = dbAll(
       'SELECT rowid as rid, * FROM time_entries WHERE user_id=? AND log_date>=? AND log_date<=? ORDER BY log_date',
       [session.user.id, fromDate, toDate]
-    ).map(r => ({ ...r, id: Number(r.rid) }));
+    ).map((r: any) => ({ ...r, id: Number(r.rid) }));
 
     const companyRows = dbAll('SELECT rowid as rid, * FROM companies WHERE user_id=?', [session.user.id]);
-    const companies = {};
-    companyRows.forEach(co => {
+    const companies: Record<number, string> = {};
+    companyRows.forEach((co: any) => {
       try { companies[Number(co.rid)] = JSON.parse(decrypt({ data: co.data_enc, iv: co.data_iv, tag: co.data_tag }, session.key)).name || ''; } catch {}
     });
 
-    const totalMins = entries.reduce((s, e) => s + (e.total_mins || 0), 0);
-    const fmtM = m => { const h = Math.floor(m/60), mn = m%60; return `${h}h ${mn}m`; };
+    const totalMins = entries.reduce((s: any, e: any) => s + (e.total_mins || 0), 0);
+    const fmtM = (m: number) => { const h = Math.floor(m/60), mn = m%60; return `${h}h ${mn}m`; };
 
     const byLabel: Record<string, number> = {};
-    entries.forEach(e => { try { JSON.parse(e.rows_json||'[]').forEach(r => { if (r.total_mins > 0) { const l = r.label||'Other'; byLabel[l]=(byLabel[l]||0)+r.total_mins; } }); } catch {} });
+    entries.forEach((e: any) => { try { JSON.parse(e.rows_json||'[]').forEach((r: any) => { if (r.total_mins > 0) { const l = r.label||'Other'; byLabel[l]=(byLabel[l]||0)+r.total_mins; } }); } catch {} });
     const labelRows = Object.entries(byLabel).sort((a,b)=>b[1]-a[1])
       .map(([l,m]) => `<tr><td>${l}</td><td style="text-align:right">${fmtM(m)}</td></tr>`).join('');
 
@@ -221,7 +221,7 @@ td{padding:7px 8px;border-bottom:1px solid #e5e7eb;}
 
     const cfg = getEmailSmtpConfig();
     if (!cfg.host || !cfg.password) throw new Error('SMTP not configured.');
-    const toList = (cfg.defaultTo || '').split(/[,;\s]+/).map(s => s.trim()).filter(Boolean);
+    const toList = (cfg.defaultTo || '').split(/[,;\s]+/).map((s: any) => s.trim()).filter(Boolean);
     if (!toList.length) throw new Error('No default recipient set. Add one in Settings → Data → Email Reports.');
 
     await doSendReport({

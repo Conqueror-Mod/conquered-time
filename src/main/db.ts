@@ -93,7 +93,7 @@ function dbGet(sql: string, params: unknown[] = []): Record<string, any> | null 
     const cols = result[0].columns;
     const vals = result[0].values[0];
     const row: Record<string, any> = {};
-    cols.forEach((col, i) => { row[col] = vals[i] !== undefined ? vals[i] : null; });
+    cols.forEach((col: any, i: any) => { row[col] = vals[i] !== undefined ? vals[i] : null; });
     return row;
   }
   return null;
@@ -103,9 +103,9 @@ function dbAll(sql: string, params: unknown[] = []): Array<Record<string, any>> 
   const result = db.exec(sql, params);
   if (!result || !result[0]) return [];
   const cols = result[0].columns;
-  return result[0].values.map(vals => {
+  return result[0].values.map((vals: any) => {
     const row: Record<string, any> = {};
-    cols.forEach((col, i) => { row[col] = vals[i] !== undefined ? vals[i] : null; });
+    cols.forEach((col: any, i: any) => { row[col] = vals[i] !== undefined ? vals[i] : null; });
     return row;
   });
 }

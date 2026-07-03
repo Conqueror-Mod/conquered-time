@@ -8,10 +8,10 @@ const { encrypt } = require('../vault-crypto');
 const { getEmailSmtpConfig, doSendReport, runScheduledEmailCheck, computeNextSendDate } = require('../email');
 
 function register() {
-ipcMain.handle('email:save-config', (_, { host, port, username, password, fromName, defaultTo }) => {
+ipcMain.handle('email:save-config', (_: unknown, { host, port, username, password, fromName, defaultTo }: Record<string, any>) => {
   if (!session.key) return { ok: false, error: 'Not logged in.' };
   try {
-    const set = (k, v) => dbRun('INSERT OR REPLACE INTO app_settings (key,value) VALUES (?,?)', [k, String(v || '')]);
+    const set = (k: string, v: any) => dbRun('INSERT OR REPLACE INTO app_settings (key,value) VALUES (?,?)', [k, String(v || '')]);
     set('email_smtp_host', host);
     set('email_smtp_port', port || 587);
     set('email_smtp_username', username);
@@ -30,7 +30,7 @@ ipcMain.handle('email:save-config', (_, { host, port, username, password, fromNa
 
 ipcMain.handle('email:get-config', () => {
   if (!hasDb()) return {};
-  const get = k => (dbGet('SELECT value FROM app_settings WHERE key=?', [k]) || {}).value || '';
+  const get = (k: string) => (dbGet('SELECT value FROM app_settings WHERE key=?', [k]) || {}).value || '';
   const hasPassword = !!(get('email_smtp_password_enc'));
   return {
     host:       get('email_smtp_host'),
@@ -66,7 +66,7 @@ ipcMain.handle('email:test-smtp', async () => {
 
 // doSendReport lives in ./email.
 
-ipcMain.handle('email:send-report', async (_, { htmlContent, subject, recipients }) => {
+ipcMain.handle('email:send-report', async (_: unknown, { htmlContent, subject, recipients }: Record<string, any>) => {
   if (!session.key || !session.user) return { ok: false, error: 'Not logged in.' };
   try {
     await doSendReport({ htmlContent, subject, recipients });
@@ -90,7 +90,7 @@ ipcMain.handle('email:send-scheduled-now', async () => {
 
 ipcMain.handle('email:get-schedule-status', () => {
   if (!hasDb()) return {};
-  const get = k => (dbGet('SELECT value FROM app_settings WHERE key=?', [k]) || {}).value || '';
+  const get = (k: string) => (dbGet('SELECT value FROM app_settings WHERE key=?', [k]) || {}).value || '';
   const freq      = get('email_schedule_freq') || 'off';
   const lastSent  = get('email_schedule_last_sent') || null;
   const lastError = get('email_schedule_last_error') || null;

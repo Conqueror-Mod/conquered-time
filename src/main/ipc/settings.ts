@@ -12,11 +12,11 @@ const { setBackupDir, getBackupDir, performBackup } = require('../backups');
 const UPDATE_CHECK_URL = 'https://raw.githubusercontent.com/Conqueror-Mod/conquered-time/master/version.json';
 
 // ctx: main-owned window/prefs helpers.
-function register(ctx) {
+function register(ctx: Record<string, any>) {
   const { getMainWindow, applyLaunchAtStartup, loginItemOpts, getAppPref, setAppPref, rendererDir, IS_DEV } = ctx;
 ipcMain.handle('win:get-displays', () => {
   const primary = screen.getPrimaryDisplay();
-  return screen.getAllDisplays().map((d, i) => ({
+  return screen.getAllDisplays().map((d: any, i: any) => ({
     id:        d.id,
     index:     i + 1,
     isPrimary: d.id === primary.id,
@@ -25,11 +25,11 @@ ipcMain.handle('win:get-displays', () => {
   }));
 });
 
-ipcMain.handle('win:move-to-display', (_, displayId) => {
+ipcMain.handle('win:move-to-display', (_: unknown, displayId: any) => {
   const displays = screen.getAllDisplays();
   const target = displayId === 'primary'
     ? screen.getPrimaryDisplay()
-    : (displays.find(d => d.id === Number(displayId)) || screen.getPrimaryDisplay());
+    : (displays.find((d: any) => d.id === Number(displayId)) || screen.getPrimaryDisplay());
   // Windows ignores setPosition() on a maximized window — must unmaximize first,
   // reposition, then re-maximize so Electron targets the correct display.
   if (getMainWindow().isMaximized()) getMainWindow().unmaximize();
@@ -37,7 +37,7 @@ ipcMain.handle('win:move-to-display', (_, displayId) => {
   getMainWindow().maximize();
   return { ok: true };
 });
-ipcMain.handle('win:set-launch-at-startup', (_, enabled) => {
+ipcMain.handle('win:set-launch-at-startup', (_: unknown, enabled: any) => {
   applyLaunchAtStartup(enabled);
   return { ok: true };
 });
@@ -47,12 +47,12 @@ ipcMain.handle('win:get-launch-at-startup', () => {
   try { return app.getLoginItemSettings(loginItemOpts()).openAtLogin === true; } catch { return false; }
 });
 ipcMain.handle('win:get-close-to-tray', () => getAppPref('closeToTray', false) === true);
-ipcMain.handle('win:set-close-to-tray', (_, enabled) => {
+ipcMain.handle('win:set-close-to-tray', (_: unknown, enabled: any) => {
   setAppPref('closeToTray', !!enabled);
   return { ok: true };
 });
 ipcMain.handle('win:get-start-minimized', () => getAppPref('startMinimized', false) === true);
-ipcMain.handle('win:set-start-minimized', (_, enabled) => {
+ipcMain.handle('win:set-start-minimized', (_: unknown, enabled: any) => {
   setAppPref('startMinimized', !!enabled);
   return { ok: true };
 });
@@ -61,16 +61,16 @@ ipcMain.handle('backup:list', () => {
   if (!session.user) return [];
   if (!fs.existsSync(getBackupDir())) return [];
   const files = fs.readdirSync(getBackupDir())
-    .filter(f => f.startsWith('vault-') && f.endsWith('.db'))
+    .filter((f: any) => f.startsWith('vault-') && f.endsWith('.db'))
     .sort().reverse();
-  return files.map(f => {
+  return files.map((f: any) => {
     const stat = fs.statSync(path.join(getBackupDir(), f));
     const ts = f.replace('vault-', '').replace('.db', '').replace(/T(\d{2})-(\d{2})-(\d{2})/, 'T$1:$2:$3');
     return { filename: f, timestamp: ts, sizeKB: Math.round(stat.size / 1024) };
   });
 });
 
-ipcMain.handle('backup:preview', (_, filename) => {
+ipcMain.handle('backup:preview', (_: unknown, filename: any) => {
   if (!session.user) return { error: 'No session' };
   if (!/^vault-[\d\-T]+\.db$/.test(filename)) return { error: 'Invalid filename' };
   const filepath = path.join(getBackupDir(), filename);
@@ -78,7 +78,7 @@ ipcMain.handle('backup:preview', (_, filename) => {
   try {
     const buf     = fs.readFileSync(filepath);
     const preview = newDatabase(buf);
-    const get1    = (q) => { const r = preview.exec(q); return r[0]?.values[0]?.[0] ?? null; };
+    const get1    = (q: any) => { const r = preview.exec(q); return r[0]?.values[0]?.[0] ?? null; };
     const username    = get1('SELECT username FROM users LIMIT 1') || 'Unknown';
     const companyCount = Number(get1('SELECT COUNT(*) FROM companies') || 0);
     const entryCount   = Number(get1('SELECT COUNT(*) FROM time_entries') || 0);
@@ -89,7 +89,7 @@ ipcMain.handle('backup:preview', (_, filename) => {
   } catch(e) { return { error: e.message }; }
 });
 
-ipcMain.handle('backup:restore', (_, filename) => {
+ipcMain.handle('backup:restore', (_: unknown, filename: any) => {
   if (!session.user) return { ok: false, error: 'No session' };
   if (!/^vault-[\d\-T]+\.db$/.test(filename)) return { ok: false, error: 'Invalid filename' };
   const filepath = path.join(getBackupDir(), filename);
@@ -155,7 +155,7 @@ ipcMain.handle('db:clear-timeclock', () => {
 // task_items) for ONE company, leaving the company row and all other companies
 // intact. task_items are entry_id-scoped, so delete them via subquery BEFORE
 // the entries are removed.
-ipcMain.handle('db:clear-timeclock-company', (_, arg) => {
+ipcMain.handle('db:clear-timeclock-company', (_: unknown, arg: any) => {
   if (!session.key || !session.user) return { ok: false };
   const companyId = Number(arg && arg.companyId);
   if (!companyId) return { ok: false, error: 'No company specified' };
@@ -233,15 +233,15 @@ ipcMain.handle('app:get-info', () => ({
 ipcMain.handle('app:check-update', () => new Promise((resolve) => {
   const https = require('https');
   const current = app.getVersion();
-  const req = https.get(UPDATE_CHECK_URL, { timeout: 8000 }, (res) => {
+  const req = https.get(UPDATE_CHECK_URL, { timeout: 8000 }, (res: any) => {
     let raw = '';
-    res.on('data', chunk => raw += chunk);
+    res.on('data', (chunk: any) => raw += chunk);
     res.on('end', () => {
       try {
         const data = JSON.parse(raw);
         const latest = data.version || current;
         // Simple semver comparison: split on dots, compare each segment numerically
-        const parse = v => v.replace(/[^0-9.]/g, '').split('.').map(Number);
+        const parse = (v: string) => v.replace(/[^0-9.]/g, '').split('.').map(Number);
         const [aMaj, aMin, aPat] = parse(latest);
         const [bMaj, bMin, bPat] = parse(current);
         const hasUpdate =
@@ -258,12 +258,12 @@ ipcMain.handle('app:check-update', () => new Promise((resolve) => {
   req.on('timeout', () => { req.destroy(); resolve({ ok: false, error: 'Update check timed out.' }); });
 }));
 
-ipcMain.handle('settings:get', (_, key) => {
+ipcMain.handle('settings:get', (_: unknown, key: any) => {
   if (!hasDb()) return null;
   const row = dbGet('SELECT value FROM app_settings WHERE key=?', [key]);
   return row ? row.value : null;
 });
-ipcMain.handle('settings:set', (_, { key, value }) => {
+ipcMain.handle('settings:set', (_: unknown, { key, value }: Record<string, any>) => {
   if (!hasDb()) return { ok: false };
   dbRun('INSERT OR REPLACE INTO app_settings (key,value) VALUES (?,?)', [key, String(value)]);
   persistDB();
