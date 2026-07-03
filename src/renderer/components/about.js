@@ -24,6 +24,9 @@ const About = (() => {
   // Changelog — newest first. Edit HERE and both About surfaces update. The two
   // most recent entries render in-panel; older notes live on GitHub Releases.
   const CHANGELOG = [
+    { version: 'v3.11.6', items: [
+      'Fixed a blank screen after redeeming a beta key on a fresh install — new users now land on the account-setup screen as expected',
+    ] },
     { version: 'v3.11.5', items: [
       'A sharper startup — the splash screen now uses the full-resolution app icon',
     ] },

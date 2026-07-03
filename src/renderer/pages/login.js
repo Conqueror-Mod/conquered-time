@@ -551,6 +551,11 @@ async function routeInitialScreen() {
     profileMode = true;
     await showProfileSelector();
   } else {
+    // A fresh machine coming through the beta gate had login-card hidden by
+    // showBetaGate(); the first-user setup path below never re-shows it (only
+    // showLoginCard/showProfileSelector do), which left new beta users on a
+    // blank screen after redeeming their key. Make the card visible here.
+    document.getElementById('login-card').style.display = 'block';
     const { needsSetup } = await api.invoke('auth:check-setup');
     if (needsSetup) {
       document.getElementById('tab-setup').style.display = '';
