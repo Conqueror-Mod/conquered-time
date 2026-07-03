@@ -1,5 +1,5 @@
 {
-  "version": "3.11.1",
+  "version": "3.11.2",
   "downloadUrl": "https://github.com/Conqueror-Mod/conquered-time/releases/latest",
-  "notes": "v3.11.1 — The LIVE badge now means what it says. It lights up only when a session is genuinely running (clocked in, not yet out) instead of the moment you pick a company. A matching LIVE indicator now sits in the sidebar and counts up in real time, right above the Dispatch timer."
+  "notes": "v3.11.2 — The Dashboard's company web now matches the full Companies web: an organic, force-simulated layout with names and roles inside each sphere, hours below, and hover tooltips. The About page is now a single shared panel, so the login screen and in-app Settings always show the same version notes, Check for Updates, and GitHub / Ko-fi links."
 }
