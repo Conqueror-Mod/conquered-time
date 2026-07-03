@@ -7,6 +7,10 @@ build/*
 dist/
 # Compiled main process (tsc -p tsconfig.main.json) — generated, never commit.
 dist-main/
+# Phase 3: converted renderer pages compile .ts -> sibling .js (same filename
+# the HTML references). The generated .js is never committed — one line per
+# converted page; remove the source .js from git when converting.
+src/renderer/pages/dashboard.js
 dev-data/
 *.db
 *.db-backup-*

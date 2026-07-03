@@ -15,16 +15,18 @@
   "license": "UNLICENSED",
   "private": true,
   "scripts": {
-    "start": "npm run build:main && electron .",
-    "dev": "npm run build:main && electron . --dev",
+    "start": "npm run compile && electron .",
+    "dev": "npm run compile && electron . --dev",
     "test": "node --test && npm run typecheck",
-    "typecheck": "tsc --noEmit && tsc -p tsconfig.main.json --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.main.json --noEmit && tsc -p tsconfig.renderer.json --noEmit",
     "build:main": "tsc -p tsconfig.main.json",
+    "build:renderer": "tsc -p tsconfig.renderer.json",
+    "compile": "npm run build:main && npm run build:renderer",
     "seed": "node seed-dev.js",
-    "build": "npm run build:main && electron-builder --win --x64",
-    "build:mac": "npm run build:main && electron-builder --mac",
-    "build:linux": "npm run build:main && electron-builder --linux",
-    "pack": "npm run build:main && electron-builder --dir"
+    "build": "npm run compile && electron-builder --win --x64",
+    "build:mac": "npm run compile && electron-builder --mac",
+    "build:linux": "npm run compile && electron-builder --linux",
+    "pack": "npm run compile && electron-builder --dir"
   },
   "build": {
     "appId": "com.conquered.time",
@@ -84,6 +86,7 @@
     "files": [
       "dist-main/**/*",
       "src/renderer/**/*",
+      "!src/renderer/**/*.ts",
       "assets/**/*",
       "package.json"
     ],
