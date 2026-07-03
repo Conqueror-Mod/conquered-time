@@ -102,12 +102,37 @@ Definition of done: main process fully `.ts` + modular; packaged NSIS build
 installed and smoke-tested (login, tracker, audit, backup, tray, scheduled-
 report catch-up); suite green; CLAUDE.md structure/docs updated.
 
-## Phase 3 — Renderer pages to .ts — HELD
+## Phase 3 — Renderer pages to .ts — DONE (2026-07-03)
 
-Not approved yet. Revisit after Phase 1's error inventory. Shape if it
-proceeds: per-page `tsc` output to the same filenames the HTML already
-references (no bundler, CSP untouched), one page per PR, run-app verified —
-same cadence as the v3.6 CSP sweep.
+Approved after Phase 1's clean inventory. Executed exactly as shaped: a third
+project `tsconfig.renderer.json` (strict, sibling-emit to the filename the HTML
+already references — no bundler, CSP untouched), one page per PR, run-app
+verified. Converted pages are IIFE-wrapped (tsc treats classic scripts as one
+shared global scope; page-local helpers would otherwise collide).
+
+Converted (PRs #57–#66): dashboard, task-timer, the four theme-init/splash
+guards, global-log, reports, companies, profile, audit-wizard, tracker, and the
+pure helpers store/ipc/validator. Every Phase-1 `@ts-ignore` on those files is
+gone.
+
+**Deliberately left as JSDoc-typed `.js`** (documented decision, not
+incomplete):
+- `shell.js` + `login.js` — DOM-manipulation glue with hundreds of
+  `getElementById().value/.style` accesses. The `phase1-dom-compat.d.ts` shim
+  absorbs those under checkJs; strict `.ts` excludes the shim, so converting
+  would mean hundreds of manual casts on the app's most critical file
+  (shell.js loads on every page) for negligible safety gain. Both are already
+  checkJs-clean.
+- `settings.js` — top-level `const Settings` global (const, NOT a window
+  property, by design — see gotcha in CLAUDE.md); converting collides with the
+  ambient `declare const Settings`. Already checkJs-typed.
+- `row-utils.js` / `time-parse.js` / `canvas-text.js` / `pdf-fonts.js` — UMD /
+  generated-data files `require()`d by both the unit tests and the main
+  process; must stay `.js`. Already JSDoc-typed + unit-tested.
+
+Consequence: `phase1-dom-compat.d.ts` stays (it supports shell.js/login.js).
+Its original "delete when the last page converts" tripwire doesn't fire because
+shell/login are intentionally not converted.
 
 ## Risks / gotchas to carry through
 
