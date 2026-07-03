@@ -81,6 +81,13 @@ const Shell = (() => {
         ${navItems}
       </div>
       <div class="sidebar-spacer">
+        <div id="sidebar-live-badge" class="sidebar-live-badge" style="display:none;">
+          <div class="sidebar-live-pill">
+            <span class="sidebar-live-dot"></span>
+            <span class="sidebar-live-label">Live</span>
+          </div>
+          <span id="sidebar-live-time" class="sidebar-live-time">00:00</span>
+        </div>
         <div id="sidebar-task-timer" style="display:none;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:12px 0;">
           <div class="sidebar-timer-dot"></div>
           <div id="sidebar-task-time" class="sidebar-timer-display">00:00</div>
@@ -848,6 +855,17 @@ const Shell = (() => {
       try {
         const entry = await api.invoke('entries:get-active');
         if (!entry) return;
+        // Sidebar LIVE badge: reflect the entry's open punch (clocked in, not
+        // out) and count up from its clock-in. clock_in is HH:MM (24h, local);
+        // combine with the entry's log_date for an epoch-ms start.
+        try {
+          const rows = JSON.parse(entry.rows_json || '[]');
+          const open = rows.find(r => r.clock_in && !r.clock_out);
+          if (open && entry.log_date) {
+            const startMs = new Date(`${entry.log_date}T${open.clock_in}:00`).getTime();
+            if (!isNaN(startMs)) showLiveBadge(startMs);
+          }
+        } catch {}
         const tasks = await api.invoke('tasks:list', entry.id);
         const active = tasks.find(t => t.item_type === 'task' && t.started_at && !t.stopped_at);
         if (!active) return;
@@ -887,6 +905,37 @@ const Shell = (() => {
     if (wrapper) wrapper.style.display = 'none';
   }
 
+  // ── Sidebar LIVE badge (open-punch session indicator) ────────────────────
+  // Distinct from the task timer above: this reflects an open time-tracker punch
+  // (clocked in, not clocked out) and counts up from that punch's clock-in.
+  let _liveBadgeInterval = null;
+
+  function showLiveBadge(startedAtMs) {
+    const badge = document.getElementById('sidebar-live-badge');
+    const display = document.getElementById('sidebar-live-time');
+    if (!badge || !display) return;
+    clearInterval(_liveBadgeInterval);
+    badge.style.display = 'flex';
+    function tick() {
+      const secs = Math.max(0, Math.floor((Date.now() - startedAtMs) / 1000));
+      const h = Math.floor(secs / 3600);
+      const m = Math.floor((secs % 3600) / 60);
+      const s = secs % 60;
+      display.textContent = h > 0
+        ? `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
+        : `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    }
+    tick();
+    _liveBadgeInterval = setInterval(tick, 1000);
+  }
+
+  function hideLiveBadge() {
+    clearInterval(_liveBadgeInterval);
+    _liveBadgeInterval = null;
+    const badge = document.getElementById('sidebar-live-badge');
+    if (badge) badge.style.display = 'none';
+  }
+
   function toast(msg, type = 'success', duration = 3500) {
     const container = document.getElementById('toast-container');
     if (!container) return;
@@ -897,7 +946,7 @@ const Shell = (() => {
     setTimeout(() => el.remove(), duration);
   }
 
-  return { init, toast, showSidebarTimer, hideSidebarTimer, setSidebarAvatar };
+  return { init, toast, showSidebarTimer, hideSidebarTimer, showLiveBadge, hideLiveBadge, setSidebarAvatar };
 })();
 
 // ── Settings modal controls (global scope) ────────────────────────────────────

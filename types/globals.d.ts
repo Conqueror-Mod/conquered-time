@@ -411,6 +411,8 @@ interface ShellApi {
   toast(msg: string, type?: 'info' | 'success' | 'error' | string, duration?: number): void;
   showSidebarTimer(startedAtMs: number): void;
   hideSidebarTimer(): void;
+  showLiveBadge(startedAtMs: number): void;
+  hideLiveBadge(): void;
   setSidebarAvatar(profile: { avatar?: string | null } | null,
                    displayName?: string | null, username?: string | null): void;
 }
