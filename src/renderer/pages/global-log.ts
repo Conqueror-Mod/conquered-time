@@ -3,14 +3,25 @@
 // Global Log page logic. Externalized from an inline <script> so the page runs
 // under a strict script-src 'self' CSP. Depends on globals injected by shell.js
 // (Shell, Store, escapeHtml, api) — must load after shell.js.
+//
+// IIFE-wrapped (Phase 3 pattern) — see tsconfig.renderer.json.
+(() => {
 
-let allEntries=[], companies=[], filtered=[], compMap={};
+let allEntries: TimeEntry[] = [], filtered: TimeEntry[] = [];
+let companies: Company[] = [];
+let compMap: Record<number, Company> = {};
+
+// Static markup lookups — a missing id is a programming error.
+const $id = (id: string): HTMLElement => document.getElementById(id)!;
+// Filter controls are a mix of <input> and <select>; both carry .value.
+const $field = (id: string): HTMLInputElement | HTMLSelectElement =>
+  document.getElementById(id) as HTMLInputElement | HTMLSelectElement;
 
 // Display-only 12h/24h formatting for on-screen times. Stored value is always
 // 24h HH:MM (gotcha #8); PDF/CSV exports stay raw 24h by design.
-function fmtClock(hhmm) {
+function fmtClock(hhmm: string | undefined): string {
   // Settings is a top-level const (not a window property) — guard via typeof.
-  return (hhmm && typeof Settings !== 'undefined') ? Settings.formatTime(hhmm) : hhmm;
+  return (hhmm && typeof Settings !== 'undefined') ? Settings.formatTime(hhmm) : (hhmm || '');
 }
 
 window.addEventListener('DOMContentLoaded', async () => {
@@ -20,30 +31,31 @@ window.addEventListener('DOMContentLoaded', async () => {
   applyFilters();
 
   // ── Static control wiring (CSP-safe; replaces inline on* handlers) ──────
-  document.getElementById('btn-export-csv').addEventListener('click', exportCSV);
-  document.getElementById('btn-export-pdf').addEventListener('click', exportAllPDF);
-  document.getElementById('btn-clear-filters').addEventListener('click', clearFilters);
-  document.getElementById('filter-company').addEventListener('change', applyFilters);
-  document.getElementById('filter-from').addEventListener('change', applyFilters);
-  document.getElementById('filter-to').addEventListener('change', applyFilters);
-  document.getElementById('filter-range').addEventListener('change', applyQuickRange);
+  $id('btn-export-csv').addEventListener('click', exportCSV);
+  $id('btn-export-pdf').addEventListener('click', exportAllPDF);
+  $id('btn-clear-filters').addEventListener('click', clearFilters);
+  $id('filter-company').addEventListener('change', applyFilters);
+  $id('filter-from').addEventListener('change', applyFilters);
+  $id('filter-to').addEventListener('change', applyFilters);
+  $id('filter-range').addEventListener('change', applyQuickRange);
 
   // Table — delegated so dynamically-rendered rows need no re-wiring.
-  document.getElementById('log-tbody').addEventListener('click', e => {
-    const btn = e.target.closest('.btn-xs');
+  $id('log-tbody').addEventListener('click', e => {
+    const target = e.target as HTMLElement;
+    const btn = target.closest<HTMLElement>('.btn-xs');
     if (btn) {
       e.stopPropagation();
-      if (btn.dataset.act === 'open') openInTracker(Number(btn.dataset.co), btn.dataset.date, Number(btn.dataset.entry)||0);
+      if (btn.dataset.act === 'open') openInTracker(Number(btn.dataset.co), btn.dataset.date || '', Number(btn.dataset.entry)||0);
       else if (btn.dataset.act === 'pdf') exportSessionPDF(Number(btn.dataset.idx));
       return;
     }
-    const tr = e.target.closest('tr[data-idx]');
+    const tr = target.closest<HTMLElement>('tr[data-idx]');
     if (tr) toggleDetail(Number(tr.dataset.idx));
   });
 
   // Live 12h/24h switch — re-render expandable detail times in place (no reload).
   document.addEventListener('ct:settings-changed', e => {
-    if (e.detail?.key === 'timeFormat') {
+    if ((e as CustomEvent).detail?.key === 'timeFormat') {
       const open = [...document.querySelectorAll('tr.detail-row.open')].map(r => r.id);
       renderTable();
       open.forEach(id => { const m = id.match(/detail-(\d+)/); if (m) toggleDetail(Number(m[1])); });
@@ -51,45 +63,44 @@ window.addEventListener('DOMContentLoaded', async () => {
   });
 });
 
-async function loadData() {
+async function loadData(): Promise<void> {
   companies  = await Store.getCompanies();
   allEntries = await Store.getEntries();
   compMap    = {};
   companies.forEach(c => compMap[c.id] = c);
-  const sel = document.getElementById('filter-company');
+  const sel = $id('filter-company');
   companies.forEach(co => {
-    const opt=document.createElement('option');
-    // @ts-ignore — number assigned to option value; DOM stringifies.
-    opt.value=co.id; opt.textContent=co.name;
+    const opt = document.createElement('option');
+    opt.value = String(co.id); opt.textContent = co.name;
     sel.appendChild(opt);
   });
 }
 
-function applyQuickRange() {
-  const val=document.getElementById('filter-range').value;
+function applyQuickRange(): void {
+  const val = $field('filter-range').value;
   if (!val||val==='all') {
-    document.getElementById('filter-from').value='';
-    document.getElementById('filter-to').value='';
+    $field('filter-from').value='';
+    $field('filter-to').value='';
   } else {
     const to=new Date(), from=new Date(Date.now()-parseInt(val)*86400000);
-    document.getElementById('filter-from').value=from.toISOString().slice(0,10);
-    document.getElementById('filter-to').value=to.toISOString().slice(0,10);
+    $field('filter-from').value=from.toISOString().slice(0,10);
+    $field('filter-to').value=to.toISOString().slice(0,10);
   }
   applyFilters();
 }
 
-function clearFilters() {
-  document.getElementById('filter-company').value='';
-  document.getElementById('filter-from').value='';
-  document.getElementById('filter-to').value='';
-  document.getElementById('filter-range').value='';
+function clearFilters(): void {
+  $field('filter-company').value='';
+  $field('filter-from').value='';
+  $field('filter-to').value='';
+  $field('filter-range').value='';
   applyFilters();
 }
 
-function applyFilters() {
-  const coId=parseInt(document.getElementById('filter-company').value)||null;
-  const from=document.getElementById('filter-from').value;
-  const to=document.getElementById('filter-to').value;
+function applyFilters(): void {
+  const coId=parseInt($field('filter-company').value)||null;
+  const from=$field('filter-from').value;
+  const to=$field('filter-to').value;
   filtered=allEntries.filter(e => {
     if (coId&&e.company_id!==coId) return false;
     if (from&&e.log_date<from) return false;
@@ -99,21 +110,19 @@ function applyFilters() {
   renderTable(); renderSummary();
 }
 
-function renderSummary() {
+function renderSummary(): void {
   const totalMins=filtered.reduce((s,e)=>s+e.total_mins,0);
   const coSet=new Set(filtered.map(e=>e.company_id));
   const avgMins=filtered.length?totalMins/filtered.length:0;
-  // @ts-ignore — number assigned to textContent; DOM stringifies.
-  document.getElementById('chip-sessions').textContent=filtered.length;
-  document.getElementById('chip-hours').textContent=fmtH(totalMins);
-  // @ts-ignore — number assigned to textContent; DOM stringifies.
-  document.getElementById('chip-companies').textContent=coSet.size;
-  document.getElementById('chip-avg').textContent=fmtH(avgMins);
+  $id('chip-sessions').textContent=String(filtered.length);
+  $id('chip-hours').textContent=fmtH(totalMins);
+  $id('chip-companies').textContent=String(coSet.size);
+  $id('chip-avg').textContent=fmtH(avgMins);
 }
 
-function renderTable() {
-  const tbody=document.getElementById('log-tbody');
-  document.getElementById('row-count').textContent=`Showing ${filtered.length} session${filtered.length!==1?'s':''}`;
+function renderTable(): void {
+  const tbody=$id('log-tbody');
+  $id('row-count').textContent=`Showing ${filtered.length} session${filtered.length!==1?'s':''}`;
   if (filtered.length===0) {
     tbody.innerHTML=`<tr><td colspan="6"><div class="empty-state">No sessions match the current filters.</div></td></tr>`;
     return;
@@ -153,7 +162,7 @@ function renderTable() {
   }).join('');
 }
 
-function toggleDetail(idx) {
+function toggleDetail(idx: number): void {
   const row=document.getElementById(`detail-${idx}`);
   if (!row) return;
   row.classList.toggle('open');
@@ -161,7 +170,7 @@ function toggleDetail(idx) {
   if (arrow) arrow.textContent=row.classList.contains('open')?'▼':'▶';
 }
 
-function openInTracker(companyId, date, entryId) {
+function openInTracker(companyId: number, date: string, entryId: number): void {
   const co=compMap[companyId];
   if (!co) return;
   sessionStorage.setItem('active_company',JSON.stringify(co));
@@ -171,22 +180,22 @@ function openInTracker(companyId, date, entryId) {
   api.send('navigate','tracker');
 }
 
-function exportSessionPDF(idx) {
+function exportSessionPDF(idx: number): void {
   const e=filtered[idx];
   const co=compMap[e.company_id];
   printTimesheet(co,e.log_date,e.session_label,safeParseRows(e.rows_json),e.total_mins);
 }
 
-function exportAllPDF() {
+function exportAllPDF(): void {
   if (filtered.length===0) { Shell.toast('No sessions to export.','warning'); return; }
-  const coId=parseInt(document.getElementById('filter-company').value)||null;
+  const coId=parseInt($field('filter-company').value)||null;
   if (!coId) { Shell.toast('Select a company filter for PDF export.','warning'); return; }
   const co=compMap[coId];
   const sessions=[...filtered].reverse(); // chronological order
   const grandTotal=filtered.reduce((s,e)=>s+e.total_mins,0);
   const dateFrom=sessions[0]?.log_date;
   const dateTo=sessions[sessions.length-1]?.log_date;
-  const allRows=[];
+  const allRows: EntryRow[]=[];
   sessions.forEach(e=>safeParseRows(e.rows_json).forEach(r=>{if(RowUtils.rowHasContent(r))allRows.push(r);}));
   const hierParts=co?[co.hier_company,co.hier_project,co.hier_platform,co.name].filter(Boolean).join(' › '):'—';
   const summaryBreakdown=buildLabelBreakdown(allRows);
@@ -228,7 +237,7 @@ function exportAllPDF() {
     co.location?`<div class="meta">Location: ${escapeHtml(co.location)}</div>`:'',
     co.supervisors?`<div class="meta">Submitted to: ${escapeHtml(co.supervisors)}</div>`:'',
   ].join('');
-  const win=window.open('','_blank');
+  const win=window.open('','_blank')!;
   win.document.write(`<!DOCTYPE html><html><head><title>Timesheet</title>
   <style>${window.PDF_FONT_CSS || ''}</style>
   <style>
@@ -256,13 +265,14 @@ function exportAllPDF() {
   win.document.close(); win.print();
 }
 
-function buildLabelBreakdown(rows) {
-  const map={};
-  rows.filter(r=>r.label).forEach(r=>{ map[r.label]=(map[r.label]||0)+(r.total_mins||0); });
+function buildLabelBreakdown(rows: EntryRow[]): Array<[string, number]> {
+  const map: Record<string, number>={};
+  rows.filter(r=>r.label).forEach(r=>{ map[r.label!]=(map[r.label!]||0)+(r.total_mins||0); });
   return Object.entries(map).sort((a,b)=>b[1]-a[1]);
 }
 
-function printTimesheet(co,dateStr,sessionLabel,rows,totalMins) {
+function printTimesheet(co: Company | undefined, dateStr: string, sessionLabel: string,
+                        rows: EntryRow[], totalMins: number): void {
   const hierParts=co?[co.hier_company,co.hier_project,co.hier_platform,co.name].filter(Boolean).join(' › '):'—';
   const filledRows=rows.filter(r=>RowUtils.rowHasContent(r));
   const taskRows=filledRows.map((r,i)=>`<tr>
@@ -285,7 +295,7 @@ function printTimesheet(co,dateStr,sessionLabel,rows,totalMins) {
     co?.location?`<div class="meta">Location: ${escapeHtml(co.location)}</div>`:'',
     co?.supervisors?`<div class="meta">Submitted to: ${escapeHtml(co.supervisors)}</div>`:'',
   ].join('');
-  const win=window.open('','_blank');
+  const win=window.open('','_blank')!;
   win.document.write(`<!DOCTYPE html><html><head><title>Timesheet</title>
   <style>${window.PDF_FONT_CSS || ''}</style>
   <style>
@@ -317,13 +327,13 @@ function printTimesheet(co,dateStr,sessionLabel,rows,totalMins) {
 // and neutralize formula injection — a leading =, +, -, @, tab or CR makes
 // Excel/Sheets evaluate the cell as a formula, so prefix those with a single
 // quote. (e.g. a company named "=cmd|'/c calc'!A1" must not execute on open.)
-function csvCell(v) {
+function csvCell(v: unknown): string {
   let s = v == null ? '' : String(v);
   if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
   return '"' + s.replace(/"/g, '""') + '"';
 }
 
-function exportCSV() {
+function exportCSV(): void {
   if (filtered.length===0) { Shell.toast('No data to export.','warning'); return; }
   const lines=['Company,Date,Session,Task Label,Task Name,Description,Clock In,Clock Out,Duration (mins)'];
   filtered.forEach(e => {
@@ -342,10 +352,12 @@ function exportCSV() {
   Shell.toast('CSV exported.','success');
 }
 
-function safeParseRows(json) { try{return JSON.parse(json)||[];}catch{return[];} }
-function fmtH(mins)     { return mins?(mins/60).toFixed(1)+'h':'0h'; }
-function fmtHFull(mins) {
+function safeParseRows(json: string | null | undefined): EntryRow[] { try{return JSON.parse(json || '[]')||[];}catch{return[];} }
+function fmtH(mins: number): string { return mins?(mins/60).toFixed(1)+'h':'0h'; }
+function fmtHFull(mins: number | undefined): string {
   if (!mins||mins<=0) return '—';
   const h=Math.floor(mins/60), m=mins%60;
   return h>0?`${h}h ${String(m).padStart(2,'0')}m`:`${m}m`;
 }
+
+})();
