@@ -3,11 +3,18 @@
 // Profile page logic. Externalized from an inline <script> so the page runs under
 // a strict script-src 'self' CSP. Depends on globals injected by shell.js (Shell,
 // api) — must load after shell.js.
+//
+// IIFE-wrapped (Phase 3 pattern) — see tsconfig.renderer.json.
+(() => {
 
-let avatarDataUrl = null;
+let avatarDataUrl: string | null = null;
 let dirty = false;
-let originalValues = {};
-let session = null;
+let originalValues: Record<string, string | null> = {};
+let sessionInfo: SessionInfo | null = null;
+
+const $id = (id: string): HTMLElement => document.getElementById(id)!;
+const $field = (id: string): HTMLInputElement | HTMLSelectElement =>
+  document.getElementById(id) as HTMLInputElement | HTMLSelectElement;
 
 window.addEventListener('DOMContentLoaded', async () => {
   await Shell.init('profile');
@@ -15,7 +22,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   // Build state dropdown options via JS to avoid a large static option list
   (function buildStateDropdown() {
-    const states = [
+    const states: Array<[string, string]> = [
       ['','Not specified (general recommendations)'],
       ['AK','Alaska'],['AL','Alabama'],['AR','Arkansas'],['AZ','Arizona'],
       ['CA','California'],['CO','Colorado'],['CT','Connecticut'],
@@ -32,7 +39,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       ['VA','Virginia'],['VT','Vermont'],['WA','Washington'],['WI','Wisconsin'],
       ['WV','West Virginia'],['WY','Wyoming'],
     ];
-    const sel = document.getElementById('field-work-state');
+    const sel = $id('field-work-state');
     states.forEach(([code, name]) => {
       const opt = document.createElement('option');
       opt.value = code; opt.textContent = name;
@@ -41,23 +48,23 @@ window.addEventListener('DOMContentLoaded', async () => {
   })();
 
   const profile = await api.invoke('profile:get');
-  session = await api.invoke('session:get');
+  sessionInfo = await api.invoke('session:get');
 
   // Populate identity sidebar
-  const username = session?.username || '—';
-  document.getElementById('identity-username-value').textContent = username;
+  const username = sessionInfo?.username || '—';
+  $id('identity-username-value').textContent = username;
 
   const displayName = profile?.display_name || '';
-  document.getElementById('field-display-name').value = displayName;
-  document.getElementById('identity-display-name-view').textContent = displayName || username;
+  $field('field-display-name').value = displayName;
+  $id('identity-display-name-view').textContent = displayName || username;
   updateAvatarPreview(profile?.avatar || null, displayName || username);
 
   // Populate personal details
-  document.getElementById('field-full-name').value  = profile?.full_name  || '';
-  document.getElementById('field-job-title').value  = profile?.job_title  || '';
-  document.getElementById('field-work-state').value = profile?.work_state || '';
-  document.getElementById('field-email').value      = profile?.email      || '';
-  document.getElementById('field-phone').value      = profile?.phone      || '';
+  $field('field-full-name').value  = profile?.full_name  || '';
+  $field('field-job-title').value  = profile?.job_title  || '';
+  $field('field-work-state').value = profile?.work_state || '';
+  $field('field-email').value      = profile?.email      || '';
+  $field('field-phone').value      = profile?.phone      || '';
 
   avatarDataUrl = profile?.avatar || null;
 
@@ -73,9 +80,9 @@ window.addEventListener('DOMContentLoaded', async () => {
     setTimeout(() => document.getElementById('field-email')?.focus(), 100);
     // Block sidebar nav links until email is saved
     document.addEventListener('click', function emailGate(e) {
-      const navLink = e.target.closest('.nav-item, .sidebar-nav a, [data-page]');
+      const navLink = (e.target as HTMLElement).closest('.nav-item, .sidebar-nav a, [data-page]');
       if (navLink && !navLink.closest('#profile-layout')) {
-        if (!document.getElementById('field-email')?.value.trim()) {
+        if (!($field('field-email')?.value || '').trim()) {
           e.stopImmediatePropagation();
           e.preventDefault();
           Shell.toast('Add an email address and save your profile before navigating away.', 'error');
@@ -90,57 +97,56 @@ window.addEventListener('DOMContentLoaded', async () => {
     'field-work-state', 'field-email', 'field-phone'
   ];
   trackableInputs.forEach(id => {
-    document.getElementById(id).addEventListener('input', () => {
+    $id(id).addEventListener('input', () => {
       markDirty();
       // Live-update the identity preview from display name
       if (id === 'field-display-name') {
-        const dn = document.getElementById('field-display-name').value.trim();
-        document.getElementById('identity-display-name-view').textContent = dn || username;
+        const dn = $field('field-display-name').value.trim();
+        $id('identity-display-name-view').textContent = dn || username;
         updateAvatarInitials(dn || username);
       }
     });
   });
 
   // Avatar upload
-  document.getElementById('avatar-wrap').addEventListener('click', () => {
-    document.getElementById('avatar-file-input').click();
+  $id('avatar-wrap').addEventListener('click', () => {
+    $id('avatar-file-input').click();
   });
-  document.getElementById('avatar-file-input').addEventListener('change', handleAvatarUpload);
+  $id('avatar-file-input').addEventListener('change', handleAvatarUpload);
 
   // Save
-  document.getElementById('btn-save').addEventListener('click', saveProfile);
+  $id('btn-save').addEventListener('click', saveProfile);
 
   // Password panel toggle
-  document.getElementById('pw-toggle').addEventListener('click', () => {
-    const body    = document.getElementById('pw-body');
-    const chevron = document.getElementById('pw-chevron');
+  $id('pw-toggle').addEventListener('click', () => {
+    const body    = $id('pw-body');
+    const chevron = $id('pw-chevron');
     const isOpen  = body.classList.toggle('open');
     chevron.classList.toggle('open', isOpen);
   });
 
   // Change password
-  document.getElementById('btn-change-password').addEventListener('click', changePassword);
+  $id('btn-change-password').addEventListener('click', changePassword);
 
   // Crop modal
   initCropModal();
 });
 
 // ── Avatar helpers ───────────────────────────────────────────────────────
-function getInitials(name) {
+function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/);
   if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
   return name.slice(0, 2).toUpperCase();
 }
 
-function updateAvatarInitials(name) {
-  const circle = document.getElementById('avatar-circle');
+function updateAvatarInitials(name: string): void {
   if (avatarDataUrl) return; // avatar image takes precedence
-  document.getElementById('avatar-initials').textContent = getInitials(name);
+  $id('avatar-initials').textContent = getInitials(name);
 }
 
-function updateAvatarPreview(dataUrl, fallbackName) {
-  const circle = document.getElementById('avatar-circle');
-  const initials = document.getElementById('avatar-initials');
+function updateAvatarPreview(dataUrl: string | null, fallbackName: string): void {
+  const circle = $id('avatar-circle');
+  const initials = $id('avatar-initials');
   if (dataUrl) {
     initials.style.display = 'none';
     let img = circle.querySelector('img');
@@ -158,7 +164,7 @@ const ANIMATED_TYPES = ['image/gif', 'image/apng', 'image/webp'];
 
 // ── Crop state ───────────────────────────────────────────────────────────
 const CROP_SIZE = 280; // canvas/viewport px
-let cropImg    = null;
+let cropImg: HTMLImageElement | null = null;
 let cropMinScale = 1;
 let cropScale  = 1;
 let cropOx     = 0; // image draw origin X on canvas
@@ -167,23 +173,23 @@ let cropDragging = false;
 let cropDragStartX = 0, cropDragStartY = 0;
 let cropDragOriginX = 0, cropDragOriginY = 0;
 
-function cropClamp() {
+function cropClamp(): void {
   // Keep image covering the circle (no blank edges inside viewport)
-  const iw = cropImg.width  * cropScale;
-  const ih = cropImg.height * cropScale;
+  const iw = cropImg!.width  * cropScale;
+  const ih = cropImg!.height * cropScale;
   cropOx = Math.min(0, Math.max(CROP_SIZE - iw, cropOx));
   cropOy = Math.min(0, Math.max(CROP_SIZE - ih, cropOy));
 }
 
-function cropDraw() {
-  const canvas = document.getElementById('crop-canvas');
-  const ctx = canvas.getContext('2d');
+function cropDraw(): void {
+  const canvas = document.getElementById('crop-canvas') as HTMLCanvasElement;
+  const ctx = canvas.getContext('2d')!;
   ctx.clearRect(0, 0, CROP_SIZE, CROP_SIZE);
-  ctx.drawImage(cropImg, cropOx, cropOy,
-    cropImg.width * cropScale, cropImg.height * cropScale);
+  ctx.drawImage(cropImg!, cropOx, cropOy,
+    cropImg!.width * cropScale, cropImg!.height * cropScale);
 }
 
-function cropSetScale(newScale) {
+function cropSetScale(newScale: number): void {
   // Zoom around canvas center
   const cx = CROP_SIZE / 2, cy = CROP_SIZE / 2;
   const ratio = newScale / cropScale;
@@ -195,15 +201,14 @@ function cropSetScale(newScale) {
   syncSlider();
 }
 
-function syncSlider() {
-  const slider = document.getElementById('crop-zoom-slider');
+function syncSlider(): void {
+  const slider = $field('crop-zoom-slider');
   const maxScale = cropMinScale * 4;
   const t = (cropScale - cropMinScale) / (maxScale - cropMinScale);
-  // @ts-ignore — number assigned to input value; DOM stringifies.
-  slider.value = Math.round(t * 100);
+  slider.value = String(Math.round(t * 100));
 }
 
-function openCropModal(img) {
+function openCropModal(img: HTMLImageElement): void {
   cropImg = img;
   // Min scale: image must cover the full CROP_SIZE circle
   cropMinScale = Math.max(CROP_SIZE / img.width, CROP_SIZE / img.height);
@@ -214,52 +219,54 @@ function openCropModal(img) {
   cropClamp();
   cropDraw();
   syncSlider();
-  document.getElementById('crop-modal').classList.remove('hidden');
+  $id('crop-modal').classList.remove('hidden');
 }
 
-function commitCrop() {
+function commitCrop(): void {
   const out = document.createElement('canvas');
   out.width = 200; out.height = 200;
-  const ctx = out.getContext('2d');
+  const ctx = out.getContext('2d')!;
   // Map the canvas viewport back to image source coords
   const srcX = -cropOx / cropScale;
   const srcY = -cropOy / cropScale;
   const srcW =  CROP_SIZE / cropScale;
   const srcH =  CROP_SIZE / cropScale;
-  ctx.drawImage(cropImg, srcX, srcY, srcW, srcH, 0, 0, 200, 200);
+  ctx.drawImage(cropImg!, srcX, srcY, srcW, srcH, 0, 0, 200, 200);
   avatarDataUrl = out.toDataURL('image/jpeg', 0.85);
   updateAvatarPreview(avatarDataUrl, '');
   markDirty();
-  document.getElementById('crop-modal').classList.add('hidden');
+  $id('crop-modal').classList.add('hidden');
 }
 
-function handleAvatarUpload(e) {
-  const file = e.target.files[0];
+function handleAvatarUpload(e: Event): void {
+  const input = e.target as HTMLInputElement;
+  const file = input.files?.[0];
   if (!file) return;
   const reader = new FileReader();
   reader.onload = evt => {
+    // readAsDataURL always yields a string result.
+    const dataUrl = evt.target?.result as string;
     if (ANIMATED_TYPES.includes(file.type)) {
-      avatarDataUrl = evt.target.result;
+      avatarDataUrl = dataUrl;
       updateAvatarPreview(avatarDataUrl, '');
       markDirty();
     } else {
       const img = new Image();
       img.onload = () => openCropModal(img);
-      // @ts-ignore — FileReader was started with readAsDataURL, so result is a string.
-      img.src = evt.target.result;
+      img.src = dataUrl;
     }
   };
   reader.readAsDataURL(file);
-  e.target.value = '';
+  input.value = '';
 }
 
 // Crop modal interactions (wired after DOMContentLoaded)
-function initCropModal() {
-  const viewport = document.getElementById('crop-viewport');
-  const slider   = document.getElementById('crop-zoom-slider');
+function initCropModal(): void {
+  const viewport = $id('crop-viewport');
+  const slider   = $field('crop-zoom-slider');
 
   // Drag to pan
-  viewport.addEventListener('mousedown', ev => {
+  viewport.addEventListener('mousedown', (ev: MouseEvent) => {
     cropDragging   = true;
     cropDragStartX = ev.clientX;
     cropDragStartY = ev.clientY;
@@ -267,7 +274,7 @@ function initCropModal() {
     cropDragOriginY = cropOy;
     ev.preventDefault();
   });
-  window.addEventListener('mousemove', ev => {
+  window.addEventListener('mousemove', (ev: MouseEvent) => {
     if (!cropDragging) return;
     cropOx = cropDragOriginX + (ev.clientX - cropDragStartX);
     cropOy = cropDragOriginY + (ev.clientY - cropDragStartY);
@@ -277,7 +284,7 @@ function initCropModal() {
   window.addEventListener('mouseup', () => { cropDragging = false; });
 
   // Scroll to zoom
-  viewport.addEventListener('wheel', ev => {
+  viewport.addEventListener('wheel', (ev: WheelEvent) => {
     ev.preventDefault();
     const delta = ev.deltaY > 0 ? -0.05 : 0.05;
     const maxScale = cropMinScale * 4;
@@ -285,62 +292,61 @@ function initCropModal() {
   }, { passive: false });
 
   // +/- buttons
-  document.getElementById('crop-zoom-in').addEventListener('click', () => {
+  $id('crop-zoom-in').addEventListener('click', () => {
     cropSetScale(Math.min(cropMinScale * 4, cropScale + 0.1 * cropMinScale));
   });
-  document.getElementById('crop-zoom-out').addEventListener('click', () => {
+  $id('crop-zoom-out').addEventListener('click', () => {
     cropSetScale(Math.max(cropMinScale, cropScale - 0.1 * cropMinScale));
   });
 
   // Slider
   slider.addEventListener('input', () => {
-    // @ts-ignore — string/number division coerces; Phase 3 should Number() this.
-    const t = slider.value / 100;
+    const t = Number(slider.value) / 100;
     const maxScale = cropMinScale * 4;
     const newScale = cropMinScale + t * (maxScale - cropMinScale);
     cropSetScale(newScale);
   });
 
-  document.getElementById('crop-apply').addEventListener('click', commitCrop);
-  document.getElementById('crop-cancel').addEventListener('click', () => {
-    document.getElementById('crop-modal').classList.add('hidden');
+  $id('crop-apply').addEventListener('click', commitCrop);
+  $id('crop-cancel').addEventListener('click', () => {
+    $id('crop-modal').classList.add('hidden');
   });
 }
 
 // ── Dirty tracking ───────────────────────────────────────────────────────
-function snapshotOriginal() {
+function snapshotOriginal(): void {
   originalValues = {
-    display_name: document.getElementById('field-display-name').value,
-    full_name:    document.getElementById('field-full-name').value,
-    job_title:    document.getElementById('field-job-title').value,
-    work_state:   document.getElementById('field-work-state').value,
-    email:        document.getElementById('field-email').value,
-    phone:        document.getElementById('field-phone').value,
+    display_name: $field('field-display-name').value,
+    full_name:    $field('field-full-name').value,
+    job_title:    $field('field-job-title').value,
+    work_state:   $field('field-work-state').value,
+    email:        $field('field-email').value,
+    phone:        $field('field-phone').value,
     avatar:       avatarDataUrl,
   };
   dirty = false;
   setDirtyUI(false);
 }
 
-function markDirty() {
+function markDirty(): void {
   dirty = true;
   setDirtyUI(true);
 }
 
-function setDirtyUI(isDirty) {
-  document.getElementById('unsaved-dot').classList.toggle('visible', isDirty);
-  document.getElementById('unsaved-label').classList.toggle('visible', isDirty);
+function setDirtyUI(isDirty: boolean): void {
+  $id('unsaved-dot').classList.toggle('visible', isDirty);
+  $id('unsaved-label').classList.toggle('visible', isDirty);
 }
 
 // ── Save ─────────────────────────────────────────────────────────────────
-function makeThumb48(dataUrl) {
+function makeThumb48(dataUrl: string | null): Promise<string | null> | null {
   if (!dataUrl) return null;
   return new Promise(resolve => {
     const img = new Image();
     img.onload = () => {
       const c = document.createElement('canvas');
       c.width = c.height = 48;
-      c.getContext('2d').drawImage(img, 0, 0, 48, 48);
+      c.getContext('2d')!.drawImage(img, 0, 0, 48, 48);
       resolve(c.toDataURL('image/jpeg', 0.85));
     };
     img.onerror = () => resolve(null);
@@ -348,14 +354,14 @@ function makeThumb48(dataUrl) {
   });
 }
 
-async function saveProfile() {
+async function saveProfile(): Promise<void> {
   const payload = {
-    display_name:    document.getElementById('field-display-name').value.trim(),
-    full_name:       document.getElementById('field-full-name').value.trim(),
-    job_title:       document.getElementById('field-job-title').value.trim(),
-    work_state:      document.getElementById('field-work-state').value || null,
-    email:           document.getElementById('field-email').value.trim(),
-    phone:           document.getElementById('field-phone').value.trim(),
+    display_name:    $field('field-display-name').value.trim(),
+    full_name:       $field('field-full-name').value.trim(),
+    job_title:       $field('field-job-title').value.trim(),
+    work_state:      $field('field-work-state').value || null,
+    email:           $field('field-email').value.trim(),
+    phone:           $field('field-phone').value.trim(),
     avatar:          avatarDataUrl,
     avatar_thumb_48: await makeThumb48(avatarDataUrl),
   };
@@ -367,7 +373,7 @@ async function saveProfile() {
   const res = await api.invoke('profile:save', payload);
   if (res?.ok) {
     Shell.toast('Profile saved.', 'success');
-    Shell.setSidebarAvatar({ avatar: avatarDataUrl }, payload.display_name, session?.username);
+    Shell.setSidebarAvatar({ avatar: avatarDataUrl }, payload.display_name, sessionInfo?.username);
     snapshotOriginal();
     // Email gate satisfied — clear flag and continue to dashboard
     if (sessionStorage.getItem('require_email') === '1') {
@@ -381,12 +387,12 @@ async function saveProfile() {
 }
 
 // ── Change password ──────────────────────────────────────────────────────
-async function changePassword() {
-  const result   = document.getElementById('pw-result');
-  const currentPw = document.getElementById('field-current-pw').value;
-  const totp      = document.getElementById('field-totp').value.trim();
-  const newPw     = document.getElementById('field-new-pw').value;
-  const confirmPw = document.getElementById('field-confirm-pw').value;
+async function changePassword(): Promise<void> {
+  const result   = $id('pw-result');
+  const currentPw = $field('field-current-pw').value;
+  const totp      = $field('field-totp').value.trim();
+  const newPw     = $field('field-new-pw').value;
+  const confirmPw = $field('field-confirm-pw').value;
 
   result.style.display = 'none';
 
@@ -403,7 +409,7 @@ async function changePassword() {
     return;
   }
 
-  const btn = document.getElementById('btn-change-password');
+  const btn = document.getElementById('btn-change-password') as HTMLButtonElement;
   btn.disabled = true;
   btn.textContent = 'Updating…';
 
@@ -420,21 +426,23 @@ async function changePassword() {
     showPwResult('success', 'Password changed successfully. All data re-encrypted with your new key.');
     // Clear fields and collapse panel on success
     ['field-current-pw', 'field-totp', 'field-new-pw', 'field-confirm-pw'].forEach(id => {
-      document.getElementById(id).value = '';
+      $field(id).value = '';
     });
     setTimeout(() => {
-      document.getElementById('pw-body').classList.remove('open');
-      document.getElementById('pw-chevron').classList.remove('open');
-      document.getElementById('pw-result').style.display = 'none';
+      $id('pw-body').classList.remove('open');
+      $id('pw-chevron').classList.remove('open');
+      $id('pw-result').style.display = 'none';
     }, 2500);
   } else {
     showPwResult('error', res?.error || 'Password change failed.');
   }
 }
 
-function showPwResult(type, msg) {
-  const el = document.getElementById('pw-result');
+function showPwResult(type: string, msg: string): void {
+  const el = $id('pw-result');
   el.className = `pw-result ${type}`;
   el.textContent = msg;
   el.style.display = '';
 }
+
+})();

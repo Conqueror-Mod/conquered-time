@@ -36,6 +36,7 @@
     "src/renderer/pages/splash.js",
     "src/renderer/pages/global-log.js",
     "src/renderer/pages/reports.js",
-    "src/renderer/pages/companies.js"
+    "src/renderer/pages/companies.js",
+    "src/renderer/pages/profile.js"
   ]
 }
