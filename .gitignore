@@ -20,3 +20,7 @@ dev-data/
 .tmp-shots/
 # Private beta-key signing secret — never commit (example template IS tracked).
 src/shared/beta-secret.js
+src/renderer/pages/theme-init.js
+src/renderer/pages/login-theme-init.js
+src/renderer/pages/audit-theme-init.js
+src/renderer/pages/splash.js
