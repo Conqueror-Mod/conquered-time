@@ -8,29 +8,25 @@
 //   await Store.invalidate('companies');          // clears companies cache
 //   Store.subscribe('companies', () => refresh()); // called after invalidate
 window.Store = (() => {
-  const _cache = { companies: null, entries: null, entriesSummary: null };
-  const _listeners = { companies: [], entries: [] };
+  const _cache: {
+    companies: Company[] | null;
+    entries: TimeEntry[] | null;
+    entriesSummary: EntrySummary[] | null;
+  } = { companies: null, entries: null, entriesSummary: null };
+  const _listeners: { companies: Array<() => void>; entries: Array<() => void> } =
+    { companies: [], entries: [] };
 
-  /**
-   * @param {Company} row
-   * @returns {Company}
-   */
-  function _normalizeCompany(row) {
+  function _normalizeCompany(row: Company): Company {
     if (row && row.rid != null) row.id = Number(row.rid);
     return row;
   }
 
-  /**
-   * @template {{ rid?: number, id?: number }} T
-   * @param {T} row
-   * @returns {T}
-   */
-  function _normalizeEntry(row) {
+  function _normalizeEntry<T extends { rid?: number; id?: number }>(row: T): T {
     if (row && row.rid != null) row.id = Number(row.rid);
     return row;
   }
 
-  async function getCompanies() {
+  async function getCompanies(): Promise<Company[]> {
     if (!_cache.companies) {
       const raw = await window.IPC.companies.list() || [];
       _cache.companies = raw.map(_normalizeCompany);
@@ -40,7 +36,7 @@ window.Store = (() => {
 
   // Full entries incl. decrypted rows_json — for per-row detail (global log,
   // audit, reports).
-  async function getEntries() {
+  async function getEntries(): Promise<TimeEntry[]> {
     if (!_cache.entries) {
       const raw = await window.IPC.entries.all() || [];
       _cache.entries = raw.map(_normalizeEntry);
@@ -51,7 +47,7 @@ window.Store = (() => {
   // Lightweight entries — plaintext aggregate columns only, no rows_json
   // decryption. For consumers that only need totals/dates/labels (dashboard,
   // company hour rollups).
-  async function getEntriesSummary() {
+  async function getEntriesSummary(): Promise<EntrySummary[]> {
     if (!_cache.entriesSummary) {
       const raw = await window.IPC.entries.summary() || [];
       _cache.entriesSummary = raw.map(_normalizeEntry);
@@ -59,8 +55,7 @@ window.Store = (() => {
     return _cache.entriesSummary;
   }
 
-  /** @param {'all' | 'companies' | 'entries'} key */
-  function invalidate(key) {
+  function invalidate(key: 'all' | 'companies' | 'entries'): void {
     if (key === 'all') {
       _cache.companies = null;
       _cache.entries = null;
@@ -77,23 +72,15 @@ window.Store = (() => {
     }
   }
 
-  /**
-   * @param {'companies' | 'entries'} event
-   * @param {() => void} fn
-   */
-  function subscribe(event, fn) {
+  function subscribe(event: 'companies' | 'entries', fn: () => void): void {
     if (_listeners[event]) _listeners[event].push(fn);
   }
 
-  /**
-   * @param {'companies' | 'entries'} event
-   * @param {() => void} fn
-   */
-  function unsubscribe(event, fn) {
+  function unsubscribe(event: 'companies' | 'entries', fn: () => void): void {
     if (_listeners[event]) _listeners[event] = _listeners[event].filter(f => f !== fn);
   }
 
-  function _emit(event) {
+  function _emit(event: 'companies' | 'entries'): void {
     (_listeners[event] || []).forEach(fn => { try { fn(); } catch(e) { console.error('[Store] listener error', e); } });
   }
 
