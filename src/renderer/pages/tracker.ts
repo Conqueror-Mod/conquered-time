@@ -196,6 +196,9 @@ async function loadEntryIntoTracker(existing: TimeEntry | null): Promise<void> {
   }
   const sw = document.getElementById('btn-switch-session');
   if (sw) sw.style.display = sameDateEntries.length > 1 ? '' : 'none';
+  // Reflect whether the loaded session already has an open punch (e.g. the app
+  // was reopened mid-session) in both the header and sidebar LIVE badges.
+  updateStatusDot();
 }
 
 // Modal session picker for same-date sessions. Resolves with the chosen entry
@@ -595,6 +598,7 @@ function clockIn(): void {
   normalizeRows();
   renderTable();
   updateTotals();
+  updateStatusDot();
   autoSave();
 }
 
@@ -614,6 +618,7 @@ function clockOut(): void {
   normalizeRows();
   renderTable();
   updateTotals();
+  updateStatusDot();
   autoSave();
 
   // C6 (D-012): a task/break/lunch can't keep running once the session has no
@@ -745,6 +750,7 @@ function startEdit(cell: HTMLElement, idx: number, field: StrField): void {
     normalizeRows();
     renderTable();
     updateTotals();
+    updateStatusDot();
     autoSave();
   };
 
@@ -803,12 +809,30 @@ function clearAutoSaveTimer(): void {
   updateStatusDot();
 }
 
+// The LIVE badge reflects a genuinely running session — a row that has been
+// clocked in but not yet clocked out — NOT merely "a company is selected" or
+// "the autosave timer is ticking". The sidebar nav badge (Shell) mirrors the
+// same open-punch state and shows the elapsed time.
 function updateStatusDot(): void {
   const badge = document.getElementById('live-badge');
-  if (!badge) return;
-  const secs = parseInt(Settings.get('autoSaveInterval') ?? 60, 10);
-  const isLive = !!(currentCompany && secs > 0 && autoSaveTimer);
-  badge.style.display = isLive ? 'flex' : 'none';
+  const open = rowsData.find(r => r.clock_in && !r.clock_out);
+  if (badge) badge.style.display = open ? 'flex' : 'none';
+  // Drive the sidebar nav LIVE badge from the same source of truth.
+  try {
+    const logDate = $input('log-date')?.value;
+    if (open && logDate) {
+      Shell.showLiveBadge(punchStartMs(logDate, open.clock_in));
+    } else {
+      Shell.hideLiveBadge();
+    }
+  } catch { /* Shell may not expose the badge helpers on older pages */ }
+}
+
+// Convert an entry's log_date (YYYY-MM-DD) + a row's clock_in (HH:MM, 24h,
+// local) into an epoch-ms start for the elapsed-time readout.
+function punchStartMs(logDate: string, clockIn: string): number {
+  const t = new Date(`${logDate}T${clockIn}:00`).getTime();
+  return isNaN(t) ? Date.now() : t;
 }
 
 // ── Save / clear ──
