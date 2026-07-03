@@ -1,5 +1,5 @@
 {
-  "version": "3.11.4",
+  "version": "3.11.5",
   "downloadUrl": "https://github.com/Conqueror-Mod/conquered-time/releases/latest",
-  "notes": "v3.11.4 — The company web never lets spheres overlap now. Even a busy network (or a small panel) lays out with clean gaps between every node, on both the Dashboard and the Companies page."
+  "notes": "v3.11.5 — A sharper startup: the splash screen now uses the full-resolution app icon."
 }

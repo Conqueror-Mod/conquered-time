@@ -24,6 +24,9 @@ const About = (() => {
   // Changelog — newest first. Edit HERE and both About surfaces update. The two
   // most recent entries render in-panel; older notes live on GitHub Releases.
   const CHANGELOG = [
+    { version: 'v3.11.5', items: [
+      'A sharper startup — the splash screen now uses the full-resolution app icon',
+    ] },
     { version: 'v3.11.4', items: [
       'The company web never lets spheres overlap now — even a busy network (or a small panel) lays out with clean gaps between every node, on both the Dashboard and the Companies page',
     ] },
