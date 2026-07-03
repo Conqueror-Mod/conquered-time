@@ -1,0 +1,35 @@
+{
+  // Phase 3 of the TypeScript refactor (docs/refactor-plan.md): renderer pages
+  // convert one at a time from .js to .ts. No outDir — tsc emits the sibling
+  // .js the HTML already references (classic <script src>, no bundler, CSP
+  // untouched). Generated .js files are gitignored and excluded from the root
+  // checkJs project.
+  //
+  // Converted pages are wrapped in an IIFE: tsc treats all non-module scripts
+  // in one project as ONE global scope, so page-local helpers that repeat
+  // across pages (getCanvasColors, drawSphereNode, ...) would otherwise be
+  // duplicate-identifier errors. Anything a page intentionally exposes (e.g.
+  // the onExportPDF hook) is assigned to window explicitly.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    // Converted pages have no imports/exports, so they emit as plain classic
+    // scripts regardless of module setting ("None" is deprecated in TS 6).
+    "module": "ES2022",
+    "strict": true,
+    // Same rationale as tsconfig.main.json — catch (e) { e.message } idiom.
+    "useUnknownInCatchVariables": false,
+    "noEmitOnError": true,
+    "types": [],
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  // Deliberately NOT including types/phase1-dom-compat.d.ts: converted pages
+  // use real DOM types + casts. The shim exists only for the still-JS pages in
+  // the root checkJs project, and its optional members would poison strict
+  // null checks here (e.g. Element.style? makes .style possibly-undefined).
+  "include": [
+    "src/renderer/**/*.ts",
+    "types/globals.d.ts"
+  ]
+}

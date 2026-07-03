@@ -3,9 +3,24 @@
 // Dashboard page logic. Externalized from an inline <script> so the page runs
 // under a strict script-src 'self' CSP. Depends on globals injected by shell.js
 // (Shell, Store, escapeHtml) — must load after ../components/shell.js.
+//
+// IIFE-wrapped (Phase 3 pattern): tsc compiles all renderer pages in one
+// project as classic scripts sharing a global scope, so page-local helpers
+// (getCanvasColors, drawSphereNode, ...) must not leak as globals.
+(() => {
 
-let companies = [], allEntries = [];
-let miniAnimFrame = null, miniResizeObserver = null;
+interface SphereColors {
+  g1: string; g2: string; border: string; label: string; rim: string;
+  glow?: string; base?: string;
+}
+interface WebColors {
+  center: SphereColors; node: SphereColors;
+  edge1: string; edge2: string; grid: string; hours: string;
+}
+
+let companies: Company[] = [], allEntries: EntrySummary[] = [];
+let miniAnimFrame: number | null = null;
+let miniResizeObserver: ResizeObserver | null = null;
 
 window.addEventListener('DOMContentLoaded', async () => {
   await Shell.init('dashboard');
@@ -24,7 +39,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   drawMiniWeb();
 });
 
-async function loadData() {
+async function loadData(): Promise<void> {
   companies  = await Store.getCompanies();
   allEntries = await Store.getEntriesSummary();
 
@@ -35,13 +50,12 @@ async function loadData() {
   const weekMins    = allEntries.filter(e => e.log_date >= weekAgo).reduce((a,e) => a+e.total_mins, 0);
   const allTimeMins = allEntries.reduce((a,e) => a+e.total_mins, 0);
 
-  document.getElementById('stat-today').textContent     = fmtH(todayMins);
-  document.getElementById('stat-week').textContent      = fmtH(weekMins);
-  document.getElementById('stat-alltime').textContent   = fmtH(allTimeMins);
-  // @ts-ignore — number assigned to textContent; DOM stringifies.
-  document.getElementById('stat-companies').textContent = companies.length;
+  document.getElementById('stat-today')!.textContent     = fmtH(todayMins);
+  document.getElementById('stat-week')!.textContent      = fmtH(weekMins);
+  document.getElementById('stat-alltime')!.textContent   = fmtH(allTimeMins);
+  document.getElementById('stat-companies')!.textContent = String(companies.length);
 
-  const compMap = {};
+  const compMap: Record<number, string> = {};
   companies.forEach(c => compMap[c.id] = c.name || '—');
 
   // C6 (D-009): future-dated entries don't belong in "Recent Activity" —
@@ -50,7 +64,7 @@ async function loadData() {
   const recent = allEntries.filter(e => e.log_date <= today)
     .sort((a,b) => b.log_date.localeCompare(a.log_date)).slice(0, 8);
   const list   = document.getElementById('activity-list');
-  if (recent.length === 0) return;
+  if (recent.length === 0 || !list) return;
 
   list.innerHTML = recent.map(e => `
     <div class="activity-row">
@@ -61,27 +75,27 @@ async function loadData() {
   `).join('');
 }
 
-function fmtH(mins) {
+function fmtH(mins: number): string {
   if (!mins) return '0h';
   return (mins / 60).toFixed(1) + 'h';
 }
 
-function drawMiniWeb() {
-  const canvas = document.getElementById('web-canvas');
+function drawMiniWeb(): void {
+  const canvas = document.getElementById('web-canvas') as HTMLCanvasElement | null;
   const wrap   = document.getElementById('web-canvas-wrap');
   if (!canvas || !wrap) return;
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d')!;
 
   if (miniAnimFrame) cancelAnimationFrame(miniAnimFrame);
   if (miniResizeObserver) miniResizeObserver.disconnect();
 
-  function resizeCanvas() {
-    const W = wrap.clientWidth, H = wrap.clientHeight;
+  function resizeCanvas(): void {
+    const W = wrap!.clientWidth, H = wrap!.clientHeight;
     if (!W || !H) return;
-    canvas.width  = W * devicePixelRatio;
-    canvas.height = H * devicePixelRatio;
-    canvas.style.width  = W + 'px';
-    canvas.style.height = H + 'px';
+    canvas!.width  = W * devicePixelRatio;
+    canvas!.height = H * devicePixelRatio;
+    canvas!.style.width  = W + 'px';
+    canvas!.style.height = H + 'px';
     ctx.setTransform(1,0,0,1,0,0);
     ctx.scale(devicePixelRatio, devicePixelRatio);
   }
@@ -94,7 +108,7 @@ function drawMiniWeb() {
   miniResizeObserver.observe(wrap);
   startRender();
 
-  canvas.addEventListener('click', e => {
+  canvas.addEventListener('click', (e: MouseEvent) => {
     const rect = canvas.getBoundingClientRect();
     const mx = e.clientX - rect.left, my = e.clientY - rect.top;
     const W = wrap.clientWidth, H = wrap.clientHeight;
@@ -114,18 +128,15 @@ function drawMiniWeb() {
   });
 }
 
-function startRender() {
-  const canvas = document.getElementById('web-canvas');
+function startRender(): void {
+  const canvas = document.getElementById('web-canvas') as HTMLCanvasElement | null;
   const wrap   = document.getElementById('web-canvas-wrap');
   if (!canvas || !wrap) return;
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d')!;
   let pulse = 0;
 
-  // Get accent color from CSS
-  const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
-
-  function render() {
-    const W = wrap.clientWidth, H = wrap.clientHeight;
+  function render(): void {
+    const W = wrap!.clientWidth, H = wrap!.clientHeight;
     if (!W || !H) { miniAnimFrame = requestAnimationFrame(render); return; }
     const cx = W/2, cy = H/2;
     const c = getCanvasColors();
@@ -181,7 +192,7 @@ function startRender() {
   miniAnimFrame = requestAnimationFrame(render);
 }
 
-function getCanvasColors() {
+function getCanvasColors(): WebColors {
   const theme = document.documentElement.getAttribute('data-theme') || 'memoria';
   const isLight = theme === 'memoria' || theme === 'rabanastre';
   if (isLight) return {
@@ -201,7 +212,8 @@ function getCanvasColors() {
   };
 }
 
-function drawSphereNode(ctx, x, y, r, isCenter, pulse, label) {
+function drawSphereNode(ctx: CanvasRenderingContext2D, x: number, y: number, r: number,
+                        isCenter: boolean, pulse: number, label: string): void {
   const c = getCanvasColors();
   const nc = isCenter ? c.center : c.node;
   const pR = isCenter ? r + 3*Math.sin(pulse) : r;
@@ -236,3 +248,5 @@ function drawSphereNode(ctx, x, y, r, isCenter, pulse, label) {
     ctx.fillText(CanvasText.ellipsizeToWidth(ctx, label, 84), x, y+pR+5);
   }
 }
+
+})();
