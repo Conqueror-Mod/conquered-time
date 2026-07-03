@@ -3,9 +3,22 @@
 // Audit wizard window logic. Externalized from an inline <script> so the window
 // runs under a strict script-src 'self' CSP. Standalone window (no shell.js);
 // uses the preload `api` bridge and settings.js.
+//
+// IIFE-wrapped (Phase 3 pattern) — see tsconfig.renderer.json. The local
+// escapeHtml below shadows the ambient global for this standalone window.
+(() => {
+
+interface AuditRow extends EntryRow { req_breaks?: number; has_breaks?: number; }
+interface WizardIssue {
+  date: string; company: string; entryId: number; rowIdx: number;
+  type: string; dKey: string; r: AuditRow;
+}
+interface AuditMeta { flag: string; cls: string; suggestion: string; fix: string | null; }
+
+const $id = (id: string): HTMLElement => document.getElementById(id)!;
 
 // Standalone window (no shell.js) — local HTML-escape for user-controlled text.
-function escapeHtml(v) {
+function escapeHtml(v: unknown): string {
   if (v == null) return '';
   return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
@@ -13,12 +26,12 @@ const params   = new URLSearchParams(window.location.search);
 const mode     = params.get('mode') || 'fix';
 const isFix    = mode === 'fix';
 
-let issues  = [];
+let issues: WizardIssue[] = [];
 let current = 0;
 let acted   = 0; // issues acted on (applied or acknowledged — not skipped)
 
 // ── Audit logic (mirrors reports.html) ──────────────────────────────────
-function getAuditType(r) {
+function getAuditType(r: EntryRow): string {
   if (!r.clock_in)        return 'no_clock_in';
   if (!r.clock_out)       return 'no_clock_out';
   if (!r.total_mins)      return 'zero_duration';
@@ -26,23 +39,24 @@ function getAuditType(r) {
   return 'ok';
 }
 
-let auditPolicy = null; // loaded on DOMContentLoaded
+let auditPolicy: AuditPolicy | null = null; // loaded on DOMContentLoaded
 
-function policyBreakHours(policy) {
+function policyBreakHours(policy: AuditPolicy | null): number {
   // break first required once session crosses breakThresholds[0][0]
   const t0 = policy?.breakThresholds?.[0]?.[0];
   return t0 != null ? Math.round(t0 / 60 * 10) / 10 : 3.5;
 }
 
-function localRequiredBreaks(totalMins, policy) {
-  const thresholds = policy?.breakThresholds || [[210,0],[360,1],[600,2],[Infinity,3]];
+function localRequiredBreaks(totalMins: number, policy: AuditPolicy | null): number {
+  const thresholds: Array<[number | null, number]> =
+    policy?.breakThresholds || [[210,0],[360,1],[600,2],[null,3]];
   for (const [threshold, count] of thresholds) {
     if (threshold === null || totalMins < threshold) return count;
   }
   return 0;
 }
 
-function auditMeta(type, r) {
+function auditMeta(type: string, r: AuditRow): AuditMeta {
   const p         = auditPolicy;
   const stateName = (p?.hasStatePolicy && p.stateName) || null; // C5 (D-007): law wording only for state-tier policies
   const lunchH    = p ? Math.round(p.lunchThreshMins / 60 * 10) / 10 : 5;
@@ -66,8 +80,8 @@ function auditMeta(type, r) {
 
 // ── Load data and build issue list ──────────────────────────────────────
 window.addEventListener('DOMContentLoaded', async () => {
-  document.getElementById('titlebar-label').textContent = isFix ? 'Suggest Discrepancy Fix' : 'Acknowledge Discrepancies';
-  document.getElementById('btn-titlebar-close').addEventListener('click', () => window.close());
+  $id('titlebar-label').textContent = isFix ? 'Suggest Discrepancy Fix' : 'Acknowledge Discrepancies';
+  $id('btn-titlebar-close').addEventListener('click', () => window.close());
 
   // Apply settings (scale only — theme already set via query param).
   // settings:get requires a key and returns the raw stored string; UI prefs
@@ -90,14 +104,14 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   // Build companies map for display
   const companies = await api.invoke('companies:list') || [];
-  const companyMap = {};
+  const companyMap: Record<number, Company> = {};
   companies.forEach(c => { companyMap[Number(c.id)] = c; });
 
   entries.forEach(e => {
     const co      = companyMap[Number(e.company_id)];
     const entryId = Number(e.id);
     try {
-      JSON.parse(e.rows_json || '[]').forEach((r, idx) => {
+      (JSON.parse(e.rows_json || '[]') as EntryRow[]).forEach((r, idx) => {
         if (!r.clock_in && !r.clock_out && !r.label && !r.name) return;
         const type = getAuditType(r);
         if (type === 'ok') return;
@@ -130,8 +144,8 @@ window.addEventListener('DOMContentLoaded', async () => {
 });
 
 // ── Render current step ──────────────────────────────────────────────────
-function renderStep() {
-  const body = document.getElementById('wizard-body');
+function renderStep(): void {
+  const body = $id('wizard-body');
 
   if (!issues.length) {
     body.innerHTML = `
@@ -141,7 +155,7 @@ function renderStep() {
         <div class="completion-sub">All audit issues have already been addressed.</div>
         <button class="btn-wiz-close-final" id="btn-final-close">Close</button>
       </div>`;
-    document.getElementById('btn-final-close').addEventListener('click', () => window.close());
+    $id('btn-final-close').addEventListener('click', () => window.close());
     return;
   }
 
@@ -209,15 +223,15 @@ function renderStep() {
     </div>`;
 
   if (showFix) {
-    document.getElementById('btn-apply-fix').addEventListener('click', applyFix);
+    $id('btn-apply-fix').addEventListener('click', applyFix);
   }
-  document.getElementById('btn-acknowledge').addEventListener('click', acknowledge);
-  document.getElementById('btn-skip').addEventListener('click', skip);
-  document.getElementById('btn-done').addEventListener('click', () => window.close());
+  $id('btn-acknowledge').addEventListener('click', acknowledge);
+  $id('btn-skip').addEventListener('click', skip);
+  $id('btn-done').addEventListener('click', () => window.close());
 }
 
 // ── Actions ──────────────────────────────────────────────────────────────
-async function applyFix() {
+async function applyFix(): Promise<void> {
   const issue = issues[current];
   const { fix } = auditMeta(issue.type, issue.r);
   if (!fix) return;
@@ -230,25 +244,25 @@ async function applyFix() {
   advance();
 }
 
-async function acknowledge() {
+async function acknowledge(): Promise<void> {
   const issue = issues[current];
   await api.invoke('audit:dismiss', { entry_id: issue.entryId, row_idx: issue.rowIdx, type: issue.type });
   acted++;
   advance();
 }
 
-function skip() {
+function skip(): void {
   advance();
 }
 
-function advance() {
+function advance(): void {
   current++;
   renderStep();
 }
 
 // ── Completion ───────────────────────────────────────────────────────────
-function renderCompletion() {
-  const body   = document.getElementById('wizard-body');
+function renderCompletion(): void {
+  const body   = $id('wizard-body');
   const skipped = issues.length - acted;
   body.innerHTML = `
     <div class="completion-screen">
@@ -260,5 +274,7 @@ function renderCompletion() {
       </div>
       <button class="btn-wiz-close-final" id="btn-final-close">Close</button>
     </div>`;
-  document.getElementById('btn-final-close').addEventListener('click', () => window.close());
+  $id('btn-final-close').addEventListener('click', () => window.close());
 }
+
+})();
