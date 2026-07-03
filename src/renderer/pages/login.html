@@ -724,6 +724,7 @@
 
 <div id="toast-container"></div>
 
+<script src="../components/about.js"></script>
 <script src="login.js"></script>
 
 <!-- ── Pre-Auth Settings Gear Button ── -->
@@ -910,50 +911,8 @@
         </div>
 
         <!-- ABOUT -->
-        <div id="pa-cat-about" class="settings-cat-panel about-panel" style="display:none;">
-          <div class="sc-title">About</div>
-          <div class="about-hero">
-            <img class="about-icon" src="../../../assets/icon-256.png" alt="Conquered Time icon">
-            <div class="about-wordmark">Conquered Time</div>
-            <div class="about-version-badge" id="pa-about-version-badge">v—</div>
-          </div>
-          <div class="about-tagline">"Take back your time."</div>
-          <div class="about-section">
-            <div class="about-section-title">Build Info</div>
-            <div class="about-build-grid">
-              <span class="about-build-label">Version</span><span class="about-build-value" id="pa-ab-version">—</span>
-              <span class="about-build-label">Electron</span><span class="about-build-value" id="pa-ab-electron">—</span>
-              <span class="about-build-label">Node</span><span class="about-build-value" id="pa-ab-node">—</span>
-              <span class="about-build-label">Platform</span><span class="about-build-value" id="pa-ab-platform">—</span>
-            </div>
-          </div>
-          <div class="about-section">
-            <div class="about-section-title">Credits</div>
-            <div class="about-credit-block">
-              <div class="about-credit-role">Created by</div>
-              <div class="about-credit-name">Chris Bowles — The Conqueror</div>
-            </div>
-            <div class="about-credit-block">
-              <div class="about-credit-role">Co-Author</div>
-              <div class="about-credit-name">Vincent Vathan</div>
-            </div>
-            <div class="about-copyright">Copyright © 2026 Chris Bowles - The Conqueror. All rights reserved.</div>
-          </div>
-          <div class="about-section">
-            <div class="about-section-title">What's New — v1.0</div>
-            <ul class="about-changelog">
-              <li>Dispatch — task timing, break/lunch compliance, and live session counters</li>
-              <li>Five themes: Memoria, Zanarkand, Rabanastre, Treno, Nibelheim</li>
-              <li>AES-256-GCM encrypted company data with PBKDF2 key derivation</li>
-              <li>TOTP multi-factor authentication with lockout and local recovery</li>
-              <li>Company hierarchy — Company › Project › Platform › NavID</li>
-              <li>Dynamic time-entry table with inline editing and per-session totals</li>
-              <li>Spiderweb company visualizer (force-simulated, theme-aware)</li>
-              <li>Global Log with CSV and PDF export, Audit discrepancy detection</li>
-              <li>Branded splash screen and Inter-typography design system</li>
-            </ul>
-          </div>
-        </div>
+        <!-- About panel content is mounted from the shared module (components/about.js). -->
+        <div id="pa-cat-about" class="settings-cat-panel about-panel" style="display:none;"></div>
 
       </div><!-- /settings-content -->
     </div><!-- /settings-layout -->

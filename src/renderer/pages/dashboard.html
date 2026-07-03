@@ -81,6 +81,24 @@
     width: 100%; height: 100%;
     display: block;
   }
+  /* Node tooltip — matches the Companies page web */
+  #node-tooltip {
+    position: absolute;
+    background: var(--surface-3);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-lg);
+    padding: 10px 14px;
+    font-size: 12px;
+    color: var(--text-bright);
+    pointer-events: none;
+    z-index: 10;
+    display: none;
+    box-shadow: var(--shadow-2);
+    max-width: 220px;
+  }
+  .tooltip-name   { font-weight: 600; color: var(--text-white); margin-bottom: 3px; }
+  .tooltip-hier   { font-size: 11px; color: var(--accent); margin-bottom: 2px; font-family: var(--mono); }
+  .tooltip-detail { font-size: 11px; color: var(--text-muted); }
   .web-hint {
     font-family: var(--sans);
     font-size: 11px;
@@ -160,7 +178,13 @@
       <button class="btn-neutral" style="font-size:11px;padding:5px 10px;" data-action="navigate" data-arg="companies">View Full →</button>
     </div>
     <div class="web-panel-body">
-      <div id="web-canvas-wrap"><canvas id="web-canvas"></canvas></div>
+      <div id="web-canvas-wrap"><canvas id="web-canvas"></canvas>
+        <div id="node-tooltip">
+          <div class="tooltip-name"   id="tt-name"></div>
+          <div class="tooltip-hier"   id="tt-hier"></div>
+          <div class="tooltip-detail" id="tt-detail"></div>
+        </div>
+      </div>
       <div class="web-hint">Click a node to open that company's tracker</div>
     </div>
   </div>
@@ -197,6 +221,7 @@
 </div>
 
 <script src="../components/settings.js"></script>
+<script src="../components/about.js"></script>
 <script src="../components/shell.js"></script>
 <script src="../canvas-text.js"></script>
 <script src="dashboard.js"></script>
