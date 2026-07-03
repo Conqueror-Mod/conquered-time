@@ -73,7 +73,7 @@ async function writeBmp(image, w, h, bg, outName) {
       <rect x="${W / 2 - 22}" y="268" width="44" height="2" rx="1" fill="#00b8cc"/>
     </svg>`
   );
-  const icon = await sharp(path.join(ASSETS, 'Splash-Icon-Main.png'))
+  const icon = await sharp(path.join(ASSETS, 'icon-1024.png'))
     .resize(104, 104, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
     .png().toBuffer();
   const img = sharp(bg).composite([{ input: icon, top: 54, left: Math.round((W - 104) / 2) }]);
