@@ -1,5 +1,5 @@
 {
-  "version": "3.11.3",
+  "version": "3.11.4",
   "downloadUrl": "https://github.com/Conqueror-Mod/conquered-time/releases/latest",
-  "notes": "v3.11.3 — The two sidebar counters are now labelled: “Active Punch” (your live session clock) and “Dispatch Timer” (the running task), so it’s clear at a glance which timer is which."
+  "notes": "v3.11.4 — The company web never lets spheres overlap now. Even a busy network (or a small panel) lays out with clean gaps between every node, on both the Dashboard and the Companies page."
 }
