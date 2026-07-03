@@ -3,24 +3,42 @@
 // Reports page logic. Externalized from an inline <script> so the page runs under
 // a strict script-src 'self' CSP. Depends on globals injected by shell.js (Shell,
 // Store, escapeHtml, api) — must load after shell.js.
+//
+// IIFE-wrapped (Phase 3 pattern) — see tsconfig.renderer.json.
+(() => {
 
-let companies = [], allEntries = [], companyMap = {}, taskMap = {}, auditPolicy = null;
+type TaskCounts = { break_count: number; lunch_count: number };
+interface AuditRow extends EntryRow { req_breaks?: number; has_breaks?: number; }
+interface AuditItem {
+  date: string; company: string; entryId: number; rowIdx: number;
+  type: string; dKey: string; r: AuditRow;
+}
 
-function localRequiredBreaks(totalMins, policy) {
-  const thresholds = policy?.breakThresholds || [[210,0],[360,1],[600,2],[Infinity,3]];
+let companies: Company[] = [], allEntries: TimeEntry[] = [];
+let companyMap: Record<number, Company> = {};
+let taskMap: Record<string, TaskCounts> = {};
+let auditPolicy: AuditPolicy | null = null;
+
+const $id = (id: string): HTMLElement => document.getElementById(id)!;
+const $field = (id: string): HTMLInputElement | HTMLSelectElement =>
+  document.getElementById(id) as HTMLInputElement | HTMLSelectElement;
+
+function localRequiredBreaks(totalMins: number, policy: AuditPolicy | null): number {
+  const thresholds: Array<[number | null, number]> =
+    policy?.breakThresholds || [[210,0],[360,1],[600,2],[null,3]];
   for (const [threshold, count] of thresholds) {
     if (threshold === null || totalMins < threshold) return count;
   }
   return 0;
 }
 let currentTab = 'period';
-let barResizeObserver = null;
-let dismissedSet = new Set();
-let emailedSet = new Set();   // dKeys the user was emailed about (acknowledged but kept visible)
+let barResizeObserver: ResizeObserver | null = null;
+let dismissedSet = new Set<string>();
+let emailedSet = new Set<string>();   // dKeys the user was emailed about (acknowledged but kept visible)
 let showDismissed = false;
 
 // Build dismissedSet + emailedSet from audit:get-dismissed rows.
-function applyDismissedRows(rows) {
+function applyDismissedRows(rows: AuditDismissedRow[] | null): void {
   dismissedSet = new Set((rows || []).map(d => `${d.entry_id}:${d.row_idx}:${d.type}`));
   emailedSet   = new Set((rows || []).filter(d => d.emailed_at).map(d => `${d.entry_id}:${d.row_idx}:${d.type}`));
 }
@@ -38,26 +56,26 @@ window.addEventListener('DOMContentLoaded', async () => {
   setupTabs();
   initPeriodFilter();
 
-  document.getElementById('btn-acknowledge-wizard').addEventListener('click', () => {
+  $id('btn-acknowledge-wizard').addEventListener('click', () => {
     const theme = document.documentElement.getAttribute('data-theme') || 'memoria';
     api.invoke('audit:open-wizard', { mode: 'acknowledge', theme });
   });
-  document.getElementById('btn-fix-wizard').addEventListener('click', () => {
+  $id('btn-fix-wizard').addEventListener('click', () => {
     const theme = document.documentElement.getAttribute('data-theme') || 'memoria';
     api.invoke('audit:open-wizard', { mode: 'fix', theme });
   });
 
   // Audit toolbar + row actions (CSP-safe; replaces inline on* handlers)
-  document.getElementById('btn-toggle-dismissed').addEventListener('click', toggleShowDismissed);
-  document.getElementById('btn-clear-dismissed').addEventListener('click', clearAllDismissed);
-  document.getElementById('audit-tbody').addEventListener('click', e => {
-    const btn = e.target.closest('.audit-row-btn');
+  $id('btn-toggle-dismissed').addEventListener('click', toggleShowDismissed);
+  $id('btn-clear-dismissed').addEventListener('click', clearAllDismissed);
+  $id('audit-tbody').addEventListener('click', e => {
+    const btn = (e.target as HTMLElement).closest<HTMLElement>('.audit-row-btn');
     if (!btn) return;
     const { act, dkey, eid, ridx, type, fix } = btn.dataset;
-    if (act === 'restore')      undismissAuditItem(dkey, eid, ridx, type);
-    else if (act === 'fix')     applyAuditFix(eid, ridx, fix, dkey);
-    else if (act === 'dismiss') dismissAuditItem(dkey, eid, ridx, type);
-    else if (act === 'email')   emailAuditItem(dkey, eid, ridx, type);
+    if (act === 'restore')      undismissAuditItem(dkey!, eid!, ridx!, type!);
+    else if (act === 'fix')     applyAuditFix(eid!, ridx!, fix!, dkey!);
+    else if (act === 'dismiss') dismissAuditItem(dkey!, eid!, ridx!, type!);
+    else if (act === 'email')   emailAuditItem(dkey!, eid!, ridx!, type!);
   });
 
   api.on('audit:wizard-done', async () => {
@@ -86,7 +104,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 });
 
 // ── Data ──
-async function loadData() {
+async function loadData(): Promise<void> {
   [companies, allEntries, taskMap] = await Promise.all([
     Store.getCompanies(),
     Store.getEntries(),
@@ -99,17 +117,16 @@ async function loadData() {
   companyMap = {};
   companies.forEach(c => { companyMap[Number(c.id)] = c; });
 
-  const sel = document.getElementById('period-company');
+  const sel = $id('period-company');
   companies.forEach(c => {
     const o = document.createElement('option');
-    // @ts-ignore — number assigned to option value; DOM stringifies.
-    o.value = c.id; o.textContent = c.name;
+    o.value = String(c.id); o.textContent = c.name;
     sel.appendChild(o);
   });
 }
 
 // ── Tabs ──
-function switchTab(tab) {
+function switchTab(tab: string): void {
   currentTab = tab;
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
@@ -125,28 +142,28 @@ function switchTab(tab) {
   if (emailBtn) emailBtn.style.display = tab === 'period' ? '' : 'none';
 }
 
-function setupTabs() {
-  document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+function setupTabs(): void {
+  document.querySelectorAll<HTMLElement>('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => switchTab(btn.dataset.tab!));
   });
-  document.getElementById('btn-export-pdf').addEventListener('click', exportPDF);
-  document.getElementById('btn-export-csv').addEventListener('click', exportCSV);
-  document.getElementById('btn-email-report').addEventListener('click', openEmailModal);
+  $id('btn-export-pdf').addEventListener('click', exportPDF);
+  $id('btn-export-csv').addEventListener('click', exportCSV);
+  $id('btn-email-report').addEventListener('click', openEmailModal);
 }
 
 // ── Period filter ──
-function initPeriodFilter() {
+function initPeriodFilter(): void {
   const to = new Date(), from = new Date();
   from.setDate(from.getDate() - 29);
-  document.getElementById('period-to').value   = to.toISOString().slice(0,10);
-  document.getElementById('period-from').value = from.toISOString().slice(0,10);
-  document.getElementById('btn-apply').addEventListener('click', renderPeriod);
+  $field('period-to').value   = to.toISOString().slice(0,10);
+  $field('period-from').value = from.toISOString().slice(0,10);
+  $id('btn-apply').addEventListener('click', renderPeriod);
 }
 
-function getFilteredEntries() {
-  const from = document.getElementById('period-from').value;
-  const to   = document.getElementById('period-to').value;
-  const coId = document.getElementById('period-company').value;
+function getFilteredEntries(): TimeEntry[] {
+  const from = $field('period-from').value;
+  const to   = $field('period-to').value;
+  const coId = $field('period-company').value;
   return allEntries.filter(e => {
     if (from && e.log_date < from) return false;
     if (to   && e.log_date > to)   return false;
@@ -156,29 +173,28 @@ function getFilteredEntries() {
 }
 
 // ── Helpers ──
-function fmtH(mins)  { return mins ? (mins/60).toFixed(1)+'h' : '0.0h'; }
-function fmtM(mins)  {
+function fmtH(mins: number): string { return mins ? (mins/60).toFixed(1)+'h' : '0.0h'; }
+function fmtM(mins: number | undefined): string {
   if (!mins || mins <= 0) return '—';
   const h = Math.floor(mins/60), m = mins%60;
   return h > 0 ? `${h}h ${String(m).padStart(2,'0')}m` : `${m}m`;
 }
 
 // ── Period Summary ──
-function renderPeriod() {
+function renderPeriod(): void {
   const entries    = getFilteredEntries();
   const totalMins  = entries.reduce((s,e) => s + (e.total_mins||0), 0);
-  const from       = new Date(document.getElementById('period-from').value);
-  const to         = new Date(document.getElementById('period-to').value);
-  // @ts-ignore — Date subtraction via valueOf() is intended here.
-  const daySpan    = Math.max(1, Math.round((to-from)/86400000)+1);
+  const from       = new Date($field('period-from').value);
+  const to         = new Date($field('period-to').value);
+  const daySpan    = Math.max(1, Math.round((to.getTime()-from.getTime())/86400000)+1);
 
-  const byCompany = {};
+  const byCompany: Record<string, number> = {};
   entries.forEach(e => { const k = String(e.company_id); byCompany[k] = (byCompany[k]||0)+(e.total_mins||0); });
   const topEntry  = Object.entries(byCompany).sort((a,b)=>b[1]-a[1])[0];
   const topCoName = topEntry ? (companyMap[Number(topEntry[0])]?.name || '—') : '—';
   const topCoMins = topEntry?.[1] || 0;
 
-  document.getElementById('period-chips').innerHTML = `
+  $id('period-chips').innerHTML = `
     <div class="summary-chip">
       <div class="chip-label">Total Hours</div>
       <div class="chip-value">${fmtH(totalMins)}</div>
@@ -205,20 +221,20 @@ function renderPeriod() {
   renderLabelBreakdown(entries, totalMins);
 }
 
-function drawBarChart(entries) {
+function drawBarChart(entries: TimeEntry[]): void {
   const wrap = document.getElementById('bar-svg-wrap');
   const svg  = document.getElementById('bar-svg');
   if (!wrap || !svg) return;
   const W = wrap.clientWidth, H = wrap.clientHeight;
   if (!W || !H) return;
 
-  const from = new Date(document.getElementById('period-from').value);
-  const to   = new Date(document.getElementById('period-to').value);
+  const from = new Date($field('period-from').value);
+  const to   = new Date($field('period-to').value);
 
-  const byDate = {};
+  const byDate: Record<string, number> = {};
   entries.forEach(e => { byDate[e.log_date] = (byDate[e.log_date]||0)+(e.total_mins||0); });
 
-  const dates = [];
+  const dates: string[] = [];
   const cur = new Date(from);
   while (cur <= to) { dates.push(cur.toISOString().slice(0,10)); cur.setDate(cur.getDate()+1); }
 
@@ -264,18 +280,18 @@ function drawBarChart(entries) {
   svg.innerHTML = out;
 }
 
-function renderLabelBreakdown(entries, totalMins) {
-  const byLabel = {};
+function renderLabelBreakdown(entries: TimeEntry[], totalMins: number): void {
+  const byLabel: Record<string, number> = {};
   entries.forEach(e => {
     try {
-      JSON.parse(e.rows_json||'[]').forEach(r => {
-        if (r.total_mins > 0) { const l=r.label||'Other'; byLabel[l]=(byLabel[l]||0)+r.total_mins; }
+      (JSON.parse(e.rows_json||'[]') as EntryRow[]).forEach(r => {
+        if (r.total_mins && r.total_mins > 0) { const l=r.label||'Other'; byLabel[l]=(byLabel[l]||0)+r.total_mins; }
       });
     } catch {}
   });
 
   const sorted = Object.entries(byLabel).sort((a,b)=>b[1]-a[1]);
-  const panel  = document.getElementById('label-breakdown');
+  const panel  = $id('label-breakdown');
   const maxV   = sorted[0]?.[1] || 1;
 
   panel.innerHTML = `<div class="panel-title">Task Breakdown</div>
@@ -291,8 +307,8 @@ function renderLabelBreakdown(entries, totalMins) {
 }
 
 // ── Company Breakdown ──
-function renderCompanyBreakdown() {
-  const cards = document.getElementById('company-cards');
+function renderCompanyBreakdown(): void {
+  const cards = $id('company-cards');
   if (!companies.length) { cards.innerHTML = '<div class="empty-state">No companies yet.</div>'; return; }
 
   cards.innerHTML = companies.map(co => {
@@ -301,9 +317,9 @@ function renderCompanyBreakdown() {
     const sorted   = [...ces].sort((a,b) => b.log_date.localeCompare(a.log_date));
     const lastDate = sorted[0]?.log_date || null;
 
-    const byLabel = {};
+    const byLabel: Record<string, number> = {};
     ces.forEach(e => {
-      try { JSON.parse(e.rows_json||'[]').forEach(r => { if (r.total_mins>0) { const l=r.label||'Other'; byLabel[l]=(byLabel[l]||0)+r.total_mins; } }); } catch {}
+      try { (JSON.parse(e.rows_json||'[]') as EntryRow[]).forEach(r => { if (r.total_mins && r.total_mins>0) { const l=r.label||'Other'; byLabel[l]=(byLabel[l]||0)+r.total_mins; } }); } catch {}
     });
     const chips = Object.entries(byLabel).sort((a,b)=>b[1]-a[1])
       .map(([l,m]) => `<span class="cc-chip">${l} <span>${fmtM(m)}</span></span>`).join('');
@@ -325,7 +341,7 @@ function renderCompanyBreakdown() {
 }
 
 // ── Audit Log ──
-function getAuditType(r) {
+function getAuditType(r: EntryRow): string {
   if (!r.clock_in)          return 'no_clock_in';
   if (!r.clock_out)         return 'no_clock_out';
   if (!r.total_mins)        return 'zero_duration';
@@ -333,7 +349,8 @@ function getAuditType(r) {
   return 'ok';
 }
 
-function auditMeta(type, r) {
+interface AuditMeta { flag: string; cls: string; suggestion: string; fix: string | null; }
+function auditMeta(type: string, r: AuditRow): AuditMeta {
   switch(type) {
     case 'no_clock_in':    return { flag:'⚠ No clock-in',   cls:'flag-error',  suggestion:'Enter a clock-in time in the Time Tracker.',            fix: null };
     case 'no_clock_out':   return { flag:'● No clock-out',   cls:'flag-error',  suggestion:'Auto-set clock-out to clock-in + 8h.',                  fix: 'set_clock_out' };
@@ -345,16 +362,16 @@ function auditMeta(type, r) {
   }
 }
 
-function renderAuditLog() {
-  const tbody = document.getElementById('audit-tbody');
-  const items = [];
+function renderAuditLog(): void {
+  const tbody = $id('audit-tbody');
+  const items: AuditItem[] = [];
 
   allEntries.forEach(e => {
     const co = companyMap[Number(e.company_id)];
     const entryId = Number(e.id);
     try {
-      JSON.parse(e.rows_json||'[]').forEach((r, idx) => {
-        if (!RowUtils.rowHasContent(r)) return; // C3: keep in lockstep with main.js countAuditDiscrepancies
+      (JSON.parse(e.rows_json||'[]') as EntryRow[]).forEach((r, idx) => {
+        if (!RowUtils.rowHasContent(r)) return; // C3: keep in lockstep with src/main/audit.ts countAuditDiscrepancies
         const type = getAuditType(r);
         const dKey = `${entryId}:${idx}:${type}`;
         items.push({ date: e.log_date, company: co?.name || `#${e.company_id}`, entryId, rowIdx: idx, type, dKey, r });
@@ -394,8 +411,8 @@ function renderAuditLog() {
   }
   const clearBtn = document.getElementById('btn-clear-dismissed');
   if (clearBtn) clearBtn.style.display = totalDismissed ? '' : 'none';
-  const ackBtn = document.getElementById('btn-acknowledge-wizard');
-  const fixBtn = document.getElementById('btn-fix-wizard');
+  const ackBtn = document.getElementById('btn-acknowledge-wizard') as HTMLButtonElement | null;
+  const fixBtn = document.getElementById('btn-fix-wizard') as HTMLButtonElement | null;
   if (ackBtn) ackBtn.disabled = flagged === 0;
   if (fixBtn) fixBtn.disabled = flagged === 0;
 
@@ -434,15 +451,14 @@ function renderAuditLog() {
   }).join('');
 }
 
-async function dismissAuditItem(dKey, entryId, rowIdx, type) {
+async function dismissAuditItem(dKey: string, entryId: string | number, rowIdx: string | number, type: string): Promise<void> {
   await api.invoke('audit:dismiss', { entry_id: Number(entryId), row_idx: Number(rowIdx), type });
   dismissedSet.add(dKey);
   renderAuditLog();
 }
 
-async function emailAuditItem(dKey, entryId, rowIdx, type) {
-  const item = { type, r: {} };
-  const { suggestion } = auditMeta(type, item.r) || {};
+async function emailAuditItem(dKey: string, entryId: string | number, rowIdx: string | number, type: string): Promise<void> {
+  const { suggestion } = auditMeta(type, {});
   const res = await api.invoke('audit:email-notify', {
     entry_id: Number(entryId), row_idx: Number(rowIdx), type,
     subject: 'Conquered Time — timesheet discrepancy',
@@ -456,28 +472,28 @@ async function emailAuditItem(dKey, entryId, rowIdx, type) {
   renderAuditLog();
 }
 
-async function undismissAuditItem(dKey, entryId, rowIdx, type) {
+async function undismissAuditItem(dKey: string, entryId: string | number, rowIdx: string | number, type: string): Promise<void> {
   await api.invoke('audit:undismiss', { entry_id: Number(entryId), row_idx: Number(rowIdx), type });
   dismissedSet.delete(dKey);
   emailedSet.delete(dKey);
   renderAuditLog();
 }
 
-async function clearAllDismissed() {
+async function clearAllDismissed(): Promise<void> {
   await api.invoke('audit:clear-dismissed');
   dismissedSet.clear();
   emailedSet.clear();
   renderAuditLog();
 }
 
-function toggleShowDismissed() {
+function toggleShowDismissed(): void {
   showDismissed = !showDismissed;
   const btn = document.getElementById('btn-toggle-dismissed');
   if (btn) btn.textContent = showDismissed ? 'Hide Dismissed' : 'Show Dismissed';
   renderAuditLog();
 }
 
-async function applyAuditFix(entryId, rowIdx, fixType, dKey) {
+async function applyAuditFix(entryId: string | number, rowIdx: string | number, fixType: string, dKey: string): Promise<void> {
   const res = await api.invoke('audit:apply-fix', { entry_id: Number(entryId), row_idx: Number(rowIdx), fix_type: fixType });
   if (!res?.ok) { Shell.toast('Fix could not be applied: ' + (res?.error || 'unknown error'), 'error'); return; }
   // Reload entries so the fix is reflected
@@ -491,23 +507,23 @@ async function applyAuditFix(entryId, rowIdx, fixType, dKey) {
 }
 
 // ── PDF Export ──
-function exportPDF() {
+function exportPDF(): void {
   if (currentTab === 'period')  exportPeriodPDF();
   if (currentTab === 'company') exportCompanyPDF();
 }
 
-function buildPeriodReportHTML() {
+function buildPeriodReportHTML(): { html: string; from: string; to: string; coLabel: string } {
   const entries   = getFilteredEntries();
-  const from      = document.getElementById('period-from').value;
-  const to        = document.getElementById('period-to').value;
-  const coSel     = document.getElementById('period-company');
+  const from      = $field('period-from').value;
+  const to        = $field('period-to').value;
+  const coSel     = document.getElementById('period-company') as HTMLSelectElement;
   const coLabel   = coSel.value ? coSel.options[coSel.selectedIndex].text : 'All Companies';
   const totalMins = entries.reduce((s,e) => s+(e.total_mins||0), 0);
 
-  const byDate = {};
+  const byDate: Record<string, number> = {};
   entries.forEach(e => { byDate[e.log_date]=(byDate[e.log_date]||0)+(e.total_mins||0); });
-  const byLabel = {};
-  entries.forEach(e => { try { JSON.parse(e.rows_json||'[]').forEach(r => { if(r.total_mins>0){const l=r.label||'Other';byLabel[l]=(byLabel[l]||0)+r.total_mins;} }); } catch {} });
+  const byLabel: Record<string, number> = {};
+  entries.forEach(e => { try { (JSON.parse(e.rows_json||'[]') as EntryRow[]).forEach(r => { if(r.total_mins&&r.total_mins>0){const l=r.label||'Other';byLabel[l]=(byLabel[l]||0)+r.total_mins;} }); } catch {} });
 
   const dateRows  = Object.entries(byDate).sort(([a],[b])=>a.localeCompare(b))
     .map(([d,m])=>`<tr><td>${d}</td><td style="text-align:right">${fmtM(m)}</td></tr>`).join('');
@@ -534,15 +550,15 @@ function buildPeriodReportHTML() {
   </body></html>`, from, to, coLabel };
 }
 
-function exportPeriodPDF() {
+function exportPeriodPDF(): void {
   const { html } = buildPeriodReportHTML();
-  const win = window.open('','_blank');
+  const win = window.open('','_blank')!;
   win.document.write(html);
   win.document.close(); win.print();
 }
 
 // ── Email modal ──
-async function openEmailModal() {
+async function openEmailModal(): Promise<void> {
   const { html, from, to, coLabel } = buildPeriodReportHTML();
   const defaultSubject = `Conquered Time — Period Report — ${to}`;
   let defaultTo = '';
@@ -576,12 +592,12 @@ async function openEmailModal() {
 
   const closeModal = () => overlay.remove();
   overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
-  document.getElementById('em-cancel-btn').addEventListener('click', closeModal);
-  document.getElementById('em-send-btn').addEventListener('click', async () => {
-    const btn      = document.getElementById('em-send-btn');
-    const statusEl = document.getElementById('em-status');
-    const to       = (document.getElementById('em-to')?.value || '').trim();
-    const subject  = (document.getElementById('em-subject')?.value || '').trim();
+  $id('em-cancel-btn').addEventListener('click', closeModal);
+  $id('em-send-btn').addEventListener('click', async () => {
+    const btn      = document.getElementById('em-send-btn') as HTMLButtonElement;
+    const statusEl = $id('em-status');
+    const to       = ((document.getElementById('em-to') as HTMLInputElement | null)?.value || '').trim();
+    const subject  = ((document.getElementById('em-subject') as HTMLInputElement | null)?.value || '').trim();
     if (!to) { statusEl.textContent = 'Enter at least one recipient.'; statusEl.style.color = 'var(--error,#e05252)'; return; }
     btn.disabled = true;
     btn.textContent = 'Sending…';
@@ -607,14 +623,14 @@ async function openEmailModal() {
   });
 }
 
-function exportCompanyPDF() {
+function exportCompanyPDF(): void {
   const grandTotal = allEntries.reduce((s,e)=>s+(e.total_mins||0),0);
   const rows = companies.map(co => {
     const ces = allEntries.filter(e=>Number(e.company_id)===Number(co.id));
     const m   = ces.reduce((s,e)=>s+(e.total_mins||0),0);
     return `<tr><td>${escapeHtml(co.name)}</td><td>${ces.length}</td><td style="text-align:right">${fmtM(m)}</td></tr>`;
   }).join('');
-  const win = window.open('','_blank');
+  const win = window.open('','_blank')!;
   win.document.write(`<!DOCTYPE html><html><head><title>Company Report</title>
   <style>body{font-family:DM Sans,Arial,sans-serif;font-size:12px;color:#111;padding:40px;max-width:900px;margin:0 auto;}
   h1{font-size:20px;font-weight:600;margin:0 0 4px;}.meta{color:#666;font-size:11px;margin-bottom:20px;}
@@ -633,12 +649,12 @@ function exportCompanyPDF() {
 }
 
 // ── CSV Export (Audit) ──
-function exportCSV() {
-  const rows = [];
+function exportCSV(): void {
+  const rows: Array<Array<string | number>> = [];
   allEntries.forEach(e => {
     const co = companyMap[Number(e.company_id)];
     try {
-      JSON.parse(e.rows_json||'[]').forEach(r => {
+      (JSON.parse(e.rows_json||'[]') as EntryRow[]).forEach(r => {
         if (!r.clock_in && !r.label && !r.name) return;
         rows.push([e.log_date, co?.name||`#${e.company_id}`, r.label||'', r.name||'', flattenText(r.desc), r.clock_in||'', r.clock_out||'', r.total_mins||0, fmtM(r.total_mins)]);
       });
@@ -647,7 +663,7 @@ function exportCSV() {
   const header = ['Date','Company','Task Label','Task Name','Description','Clock In','Clock Out','Minutes','Duration'];
   // Quote, double embedded quotes, and neutralize CSV formula injection
   // (leading = + - @ tab CR) by prefixing a single quote.
-  const csvCell = (v) => {
+  const csvCell = (v: unknown): string => {
     let s = v == null ? '' : String(v);
     if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
     return '"' + s.replace(/"/g, '""') + '"';
@@ -660,3 +676,5 @@ function exportCSV() {
   document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
   Shell.toast('Audit log exported.','success');
 }
+
+})();

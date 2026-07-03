@@ -34,6 +34,7 @@
     "src/renderer/pages/login-theme-init.js",
     "src/renderer/pages/audit-theme-init.js",
     "src/renderer/pages/splash.js",
-    "src/renderer/pages/global-log.js"
+    "src/renderer/pages/global-log.js",
+    "src/renderer/pages/reports.js"
   ]
 }
