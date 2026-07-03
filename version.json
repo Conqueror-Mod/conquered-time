@@ -1,5 +1,5 @@
 {
-  "version": "3.11.5",
+  "version": "3.11.6",
   "downloadUrl": "https://github.com/Conqueror-Mod/conquered-time/releases/latest",
-  "notes": "v3.11.5 — A sharper startup: the splash screen now uses the full-resolution app icon."
+  "notes": "v3.11.6 — Fixed a blank screen after redeeming a beta key on a fresh install. New users now land on the account-setup screen as expected."
 }
