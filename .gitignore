@@ -11,6 +11,7 @@ dist-main/
 # the HTML references). The generated .js is never committed — one line per
 # converted page; remove the source .js from git when converting.
 src/renderer/pages/dashboard.js
+src/renderer/pages/task-timer.js
 dev-data/
 *.db
 *.db-backup-*

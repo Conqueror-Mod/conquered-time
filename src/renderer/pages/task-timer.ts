@@ -6,29 +6,40 @@
 //
 // Break/lunch punches moved to the Time Tracker (v3.6) — Dispatch is now purely
 // task timing + counting. Break/lunch are still task_items, just managed there.
+//
+// IIFE-wrapped (Phase 3 pattern) — see tsconfig.renderer.json.
+(() => {
+
+type ActiveEntry = TimeEntry & { company_name?: string };
 
 // ── State ──────────────────────────────────────────────────────────────────
-let activeEntry   = null;   // full entry object from entries:get-active
-let taskItems     = [];     // current session task_items
-let activeTaskId  = null;   // task_item id of the in-progress task (or null)
-let timerStart    = null;   // Date.now() when current task started
-let timerInterval = null;   // setInterval handle for stopwatch
-let sessionStartMs = null;  // ms when the active row clocked in (for banner duration)
+let activeEntry: ActiveEntry | null = null;   // full entry object from entries:get-active
+let taskItems: TaskItem[] = [];               // current session task_items
+let activeTaskId: number | null = null;       // task_item id of the in-progress task (or null)
+let timerStart: number | null = null;         // Date.now() when current task started
+let timerInterval: ReturnType<typeof setInterval> | null = null; // stopwatch handle
+let sessionStartMs: number | null = null;     // ms when the active row clocked in (for banner duration)
+
+// ── DOM helpers ────────────────────────────────────────────────────────────
+// The page's elements are static markup — a missing id is a programming error,
+// so the non-null lookup is the correct contract here.
+const $id = (id: string): HTMLElement => document.getElementById(id)!;
+const $input = (id: string): HTMLInputElement => document.getElementById(id) as HTMLInputElement;
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-function fmtSecs(totalSecs) {
+function fmtSecs(totalSecs: number): string {
   const m = Math.floor(totalSecs / 60);
   const s = totalSecs % 60;
   return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
 }
 
-function fmtDurSecs(secs) {
+function fmtDurSecs(secs: number): string {
   if (secs < 60) return `${secs}s`;
   const m = Math.floor(secs / 60), s = secs % 60;
   return s > 0 ? `${m}m ${s}s` : `${m}m`;
 }
 
-function fmtTime(hhmm) {
+function fmtTime(hhmm: string | null): string {
   if (!hhmm) return '—';
   if (Settings.get('timeFormat') === '12h') {
     const [h, m] = hhmm.split(':').map(Number);
@@ -39,7 +50,7 @@ function fmtTime(hhmm) {
   return hhmm;
 }
 
-function parseHHMMtoMs(hhmm) {
+function parseHHMMtoMs(hhmm: string | null): number | null {
   if (!hhmm) return null;
   const [h, m] = hhmm.split(':').map(Number);
   const today = new Date();
@@ -47,10 +58,10 @@ function parseHHMMtoMs(hhmm) {
   return today.getTime();
 }
 
-function buildDescString(tasks) {
+function buildDescString(tasks: TaskItem[]): string {
   const completed = tasks.filter(t => t.item_type === 'task' && t.stopped_at);
   if (!completed.length) return '';
-  const counts = {};
+  const counts: Record<string, number> = {};
   completed.forEach(t => { counts[t.label] = (counts[t.label] || 0) + 1; });
   const parts = Object.entries(counts)
     .sort((a,b) => b[1]-a[1])
@@ -58,7 +69,7 @@ function buildDescString(tasks) {
   return `[${completed.length} task${completed.length===1?'':'s'}] ${parts.join(', ')}`;
 }
 
-function elapsedSinceMs(ms) {
+function elapsedSinceMs(ms: number): string {
   const diff = Date.now() - ms;
   const h = Math.floor(diff / 3600000);
   const m = Math.floor((diff % 3600000) / 60000);
@@ -66,33 +77,33 @@ function elapsedSinceMs(ms) {
 }
 
 // ── Banner ─────────────────────────────────────────────────────────────────
-async function updateBanner() {
-  const banner = document.getElementById('session-banner');
+async function updateBanner(): Promise<void> {
+  const banner = $id('session-banner');
   if (!activeEntry) {
     banner.classList.add('no-session');
-    document.getElementById('no-session-msg').style.display = '';
-    document.getElementById('tt-main').style.display        = 'none';
-    document.getElementById('live-badge').style.display     = 'none';
+    $id('no-session-msg').style.display = '';
+    $id('tt-main').style.display        = 'none';
+    $id('live-badge').style.display     = 'none';
     return;
   }
   banner.classList.remove('no-session');
-  document.getElementById('no-session-msg').style.display = 'none';
-  document.getElementById('tt-main').style.display        = 'grid';
-  document.getElementById('live-badge').style.display     = '';
+  $id('no-session-msg').style.display = 'none';
+  $id('tt-main').style.display        = 'grid';
+  $id('live-badge').style.display     = '';
 
   // Find active row (clocked in, not clocked out)
-  const rows = JSON.parse(activeEntry.rows_json || '[]');
+  const rows: EntryRow[] = JSON.parse(activeEntry.rows_json || '[]');
   const activeRow = rows.find(r => r.clock_in && !r.clock_out);
   const clockIn = activeRow?.clock_in || null;
   if (clockIn) sessionStartMs = parseHHMMtoMs(clockIn);
 
-  document.getElementById('banner-company').textContent = activeEntry.company_name || activeEntry.session_label || 'Session';
-  document.getElementById('banner-date').textContent    = activeEntry.log_date || '—';
-  document.getElementById('banner-clock-in').textContent = clockIn ? fmtTime(clockIn) : '—';
+  $id('banner-company').textContent  = activeEntry.company_name || activeEntry.session_label || 'Session';
+  $id('banner-date').textContent     = activeEntry.log_date || '—';
+  $id('banner-clock-in').textContent = clockIn ? fmtTime(clockIn) : '—';
   updateBannerDuration();
 }
 
-function updateBannerDuration() {
+function updateBannerDuration(): void {
   if (!sessionStartMs) return;
   const el = document.getElementById('banner-duration');
   if (el) el.textContent = elapsedSinceMs(sessionStartMs);
@@ -103,25 +114,25 @@ function updateBannerDuration() {
 // session's Task Names (the `name` field of its saved rows), so Dispatch times
 // the tasks you've defined for today. Falls back to recent history when the
 // session has no named rows yet.
-async function loadTaskNameOptions() {
-  let labels = [];
+async function loadTaskNameOptions(): Promise<void> {
+  let labels: string[] = [];
   try {
-    const rows = JSON.parse(activeEntry?.rows_json || '[]');
+    const rows: EntryRow[] = JSON.parse(activeEntry?.rows_json || '[]');
     labels = [...new Set(rows.map(r => (r.name || '').trim()).filter(Boolean))];
   } catch {}
   if (!labels.length) labels = await api.invoke('tasks:recent-labels') || [];
 
-  const datalist = document.getElementById('recent-labels-list');
-  const row = document.getElementById('quickpick-row');
+  const datalist = $id('recent-labels-list');
+  const row = $id('quickpick-row');
   // escapeHtml — labels are user-controlled (row names / history)
   datalist.innerHTML = labels.map(l => `<option value="${escapeHtml(l)}">`).join('');
   row.innerHTML = labels.map(l =>
     `<button class="tt-quick-chip" data-label="${escapeHtml(l)}">${escapeHtml(l)}</button>`
   ).join('');
-  row.querySelectorAll('.tt-quick-chip').forEach(btn => {
+  row.querySelectorAll<HTMLElement>('.tt-quick-chip').forEach(btn => {
     btn.addEventListener('click', () => {
-      document.getElementById('task-label-input').value = btn.dataset.label;
-      document.getElementById('task-label-input').focus();
+      $input('task-label-input').value = btn.dataset.label || '';
+      $input('task-label-input').focus();
     });
   });
 }
@@ -129,13 +140,13 @@ async function loadTaskNameOptions() {
 // The active session's "current" Task Name: the in-progress (clocked-in, not
 // clocked-out) row's name, else the most recently named row. Used to pre-fill
 // the timer field so restarting the same task doesn't require re-selecting it.
-function getCurrentSessionTaskName() {
+function getCurrentSessionTaskName(): string {
   try {
-    const rows = JSON.parse(activeEntry?.rows_json || '[]');
+    const rows: EntryRow[] = JSON.parse(activeEntry?.rows_json || '[]');
     const active = rows.find(r => r.clock_in && !r.clock_out && (r.name || '').trim());
-    if (active) return active.name.trim();
+    if (active) return active.name!.trim();
     const named = rows.filter(r => (r.name || '').trim());
-    if (named.length) return named[named.length - 1].name.trim();
+    if (named.length) return named[named.length - 1].name!.trim();
   } catch {}
   return '';
 }
@@ -143,16 +154,16 @@ function getCurrentSessionTaskName() {
 // Pre-fill the timer field (when no task is running). Prefers an explicit value
 // (e.g. the task just stopped, for quick restart), falling back to the session's
 // current Task Name. The datalist/quick-picks remain for switching tasks.
-function prefillTaskInput(preferred) {
-  const input = document.getElementById('task-label-input');
+function prefillTaskInput(preferred?: string): void {
+  const input = document.getElementById('task-label-input') as HTMLInputElement | null;
   if (!input || input.disabled) return;
   const val = (preferred && preferred.trim()) || getCurrentSessionTaskName();
   if (val) input.value = val;
 }
 
 // ── Task list render ───────────────────────────────────────────────────────
-function renderTaskList() {
-  const list = document.getElementById('task-list');
+function renderTaskList(): void {
+  const list = $id('task-list');
   const completed = taskItems.filter(t => t.item_type === 'task' && t.stopped_at);
   if (!completed.length) {
     list.innerHTML = '<div style="font-family:var(--sans);font-size:12px;color:var(--text-muted);padding:12px 0;text-align:center;">No tasks logged yet</div>';
@@ -165,16 +176,15 @@ function renderTaskList() {
         <button class="tt-task-del" data-id="${t.id}" title="Remove">✕</button>
       </div>
     `).join('');
-    list.querySelectorAll('.tt-task-del').forEach(btn => {
+    list.querySelectorAll<HTMLElement>('.tt-task-del').forEach(btn => {
       btn.addEventListener('click', () => deleteTask(Number(btn.dataset.id)));
     });
   }
   const count = completed.length;
-  // @ts-ignore — number assigned to textContent; DOM stringifies.
-  document.getElementById('counter-num').textContent = count;
+  $id('counter-num').textContent = String(count);
 
-  const preview = document.getElementById('desc-preview');
-  const previewText = document.getElementById('desc-preview-text');
+  const preview = $id('desc-preview');
+  const previewText = $id('desc-preview-text');
   const desc = buildDescString(taskItems);
   if (desc) {
     preview.style.display = '';
@@ -185,35 +195,35 @@ function renderTaskList() {
 }
 
 // ── Timer controls ─────────────────────────────────────────────────────────
-function startStopwatch(startedAtMs) {
+function startStopwatch(startedAtMs?: number): void {
   timerStart = startedAtMs || Date.now();
   timerInterval = setInterval(() => {
-    const elapsed = Math.floor((Date.now() - timerStart) / 1000);
-    document.getElementById('stopwatch').textContent = fmtSecs(elapsed);
-    document.getElementById('stopwatch').classList.add('running');
+    const elapsed = Math.floor((Date.now() - timerStart!) / 1000);
+    $id('stopwatch').textContent = fmtSecs(elapsed);
+    $id('stopwatch').classList.add('running');
   }, 1000);
   // Render first tick immediately so the display isn't 00:00 for a second
   const elapsed = Math.floor((Date.now() - timerStart) / 1000);
-  document.getElementById('stopwatch').textContent = fmtSecs(elapsed);
-  document.getElementById('stopwatch').classList.add('running');
+  $id('stopwatch').textContent = fmtSecs(elapsed);
+  $id('stopwatch').classList.add('running');
 }
 
-function stopStopwatch() {
-  clearInterval(timerInterval);
+function stopStopwatch(): void {
+  if (timerInterval) clearInterval(timerInterval);
   timerInterval = null;
-  document.getElementById('stopwatch').classList.remove('running');
+  $id('stopwatch').classList.remove('running');
 }
 
-function resetStopwatch() {
-  document.getElementById('stopwatch').textContent = '00:00';
-  document.getElementById('stopwatch').classList.remove('running');
+function resetStopwatch(): void {
+  $id('stopwatch').textContent = '00:00';
+  $id('stopwatch').classList.remove('running');
 }
 
 // ── Write description back to Time Tracker entry ──────────────────────────
-async function writeDescToEntry() {
+async function writeDescToEntry(): Promise<void> {
   if (!activeEntry) return;
   const desc = buildDescString(taskItems);
-  const rows = JSON.parse(activeEntry.rows_json || '[]');
+  const rows: EntryRow[] = JSON.parse(activeEntry.rows_json || '[]');
   // Find the active row (clocked in, not clocked out)
   const activeRowIdx = rows.findIndex(r => r.clock_in && !r.clock_out);
   if (activeRowIdx === -1) return;
@@ -230,7 +240,7 @@ async function writeDescToEntry() {
 }
 
 // ── Delete task ────────────────────────────────────────────────────────────
-async function deleteTask(id) {
+async function deleteTask(id: number): Promise<void> {
   await api.invoke('tasks:delete', id);
   taskItems = taskItems.filter(t => t.id !== id);
   renderTaskList();
@@ -248,29 +258,29 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   // Live 12h/24h switch — re-render the banner clock-in time in place.
   document.addEventListener('ct:settings-changed', e => {
-    if (e.detail?.key === 'timeFormat' && activeEntry) updateBanner();
+    if ((e as CustomEvent).detail?.key === 'timeFormat' && activeEntry) updateBanner();
   });
 
   if (!activeEntry) {
     // Wire button to show error — don't silently swallow clicks
-    document.getElementById('btn-start').addEventListener('click', () => {
+    $id('btn-start').addEventListener('click', () => {
       Shell.toast('No active punch. Go to Time Tracker and clock in first.', 'error');
     });
     return;
   }
 
   // Load tasks and recent labels
-  taskItems = await api.invoke('tasks:list', activeEntry.id);
+  taskItems = await api.invoke('tasks:list', activeEntry.id) || [];
 
   // Resume an in-progress task (user navigated away and returned)
   const inProgressTask = taskItems.find(t => t.item_type === 'task' && t.started_at && !t.stopped_at);
   if (inProgressTask) {
     activeTaskId = inProgressTask.id;
-    document.getElementById('task-label-input').value    = inProgressTask.label;
-    document.getElementById('task-label-input').disabled = true;
-    document.getElementById('btn-start').style.display   = 'none';
-    document.getElementById('btn-stop').style.display    = '';
-    document.getElementById('btn-cancel').style.display  = '';
+    $input('task-label-input').value    = inProgressTask.label;
+    $input('task-label-input').disabled = true;
+    $id('btn-start').style.display   = 'none';
+    $id('btn-stop').style.display    = '';
+    $id('btn-cancel').style.display  = '';
     startStopwatch(inProgressTask.started_at);
     Shell.showSidebarTimer(inProgressTask.started_at);
   }
@@ -286,39 +296,39 @@ window.addEventListener('DOMContentLoaded', async () => {
   setInterval(updateBannerDuration, 30000);
 
   // ── Start Task ──
-  document.getElementById('btn-start').addEventListener('click', async () => {
-    const label = document.getElementById('task-label-input').value.trim();
+  $id('btn-start').addEventListener('click', async () => {
+    const label = $input('task-label-input').value.trim();
     if (!label) {
       Shell.toast('Enter a task label first.', 'info');
-      document.getElementById('task-label-input').focus();
+      $input('task-label-input').focus();
       return;
     }
     // Save task_item as started
     const res = await api.invoke('tasks:save', {
-      entry_id: activeEntry.id,
+      entry_id: activeEntry!.id,
       label,
       item_type: 'task',
       started_at: Date.now(),
       duration_secs: 0,
     });
-    activeTaskId = res.id;
+    activeTaskId = res.id ?? null;
     startStopwatch();
-    Shell.showSidebarTimer(timerStart);
+    Shell.showSidebarTimer(timerStart!);
 
-    document.getElementById('btn-start').style.display  = 'none';
-    document.getElementById('btn-stop').style.display   = '';
-    document.getElementById('btn-cancel').style.display = '';
-    document.getElementById('task-label-input').disabled = true;
+    $id('btn-start').style.display  = 'none';
+    $id('btn-stop').style.display   = '';
+    $id('btn-cancel').style.display = '';
+    $input('task-label-input').disabled = true;
   });
 
   // ── Stop & Log ──
-  document.getElementById('btn-stop').addEventListener('click', async () => {
+  $id('btn-stop').addEventListener('click', async () => {
     if (!activeTaskId) return;
-    const durationSecs = Math.floor((Date.now() - timerStart) / 1000);
+    const durationSecs = Math.floor((Date.now() - timerStart!) / 1000);
     stopStopwatch();
 
     // Update the task_item with stopped_at and duration
-    const label = document.getElementById('task-label-input').value.trim();
+    const label = $input('task-label-input').value.trim();
     await api.invoke('tasks:save', {
       id: activeTaskId,
       label,
@@ -328,7 +338,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     });
 
     // Refresh task list
-    taskItems = await api.invoke('tasks:list', activeEntry.id);
+    taskItems = await api.invoke('tasks:list', activeEntry!.id) || [];
     renderTaskList();
     await writeDescToEntry();
     await loadTaskNameOptions();
@@ -338,17 +348,17 @@ window.addEventListener('DOMContentLoaded', async () => {
     timerStart = null;
     resetStopwatch();
     Shell.hideSidebarTimer();
-    document.getElementById('task-label-input').disabled = false;
+    $input('task-label-input').disabled = false;
     // Keep the just-stopped task in the field so restarting it is one click.
     prefillTaskInput(label);
-    document.getElementById('task-label-input').focus();
-    document.getElementById('btn-start').style.display  = '';
-    document.getElementById('btn-stop').style.display   = 'none';
-    document.getElementById('btn-cancel').style.display = 'none';
+    $input('task-label-input').focus();
+    $id('btn-start').style.display  = '';
+    $id('btn-stop').style.display   = 'none';
+    $id('btn-cancel').style.display = 'none';
   });
 
   // ── Cancel ──
-  document.getElementById('btn-cancel').addEventListener('click', async () => {
+  $id('btn-cancel').addEventListener('click', async () => {
     if (activeTaskId) {
       await api.invoke('tasks:delete', activeTaskId);
       taskItems = taskItems.filter(t => t.id !== activeTaskId);
@@ -358,17 +368,19 @@ window.addEventListener('DOMContentLoaded', async () => {
     stopStopwatch();
     resetStopwatch();
     Shell.hideSidebarTimer();
-    document.getElementById('task-label-input').value    = '';
-    document.getElementById('task-label-input').disabled = false;
+    $input('task-label-input').value    = '';
+    $input('task-label-input').disabled = false;
     // Cancelled (abandoned), so fall back to the session's current Task Name.
     prefillTaskInput();
-    document.getElementById('btn-start').style.display  = '';
-    document.getElementById('btn-stop').style.display   = 'none';
-    document.getElementById('btn-cancel').style.display = 'none';
+    $id('btn-start').style.display  = '';
+    $id('btn-stop').style.display   = 'none';
+    $id('btn-cancel').style.display = 'none';
   });
 
   // ── Enter key on label input starts timer ──
-  document.getElementById('task-label-input').addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !activeTaskId) document.getElementById('btn-start').click();
+  $id('task-label-input').addEventListener('keydown', (e: KeyboardEvent) => {
+    if (e.key === 'Enter' && !activeTaskId) $id('btn-start').click();
   });
 });
+
+})();
