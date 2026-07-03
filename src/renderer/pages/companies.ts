@@ -3,10 +3,33 @@
 // Companies page logic. Externalized from an inline <script> so the page runs
 // under a strict script-src 'self' CSP. Depends on globals injected by shell.js
 // (Shell, Store, IPC, Validator, escapeHtml, api) — must load after shell.js.
+//
+// IIFE-wrapped (Phase 3 pattern) — see tsconfig.renderer.json.
+(() => {
 
-let companies = [], entries = [], nodes = [];
-let editingId = null, selectedId = null, ctxTarget = null;
-let animFrame = null, resizeObserver = null;
+interface SphereColors {
+  g1: string; g2: string; border: string; label: string; sublabel: string; rim: string;
+  glow?: string; base?: string;
+}
+interface WebColors {
+  center: SphereColors; node: SphereColors;
+  edge1: string; edge2: string; grid: string; hours: string;
+}
+interface WebNode {
+  x: number; y: number; vx: number; vy: number; r: number;
+  label: string; sublabel: string; isCenter: boolean;
+  co: Company | null; fixed?: boolean; hours?: number;
+}
+
+let companies: Company[] = [], entries: EntrySummary[] = [], nodes: WebNode[] = [];
+let editingId: number | null = null, selectedId: number | null = null;
+let ctxTarget: Company | null = null;
+let animFrame: number | null = null;
+let resizeObserver: ResizeObserver | null = null;
+
+const $id = (id: string): HTMLElement => document.getElementById(id)!;
+const $field = (id: string): HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement =>
+  document.getElementById(id) as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
 
 window.addEventListener('DOMContentLoaded', async () => {
   await Shell.init('companies');
@@ -16,53 +39,56 @@ window.addEventListener('DOMContentLoaded', async () => {
   await loadCompanies();
   drawWeb();
 
-  document.getElementById('det-edit-btn').addEventListener('click', () => {
+  $id('det-edit-btn').addEventListener('click', () => {
     const co = companies.find(c => c.id === selectedId);
     if (co) openModal(co);
   });
-  document.getElementById('det-tracker-btn').addEventListener('click', () => {
+  $id('det-tracker-btn').addEventListener('click', () => {
     const co = companies.find(c => c.id === selectedId);
     if (co) { sessionStorage.setItem('active_company', JSON.stringify(co)); api.send('navigate', 'tracker'); }
   });
-  document.getElementById('det-delete-btn').addEventListener('click', () => deleteSelected());
+  $id('det-delete-btn').addEventListener('click', () => deleteSelected());
 
   // ── Static control wiring (CSP-safe; replaces inline on* handlers) ──────
-  document.getElementById('btn-add-company').addEventListener('click', () => openModal());
-  document.getElementById('det-close-btn').addEventListener('click', closeDetail);
-  document.getElementById('modal-cancel-btn').addEventListener('click', closeModal);
-  document.getElementById('modal-save-btn').addEventListener('click', saveCompany);
-  document.getElementById('delete-btn').addEventListener('click', deleteCompany);
-  document.getElementById('ctx-open-tracker').addEventListener('click', ctxOpenTracker);
-  document.getElementById('ctx-edit').addEventListener('click', ctxEditCompany);
-  document.getElementById('ctx-delete').addEventListener('click', ctxDeleteCompany);
+  $id('btn-add-company').addEventListener('click', () => openModal());
+  $id('det-close-btn').addEventListener('click', closeDetail);
+  $id('modal-cancel-btn').addEventListener('click', closeModal);
+  $id('modal-save-btn').addEventListener('click', saveCompany);
+  $id('delete-btn').addEventListener('click', deleteCompany);
+  $id('ctx-open-tracker').addEventListener('click', ctxOpenTracker);
+  $id('ctx-edit').addEventListener('click', ctxEditCompany);
+  $id('ctx-delete').addEventListener('click', ctxDeleteCompany);
 
   // Company list — delegated so dynamically-rendered rows need no re-wiring.
-  document.getElementById('company-list').addEventListener('click', e => {
-    const item = e.target.closest('.company-list-item');
+  $id('company-list').addEventListener('click', e => {
+    const item = (e.target as HTMLElement).closest<HTMLElement>('.company-list-item');
     if (item) selectCompany(Number(item.dataset.id));
+  });
+
+  $id('company-modal').addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeModal();
   });
 });
 
-async function loadCompanies() {
+async function loadCompanies(): Promise<void> {
   companies = await Store.getCompanies();
   entries   = await Store.getEntriesSummary();
   renderList();
-  // @ts-ignore — number assigned to textContent; DOM stringifies.
-  document.getElementById('company-count').textContent = companies.length;
+  $id('company-count').textContent = String(companies.length);
   if (selectedId) {
     const co = companies.find(c => c.id === selectedId);
     if (co) renderDetail(co); else closeDetail();
   }
 }
 
-function compMinsMap() {
-  const m = {};
+function compMinsMap(): Record<number, number> {
+  const m: Record<number, number> = {};
   entries.forEach(e => { m[e.company_id] = (m[e.company_id] || 0) + e.total_mins; });
   return m;
 }
 
-function renderList() {
-  const el = document.getElementById('company-list');
+function renderList(): void {
+  const el = $id('company-list');
   if (companies.length === 0) {
     el.innerHTML = `<div style="font-size:12px;color:var(--text-dim);text-align:center;padding:24px 0;">No companies yet.<br>Add one to begin.</div>`;
     return;
@@ -84,38 +110,38 @@ function renderList() {
   }).join('');
 }
 
-function selectCompany(id) {
+function selectCompany(id: number): void {
   selectedId = id;
-  document.querySelectorAll('.company-list-item').forEach(el =>
-    el.classList.toggle('selected', parseInt(el.dataset.id) === id)
+  document.querySelectorAll<HTMLElement>('.company-list-item').forEach(el =>
+    el.classList.toggle('selected', parseInt(el.dataset.id || '') === id)
   );
   const co = companies.find(c => c.id === id);
   if (co) renderDetail(co);
 }
 
-function renderDetail(co) {
+function renderDetail(co: Company): void {
   const mins  = compMinsMap();
   const hours = mins[co.id] || 0;
 
-  document.getElementById('det-panel-title').textContent = 'Details';
-  document.getElementById('det-name').textContent = co.name || '—';
+  $id('det-panel-title').textContent = 'Details';
+  $id('det-name').textContent = co.name || '—';
 
   const hierParts = [co.hier_company, co.hier_project, co.hier_platform].filter(Boolean);
-  document.getElementById('det-breadcrumb').textContent = hierParts.join(' › ');
+  $id('det-breadcrumb').textContent = hierParts.join(' › ');
 
   const isActive = !co.date_end;
   let statsHtml = '';
   statsHtml += `<div class="det-chip yellow">${fmtH(hours)} logged</div>`;
-  if (co.pay_rate) statsHtml += `<div class="det-chip accent">$${parseFloat(co.pay_rate).toFixed(2)}/hr</div>`;
+  if (co.pay_rate) statsHtml += `<div class="det-chip accent">$${Number(co.pay_rate).toFixed(2)}/hr</div>`;
   statsHtml += `<div class="det-chip ${isActive ? 'green' : ''}">${isActive ? 'Active' : 'Ended'}</div>`;
   if (co.work_type) statsHtml += `<div class="det-chip">${escapeHtml(co.work_type)}</div>`;
-  document.getElementById('det-stats').innerHTML = statsHtml;
+  $id('det-stats').innerHTML = statsHtml;
 
-  const fv = (v) => v
+  const fv = (v: string | null | undefined): string => v
     ? `<span class="det-field-value">${escapeHtml(v)}</span>`
     : `<span class="det-field-value empty">—</span>`;
 
-  document.getElementById('det-fields').innerHTML = `
+  $id('det-fields').innerHTML = `
     <div class="det-field">
       <div class="det-field-label">Job Title</div>
       ${fv(co.job_title)}
@@ -139,29 +165,29 @@ function renderDetail(co) {
     </div>` : ''}
   `;
 
-  const notesBlock = document.getElementById('det-notes-block');
+  const notesBlock = $id('det-notes-block');
   if (co.notes) {
     notesBlock.classList.add('has-notes');
-    document.getElementById('det-notes-text').textContent = co.notes;
+    $id('det-notes-text').textContent = co.notes;
   } else {
     notesBlock.classList.remove('has-notes');
   }
 
-  document.getElementById('company-panel').classList.add('detail-open');
+  $id('company-panel').classList.add('detail-open');
 }
 
-function closeDetail() {
+function closeDetail(): void {
   selectedId = null;
-  document.getElementById('company-panel').classList.remove('detail-open');
+  $id('company-panel').classList.remove('detail-open');
   document.querySelectorAll('.company-list-item').forEach(el => el.classList.remove('selected'));
 }
 
 // ── Modal ──
-function openModal(co = null) {
+function openModal(co: Company | null = null): void {
   editingId = co?.id || null;
-  document.getElementById('modal-title').textContent = co ? 'Edit Company' : 'Add Company';
-  document.getElementById('delete-btn').style.display = co ? '' : 'none';
-  const fields = {
+  $id('modal-title').textContent = co ? 'Edit Company' : 'Add Company';
+  $id('delete-btn').style.display = co ? '' : 'none';
+  const fields: Record<string, string> = {
     'f-hier-company':  co?.hier_company  || '',
     'f-hier-project':  co?.hier_project  || '',
     'f-hier-platform': co?.hier_platform || '',
@@ -170,7 +196,7 @@ function openModal(co = null) {
     'f-title':         co?.job_title     || '',
     'f-work-type':     co?.work_type     || '',
     'f-location':      co?.location      || '',
-    'f-payrate':       co?.pay_rate      || '',
+    'f-payrate':       String(co?.pay_rate || ''),
     'f-date-start':    co?.date_start    || '',
     'f-date-end':      co?.date_end      || '',
     'f-login':         co?.platform_login  || '',
@@ -179,45 +205,48 @@ function openModal(co = null) {
     'f-supervisors':   co?.supervisors     || '',
     'f-notes':         co?.notes           || '',
   };
-  Object.entries(fields).forEach(([id, val]) => { const el = document.getElementById(id); if (el) el.value = val; });
-  document.getElementById('company-modal').style.display = 'flex';
+  Object.entries(fields).forEach(([id, val]) => {
+    const el = document.getElementById(id) as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null;
+    if (el) el.value = val;
+  });
+  $id('company-modal').style.display = 'flex';
   setTimeout(() => {
-    const focus = co ? document.getElementById('f-hier-company') : document.getElementById('f-hier-company');
+    const focus = document.getElementById('f-hier-company');
     if (focus) focus.focus();
   }, 50);
 }
 
-function closeModal() {
-  document.getElementById('company-modal').style.display = 'none';
+function closeModal(): void {
+  $id('company-modal').style.display = 'none';
   editingId = null;
 }
 
-async function saveCompany() {
-  const hierCompany = document.getElementById('f-hier-company').value.trim();
+async function saveCompany(): Promise<void> {
+  const hierCompany = $field('f-hier-company').value.trim();
   if (!hierCompany) { Shell.toast('Company field is required.', 'error'); return; }
-  const alias = document.getElementById('f-name').value.trim();
+  const alias = $field('f-name').value.trim();
   const data = {
     id:              editingId,
     name:            alias || hierCompany,
-    job_title:       document.getElementById('f-title').value.trim(),
-    work_type:       document.getElementById('f-work-type').value,
-    location:        document.getElementById('f-location').value.trim(),
-    pay_rate:        parseFloat(document.getElementById('f-payrate').value) || 0,
-    date_start:      document.getElementById('f-date-start').value,
-    date_end:        document.getElementById('f-date-end').value,
+    job_title:       $field('f-title').value.trim(),
+    work_type:       $field('f-work-type').value,
+    location:        $field('f-location').value.trim(),
+    pay_rate:        parseFloat($field('f-payrate').value) || 0,
+    date_start:      $field('f-date-start').value,
+    date_end:        $field('f-date-end').value,
     hier_company:    hierCompany,
-    hier_project:    document.getElementById('f-hier-project').value.trim(),
-    hier_platform:   document.getElementById('f-hier-platform').value.trim(),
-    nav_id:          document.getElementById('f-navid').value.trim(),
-    platform_login:  document.getElementById('f-login').value.trim(),
-    platform_email:  document.getElementById('f-email').value.trim(),
-    platform_url:    document.getElementById('f-url').value.trim(),
-    supervisors:     document.getElementById('f-supervisors').value.trim(),
-    notes:           document.getElementById('f-notes').value.trim(),
+    hier_project:    $field('f-hier-project').value.trim(),
+    hier_platform:   $field('f-hier-platform').value.trim(),
+    nav_id:          $field('f-navid').value.trim(),
+    platform_login:  $field('f-login').value.trim(),
+    platform_email:  $field('f-email').value.trim(),
+    platform_url:    $field('f-url').value.trim(),
+    supervisors:     $field('f-supervisors').value.trim(),
+    notes:           $field('f-notes').value.trim(),
   };
-  const valid = Validator.validateCompany(data);
-  if (!valid.ok) { Shell.toast(valid.error, 'error'); return; }
-  const res = await IPC.companies.save(data);
+  const valid = Validator.validateCompany(data as Partial<Company>);
+  if (!valid.ok) { Shell.toast(valid.error || 'Invalid company.', 'error'); return; }
+  const res = await IPC.companies.save(data as unknown as Company);
   if (res.ok) {
     Shell.toast(editingId ? 'Company updated.' : 'Company added.', 'success');
     closeModal();
@@ -229,7 +258,7 @@ async function saveCompany() {
   }
 }
 
-async function deleteCompany() {
+async function deleteCompany(): Promise<void> {
   if (!editingId || !confirm('Delete this company and all its time entries?')) return;
   await IPC.companies.delete(editingId);
   Shell.toast('Company deleted.', 'warning');
@@ -240,7 +269,7 @@ async function deleteCompany() {
   drawWeb();
 }
 
-async function deleteSelected() {
+async function deleteSelected(): Promise<void> {
   if (!selectedId || !confirm('Delete this company and all its time entries?')) return;
   await IPC.companies.delete(selectedId);
   Shell.toast('Company deleted.', 'warning');
@@ -251,12 +280,16 @@ async function deleteSelected() {
 }
 
 // ── Context menu ──
-function showCtx(x, y, co) { ctxTarget = co; const m = document.getElementById('ctx-menu'); m.style.left = x + 'px'; m.style.top = y + 'px'; m.style.display = 'block'; }
-function hideCtx() { document.getElementById('ctx-menu').style.display = 'none'; }
+function showCtx(x: number, y: number, co: Company): void {
+  ctxTarget = co;
+  const m = $id('ctx-menu');
+  m.style.left = x + 'px'; m.style.top = y + 'px'; m.style.display = 'block';
+}
+function hideCtx(): void { $id('ctx-menu').style.display = 'none'; }
 document.addEventListener('click', hideCtx);
-function ctxOpenTracker() { if (!ctxTarget) return; sessionStorage.setItem('active_company', JSON.stringify(ctxTarget)); api.send('navigate', 'tracker'); }
-function ctxEditCompany() { if (ctxTarget) openModal(ctxTarget); }
-async function ctxDeleteCompany() {
+function ctxOpenTracker(): void { if (!ctxTarget) return; sessionStorage.setItem('active_company', JSON.stringify(ctxTarget)); api.send('navigate', 'tracker'); }
+function ctxEditCompany(): void { if (ctxTarget) openModal(ctxTarget); }
+async function ctxDeleteCompany(): Promise<void> {
   if (!ctxTarget || !confirm(`Delete ${ctxTarget.name}?`)) return;
   await IPC.companies.delete(ctxTarget.id);
   Shell.toast('Company deleted.', 'warning');
@@ -268,16 +301,16 @@ async function ctxDeleteCompany() {
 }
 
 // ── Spiderweb ──
-function drawWeb() {
-  const canvas = document.getElementById('web-canvas');
-  const wrap   = document.getElementById('spiderweb-wrap');
-  const ctx    = canvas.getContext('2d');
+function drawWeb(): void {
+  const canvas = document.getElementById('web-canvas') as HTMLCanvasElement;
+  const wrap   = $id('spiderweb-wrap');
+  const ctx    = canvas.getContext('2d')!;
   if (animFrame) cancelAnimationFrame(animFrame);
   if (resizeObserver) resizeObserver.disconnect();
 
   const mins = compMinsMap();
 
-  function initNodes(W, H) {
+  function initNodes(W: number, H: number): WebNode[] {
     const cx = W / 2, cy = H / 2;
     const count = companies.length;
 
@@ -288,12 +321,16 @@ function drawWeb() {
     const REPEL    = count <= 1  ? 500  : count <= 3 ? 3500 : count <= 6 ? 6500 : 9500;
     const steps    = count <= 2  ? 60   : count <= 5 ? 160  : 260;
 
-    /** @type {Array<Record<string, any>>} — heterogeneous node objects (center vs company). */
-    const ns = [{ x: cx, y: cy, r: 36, label: (window.__currentUsername || 'YOU'), isCenter: true, co: null, fixed: true }];
+    // Heterogeneous node list: center node (fixed) + one node per company.
+    const ns: WebNode[] = [{
+      x: cx, y: cy, vx: 0, vy: 0, r: 36,
+      label: (window.__currentUsername || 'YOU'), sublabel: '',
+      isCenter: true, co: null, fixed: true,
+    }];
     // D-003: nodes size themselves to the measured label (bounded), and the
     // draw step ellipsizes anything that still can't fit — no more bare
     // character slices ("Zenith Analy") with no ellipsis.
-    const mctx = document.getElementById('web-canvas').getContext('2d');
+    const mctx = canvas.getContext('2d')!;
     const LABEL_FONT = '500 10px DM Sans, system-ui, sans-serif';
     const maxR = Math.min(48, nodeR + 22);
     companies.forEach((co, i) => {
@@ -315,7 +352,7 @@ function drawWeb() {
     return ns;
   }
 
-  function resizeCanvas() {
+  function resizeCanvas(): void {
     const W = wrap.clientWidth, H = wrap.clientHeight;
     canvas.width  = W * devicePixelRatio;
     canvas.height = H * devicePixelRatio;
@@ -336,10 +373,10 @@ function drawWeb() {
   resizeObserver.observe(wrap);
   startRender();
 
-  canvas.addEventListener('mousemove', e => {
+  canvas.addEventListener('mousemove', (e: MouseEvent) => {
     const rect = canvas.getBoundingClientRect();
     const mx = e.clientX - rect.left, my = e.clientY - rect.top;
-    const tt = document.getElementById('node-tooltip');
+    const tt = $id('node-tooltip');
     let hit = false;
     nodes.slice(1).forEach(n => {
       if (Math.hypot(mx - n.x, my - n.y) < n.r + 10) {
@@ -347,12 +384,12 @@ function drawWeb() {
         tt.style.left = (e.clientX - wr.left + 16) + 'px';
         tt.style.top  = (e.clientY - wr.top  - 12) + 'px';
         tt.style.display = 'block';
-        document.getElementById('tt-name').textContent = n.co.name;
-        const hierParts = [n.co.hier_company, n.co.hier_project, n.co.hier_platform].filter(Boolean);
-        document.getElementById('tt-hier').textContent   = hierParts.length > 1 ? hierParts.join(' › ') : '';
-        document.getElementById('tt-detail').textContent = [
-          n.co.job_title,
-          n.co.location,
+        $id('tt-name').textContent = n.co!.name;
+        const hierParts = [n.co!.hier_company, n.co!.hier_project, n.co!.hier_platform].filter(Boolean);
+        $id('tt-hier').textContent   = hierParts.length > 1 ? hierParts.join(' › ') : '';
+        $id('tt-detail').textContent = [
+          n.co!.job_title,
+          n.co!.location,
           n.hours ? fmtH(n.hours) + ' logged' : '',
         ].filter(Boolean).join(' · ');
         canvas.style.cursor = 'pointer';
@@ -362,25 +399,24 @@ function drawWeb() {
     if (!hit) { tt.style.display = 'none'; canvas.style.cursor = 'default'; }
   });
 
-  canvas.addEventListener('click', e => {
+  canvas.addEventListener('click', (e: MouseEvent) => {
     const rect = canvas.getBoundingClientRect();
     const mx = e.clientX - rect.left, my = e.clientY - rect.top;
     nodes.slice(1).forEach(n => {
       if (Math.hypot(mx - n.x, my - n.y) < n.r + 10) {
         const wr = wrap.getBoundingClientRect();
-        showCtx(e.clientX - wr.left, e.clientY - wr.top, n.co);
+        showCtx(e.clientX - wr.left, e.clientY - wr.top, n.co!);
       }
     });
   });
 }
 
-function startRender() {
-  const canvas = document.getElementById('web-canvas');
-  const wrap   = document.getElementById('spiderweb-wrap');
-  const ctx    = canvas.getContext('2d');
+function startRender(): void {
+  const canvas = document.getElementById('web-canvas') as HTMLCanvasElement;
+  const ctx    = canvas.getContext('2d')!;
   let pulse = 0;
 
-  function render() {
+  function render(): void {
     const W = canvas.offsetWidth, H = canvas.offsetHeight;
     const cx = W / 2, cy = H / 2;
     const c = getCanvasColors();
@@ -421,7 +457,7 @@ function startRender() {
   animFrame = requestAnimationFrame(render);
 }
 
-function getCanvasColors() {
+function getCanvasColors(): WebColors {
   const theme = document.documentElement.getAttribute('data-theme') || 'memoria';
   const isLight = theme === 'memoria' || theme === 'rabanastre';
   if (isLight) return {
@@ -441,12 +477,13 @@ function getCanvasColors() {
   };
 }
 
-function drawSphereNode(ctx, x, y, r, isCenter, label, sublabel) {
+function drawSphereNode(ctx: CanvasRenderingContext2D, x: number, y: number, r: number,
+                        isCenter: boolean, label: string, sublabel: string): void {
   const c  = getCanvasColors();
   const nc = isCenter ? c.center : c.node;
   if (isCenter) {
     ctx.beginPath(); ctx.arc(x, y, r + 12, 0, Math.PI * 2);
-    ctx.fillStyle = nc.glow; ctx.fill();
+    ctx.fillStyle = nc.glow || 'rgba(59,130,246,0.12)'; ctx.fill();
   }
   if (isCenter && nc.base) {
     ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
@@ -480,13 +517,14 @@ function drawSphereNode(ctx, x, y, r, isCenter, label, sublabel) {
   }
 }
 
-function forceStep(nodes, cx, cy, W, H, LINK, REPEL) {
+function forceStep(ns: WebNode[], cx: number, cy: number, W: number, H: number,
+                   LINK: number, REPEL: number): void {
   const DAMP = 0.65;
-  nodes.slice(1).forEach((a, i) => {
+  ns.slice(1).forEach((a, i) => {
     const dx = cx - a.x, dy = cy - a.y, d = Math.hypot(dx, dy) || 1;
     const pull = (d - LINK) * 0.01;
     a.vx += (dx / d) * pull; a.vy += (dy / d) * pull;
-    nodes.slice(1).forEach((b, j) => {
+    ns.slice(1).forEach((b, j) => {
       if (i === j) return;
       const rx = a.x - b.x, ry = a.y - b.y, rd = Math.hypot(rx, ry) || 1;
       const f = REPEL / (rd * rd);
@@ -499,8 +537,6 @@ function forceStep(nodes, cx, cy, W, H, LINK, REPEL) {
   });
 }
 
-function fmtH(mins) { return mins ? (mins / 60).toFixed(1) + 'h' : '0h'; }
+function fmtH(mins: number): string { return mins ? (mins / 60).toFixed(1) + 'h' : '0h'; }
 
-document.getElementById('company-modal').addEventListener('click', function (e) {
-  if (e.target === this) closeModal();
-});
+})();
