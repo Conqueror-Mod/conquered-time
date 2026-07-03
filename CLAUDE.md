@@ -36,7 +36,7 @@ This file gives Claude Code full context to continue work on **Conquered Time** 
 - **bcryptjs** — password hashing
 - **electron-builder** — NSIS installer for distribution
 - **Node v20.11.1 via NVM for Windows** — required; Node v24 breaks Electron's prebuilt binary downloads
-- **TypeScript (devDependency only)** — the main process is `.ts` under `strict: true`, compiled by `tsc -p tsconfig.main.json` → `dist-main/` (package.json `main` points there; `npm start`/`dev`/`build` run `build:main` first). The renderer stays plain JS checked via `checkJs` (root `tsconfig.json` + `types/globals.d.ts`); `npm run typecheck` covers both projects and is part of `npm test`. No bundler, no runtime deps — see docs/refactor-plan.md and docs/ts-phase1-error-inventory.md.
+- **TypeScript (devDependency only)** — the main process is `.ts` under `strict: true`, compiled by `tsc -p tsconfig.main.json` → `dist-main/` (package.json `main` points there; `npm start`/`dev`/`build` run `build:main` first). The renderer stays plain JS checked via `checkJs` (root `tsconfig.json` + `types/globals.d.ts`); `npm run typecheck` covers both projects and is part of `npm test`. No bundler, no runtime deps. (The TS refactor is complete; its planning docs under `docs/` were removed once the work shipped.)
 - No frontend framework — vanilla HTML/CSS/JS per page, loaded via `mainWindow.loadFile()` per-page navigation (not a SPA)
 
 ---
