@@ -174,45 +174,50 @@
    Semi-dark. Deep oceanic base, bioluminescent aqua, twilight violet.
    ══════════════════════════════════════════════════════════════ */
 [data-theme="zanarkand"] {
-  /* Deep ocean at night — not pitch black, alive with depth */
-  --bg:           #080e18;
-  --bg-deep:      #040810;
-  --surface-0:    #080e18;
-  --surface-1:    #0e1628;
-  --surface-2:    #141e34;
-  --surface-3:    #1a2640;
-  --border:       #1e3058;
-  --border-light: #284070;
+  /* Deep ocean at night — deeper black-water base, wider ramp so elevation
+     reads unmistakably. Upper surfaces are cooler-lit, as if catching the
+     bioluminescence rising through the water. (challenge/theme-refactor) */
+  --bg:           #05090f;
+  --bg-deep:      #02040a;
+  --surface-0:    #05090f;
+  --surface-1:    #0c1420;
+  --surface-2:    #121d30;
+  --surface-3:    #1b2b46;
+  /* Borders sit brighter/bluer so hairlines catch the city's light */
+  --border:       #223a63;
+  --border-light: #33568c;
 
-  /* Bioluminescent aqua — the city's own light, rising from the water */
-  --accent:       #00b8cc;
-  --accent-dim:   rgba(0,184,204,0.12);
-  --accent-glow:  rgba(0,184,204,0.35);
+  /* Bioluminescent aqua — brighter now, reads as actual light emission */
+  --accent:       #10d6e8;
+  --accent-dim:   rgba(16,214,232,0.13);
+  --accent-glow:  rgba(16,214,232,0.45);
   /* Twilight violet — the sky reflected in every surface */
-  --accent-2:     #7868d0;
-  --accent-2-dim: rgba(120,104,208,0.14);
+  --accent-2:     #8a7aec;
+  --accent-2-dim: rgba(138,122,236,0.16);
 
-  --red:          #e05878;
-  --red-dim:      rgba(224,88,120,0.12);
-  --yellow:       #d0a840;
-  --yellow-dim:   rgba(208,168,64,0.12);
-  --green:        #38c890;
-  --green-dim:    rgba(56,200,144,0.12);
-  --blue:         #00b8cc;
-  --blue-dim:     rgba(0,184,204,0.12);
+  --red:          #ff6b8a;
+  --red-dim:      rgba(255,107,138,0.13);
+  --yellow:       #e6b84e;
+  --yellow-dim:   rgba(230,184,78,0.13);
+  --green:        #3ee0a0;
+  --green-dim:    rgba(62,224,160,0.13);
+  --blue:         #10d6e8;
+  --blue-dim:     rgba(16,214,232,0.13);
 
-  /* Pale moonlight on water — soft, never harsh */
-  --text:         #8ab0c8;
-  --text-dim:     #2e4870;
-  --text-muted:   #6898b8;
-  --text-bright:  #c0d8e8;
-  --text-white:   #e0f0f8;
+  /* Moonlight on water — lifted for legibility (body ~7:1 on the deep base) */
+  --text:         #aacfe4;
+  --text-dim:     #35547f;
+  --text-muted:   #7fabcc;
+  --text-bright:  #d6ecf8;
+  --text-white:   #eef8ff;
 
-  /* Deep water shadows with aqua edge glow */
-  --shadow-1: 0 1px 4px rgba(0,8,24,0.65), 0 2px 10px rgba(0,8,24,0.48);
-  --shadow-2: 0 4px 16px rgba(0,8,24,0.70), 0 8px 32px rgba(0,8,24,0.55);
-  --shadow-3: 0 12px 48px rgba(0,8,24,0.85), 0 24px 72px rgba(0,8,24,0.65);
-  --shadow-inset: inset 0 1px 0 rgba(0,184,204,0.10);
+  /* Hero depth: dark mass (weight) + aqua ambient glow (the light) +
+     a bright top-lit inset bevel (lit glass). Every panel/card/modal that
+     uses these tokens is now lit from within, scaled by elevation. */
+  --shadow-1: 0 1px 3px rgba(0,6,16,0.70), 0 2px 12px rgba(0,6,16,0.50), 0 0 22px rgba(16,214,232,0.05);
+  --shadow-2: 0 4px 16px rgba(0,6,16,0.72), 0 10px 34px rgba(0,6,16,0.56), 0 0 34px rgba(16,214,232,0.08);
+  --shadow-3: 0 14px 48px rgba(0,6,16,0.86), 0 28px 76px rgba(0,6,16,0.66), 0 0 52px rgba(16,214,232,0.13);
+  --shadow-inset: inset 0 1px 0 rgba(120,232,255,0.16), inset 0 0 0 1px rgba(16,214,232,0.035);
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -261,4 +266,72 @@
   --shadow-2: 0 4px 16px rgba(100,60,8,0.20), 0 8px 32px rgba(100,60,8,0.13);
   --shadow-3: 0 12px 40px rgba(100,60,8,0.28), 0 24px 64px rgba(100,60,8,0.18);
   --shadow-inset: inset 0 1px 0 rgba(255,255,255,0.65);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ZANARKAND — premium hero treatment (theme-scoped, challenge/theme-refactor)
+   Directed bioluminescence: glow is a SCARCE resource applied only to focal &
+   interactive elements — never to body text or every surface (the gamer-HUD
+   trap). Glass + backdrop-blur on the true overlays. Every rule below is
+   [data-theme="zanarkand"]-scoped, so the other four themes are untouched.
+   ══════════════════════════════════════════════════════════════ */
+
+/* Glass — the highest surfaces (real overlays) refract the city behind them */
+[data-theme="zanarkand"] .settings-modal-box {
+  background: rgba(12,20,36,0.82);
+  backdrop-filter: blur(24px) saturate(1.35);
+  -webkit-backdrop-filter: blur(24px) saturate(1.35);
+}
+[data-theme="zanarkand"] #settings-modal {
+  background: radial-gradient(120% 90% at 50% 0%, rgba(16,214,232,0.06), rgba(2,4,10,0.72) 60%);
+}
+
+/* Chrome — translucent glass edge + a faint interior rim-light */
+[data-theme="zanarkand"] .titlebar,
+[data-theme="zanarkand"] .sidebar {
+  background: rgba(8,14,26,0.78);
+  backdrop-filter: blur(16px) saturate(1.25);
+  -webkit-backdrop-filter: blur(16px) saturate(1.25);
+}
+[data-theme="zanarkand"] .sidebar { box-shadow: inset -1px 0 0 rgba(16,214,232,0.06); }
+[data-theme="zanarkand"] .titlebar-brand,
+[data-theme="zanarkand"] .titlebar-logo { text-shadow: 0 0 12px var(--accent-glow); }
+
+/* Active nav item — lit from within, not just tinted */
+[data-theme="zanarkand"] .nav-item.active {
+  background: linear-gradient(90deg, rgba(16,214,232,0.18), rgba(16,214,232,0.04));
+  box-shadow: 0 0 18px rgba(16,214,232,0.20), inset 0 0 0 1px rgba(16,214,232,0.28);
+  text-shadow: 0 0 12px rgba(16,214,232,0.55);
+}
+[data-theme="zanarkand"] .nav-item:hover { box-shadow: inset 0 0 0 1px rgba(16,214,232,0.16); }
+
+/* Primary actions emit light; brighten on hover */
+[data-theme="zanarkand"] .btn-primary,
+[data-theme="zanarkand"] .s-btn-primary {
+  box-shadow: 0 0 20px rgba(16,214,232,0.30), 0 2px 8px rgba(0,6,16,0.5);
+}
+[data-theme="zanarkand"] .btn-primary:hover,
+[data-theme="zanarkand"] .s-btn-primary:hover {
+  box-shadow: 0 0 30px rgba(16,214,232,0.48), 0 2px 10px rgba(0,6,16,0.55);
+}
+
+/* Focus rings glow aqua */
+[data-theme="zanarkand"] input:focus,
+[data-theme="zanarkand"] select:focus,
+[data-theme="zanarkand"] textarea:focus {
+  box-shadow: 0 0 0 3px rgba(16,214,232,0.18), 0 0 20px rgba(16,214,232,0.22);
+}
+
+/* Stat-chip top bar becomes a glowing filament */
+[data-theme="zanarkand"] .stat-chip::before { box-shadow: 0 0 14px var(--accent); }
+
+/* Live-session badge — a pulse of life in the deep */
+[data-theme="zanarkand"] .sidebar-active-badge {
+  box-shadow: 0 0 16px rgba(57,255,20,0.35);
+  text-shadow: 0 0 10px rgba(57,255,20,0.55);
+}
+
+/* Selected/active table row picks up the current */
+[data-theme="zanarkand"] tbody tr.row-active {
+  box-shadow: inset 0 0 22px rgba(16,214,232,0.10), inset 0 0 0 1px rgba(16,214,232,0.30);
 }
