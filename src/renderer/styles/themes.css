@@ -63,11 +63,12 @@
   --text-bright:  #16163a;
   --text-white:   #0c0c28;
 
-  /* Blue-tinted shadows — depth without warmth on the cool base */
+  /* Blue-tinted shadows — depth without warmth on the cool base.
+     Light theme: refined bevel, no colored emission (would muddy light surfaces). */
   --shadow-1: 0 1px 4px rgba(40,44,120,0.13), 0 2px 10px rgba(40,44,120,0.08);
   --shadow-2: 0 4px 16px rgba(40,44,120,0.17), 0 8px 32px rgba(40,44,120,0.11);
   --shadow-3: 0 12px 40px rgba(40,44,120,0.24), 0 24px 64px rgba(40,44,120,0.14);
-  --shadow-inset: inset 0 1px 0 rgba(255,255,255,0.90);
+  --shadow-inset: inset 0 1px 0 rgba(255,255,255,0.95), inset 0 0 0 1px rgba(109,78,216,0.022);
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -111,11 +112,12 @@
   --text-bright:  #ddd0e8;
   --text-white:   #f0e8f8;
 
-  /* Deep warm shadows — candlelight, not moonlight. Heavy and directional. */
-  --shadow-1: 0 1px 4px rgba(12,6,16,0.58), 0 2px 10px rgba(12,6,16,0.40);
-  --shadow-2: 0 4px 16px rgba(12,6,16,0.65), 0 8px 32px rgba(12,6,16,0.48);
-  --shadow-3: 0 12px 48px rgba(12,6,16,0.82), 0 24px 72px rgba(12,6,16,0.58);
-  --shadow-inset: inset 0 1px 0 rgba(255,255,255,0.05);
+  /* Candlelight depth: dark mass + a warm gold ambient glow + a gilt top-lit
+     bevel. Dark theme gets the full emissive treatment in its own accent. */
+  --shadow-1: 0 1px 4px rgba(12,6,16,0.58), 0 2px 10px rgba(12,6,16,0.40), 0 0 20px rgba(200,144,42,0.04);
+  --shadow-2: 0 4px 16px rgba(12,6,16,0.65), 0 8px 32px rgba(12,6,16,0.48), 0 0 32px rgba(200,144,42,0.07);
+  --shadow-3: 0 12px 48px rgba(12,6,16,0.82), 0 24px 72px rgba(12,6,16,0.58), 0 0 48px rgba(200,144,42,0.11);
+  --shadow-inset: inset 0 1px 0 rgba(240,200,120,0.10), inset 0 0 0 1px rgba(200,144,42,0.03);
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -159,11 +161,12 @@
   --text-bright:  #c8d4e0;
   --text-white:   #e8edf4;
 
-  /* Heavy cold black shadows — this theme should feel weighty */
-  --shadow-1: 0 1px 4px rgba(0,0,0,0.60), 0 2px 10px rgba(0,0,0,0.45);
-  --shadow-2: 0 4px 16px rgba(0,0,0,0.65), 0 8px 32px rgba(0,0,0,0.50);
-  --shadow-3: 0 12px 48px rgba(0,0,0,0.80), 0 24px 72px rgba(0,0,0,0.58);
-  --shadow-inset: inset 0 1px 0 rgba(255,255,255,0.04);
+  /* Heavy cold black shadows + a faint steel-blue ambient and an icy top-lit
+     bevel — weighty, but now with a cold gleam catching the edges. */
+  --shadow-1: 0 1px 4px rgba(0,0,0,0.60), 0 2px 10px rgba(0,0,0,0.45), 0 0 20px rgba(88,136,200,0.04);
+  --shadow-2: 0 4px 16px rgba(0,0,0,0.65), 0 8px 32px rgba(0,0,0,0.50), 0 0 32px rgba(88,136,200,0.07);
+  --shadow-3: 0 12px 48px rgba(0,0,0,0.80), 0 24px 72px rgba(0,0,0,0.58), 0 0 48px rgba(88,136,200,0.11);
+  --shadow-inset: inset 0 1px 0 rgba(200,216,240,0.09), inset 0 0 0 1px rgba(88,136,200,0.03);
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -261,77 +264,87 @@
   --text-bright:  #1e1408;
   --text-white:   #140e04;
 
-  /* Dusty warm tan shadows — desert haze */
+  /* Dusty warm tan shadows — desert haze. Light theme: refined bevel, no
+     colored emission (teal glow would muddy the warm sandstone surfaces). */
   --shadow-1: 0 1px 4px rgba(100,60,8,0.16), 0 2px 10px rgba(100,60,8,0.10);
   --shadow-2: 0 4px 16px rgba(100,60,8,0.20), 0 8px 32px rgba(100,60,8,0.13);
   --shadow-3: 0 12px 40px rgba(100,60,8,0.28), 0 24px 64px rgba(100,60,8,0.18);
-  --shadow-inset: inset 0 1px 0 rgba(255,255,255,0.65);
+  --shadow-inset: inset 0 1px 0 rgba(255,255,255,0.72), inset 0 0 0 1px rgba(30,110,120,0.022);
 }
 
 /* ══════════════════════════════════════════════════════════════
-   ZANARKAND — premium hero treatment (theme-scoped, challenge/theme-refactor)
-   Directed bioluminescence: glow is a SCARCE resource applied only to focal &
-   interactive elements — never to body text or every surface (the gamer-HUD
-   trap). Glass + backdrop-blur on the true overlays. Every rule below is
-   [data-theme="zanarkand"]-scoped, so the other four themes are untouched.
+   PREMIUM LAYER — sleek depth + directed glow (challenge/theme-refactor)
+   Applied across all five themes via var() tokens, so each renders in its own
+   accent. Glow is a SCARCE resource — focal & interactive elements only, never
+   body text or every surface (the gamer-HUD trap). Light themes get refined
+   depth + soft accent glow; dark themes add emissive emphasis (bottom group).
+   Rules are prefixed with [data-theme] so they reliably out-specify the
+   component defaults regardless of stylesheet load order (the html always
+   carries a data-theme attribute — set by theme-init + Settings.apply).
    ══════════════════════════════════════════════════════════════ */
 
-/* Glass — the highest surfaces (real overlays) refract the city behind them */
-[data-theme="zanarkand"] .settings-modal-box {
-  background: rgba(12,20,36,0.82);
-  backdrop-filter: blur(24px) saturate(1.35);
-  -webkit-backdrop-filter: blur(24px) saturate(1.35);
+/* Glass — the highest surfaces refract what's behind them, in-theme */
+[data-theme] .settings-modal-box {
+  background: color-mix(in srgb, var(--surface-1) 84%, transparent);
+  backdrop-filter: blur(24px) saturate(1.3);
+  -webkit-backdrop-filter: blur(24px) saturate(1.3);
 }
-[data-theme="zanarkand"] #settings-modal {
-  background: radial-gradient(120% 90% at 50% 0%, rgba(16,214,232,0.06), rgba(2,4,10,0.72) 60%);
+[data-theme] #settings-modal {
+  background: radial-gradient(120% 90% at 50% 0%, var(--accent-dim), rgba(0,0,0,0.55) 62%);
+}
+[data-theme] .titlebar,
+[data-theme] .sidebar {
+  background: color-mix(in srgb, var(--bg-deep) 82%, transparent);
+  backdrop-filter: blur(16px) saturate(1.2);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+}
+[data-theme] .sidebar { box-shadow: inset -1px 0 0 var(--accent-dim); }
+
+/* Active nav item — lit tint + a crisp accent inner border */
+[data-theme] .nav-item.active {
+  background: linear-gradient(90deg, var(--accent-dim), transparent);
+  box-shadow: 0 0 16px var(--accent-glow), inset 0 0 0 1px var(--accent);
+}
+[data-theme] .nav-item:hover { box-shadow: inset 0 0 0 1px var(--accent-dim); }
+
+/* Primary actions emit their accent; brighten on hover */
+[data-theme] .btn-primary,
+[data-theme] .s-btn-primary {
+  box-shadow: 0 0 18px var(--accent-glow), 0 2px 8px rgba(0,0,0,0.18);
+}
+[data-theme] .btn-primary:hover,
+[data-theme] .s-btn-primary:hover {
+  box-shadow: 0 0 28px var(--accent-glow), 0 2px 10px rgba(0,0,0,0.22);
 }
 
-/* Chrome — translucent glass edge + a faint interior rim-light */
-[data-theme="zanarkand"] .titlebar,
-[data-theme="zanarkand"] .sidebar {
-  background: rgba(8,14,26,0.78);
-  backdrop-filter: blur(16px) saturate(1.25);
-  -webkit-backdrop-filter: blur(16px) saturate(1.25);
-}
-[data-theme="zanarkand"] .sidebar { box-shadow: inset -1px 0 0 rgba(16,214,232,0.06); }
-[data-theme="zanarkand"] .titlebar-brand,
-[data-theme="zanarkand"] .titlebar-logo { text-shadow: 0 0 12px var(--accent-glow); }
-
-/* Active nav item — lit from within, not just tinted */
-[data-theme="zanarkand"] .nav-item.active {
-  background: linear-gradient(90deg, rgba(16,214,232,0.18), rgba(16,214,232,0.04));
-  box-shadow: 0 0 18px rgba(16,214,232,0.20), inset 0 0 0 1px rgba(16,214,232,0.28);
-  text-shadow: 0 0 12px rgba(16,214,232,0.55);
-}
-[data-theme="zanarkand"] .nav-item:hover { box-shadow: inset 0 0 0 1px rgba(16,214,232,0.16); }
-
-/* Primary actions emit light; brighten on hover */
-[data-theme="zanarkand"] .btn-primary,
-[data-theme="zanarkand"] .s-btn-primary {
-  box-shadow: 0 0 20px rgba(16,214,232,0.30), 0 2px 8px rgba(0,6,16,0.5);
-}
-[data-theme="zanarkand"] .btn-primary:hover,
-[data-theme="zanarkand"] .s-btn-primary:hover {
-  box-shadow: 0 0 30px rgba(16,214,232,0.48), 0 2px 10px rgba(0,6,16,0.55);
-}
-
-/* Focus rings glow aqua */
-[data-theme="zanarkand"] input:focus,
-[data-theme="zanarkand"] select:focus,
-[data-theme="zanarkand"] textarea:focus {
-  box-shadow: 0 0 0 3px rgba(16,214,232,0.18), 0 0 20px rgba(16,214,232,0.22);
+/* Focus rings glow in-accent */
+[data-theme] input:focus,
+[data-theme] select:focus,
+[data-theme] textarea:focus {
+  box-shadow: 0 0 0 3px var(--accent-dim), 0 0 18px var(--accent-glow);
 }
 
 /* Stat-chip top bar becomes a glowing filament */
-[data-theme="zanarkand"] .stat-chip::before { box-shadow: 0 0 14px var(--accent); }
+[data-theme] .stat-chip::before { box-shadow: 0 0 12px var(--accent); }
 
-/* Live-session badge — a pulse of life in the deep */
-[data-theme="zanarkand"] .sidebar-active-badge {
-  box-shadow: 0 0 16px rgba(57,255,20,0.35);
-  text-shadow: 0 0 10px rgba(57,255,20,0.55);
+/* Live-session badge — a pulse of life (green on every theme) */
+[data-theme] .sidebar-active-badge {
+  box-shadow: 0 0 16px rgba(57,255,20,0.32);
+  text-shadow: 0 0 10px rgba(57,255,20,0.50);
 }
 
-/* Selected/active table row picks up the current */
-[data-theme="zanarkand"] tbody tr.row-active {
-  box-shadow: inset 0 0 22px rgba(16,214,232,0.10), inset 0 0 0 1px rgba(16,214,232,0.30);
+/* Selected/active table row picks up the current accent */
+[data-theme] tbody tr.row-active {
+  box-shadow: inset 0 0 22px var(--accent-dim), inset 0 0 0 1px var(--accent);
+}
+
+/* ── Dark-theme emphasis — full emission (light themes stay refined) ── */
+[data-theme="zanarkand"] .nav-item.active,
+[data-theme="treno"] .nav-item.active,
+[data-theme="nibelheim"] .nav-item.active { text-shadow: 0 0 12px var(--accent-glow); }
+
+[data-theme="zanarkand"] .titlebar-brand, [data-theme="zanarkand"] .titlebar-logo,
+[data-theme="treno"] .titlebar-brand, [data-theme="treno"] .titlebar-logo,
+[data-theme="nibelheim"] .titlebar-brand, [data-theme="nibelheim"] .titlebar-logo {
+  text-shadow: 0 0 12px var(--accent-glow);
 }

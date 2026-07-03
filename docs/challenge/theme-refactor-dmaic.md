@@ -141,3 +141,29 @@ motion beyond the existing transition tokens, no legibility trade for style.
 - **Documentation:** this file records the rationale so the redesign is
   maintainable and the decision is auditable — same discipline as the code
   refactor's defect register.
+
+---
+
+## Addendum — extended to all five themes (post-Zanarkand review)
+
+After reviewing the Zanarkand proof, the owner approved spreading the premium
+treatment to **all five** themes. The scoped hero rules were generalized to a
+single **premium layer** driven by `var()` tokens, so each theme renders in its
+own accent; the per-theme shadow/inset tokens were upgraded the same way.
+
+Light/dark split honored (emission glow reads on dark, muddies light):
+- **Dark themes (Zanarkand aqua, Treno gold, Nibelheim steel-blue):** full
+  emissive treatment — colored ambient in the shadow stack, emissive text-shadow
+  on the active nav + titlebar brand, glowing buttons/rings.
+- **Light themes (Memoria amethyst, Rabanastre teal):** *refined depth only* —
+  crisper top-lit bevels, glass modals (`color-mix` translucent surface), soft
+  in-accent focus/button glow — **no colored emission in the base shadows**.
+
+Implementation notes:
+- The premium layer is prefixed `[data-theme]` so it out-specifies the component
+  defaults regardless of stylesheet load order (html always carries a
+  `data-theme` attribute via theme-init + `Settings.apply`).
+- Glass uses `color-mix(in srgb, var(--surface-1) 84%, transparent)` +
+  `backdrop-filter` — adapts per theme (Chromium 122 / Electron 29 supports it).
+- Verified live: dashboard across all five themes — light themes stay clean
+  (not muddied), dark themes read luxe. No gamer-HUD, all cohesive.
