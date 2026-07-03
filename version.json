@@ -1,5 +1,5 @@
 {
-  "version": "3.11.0",
+  "version": "3.11.1",
   "downloadUrl": "https://github.com/Conqueror-Mod/conquered-time/releases/latest",
-  "notes": "v3.11 — A sleeker look: all five themes redesigned with real depth, frosted-glass panels, and a soft glow tuned to each theme's own color. Dark themes glow from within; light themes gained crisp, refined depth. Under the hood, the whole app was rebuilt on TypeScript for reliability."
+  "notes": "v3.11.1 — The LIVE badge now means what it says. It lights up only when a session is genuinely running (clocked in, not yet out) instead of the moment you pick a company. A matching LIVE indicator now sits in the sidebar and counts up in real time, right above the Dispatch timer."
 }
