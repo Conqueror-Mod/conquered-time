@@ -46,7 +46,7 @@ contextBridge.exposeInMainWorld('api', {
    * @param {string} channel
    * @param {...*} args
    */
-  invoke: (channel, ...args) => {
+  invoke: (channel: string, ...args: any[]) => {
     if (!ALLOWED_INVOKE.has(channel)) {
       throw new Error(`Blocked IPC invoke: ${channel}`);
     }
@@ -58,7 +58,7 @@ contextBridge.exposeInMainWorld('api', {
    * @param {string} channel
    * @param {...*} args
    */
-  send: (channel, ...args) => {
+  send: (channel: string, ...args: any[]) => {
     if (!ALLOWED_SEND.has(channel)) {
       throw new Error(`Blocked IPC send: ${channel}`);
     }
@@ -71,11 +71,11 @@ contextBridge.exposeInMainWorld('api', {
    * @param {(...args: any[]) => void} callback
    * @returns {() => void} unsubscribe
    */
-  on: (channel, callback) => {
+  on: (channel: string, callback: (...a: any[]) => void) => {
     if (!ALLOWED_RECEIVE.has(channel)) {
       throw new Error(`Blocked IPC receive: ${channel}`);
     }
-    const sub = (_, ...args) => callback(...args);
+    const sub = (_: any, ...args: any[]) => callback(...args);
     ipcRenderer.on(channel, sub);
     return () => ipcRenderer.removeListener(channel, sub);
   }

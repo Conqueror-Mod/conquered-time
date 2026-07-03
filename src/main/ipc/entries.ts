@@ -9,13 +9,13 @@ const { encrypt, decrypt } = require('../vault-crypto');
 
 function register() {
 // ── IPC: Time entries ──────────────────────────────────────────────────────
-ipcMain.handle('entries:list', (_, companyId) => {
+ipcMain.handle('entries:list', (_: unknown, companyId: any) => {
   if (!session.key || !session.user) return [];
   return dbAll('SELECT rowid as rid, * FROM time_entries WHERE user_id=? AND company_id=? ORDER BY log_date DESC',
-    [session.user.id, companyId]).map(r => ({...decryptEntry(r), id: Number(r.rid)}));
+    [session.user.id, companyId]).map((r: any) => ({...decryptEntry(r), id: Number(r.rid)}));
 });
 
-ipcMain.handle('entries:save', (_, entry) => {
+ipcMain.handle('entries:save', (_: unknown, entry: any) => {
   if (!session.key || !session.user) return { ok: false };
   try {
     const enc = encrypt(entry.rows_json || '[]', session.key);
@@ -47,7 +47,7 @@ ipcMain.handle('entries:all', () => {
   if (!session.key || !session.user) return [];
   return readCache.get('entriesAll', cacheOwner(), () =>
     dbAll('SELECT rowid as rid, * FROM time_entries WHERE user_id=? ORDER BY log_date DESC', [session.user.id])
-      .map(r => ({...decryptEntry(r), id: Number(r.rid)})));
+      .map((r: any) => ({...decryptEntry(r), id: Number(r.rid)})));
 });
 
 // Lightweight variant: returns only the plaintext aggregate columns and does NOT
@@ -59,7 +59,7 @@ ipcMain.handle('entries:summary', () => {
   if (!session.key || !session.user) return [];
   return readCache.get('entriesSummary', cacheOwner(), () =>
     dbAll('SELECT rowid as rid, company_id, log_date, session_label, total_mins FROM time_entries WHERE user_id=? ORDER BY log_date DESC', [session.user.id])
-      .map(r => ({ ...r, id: Number(r.rid) })));
+      .map((r: any) => ({ ...r, id: Number(r.rid) })));
 });
 
 ipcMain.handle('entries:get-active', () => {
@@ -84,7 +84,7 @@ ipcMain.handle('entries:get-active', () => {
       try {
         decryptEntry(c);
         const rows = JSON.parse(c.rows_json || '[]');
-        if (rows.some(r => r.clock_in && !r.clock_out)) { row = c; break; }
+        if (rows.some((r: any) => r.clock_in && !r.clock_out)) { row = c; break; }
       } catch {}
     }
     // Also check entries from yesterday in case of overnight sessions
@@ -98,7 +98,7 @@ ipcMain.handle('entries:get-active', () => {
         try {
           decryptEntry(c);
           const rows = JSON.parse(c.rows_json || '[]');
-          if (rows.some(r => r.clock_in && !r.clock_out)) { row = c; break; }
+          if (rows.some((r: any) => r.clock_in && !r.clock_out)) { row = c; break; }
         } catch {}
       }
     }
@@ -121,7 +121,7 @@ ipcMain.handle('entries:get-active', () => {
   return { ...row, id: Number(row.rid), company_name };
 });
 
-ipcMain.handle('entries:get', (_, id) => {
+ipcMain.handle('entries:get', (_: unknown, id: any) => {
   if (!session.key || !session.user) return null;
   const row = dbGet('SELECT rowid as rid, * FROM time_entries WHERE rowid=? AND user_id=?',
     [Number(id), session.user.id]);
@@ -130,15 +130,15 @@ ipcMain.handle('entries:get', (_, id) => {
 });
 
 // ── IPC: Task items ────────────────────────────────────────────────────────
-ipcMain.handle('tasks:list', (_, entryId) => {
+ipcMain.handle('tasks:list', (_: unknown, entryId: any) => {
   if (!session.key || !session.user) return [];
   return dbAll(
     'SELECT rowid as rid, * FROM task_items WHERE entry_id=? AND user_id=? ORDER BY started_at ASC',
     [Number(entryId), session.user.id]
-  ).map(r => ({ ...r, id: Number(r.rid) }));
+  ).map((r: any) => ({ ...r, id: Number(r.rid) }));
 });
 
-ipcMain.handle('tasks:save', (_, item) => {
+ipcMain.handle('tasks:save', (_: unknown, item: any) => {
   if (!session.key || !session.user) return { ok: false };
   try {
     if (item.id) {
@@ -163,7 +163,7 @@ ipcMain.handle('tasks:save', (_, item) => {
   } catch (e) { return { ok: false, error: e.message }; }
 });
 
-ipcMain.handle('tasks:delete', (_, id) => {
+ipcMain.handle('tasks:delete', (_: unknown, id: any) => {
   if (!session.key || !session.user) return { ok: false };
   dbRun('DELETE FROM task_items WHERE rowid=? AND user_id=?', [Number(id), session.user.id]);
   persistDB();
@@ -179,7 +179,7 @@ ipcMain.handle('tasks:recent-labels', () => {
      ORDER BY MAX(started_at) DESC LIMIT 10`,
     [session.user.id]
   );
-  return rows.map(r => r.label);
+  return rows.map((r: any) => r.label);
 });
 
 ipcMain.handle('tasks:summary', () => {
@@ -190,8 +190,8 @@ ipcMain.handle('tasks:summary', () => {
      GROUP BY entry_id, item_type`,
     [session.user.id]
   );
-  const map = {};
-  (rows || []).forEach(r => {
+  const map: Record<string, any> = {};
+  (rows || []).forEach((r: any) => {
     if (!map[r.entry_id]) map[r.entry_id] = { break_count: 0, lunch_count: 0 };
     if (r.item_type === 'break') map[r.entry_id].break_count = Number(r.cnt);
     if (r.item_type === 'lunch') map[r.entry_id].lunch_count = Number(r.cnt);

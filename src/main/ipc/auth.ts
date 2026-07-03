@@ -17,7 +17,7 @@ const { runScheduledEmailCheck, profileEmailMissing } = require('../email');
 const betaKeys = require('../beta-keys');
 
 // ctx: main-owned install/profile plumbing.
-function register(ctx) {
+function register(ctx: Record<string, any>) {
   const {
     IS_DEV, PROFILES_DIR, BETA_SECRET,
     getAppPref, setAppPref,
@@ -31,7 +31,7 @@ function profilesExist() {
   if (IS_DEV || !PROFILES_DIR || !fs.existsSync(PROFILES_DIR)) return false;
   try {
     return fs.readdirSync(PROFILES_DIR)
-      .some(name => fs.existsSync(path.join(PROFILES_DIR, name, 'profile-manifest.json')));
+      .some((name: any) => fs.existsSync(path.join(PROFILES_DIR, name, 'profile-manifest.json')));
   } catch { return false; }
 }
 
@@ -45,7 +45,7 @@ function betaGateRequired() {
 
 ipcMain.handle('beta:status', () => ({ required: betaGateRequired() }));
 
-ipcMain.handle('beta:redeem', (_, key) => {
+ipcMain.handle('beta:redeem', (_: unknown, key: any) => {
   if (!BETA_SECRET) return { ok: true };              // gate disabled → accept
   const res = betaKeys.verifyKey(BETA_SECRET, key);
   if (!res.valid) {
@@ -63,7 +63,7 @@ ipcMain.handle('beta:redeem', (_, key) => {
 // module + db handle, and adopts the handle the core returns — on a write-phase
 // rollback that is a fresh instance restored from the pre-write snapshot, so the
 // module-level `db` must be reassigned to it. Caller persists only when ok.
-function reEncryptVault(opts) {
+function reEncryptVault(opts: Record<string, any>) {
   const res = reEncryptVaultCore({ SQL: getSql(), db: getDb(), ...opts });
   adoptDb(res.db);
   return res.ok ? { ok: true } : { ok: false, error: res.error };
@@ -82,13 +82,13 @@ ipcMain.handle('profiles:list', () => {
   if (IS_DEV || !PROFILES_DIR || !fs.existsSync(PROFILES_DIR)) return [];
   try {
     return fs.readdirSync(PROFILES_DIR)
-      .filter(name => fs.existsSync(path.join(PROFILES_DIR, name, 'profile-manifest.json')))
-      .map(name => readManifest(path.join(PROFILES_DIR, name)))
+      .filter((name: any) => fs.existsSync(path.join(PROFILES_DIR, name, 'profile-manifest.json')))
+      .map((name: any) => readManifest(path.join(PROFILES_DIR, name)))
       .filter(Boolean);
   } catch { return []; }
 });
 
-ipcMain.handle('profiles:select', async (_, { username }) => {
+ipcMain.handle('profiles:select', async (_: unknown, { username }: Record<string, any>) => {
   // Dev mode: DB is already initialised at startup — nothing to create.
   if (IS_DEV) return { ok: true };
   if (!username || typeof username !== 'string') return { ok: false, error: 'Invalid username.' };
@@ -112,7 +112,7 @@ ipcMain.handle('profiles:select', async (_, { username }) => {
   return { ok: true, needsSetup };
 });
 
-ipcMain.handle('profiles:load', async (_, { username }) => {
+ipcMain.handle('profiles:load', async (_: unknown, { username }: Record<string, any>) => {
   if (!username || typeof username !== 'string') return { ok: false, error: 'Invalid username.' };
   const safeName   = username.replace(/[^a-zA-Z0-9_\-]/g, '');
   const profileDir = path.join(PROFILES_DIR, safeName);
@@ -134,7 +134,7 @@ ipcMain.handle('profiles:deselect', () => {
 // via profiles:load (vault is open, but no session key yet).
 // Returns { ok, error } — on success the profile directory is removed from disk
 // and the caller should navigate back to login (profile selector).
-ipcMain.handle('profiles:delete', async (_, { password }) => {
+ipcMain.handle('profiles:delete', async (_: unknown, { password }: Record<string, any>) => {
   if (!hasDb()) return { ok: false, error: 'No profile loaded.' };
   try {
     const bcrypt = require('bcryptjs');
@@ -176,7 +176,7 @@ ipcMain.handle('auth:safe-check', () => {
   return { available, enrolled };
 });
 
-ipcMain.handle('auth:safe-setup', async (_, { password }) => {
+ipcMain.handle('auth:safe-setup', async (_: unknown, { password }: Record<string, any>) => {
   if (!hasDb()) return { ok: false, error: 'No profile loaded.' };
   if (!safeStorage.isEncryptionAvailable()) return { ok: false, error: 'Secure sign-in is not available on this device.' };
   try {
@@ -216,7 +216,7 @@ function requestWindowsHelloConsent() {
       '$result = [Windows.Security.Credentials.UI.UserConsentVerifier]::RequestVerificationAsync("Conquered Time — verify your identity").GetAwaiter().GetResult()',
       'Write-Output $result.ToString()'
     ].join('; ');
-    execFile('powershell.exe', ['-NoProfile', '-Sta', '-Command', ps], { timeout: 60000 }, (err, stdout, stderr) => {
+    execFile('powershell.exe', ['-NoProfile', '-Sta', '-Command', ps], { timeout: 60000 }, (err: any, stdout: any, stderr: any) => {
       if (err) { console.error('Windows Hello PS error:', stderr || err.message); resolve('Error'); return; }
       resolve(stdout.trim() || 'Error');
     });
@@ -266,7 +266,7 @@ ipcMain.handle('auth:safe-login', async () => {
   } catch (e) { return { ok: false, error: 'Secure sign-in failed — use password login.' }; }
 });
 
-ipcMain.handle('auth:quick-unlock', async (_, { password }) => {
+ipcMain.handle('auth:quick-unlock', async (_: unknown, { password }: Record<string, any>) => {
   if (!hasDb()) return { ok: false, error: 'No profile loaded.' };
   const skPath = safeKeyPath();
   if (!skPath || !fs.existsSync(skPath)) return { ok: false, error: 'Secure sign-in not enrolled.' };
@@ -302,7 +302,7 @@ ipcMain.handle('auth:quick-unlock', async (_, { password }) => {
   } catch (e) { return { ok: false, error: e.message }; }
 });
 
-ipcMain.handle('auth:safe-disable', async (_, { password }) => {
+ipcMain.handle('auth:safe-disable', async (_: unknown, { password }: Record<string, any>) => {
   if (!hasDb()) return { ok: false, error: 'No profile loaded.' };
   try {
     const bcrypt = require('bcryptjs');
@@ -317,7 +317,7 @@ ipcMain.handle('auth:safe-disable', async (_, { password }) => {
     if (session.profileDir && !IS_DEV) {
       const manifest = readManifest(session.profileDir);
       if (manifest) {
-        manifest.auth_methods = manifest.auth_methods.filter(m => m !== 'safestorage');
+        manifest.auth_methods = manifest.auth_methods.filter((m: any) => m !== 'safestorage');
         writeManifest(session.profileDir, manifest);
       }
     }
@@ -332,7 +332,7 @@ ipcMain.handle('auth:check-setup', () => {
   return { needsSetup: (row?.c || 0) === 0 };
 });
 
-ipcMain.handle('auth:setup', async (_, { username, password, totpSecret, totpCode, recoveryCode }) => {
+ipcMain.handle('auth:setup', async (_: unknown, { username, password, totpSecret, totpCode, recoveryCode }: Record<string, any>) => {
   try {
     const speakeasy = require('speakeasy');
     const bcrypt    = require('bcryptjs');
@@ -365,7 +365,7 @@ ipcMain.handle('auth:setup', async (_, { username, password, totpSecret, totpCod
   } catch (e) { return { ok: false, error: e.message }; }
 });
 
-ipcMain.handle('auth:login', async (_, { username, password, totpCode }) => {
+ipcMain.handle('auth:login', async (_: unknown, { username, password, totpCode }: Record<string, any>) => {
   try {
     const bcrypt    = require('bcryptjs');
     const speakeasy = require('speakeasy');
@@ -425,7 +425,7 @@ ipcMain.handle('auth:login', async (_, { username, password, totpCode }) => {
   } catch (e) { return { ok: false, error: e.message }; }
 });
 
-function incrementFailed(user) {
+function incrementFailed(user: Record<string, any>) {
   const attempts = (user.failed_attempts || 0) + 1;
   const uid = Number(user.rid || user.id);
   if (attempts >= 3) {
@@ -439,7 +439,7 @@ function incrementFailed(user) {
   return { locked: false, attemptsLeft: 3 - attempts };
 }
 
-ipcMain.handle('auth:recover', async (_, { username, recoveryCode, newPassword }) => {
+ipcMain.handle('auth:recover', async (_: unknown, { username, recoveryCode, newPassword }: Record<string, any>) => {
   const bcrypt = require('bcryptjs');
   const user   = dbGet('SELECT rowid as rid, * FROM users WHERE username=?', [username]);
   if (!user?.recovery_hash) return { ok: false, error: 'No recovery available.' };
@@ -496,7 +496,7 @@ ipcMain.handle('profile:get', () => {
   return { display_name: user.display_name || '', ...profileData };
 });
 
-ipcMain.handle('profile:save', (_, { display_name, full_name, email, phone, job_title, work_state, avatar, avatar_thumb_48 }) => {
+ipcMain.handle('profile:save', (_: unknown, { display_name, full_name, email, phone, job_title, work_state, avatar, avatar_thumb_48 }: Record<string, any>) => {
   if (!session.key || !session.user) return { ok: false };
   try {
     const blob = encrypt(JSON.stringify({ full_name: full_name || '', email: email || '', phone: phone || '', job_title: job_title || '', work_state: work_state || null, avatar: avatar || null }), session.key);
@@ -518,7 +518,7 @@ ipcMain.handle('profile:save', (_, { display_name, full_name, email, phone, job_
   } catch(e) { return { ok: false, error: e.message }; }
 });
 
-ipcMain.handle('auth:change-password', async (_, { currentPassword, totpCode, newPassword }) => {
+ipcMain.handle('auth:change-password', async (_: unknown, { currentPassword, totpCode, newPassword }: Record<string, any>) => {
   if (!session.key || !session.user) return { ok: false, error: 'No active session.' };
   const bcrypt    = require('bcryptjs');
   const speakeasy = require('speakeasy');

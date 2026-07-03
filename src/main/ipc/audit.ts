@@ -11,7 +11,7 @@ const { countAuditDiscrepancies } = require('../audit');
 const { getProfileEmail, getEmailSmtpConfig } = require('../email');
 
 // ctx.createAuditWizardWindow — window creation stays in main.
-function register(ctx) {
+function register(ctx: Record<string, any>) {
   const { createAuditWizardWindow } = ctx;
 // ── IPC: Audit policy ────────────────────────────────────────────────────
 ipcMain.handle('audit:get-policy', () => {
@@ -19,7 +19,7 @@ ipcMain.handle('audit:get-policy', () => {
   const policy    = getPolicy(stateCode);
   const stateName = stateCode ? (STATE_NAMES[stateCode] || stateCode) : null;
   // Replace Infinity with null so serialization is safe across IPC boundary
-  const safeThresholds = policy.breakThresholds.map(([t, c]) => [isFinite(t) ? t : null, c]);
+  const safeThresholds = policy.breakThresholds.map(([t, c]: [any, any]) => [isFinite(t) ? t : null, c]);
   return {
     stateCode, stateName, policyLabel: policy.label,
     // C5 (D-007): true only when the state has its OWN policy tier. Default-
@@ -39,7 +39,7 @@ ipcMain.handle('audit:get-dismissed', () => {
   return dbAll('SELECT entry_id, row_idx, type, emailed_at FROM audit_dismissed WHERE user_id=?', [session.user.id]);
 });
 
-ipcMain.handle('audit:dismiss', (_, { entry_id, row_idx, type }) => {
+ipcMain.handle('audit:dismiss', (_: unknown, { entry_id, row_idx, type }: Record<string, any>) => {
   if (!session.user) return { ok: false };
   dbRun(
     'INSERT OR IGNORE INTO audit_dismissed (user_id, entry_id, row_idx, type) VALUES (?,?,?,?)',
@@ -49,7 +49,7 @@ ipcMain.handle('audit:dismiss', (_, { entry_id, row_idx, type }) => {
   return { ok: true };
 });
 
-ipcMain.handle('audit:undismiss', (_, { entry_id, row_idx, type }) => {
+ipcMain.handle('audit:undismiss', (_: unknown, { entry_id, row_idx, type }: Record<string, any>) => {
   if (!session.user) return { ok: false };
   dbRun('DELETE FROM audit_dismissed WHERE user_id=? AND entry_id=? AND row_idx=? AND type=?',
     [session.user.id, Number(entry_id), Number(row_idx), type]);
@@ -64,7 +64,7 @@ ipcMain.handle('audit:clear-dismissed', () => {
   return { ok: true };
 });
 
-ipcMain.handle('audit:apply-fix', (_, { entry_id, row_idx, fix_type }) => {
+ipcMain.handle('audit:apply-fix', (_: unknown, { entry_id, row_idx, fix_type }: Record<string, any>) => {
   if (!session.key || !session.user) return { ok: false };
   // Only these discrepancy types have an automated fix. Everything else
   // (e.g. missing_break / missing_lunch) is acknowledge-only by design — reject
@@ -100,7 +100,7 @@ ipcMain.handle('audit:apply-fix', (_, { entry_id, row_idx, fix_type }) => {
 
     rows[row_idx] = r;
     const newJson  = JSON.stringify(rows);
-    const newTotal = rows.reduce((s, row) => s + (row.total_mins || 0), 0);
+    const newTotal = rows.reduce((s: any, row: any) => s + (row.total_mins || 0), 0);
     const enc      = encrypt(newJson, session.key);
     dbRun(
       'UPDATE time_entries SET rows_enc=?,rows_iv=?,rows_tag=?,rows_json=?,total_mins=?,updated_at=strftime(\'%s\',\'now\') WHERE rowid=? AND user_id=?',
@@ -111,7 +111,7 @@ ipcMain.handle('audit:apply-fix', (_, { entry_id, row_idx, fix_type }) => {
   } catch (e) { return { ok: false, error: e.message }; }
 });
 
-ipcMain.handle('audit:open-wizard', (_, { mode, theme }: { mode?: string; theme?: string } = {}) => {
+ipcMain.handle('audit:open-wizard', (_: unknown, { mode, theme }: { mode?: string; theme?: string } = {}) => {
   createAuditWizardWindow(mode, theme);
   return { ok: true };
 });
@@ -123,7 +123,7 @@ ipcMain.handle('audit:count', () => countAuditDiscrepancies());
 // modifies a punch — fixes still require an explicit Apply Fix). On success the
 // discrepancy is recorded as emailed (emailed_at) so it's silenced on close/lock
 // but kept visible in the audit log.
-ipcMain.handle('audit:email-notify', async (_, { entry_id, row_idx, type, subject, message }: Record<string, any> = {}) => {
+ipcMain.handle('audit:email-notify', async (_: unknown, { entry_id, row_idx, type, subject, message }: Record<string, any> = {}) => {
   if (!session.key || !session.user) return { ok: false, error: 'Not logged in.' };
   const to = getProfileEmail();
   if (!to) return { ok: false, error: 'Add an email to your profile first (Profile screen).' };

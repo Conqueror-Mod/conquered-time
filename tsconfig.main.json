@@ -16,7 +16,13 @@
     "moduleResolution": "Node16",
     "allowJs": true,
     "checkJs": false,
-    "strict": false,
+    // strict applies to the .ts files only (the remaining .js passthroughs are
+    // not checked — checkJs stays off here; the root tsconfig covers them).
+    "strict": true,
+    // Keep `catch (e) { e.message }` working — the codebase's error handling
+    // idiom predates useUnknownInCatchVariables and rewriting every catch to
+    // narrow `unknown` adds noise without safety (errors here are Error-shaped).
+    "useUnknownInCatchVariables": false,
     "outDir": "dist-main",
     "rootDir": "src",
     "types": ["node"],

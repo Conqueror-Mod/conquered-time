@@ -36,6 +36,7 @@ This file gives Claude Code full context to continue work on **Conquered Time** 
 - **bcryptjs** — password hashing
 - **electron-builder** — NSIS installer for distribution
 - **Node v20.11.1 via NVM for Windows** — required; Node v24 breaks Electron's prebuilt binary downloads
+- **TypeScript (devDependency only)** — the main process is `.ts` under `strict: true`, compiled by `tsc -p tsconfig.main.json` → `dist-main/` (package.json `main` points there; `npm start`/`dev`/`build` run `build:main` first). The renderer stays plain JS checked via `checkJs` (root `tsconfig.json` + `types/globals.d.ts`); `npm run typecheck` covers both projects and is part of `npm test`. No bundler, no runtime deps — see docs/refactor-plan.md and docs/ts-phase1-error-inventory.md.
 - No frontend framework — vanilla HTML/CSS/JS per page, loaded via `mainWindow.loadFile()` per-page navigation (not a SPA)
 
 ---
@@ -46,12 +47,35 @@ This file gives Claude Code full context to continue work on **Conquered Time** 
 conquered-time/
 ├── seed-dev.js                       # Dev-only DB seeder — bypasses TOTP for fast testing
 ├── package.json
+├── tsconfig.json                     # checkJs project: renderer JS + types/ (noEmit gate)
+├── tsconfig.main.json                # main-process TS build → dist-main/ (strict: true)
+├── types/
+│   ├── globals.d.ts                  # renderer globals, data shapes, IpcInvokeMap (channel source of truth)
+│   └── phase1-dom-compat.d.ts        # DOM-narrowing shim — DELETE as renderer pages convert to .ts
+├── dist-main/                        # compiled main process (generated; gitignored; ships in builds)
 ├── README.md
 ├── src/
-│   ├── main/
-│   │   ├── main.js                   # Main process: window, IPC, sql.js DB, AES-256-GCM crypto, TOTP auth
-│   │   └── preload.js                # contextBridge — whitelisted IPC channels only
-│   ├── renderer/
+│   ├── main/                         # TypeScript (strict: true), compiled by `npm run build:main`
+│   │   ├── main.ts                   # App lifecycle ONLY: window/splash/tray/menu, app-prefs, profile boot
+│   │   ├── preload.ts                # contextBridge — whitelisted IPC channels only
+│   │   ├── db.ts                     # sql.js lifecycle + dbGet/dbAll/dbRun/dbInsert; owns handle + vault path
+│   │   ├── session.ts                # session.key/.user/.activeEntryId/.profileDir, idle lock, orphan sweep
+│   │   ├── cache.ts                  # main-process read cache singleton + owner token
+│   │   ├── policies.ts               # break/lunch policy tiers (pure data)
+│   │   ├── audit.ts                  # countAuditDiscrepancies + dismissed set
+│   │   ├── backups.ts                # performBackup + backups-dir state
+│   │   ├── email.ts                  # SMTP config, doSendReport, schedule engine (gotcha #9)
+│   │   ├── vault-crypto.js           # AES-256-GCM/PBKDF2 primitives (pure, unit-tested)
+│   │   ├── read-cache.js             # cache factory (pure, unit-tested)
+│   │   ├── beta-keys.js              # beta-key mint/verify (pure, unit-tested)
+│   │   └── ipc/                      # all IPC handlers, one register(ctx) module per surface
+│   │       ├── auth.ts               # profiles:*, auth:*, totp, beta:*, profile:get/save
+│   │       ├── companies.ts          # companies:*
+│   │       ├── entries.ts            # entries:*, tasks:*
+│   │       ├── audit.ts              # audit:*
+│   │       ├── settings.ts           # settings:*, win:* prefs, app:*, db:clear-*, backup:*
+│   │       └── email.ts              # email:*
+│   ├── renderer/                     # plain JS — loaded directly by loadFile(), no build step
 │   │   ├── pages/
 │   │   │   ├── login.html            # TOTP login/setup/recovery + profile selector + cosmetic grid background
 │   │   │   ├── dashboard.html        # Stat chips, mini spiderweb, recent activity, quick actions
@@ -63,7 +87,7 @@ conquered-time/
 │   │   │   └── settings.js           # Settings engine: theme/scale/accessibility, persisted to DB
 │   │   └── styles/
 │   │       └── design-system.css     # All themes, typography, elevation system, component styles
-│   └── shared/                       # (currently empty — reserved)
+│   └── shared/                       # beta-secret.js (gitignored HMAC secret; .example.js tracked)
 ├── assets/                           # icon.ico goes here (not yet added)
 └── build/                            # electron-builder output reserved dir
 ```
@@ -74,7 +98,7 @@ conquered-time/
 
 ### Authentication & Encryption
 - **TOTP MFA** (Google Authenticator compatible) gatekeeps login but does **NOT** factor into encryption key derivation (see gotcha #2 below — this was a real bug that was fixed).
-- **Key derivation:** `PBKDF2(password, stored_random_salt, 310000, 32, sha256)` → AES-256-GCM key, held in memory only (`sessionKey` in `main.js`), cleared on lock/close.
+- **Key derivation:** `PBKDF2(password, stored_random_salt, 310000, 32, sha256)` → AES-256-GCM key, held in memory only (`session.key` in `src/main/session.ts`), cleared on lock/close.
 - **3 failed TOTP attempts → 24-hour lockout** with live countdown on the login screen.
 - **Local-only recovery code** generated once at setup, shown once, bcrypt-hashed in DB.
 - **`dev_mode` user flag** (set only by `seed-dev.js`) bypasses TOTP entirely for local dev/testing — never set this flag through the normal app UI. **The bypass is gated on `IS_DEV && user.dev_mode`** at both TOTP-verify sites (`auth:login`, `auth:change-password`), and `IS_DEV` is `--dev && !app.isPackaged`, so the bypass is **physically impossible in a packaged build** no matter what the vault contains. Belt-and-suspenders: `initProfileDB()` scrubs any `dev_mode=1` → `0` (with a logged warning) when `app.isPackaged`. Do not "simplify" the bypass back to keying on `user.dev_mode` alone — that reopens the hole.
@@ -84,7 +108,7 @@ conquered-time/
 - Companies and entries store most data as **AES-256-GCM encrypted JSON blobs** (`data_enc`, `data_iv`, `data_tag` columns) — decrypted in-memory using `sessionKey` after login.
 - All ID lookups use **`rowid`**, not the `id` AUTOINCREMENT column (see gotcha #1).
 
-### IPC Surface (main.js ↔ preload.js ↔ renderer)
+### IPC Surface (src/main/ipc/* ↔ preload.ts ↔ renderer)
 Whitelisted channels only, enforced in `preload.js`:
 - `auth:check-setup`, `auth:setup`, `auth:login`, `auth:recover`, `auth:browse-backup`
 - `totp:generate`
@@ -113,7 +137,7 @@ Whitelisted channels only, enforced in `preload.js`:
 ## Known Architecture Gotchas (read before touching DB or auth code)
 
 ### 1. sql.js does NOT reliably populate the `id` AUTOINCREMENT column through query helpers
-sql.js's `prepare/bind/getAsObject()` API and even `db.exec('SELECT last_insert_rowid()')` were unreliable in this project — inserted rows kept coming back with `id: null`, which cascaded into "Select a company first" bugs, broken company dropdowns, and null foreign keys. **The fix that worked and must be preserved:** every read query explicitly does `SELECT rowid as rid, * FROM table` and the application code uses `Number(row.rid)` as the canonical ID everywhere — never trust the `id` column for lookups, joins, or as the value sent back to the renderer. `dbInsert`/equivalent insert helpers in `main.js` follow the same pattern. If you ever see `id: null` show up in a renderer console log again, this is almost certainly the first place to look.
+sql.js's `prepare/bind/getAsObject()` API and even `db.exec('SELECT last_insert_rowid()')` were unreliable in this project — inserted rows kept coming back with `id: null`, which cascaded into "Select a company first" bugs, broken company dropdowns, and null foreign keys. **The fix that worked and must be preserved:** every read query explicitly does `SELECT rowid as rid, * FROM table` and the application code uses `Number(row.rid)` as the canonical ID everywhere — never trust the `id` column for lookups, joins, or as the value sent back to the renderer. `dbInsert`/equivalent insert helpers in `src/main/db.ts` follow the same pattern. If you ever see `id: null` show up in a renderer console log again, this is almost certainly the first place to look.
 
 ### 2. TOTP code must NEVER be part of the encryption key derivation
 Early in the project, the encryption key was derived from `password + TOTP_code`. Since TOTP rotates every 30 seconds, this meant data encrypted in one login session could not be decrypted in the next (`[Decryption Error]` showing up in company lists). **Fixed by:** generating a stable random 32-byte `key_salt` once at account setup, storing it in the `users` table, and deriving the key from `PBKDF2(password, key_salt, ...)` only. TOTP remains a login gate but has zero influence on the encryption key. Do not reintroduce TOTP into key derivation.
@@ -156,14 +180,14 @@ Native `<input type="time">` renders in the OS locale's format (often 12-hour wi
 - Inline double-click editing on **any field of any row that already contains data** (label/name/description editable regardless of clock-out status; clock_in/clock_out independently editable once they have a value) — recalculates duration automatically
 - Session auto-save on every clock action and inline edit (manual "Save Session" button also present)
 - PDF export (per-session and per-company-filtered in Global Log) — Inter font, NavID excluded; header shows job title, work type, location, supervisors (when populated); per-label time subtotals block rendered when ≥2 distinct labels; Export All PDF has a summary section (date range, grand total, cross-session label breakdown) + per-session blocks each with their own table and subtotals
-- Right-click context menu enabled globally (Cut/Copy/Paste/Select All) via `web-contents-created` handler in `main.js`
+- Right-click context menu enabled globally (Cut/Copy/Paste/Select All) via `web-contents-created` handler in `src/main/main.ts`
 - CSV export from Global Log
 - Global Log: filterable by company/date range, expandable per-session task detail rows showing clock in/out times
 - Time summarization footer on tracker: total session time + per-task-label breakdown chips
 - Full Settings system: 5 Final Fantasy themes (**Memoria** default, Zanarkand, Rabanastre, Treno, Nibelheim), 4 UI scale steps (compact/normal/comfortable/large via `#main-content`-scoped zoom), 12h/24h time display toggle, accessibility toggles (reduced motion, high contrast, colorblind-safe palette), all persisted to `app_settings` table under `ui_*` keys, applied via `data-*` attributes on `<html>` cascading through CSS custom properties
 - Settings accessible via sidebar button (above username) opening a **centered modal** (not a sidebar panel — this was explicitly requested after an earlier sidebar-panel version), plus `Ctrl+,` global shortcut
 - Interactive login background: canvas grid of cells with a subtle hover glow (cosmetic only). **The old hidden click-sequences were removed in session 9** — there is **no** 3-cell/5-cell sequence, **no** "Backdoor Access" screen, and **no** `Ctrl+Shift+D` debug overlay anymore (do not reintroduce them). The only surviving easter egg is the **Konami code** (↑↑↓↓←→←→BA Enter) on the **profile selector**, which shows a cosmetic ASCII-hourglass overlay (session 13).
-- Dev seed script (`npm run seed`, **v4.0 — stress fixture**) — wipes `dev-data/`, creates `devuser`/`devpass123` with `dev_mode=1` (TOTP bypassed, `work_state=TX` → default policy), then seeds a designed measurement instrument: **10 companies** (2 canonical clean baselines Zenith/Apex; unicode/emoji `Café Müller 東京 🚀`; an **XSS canary** `<script>…</script>` company whose `onerror` probes set `document.title='XSS-FIRED'` if any sink is unescaped; a 120-char-name overflow probe; a name-only minimal co; whitespace-padded name; quotes `O'Brien & Sons "Quality"`; high-volume `Meridian Ops`; and **Pristine Control Co inserted LAST** — zero entries, the run-app `verify-cursed-path` target) and **103 entries** (6 canonical incl. the discrepancy session with EXACTLY 6 audit issues; an edge-probe session: desc-only row, midnight-crossing 23:30→00:15, 00:00→23:59 stored-vs-span drift, custom non-list Task Label, long multiline desc; a **legacy plaintext entry** exercising the at-login encryption migration; a future-dated entry; a same-date pair; 92 clean volume entries). **12 task_items** incl. 2 orphans (dead `entry_id`), a stale in-progress break, 0s and 25h tasks, an emoji/HTML label. 3 backup fixtures (`vault-<stamp>.db`). Settings under real `ui_*`/`win_*` keys + `ui_encryptionNoticeAck=1` (so modals don't block automated sweeps). Prints a 17-assert **self-check ledger** + a **verification packet** with a STRESS LEDGER (probes P1–P12). Audit expectation stays **6**; the desc-only row documents that the audit's skip-filter ignores rows holding only a description (probe P1 — Define-phase question whether it should flag). `computeExpectedDiscrepancies()` mirrors `countAuditDiscrepancies()` in `main.js` — keep in sync. Never ships in production. **Note:** the audit engine detects only the 6 types — it does NOT flag row overlaps or stored-vs-span mismatches.
+- Dev seed script (`npm run seed`, **v4.0 — stress fixture**) — wipes `dev-data/`, creates `devuser`/`devpass123` with `dev_mode=1` (TOTP bypassed, `work_state=TX` → default policy), then seeds a designed measurement instrument: **10 companies** (2 canonical clean baselines Zenith/Apex; unicode/emoji `Café Müller 東京 🚀`; an **XSS canary** `<script>…</script>` company whose `onerror` probes set `document.title='XSS-FIRED'` if any sink is unescaped; a 120-char-name overflow probe; a name-only minimal co; whitespace-padded name; quotes `O'Brien & Sons "Quality"`; high-volume `Meridian Ops`; and **Pristine Control Co inserted LAST** — zero entries, the run-app `verify-cursed-path` target) and **103 entries** (6 canonical incl. the discrepancy session with EXACTLY 6 audit issues; an edge-probe session: desc-only row, midnight-crossing 23:30→00:15, 00:00→23:59 stored-vs-span drift, custom non-list Task Label, long multiline desc; a **legacy plaintext entry** exercising the at-login encryption migration; a future-dated entry; a same-date pair; 92 clean volume entries). **12 task_items** incl. 2 orphans (dead `entry_id`), a stale in-progress break, 0s and 25h tasks, an emoji/HTML label. 3 backup fixtures (`vault-<stamp>.db`). Settings under real `ui_*`/`win_*` keys + `ui_encryptionNoticeAck=1` (so modals don't block automated sweeps). Prints a 17-assert **self-check ledger** + a **verification packet** with a STRESS LEDGER (probes P1–P12). The discrepancy session carries EXACTLY 6 issues, but the fixture-wide audit total the seed's self-check asserts (and `audit:count` returns on a fresh seed) is **7** — the desc-only edge-probe row also flags `no_clock_in` since the C3 fix made the skip-filter desc-aware. `computeExpectedDiscrepancies()` mirrors `countAuditDiscrepancies()` in `src/main/audit.ts` — keep in sync. Never ships in production. **Note:** the audit engine detects only the 6 types — it does NOT flag row overlaps or stored-vs-span mismatches.
 - **Multi-user profile container architecture** — each user gets `conquered-data/profiles/<username>/vault.db` + `backups/` + `profile-manifest.json`; dev mode uses isolated `dev-data/dev-vault.db` (unchanged); auto-migration from legacy flat `vault.db` on first launch; passkey future-proofing hooks (`auth_methods`, `key_derivation_version`, `passkey_credential_id`) baked into every manifest. Two-phase IPC login: `profiles:list` (no DB) → `profiles:load` (loads vault) → `auth:login`.
 - **Profile selector login UI** — profile cards (avatar photo or initials, display name, username) + dashed "Add Profile" card; clicking a card shows auth form with profile banner + ← back arrow; ESC on setup form returns to selector; Login tab hidden in Add Profile flow. `avatar_thumb_48` in manifest drives card photos — written on profile save and backfilled from encrypted DB on each login.
 - **View Password toggle** — eye icon in login password field; CSS grid overlay so the SVG sits inside the input's right edge; open/closed icon swap on click; auto-resets to hidden on navigation.
@@ -194,7 +218,7 @@ Native `<input type="time">` renders in the OS locale's format (often 12-hour wi
 - **User Profile Screen** — dedicated screen for user profile management (username, password change, avatar, account details)
 - **Encrypt time log entries** — time data is treated as PPI (learnable information); open question: encrypt individual time entries the same way company fields are, OR lock all user data behind session encryption on session lock. Needs design decision before implementation.
 - **Reports / Auditing** — larger feature, builds on clock_in/clock_out timestamp data already captured per row; includes charts, label breakdowns, and full audit log
-- **Session Auto Lock/Timeout** ✅ — fully wired: idle timer in main.js, heartbeat IPC, activity listeners in shell.js, settings UI (0/5/15/30/60 min); default corrected to Off
+- **Session Auto Lock/Timeout** ✅ — fully wired: idle timer in src/main/session.ts, heartbeat IPC, activity listeners in shell.js, settings UI (0/5/15/30/60 min); default corrected to Off
 - **Container/store architecture refactor** ✅ — centralized `src/renderer/store.js` (in-memory cache + pub/sub invalidation + rowid→id normalization), `ipc.js` (typed wrapper over preload channels), `validator.js` (input validation); injected by `Shell.init()` on every inner page. Cache is **per-page** (full `loadFile()` reloads recreate `window.Store` each nav) so it dedups within a page, not across navigations — true session caching deferred. Validator wired into `saveCompany()` and `saveSession()`.
 - **Settings redesign** ✅ — Steam-style split layout: left nav (Appearance, Window, Security, Data, Reports, Accessibility, About), scrollable right panel; 860px modal. (The "Time & Display" tab was removed in v3.7 — clock format now lives under Appearance.)
 - **Language change / i18n** — lowest priority, most complex; tackle last
@@ -206,7 +230,7 @@ Native `<input type="time">` renders in the OS locale's format (often 12-hour wi
 
 #### Final / Release
 - **Package for multi-platform release** — Windows (done), macOS, Linux, iOS, Android, iOS Mobile; icon assets already prepared for Win/Mac/Linux
-- **Beta Keys** ✅ — offline early-access gate. A key is a Crockford-base32 blob (`CONQ-XXXXXX-XXXXXX-XXXXXX-XXXXXX`) carrying a signed payload: `version|expiryDays(uint16 LE)|nonce` + a 10-byte HMAC-SHA256 truncation (`src/main/beta-keys.js`, pure + 10 unit tests). Shared-secret (HMAC) scheme — the secret lives in `src/shared/beta-secret.js` (**gitignored**; `beta-secret.example.js` is the tracked template) so it ships in builds but never in the public repo; `main.js` fails **open** (gate disabled) if the file is absent. Mint keys with `node scripts/gen-beta-key.mjs --expires YYYY-MM-DD [--count N] [--label ..]`. Gate is **new-installs-only**: `beta:status` returns `required:true` only when `!IS_DEV && secret present && no profiles exist && no redeemed key`; a redeemed key is stored in the app-global `app-prefs.json` (`betaKey`). The login screen shows a branded `#beta-gate` card (login.html/login.js `showBetaGate`/`redeemBeta`, routed through `routeInitialScreen`) before account setup; `beta:redeem` validates + reports a clear expired/invalid message. Dev runs and existing installs are never gated. Note: offline validation can't remotely revoke a single key mid-beta — expiry is the lever; and the check is bypassable by patching the binary (fine for a free beta gate, not DRM).
+- **Beta Keys** ✅ — offline early-access gate. A key is a Crockford-base32 blob (`CONQ-XXXXXX-XXXXXX-XXXXXX-XXXXXX`) carrying a signed payload: `version|expiryDays(uint16 LE)|nonce` + a 10-byte HMAC-SHA256 truncation (`src/main/beta-keys.js`, pure + 10 unit tests). Shared-secret (HMAC) scheme — the secret lives in `src/shared/beta-secret.js` (**gitignored**; `beta-secret.example.js` is the tracked template) so it ships in builds but never in the public repo; `src/main/ipc/auth.ts` fails **open** (gate disabled) if the file is absent. Mint keys with `node scripts/gen-beta-key.mjs --expires YYYY-MM-DD [--count N] [--label ..]`. Gate is **new-installs-only**: `beta:status` returns `required:true` only when `!IS_DEV && secret present && no profiles exist && no redeemed key`; a redeemed key is stored in the app-global `app-prefs.json` (`betaKey`). The login screen shows a branded `#beta-gate` card (login.html/login.js `showBetaGate`/`redeemBeta`, routed through `routeInitialScreen`) before account setup; `beta:redeem` validates + reports a clear expired/invalid message. Dev runs and existing installs are never gated. Note: offline validation can't remotely revoke a single key mid-beta — expiry is the lever; and the check is bypassable by patching the binary (fine for a free beta gate, not DRM).
 - **Contributions / monetization** — Patreon, app purchase, or similar; to be designed once feature set is locked
 
 ---
@@ -215,7 +239,7 @@ Native `<input type="time">` renders in the OS locale's format (often 12-hour wi
 
 **Themes were renamed to Final Fantasy city palettes.** The old Slate/Void/Arctic/Paper/Quartz set no longer exists — do not reference those names.
 
-**Default theme:** **Memoria** (`settings.js` defaults `theme: 'memoria'`). The startup **splash always uses Zanarkand** as a fixed brand moment (`createSplashWindow('zanarkand')` in `main.js`), independent of the user's selected theme.
+**Default theme:** **Memoria** (`settings.js` defaults `theme: 'memoria'`). The startup **splash always uses Zanarkand** as a fixed brand moment (`createSplashWindow('zanarkand')` in `src/main/main.ts`), independent of the user's selected theme.
 
 **Five selectable themes**, each a `[data-theme="x"]` CSS variable block in `themes.css` (imported by `design-system.css`); the picker order in `shell.js`/`login.html` is Zanarkand, Memoria, Rabanastre, Treno, Nibelheim:
 1. **Memoria** (FF9) — **default**, light. Crystalline/ethereal: cool silver-white base, soft lavender/amethyst accents.

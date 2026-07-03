@@ -13,7 +13,7 @@ ipcMain.handle('companies:list', () => {
   if (!session.key || !session.user) return [];
   return readCache.get('companies', cacheOwner(), () => {
     const rows = dbAll('SELECT rowid as rid, * FROM companies WHERE user_id=? ORDER BY rowid ASC', [session.user.id]);
-    return rows.map(r => {
+    return rows.map((r: any) => {
       const id = (r.id != null && r.id !== 0) ? Number(r.id) : Number(r.rid);
       try {
         const plain = decrypt({ iv: r.data_iv, tag: r.data_tag, data: r.data_enc }, session.key);
@@ -26,7 +26,7 @@ ipcMain.handle('companies:list', () => {
   });
 });
 
-ipcMain.handle('companies:save', (_, data) => {
+ipcMain.handle('companies:save', (_: unknown, data: any) => {
   if (!session.key || !session.user) return { ok: false, error: 'Not authenticated' };
   try {
     const { iv, tag, data: enc } = encrypt(JSON.stringify(data), session.key);
@@ -43,7 +43,7 @@ ipcMain.handle('companies:save', (_, data) => {
   } catch (e) { return { ok: false, error: e.message }; }
 });
 
-ipcMain.handle('companies:delete', (_, id) => {
+ipcMain.handle('companies:delete', (_: unknown, id: any) => {
   if (!session.key || !session.user) return { ok: false };
   const numId = Number(id);
   // task_items are entry_id-scoped — delete them via subquery BEFORE the
