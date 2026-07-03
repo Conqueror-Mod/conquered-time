@@ -421,6 +421,17 @@ interface ShellApi {
 // const in settings.js, declared here as a bare global for the same reason.
 declare const Settings: SettingsApi;
 
+// Shared About module (components/about.js) — mounted + wired by both the
+// pre-auth login About and the in-app settings About.
+interface AboutApi {
+  buildPanel(): string;
+  mount(container: HTMLElement | null): void;
+  wire(opts: { api: PreloadApi; toast?: (msg: string, type?: string, ms?: number) => void }): Promise<void> | void;
+  URLS: Record<string, string>;
+  CHANGELOG: Array<{ version: string; items: string[] }>;
+}
+declare const About: AboutApi;
+
 interface Window {
   api: PreloadApi;
   IPC: IpcWrapper;
@@ -429,6 +440,7 @@ interface Window {
   RowUtils: RowUtilsApi;
   CanvasText: CanvasTextApi;
   Shell: ShellApi;
+  About: AboutApi;
   parseClockInput(raw: unknown): ParseClockResult;
   escapeHtml(v: unknown): string;
   flattenText(v: unknown): string;

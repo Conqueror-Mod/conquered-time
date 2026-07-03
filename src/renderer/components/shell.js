@@ -508,93 +508,8 @@ const Shell = (() => {
               </div>
             </div>
 
-            <!-- ── ABOUT ─────────────────────────────────────── -->
-            <div id="settings-cat-about" class="settings-cat-panel about-panel" style="display:none;">
-              <div class="sc-title">About</div>
-
-              <div class="about-hero">
-                <img class="about-icon" src="../../../assets/icon-256.png" alt="Conquered Time icon">
-                <div class="about-wordmark">Conquered Time</div>
-                <div class="about-version-badge" id="about-version-badge">v—</div>
-              </div>
-
-              <div class="about-tagline">"Take back your time."</div>
-
-              <div class="about-section">
-                <div class="about-section-title">Build Info</div>
-                <div class="about-build-grid">
-                  <span class="about-build-label">Version</span><span class="about-build-value" id="ab-version">—</span>
-                  <span class="about-build-label">Electron</span><span class="about-build-value" id="ab-electron">—</span>
-                  <span class="about-build-label">Node</span><span class="about-build-value" id="ab-node">—</span>
-                  <span class="about-build-label">Platform</span><span class="about-build-value" id="ab-platform">—</span>
-                </div>
-              </div>
-
-              <div class="about-section">
-                <div class="about-section-title">Credits</div>
-                <div class="about-credit-block">
-                  <div class="about-credit-role">Created by</div>
-                  <div class="about-credit-name">Chris Bowles — The Conqueror</div>
-                </div>
-                <div class="about-credit-block">
-                  <div class="about-credit-role">Co-Author</div>
-                  <div class="about-credit-name">Vincent Vathan</div>
-                </div>
-                <div class="about-copyright">Copyright © 2026 Chris Bowles - The Conqueror. All rights reserved.</div>
-              </div>
-
-              <div class="about-section">
-                <div class="about-section-title">What's New — v3.11</div>
-                <ul class="about-changelog">
-                  <li>A sleeker look — all five themes redesigned with real depth, frosted-glass panels, and a soft glow tuned to each theme's own color</li>
-                  <li>Dark themes (Zanarkand, Treno, Nibelheim) now glow from within; the light themes (Memoria, Rabanastre) gained crisp, refined depth without the glare</li>
-                  <li>Focused fields, the active menu item, and primary buttons now light up in your theme's accent — the app feels alive</li>
-                  <li>Under the hood: the entire app was rebuilt on TypeScript for reliability — same features, fewer bugs</li>
-                </ul>
-              </div>
-              <div class="about-section">
-                <div class="about-section-title">v3.10</div>
-                <ul class="about-changelog">
-                  <li>Company web nodes now grow to fit long company names — no more clipped labels on either web</li>
-                  <li>Type times the way you read them — the tracker's inline time editor accepts 2:30 PM when you're in 12-hour mode</li>
-                  <li>Two sessions on one date? A picker now lets you choose, and the Global Log opens the exact session you clicked</li>
-                  <li>Rows holding only a description are no longer invisible — they show in the Global Log, exports, and the audit</li>
-                  <li>A task or break left running after its session ended is now stopped automatically at your next sign-in</li>
-                  <li>Future-dated sessions are badged in the Global Log and no longer crowd Recent Activity</li>
-                </ul>
-              </div>
-              <div class="about-section">
-                <div class="about-changelog-more">
-                  Showing the two most recent releases. Older release notes are available on
-                  <button class="about-changelog-link" data-action="openExternal" data-arg="github">GitHub</button>.
-                </div>
-              </div>
-
-              <div class="about-section">
-                <div class="about-section-title">Updates</div>
-                <div class="about-update-row">
-                  <button class="about-update-btn" id="about-check-update-btn">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-                    Check for Updates
-                  </button>
-                  <span class="about-update-result" id="about-update-result"></span>
-                </div>
-              </div>
-
-              <div class="about-section">
-                <div class="about-section-title">Links</div>
-                <div class="about-links">
-                  <button class="about-link-btn" data-action="openExternal" data-arg="github">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
-                    GitHub
-                  </button>
-                  <button class="about-link-btn" data-action="openExternal" data-arg="donate">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
-                    Support on Ko-fi
-                  </button>
-                </div>
-              </div>
-            </div>
+            <!-- ── ABOUT (shared module — see components/about.js) ── -->
+            <div id="settings-cat-about" class="settings-cat-panel about-panel" style="display:none;"></div>
 
           </div><!-- /settings-content -->
         </div><!-- /settings-layout -->
@@ -995,44 +910,13 @@ async function switchSettingsCategory(cat) {
 
   if (cat === 'about' && !_aboutInfoLoaded) {
     _aboutInfoLoaded = true;
-    try {
-      const info = await api.invoke('app:get-info');
-      document.getElementById('about-version-badge').textContent = `v${info.version}`;
-      document.getElementById('ab-version').textContent  = info.version;
-      document.getElementById('ab-electron').textContent = info.electronVersion;
-      document.getElementById('ab-node').textContent     = info.nodeVersion;
-      document.getElementById('ab-platform').textContent = `${info.platform} (${info.arch})`;
-    } catch {}
-
-    document.getElementById('about-check-update-btn')?.addEventListener('click', async () => {
-      const btn    = document.getElementById('about-check-update-btn');
-      const result = document.getElementById('about-update-result');
-      btn.disabled = true;
-      result.className = 'about-update-result';
-      result.textContent = 'Checking…';
-      try {
-        const res = await api.invoke('app:check-update');
-        if (!res.ok) {
-          result.className = 'about-update-result update-error';
-          result.textContent = res.error;
-        } else if (res.hasUpdate) {
-          result.className = 'about-update-result update-available';
-          result.innerHTML = `v${res.latest} available — <a class="update-download-link" href="#">Download</a>`;
-          result.querySelector('.update-download-link').addEventListener('click', e => {
-            e.preventDefault();
-            Shell._openUpdateUrl(res.downloadUrl);
-          });
-        } else {
-          result.className = 'about-update-result update-current';
-          result.textContent = `You're up to date (v${res.current}).`;
-        }
-      } catch {
-        result.className = 'about-update-result update-error';
-        result.textContent = 'Update check failed.';
-      } finally {
-        btn.disabled = false;
-      }
-    });
+    // Mount + wire the shared About module (components/about.js). Same asset the
+    // pre-auth login About uses, so the two never drift.
+    const panel = document.getElementById('settings-cat-about');
+    if (panel && typeof About !== 'undefined') {
+      About.mount(panel);
+      About.wire({ api, toast: Shell.toast });
+    }
   }
 }
 

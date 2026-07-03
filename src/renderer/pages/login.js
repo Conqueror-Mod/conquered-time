@@ -1014,19 +1014,17 @@ async function paApplyStartMinimized(btn) {
 }
 
 // ── About ─────────────────────────────────────────────────────────────────────
-async function paLoadAbout() {
-  try {
-    const info = await api.invoke('app:get-info');
-    if (!info) return;
-    const v = `v${info.version}`;
-    const badge = document.getElementById('pa-about-version-badge');
-    if (badge) badge.textContent = v;
-    const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
-    set('pa-ab-version',  v);
-    set('pa-ab-electron', info.electronVersion);
-    set('pa-ab-node',     info.nodeVersion);
-    set('pa-ab-platform', info.platform);
-  } catch {}
+// Mount + wire the shared About module (components/about.js) — the same asset
+// the post-login in-app About uses, so both surfaces stay identical.
+let _paAboutMounted = false;
+function paLoadAbout() {
+  const panel = document.getElementById('pa-cat-about');
+  if (!panel || typeof About === 'undefined') return;
+  if (!_paAboutMounted) {
+    About.mount(panel);
+    _paAboutMounted = true;
+  }
+  About.wire({ api, toast: (typeof toast === 'function' ? toast : undefined) });
 }
 
 // ── Data — Delete User ────────────────────────────────────────────────────────
