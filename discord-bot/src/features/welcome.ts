@@ -5,8 +5,15 @@ import { config } from '../config.js';
 // welcome channel if configured, otherwise via DM). Wired on the client's
 // guildMemberAdd event by startWelcome().
 
-async function onMemberAdd(member: GuildMember): Promise<void> {
+// Guard against welcoming the same member twice — e.g. guildMemberAdd fires and
+// then guildMemberUpdate fires again for the same person. In-memory only (a
+// member joins once; a bot restart can't replay joins), so no persistence.
+const welcomed = new Set<string>();
+
+async function welcomeMember(member: GuildMember): Promise<void> {
   if (member.user.bot) return;
+  if (welcomed.has(member.id)) return;
+  welcomed.add(member.id);
 
   // Assign the beta role.
   if (config.betaRoleId) {
@@ -44,6 +51,21 @@ async function onMemberAdd(member: GuildMember): Promise<void> {
 }
 
 export function startWelcome(client: Client): void {
-  client.on('guildMemberAdd', (member) => void onMemberAdd(member));
-  console.log('[welcome] listening for new members.');
+  // Two paths, so this works with OR without Discord's membership-screening
+  // (rules) gate:
+  //   • No screening — the member is ready the instant they join, so
+  //     guildMemberAdd welcomes them.
+  //   • Screening ON — a joining member is "pending" until they accept the
+  //     rules. We must NOT welcome/assign a role while pending; instead we wait
+  //     for guildMemberUpdate to flip pending → false (they passed the gate).
+  client.on('guildMemberAdd', (member) => {
+    if (member.pending) return;            // screening on → defer to the update
+    void welcomeMember(member);
+  });
+
+  client.on('guildMemberUpdate', (oldMember, newMember) => {
+    if (oldMember.pending && !newMember.pending) void welcomeMember(newMember);
+  });
+
+  console.log('[welcome] listening for new members (screening-aware).');
 }
