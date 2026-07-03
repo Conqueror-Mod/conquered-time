@@ -1,4 +1,12 @@
-import 'dotenv/config';
+import { config as loadEnv } from 'dotenv';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+
+// Load .env by ABSOLUTE path (relative to this file), not the current working
+// directory — so the bot finds it whether launched from discord-bot/ by hand or
+// from elsewhere by a background service / Task Scheduler. src/ (tsx) and dist/
+// (built) are both one level under discord-bot/, where .env lives.
+loadEnv({ path: join(dirname(fileURLToPath(import.meta.url)), '..', '.env') });
 
 // Centralised, validated configuration. Required values throw at startup with a
 // clear message; optional values are typed as `string | undefined` so callers

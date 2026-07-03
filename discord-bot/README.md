@@ -46,9 +46,40 @@ npm run dev     # watch mode (tsx), for development
 npm run build && npm start   # compiled, for production
 ```
 
-## Hosting
+## Running 24/7 with pm2
 
-The bot is a long-running process. Any always-on Node host works: your own machine, a VPS with `pm2`/`systemd`, or a platform like Railway/Fly. It needs the `.env` and — for beta-key commands — access to `../src/shared/beta-secret.js`. State (who claimed a key, last-announced release) is stored in `discord-bot/data/` (gitignored).
+For always-on hosting on your own machine, run the **compiled** bot under [pm2](https://pm2.keymetrics.io/) (auto-restarts on crash, survives closing the terminal). An `ecosystem.config.cjs` is included.
+
+```bash
+cd discord-bot
+npm run build                 # compile to dist/
+npm install -g pm2            # once, globally
+pm2 start ecosystem.config.cjs
+pm2 save                      # remember the running process list
+```
+
+Start automatically at login (Windows — pm2's native `startup` isn't supported there):
+
+```bash
+npm install -g pm2-windows-startup
+pm2-startup install
+pm2 save
+```
+
+Day-to-day:
+
+```bash
+pm2 status                    # is it running?
+pm2 logs conquered-bot        # tail logs
+pm2 restart conquered-bot     # after a rebuild
+pm2 stop conquered-bot        # pause it
+```
+
+**After changing code:** `npm run build && pm2 restart conquered-bot`. **After changing commands:** also `npm run deploy`.
+
+> ⚠️ Only run **one** instance. If you were running `npm run dev`, stop it (Ctrl+C) before starting pm2 — two copies online means the bot answers every command twice.
+
+Any other always-on Node host works too (a VPS with systemd, Railway/Fly, etc.). It needs the `.env` and — for beta-key commands — access to `../src/shared/beta-secret.js`. State (who claimed a key, last-announced release) is stored in `discord-bot/data/` (gitignored).
 
 ## Private-repo note
 
