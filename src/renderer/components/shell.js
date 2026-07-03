@@ -537,7 +537,16 @@ const Shell = (() => {
               </div>
 
               <div class="about-section">
-                <div class="about-section-title">What's New — v3.10</div>
+                <div class="about-section-title">What's New — v3.11</div>
+                <ul class="about-changelog">
+                  <li>A sleeker look — all five themes redesigned with real depth, frosted-glass panels, and a soft glow tuned to each theme's own color</li>
+                  <li>Dark themes (Zanarkand, Treno, Nibelheim) now glow from within; the light themes (Memoria, Rabanastre) gained crisp, refined depth without the glare</li>
+                  <li>Focused fields, the active menu item, and primary buttons now light up in your theme's accent — the app feels alive</li>
+                  <li>Under the hood: the entire app was rebuilt on TypeScript for reliability — same features, fewer bugs</li>
+                </ul>
+              </div>
+              <div class="about-section">
+                <div class="about-section-title">v3.10</div>
                 <ul class="about-changelog">
                   <li>Company web nodes now grow to fit long company names — no more clipped labels on either web</li>
                   <li>Type times the way you read them — the tracker's inline time editor accepts 2:30 PM when you're in 12-hour mode</li>
@@ -545,16 +554,6 @@ const Shell = (() => {
                   <li>Rows holding only a description are no longer invisible — they show in the Global Log, exports, and the audit</li>
                   <li>A task or break left running after its session ended is now stopped automatically at your next sign-in</li>
                   <li>Future-dated sessions are badged in the Global Log and no longer crowd Recent Activity</li>
-                  <li>Plus: break/lunch suggestions no longer cite state law where none applies, themed phone input, and clearer audit buttons on dark themes</li>
-                </ul>
-              </div>
-              <div class="about-section">
-                <div class="about-section-title">v3.9</div>
-                <ul class="about-changelog">
-                  <li>Private beta access — new installs now ask for a beta key before account setup; existing installs are unaffected</li>
-                  <li>Branded setup wizard — welcome and finish pages, license agreement, and an install-for-all-users option</li>
-                  <li>Working links — Check for Updates, GitHub, and Support on Ko-fi are all live in Settings → About</li>
-                  <li>The login screen now matches your profile's theme after sign-out (no more mismatched colors)</li>
                 </ul>
               </div>
               <div class="about-section">
