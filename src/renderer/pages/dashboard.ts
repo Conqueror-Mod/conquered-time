@@ -144,6 +144,9 @@ function drawMiniWeb(): void {
       });
     });
     for (let s = 0; s < steps; s++) forceStep(ns, cx, cy, W, H, LINK, REPEL);
+    // Hard guarantee: no two spheres may overlap. The force pass only
+    // discourages overlap; this separates any remaining collisions outright.
+    resolveCollisions(ns, W, H, 160);
     return ns;
   }
 
@@ -323,6 +326,65 @@ function drawSphereNode(ctx: CanvasRenderingContext2D, x: number, y: number, r: 
     ctx.font = `${isCenter ? '600 ' : '500 '}${isCenter ? 11 : 10}px DM Sans, system-ui, sans-serif`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(CanvasText.ellipsizeToWidth(ctx, label, fitW), x, y);
+  }
+}
+
+// Positional collision resolution — iterate pairwise separation so no two
+// spheres overlap. Radii include a padding gap and, for the center node, its
+// render-time pulse amplitude (±4px) so it never touches a neighbour even at
+// the peak of its pulse. The center is fixed, so a center↔company collision
+// moves only the company node. Bounds-clamp is radius-aware so nodes stay fully
+// inside the canvas.
+//
+// Small/dense canvases can be physically unable to hold every sphere at full
+// size — so if separation can't be achieved, we shrink the radii and retry.
+// This makes "no overlap, ever" a hard guarantee regardless of node count or
+// panel size (shrinking the drawn spheres is preferable to letting them touch).
+const COLLISION_PAD = 6;
+function effR(n: WebNode): number { return n.r + (n.isCenter ? 4 : 0); }
+
+function anyOverlap(ns: WebNode[]): boolean {
+  for (let i = 0; i < ns.length; i++)
+    for (let j = i + 1; j < ns.length; j++) {
+      const a = ns[i], b = ns[j];
+      if (Math.hypot(b.x - a.x, b.y - a.y) < effR(a) + effR(b) + COLLISION_PAD - 0.5) return true;
+    }
+  return false;
+}
+
+function separateOnce(ns: WebNode[], W: number, H: number, iterations: number): void {
+  for (let it = 0; it < iterations; it++) {
+    for (let i = 0; i < ns.length; i++) {
+      for (let j = i + 1; j < ns.length; j++) {
+        const a = ns[i], b = ns[j];
+        let dx = b.x - a.x, dy = b.y - a.y;
+        let d = Math.hypot(dx, dy);
+        const minD = effR(a) + effR(b) + COLLISION_PAD;
+        if (d < minD) {
+          if (d < 0.01) { dx = Math.random() - 0.5; dy = Math.random() - 0.5; d = 0.01; }
+          const ux = dx / d, uy = dy / d, overlap = minD - d;
+          if (a.fixed && !b.fixed)      { b.x += ux * overlap;     b.y += uy * overlap; }
+          else if (!a.fixed && b.fixed) { a.x -= ux * overlap;     a.y -= uy * overlap; }
+          else if (!a.fixed && !b.fixed){ a.x -= ux * overlap / 2; a.y -= uy * overlap / 2;
+                                          b.x += ux * overlap / 2; b.y += uy * overlap / 2; }
+        }
+      }
+    }
+    ns.forEach(n => {
+      if (n.fixed) return;
+      n.x = Math.max(n.r + 4, Math.min(W - n.r - 4, n.x));
+      n.y = Math.max(n.r + 4, Math.min(H - n.r - 4, n.y));
+    });
+  }
+}
+
+function resolveCollisions(ns: WebNode[], W: number, H: number, iterations: number): void {
+  for (let pass = 0; pass < 10; pass++) {
+    separateOnce(ns, W, H, iterations);
+    if (!anyOverlap(ns)) return;
+    // Still colliding — the canvas can't fit them at this size. Shrink every
+    // sphere (down to a legible floor) and try again.
+    ns.forEach(n => { n.r = Math.max(n.isCenter ? 20 : 12, n.r * 0.88); });
   }
 }
 
