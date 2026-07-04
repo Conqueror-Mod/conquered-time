@@ -280,7 +280,7 @@ function buildAvatarEl(el, profile, size) {
 async function showProfileSelector() {
   selectedProfile = null;
   document.getElementById('login-card').style.display = 'none';
-  document.getElementById('lockout-screen').style.display = 'none';
+  resetAuthUiState();
 
   const profiles = await api.invoke('profiles:list');
   const grid = document.getElementById('ps-grid');
@@ -324,6 +324,7 @@ async function loadProfile(profile) {
 
 async function showLoginCard(profile) {
   document.getElementById('profile-selector').style.display = 'none';
+  resetAuthUiState();  // don't carry another profile's attempts/lockout warning in
 
   // Show profile banner in place of the username field
   const banner = document.getElementById('profile-banner');
@@ -431,6 +432,7 @@ function startNewProfile() {
   selectedProfile = null;
   profileMode = true;
   document.getElementById('profile-selector').style.display = 'none';
+  resetAuthUiState();  // a fresh profile must not inherit a prior one's lockout warning
   document.getElementById('setup-back-row').style.display = '';
   document.getElementById('profile-banner').classList.remove('visible');
   document.getElementById('login-username').closest('.field-group').style.display = '';
@@ -769,6 +771,21 @@ async function doBrowseRestore() {
   if (res?.canceled) return;
   if (!res?.ok) showErr(errEl, res?.error || 'Restore failed.');
   // On success main.js navigates to login — no JS needed here
+}
+
+// Clear transient per-attempt / lockout UI. Lockout state is per-profile (each
+// vault has its own users.failed_attempts/locked_until), but the login SCREEN's
+// warning elements + countdown interval are global — without resetting them on
+// a profile transition, a "N attempts remaining" warning or lockout countdown
+// from one profile bled onto another profile's (or a new profile's) login/setup
+// card. Call this on every switch between selector / login card / setup.
+function resetAuthUiState() {
+  const hide = (id) => { const el = document.getElementById(id); if (el) el.style.display = 'none'; };
+  hide('attempts-warn');
+  hide('login-error');
+  if (lockoutInterval) { clearInterval(lockoutInterval); lockoutInterval = null; }
+  lockoutEnd = 0;
+  hide('lockout-screen');
 }
 
 function showLockout(hoursRemaining) {
