@@ -76,7 +76,12 @@
     transition: opacity 0.6s ease, transform 0.6s ease;
     isolation: isolate;
     animation: card-in 0.35s ease both;
-    overflow: hidden;
+    /* Never taller than the viewport: on short screens (or the long account-setup
+       form) the card scrolls internally so the bottom buttons stay reachable,
+       instead of being clipped by the centered, overflow:hidden login-body. */
+    max-height: calc(100vh - 56px);
+    overflow-y: auto;
+    overflow-x: hidden;
   }
   .login-card::before {
     content: '';
@@ -592,7 +597,7 @@
         </div>
       </div>
       <div class="qr-wrap" id="qr-wrap">
-        <div style="font-family:var(--mono);font-size:8px;letter-spacing:2px;color:var(--text-dim);text-transform:uppercase;margin-bottom:10px;">Scan with Google Authenticator</div>
+        <div style="font-family:var(--mono);font-size:10px;letter-spacing:1.5px;color:var(--text-muted);text-transform:uppercase;margin-bottom:10px;">Scan with Google Authenticator</div>
         <img id="qr-img" src="" alt="QR Code">
         <div class="qr-secret" id="qr-secret"></div>
         <button type="button" class="btn-neutral" id="gen-totp-btn" data-action="generateTOTP" style="margin-top:10px;font-size:11px;padding:6px 12px;">↺ Refresh QR</button>
