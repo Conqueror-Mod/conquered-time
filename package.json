@@ -1,6 +1,6 @@
 {
   "name": "conquered-time",
-  "version": "3.11.7",
+  "version": "3.11.8",
   "description": "Conquered Time — Professional Time Tracker",
   "main": "dist-main/main/main.js",
   "author": {
@@ -17,7 +17,7 @@
   "scripts": {
     "start": "npm run compile && electron .",
     "dev": "npm run compile && electron . --dev",
-    "test": "node --test && npm run typecheck",
+    "test": "npm run build:main && node --test && npm run typecheck",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.main.json --noEmit && tsc -p tsconfig.renderer.json --noEmit",
     "build:main": "tsc -p tsconfig.main.json",
     "build:renderer": "tsc -p tsconfig.renderer.json",

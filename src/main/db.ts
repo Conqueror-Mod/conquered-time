@@ -111,7 +111,15 @@ function dbAll(sql: string, params: unknown[] = []): Array<Record<string, any>> 
 }
 
 function dbRun(sql: string, params: unknown[] = []): number {
-  db.run(sql, params);
+  // CRITICAL: sql.js's db.run(sql, params) uses the PREPARED-statement path when
+  // `params` is truthy — and an empty array `[]` is truthy — which executes only
+  // the FIRST statement of a multi-statement string. The no-args db.run(sql)
+  // uses sqlite3_exec, which runs ALL statements. initProfileDB creates the
+  // whole schema in one multi-statement dbRun(), so passing [] silently created
+  // only the `users` table on fresh vaults (→ "no such table: app_settings" etc.
+  // on the first non-users query). Only bind params when there actually are some.
+  if (params && params.length) db.run(sql, params);
+  else db.run(sql);
   return db.getRowsModified();
 }
 

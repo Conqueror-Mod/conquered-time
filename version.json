@@ -1,5 +1,5 @@
 {
-  "version": "3.11.7",
+  "version": "3.11.8",
   "downloadUrl": "https://github.com/Conqueror-Mod/conquered-time/releases/latest",
-  "notes": "v3.11.7 — The installer's welcome screen now shows the new app icon, matching the splash."
+  "notes": "v3.11.8 — Critical fix: brand-new accounts were missing part of their database and hit a \"no such table\" error on login or when adding data. Fresh accounts now build correctly, and affected accounts self-repair on next login (no data loss). Update strongly recommended."
 }

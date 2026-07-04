@@ -24,6 +24,9 @@ const About = (() => {
   // Changelog — newest first. Edit HERE and both About surfaces update. The two
   // most recent entries render in-panel; older notes live on GitHub Releases.
   const CHANGELOG = [
+    { version: 'v3.11.8', items: [
+      'Critical fix: brand-new accounts created since v3.10.1 were missing part of their database and hit a "no such table" error on login or when adding data. Fresh accounts now build their full database correctly, and existing affected accounts self-repair on next login — no data loss',
+    ] },
     { version: 'v3.11.7', items: [
       'The installer’s welcome screen now shows the new app icon, matching the splash',
     ] },
