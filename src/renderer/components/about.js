@@ -24,6 +24,11 @@ const About = (() => {
   // Changelog — newest first. Edit HERE and both About surfaces update. The two
   // most recent entries render in-panel; older notes live on GitHub Releases.
   const CHANGELOG = [
+    { version: 'v3.11.9', items: [
+      'Fixed a lockout / "attempts remaining" warning from one profile showing on another profile’s login or new-account screen',
+      'The account-creation screen now scrolls on smaller monitors, so the buttons are always reachable',
+      'The "Scan with Google Authenticator" caption above the setup QR is now legible on the default theme',
+    ] },
     { version: 'v3.11.8', items: [
       'Critical fix: brand-new accounts created since v3.10.1 were missing part of their database and hit a "no such table" error on login or when adding data. Fresh accounts now build their full database correctly, and existing affected accounts self-repair on next login — no data loss',
     ] },

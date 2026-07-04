@@ -1,5 +1,5 @@
 {
-  "version": "3.11.8",
+  "version": "3.11.9",
   "downloadUrl": "https://github.com/Conqueror-Mod/conquered-time/releases/latest",
-  "notes": "v3.11.8 — Critical fix: brand-new accounts were missing part of their database and hit a \"no such table\" error on login or when adding data. Fresh accounts now build correctly, and affected accounts self-repair on next login (no data loss). Update strongly recommended."
+  "notes": "v3.11.9 — Minor fixes: a lockout warning no longer carries between profiles; the account-creation screen scrolls on smaller monitors so the buttons stay reachable; and the QR caption on the setup screen is now legible on the default theme."
 }
