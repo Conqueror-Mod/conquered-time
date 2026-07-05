@@ -510,7 +510,12 @@
   font-size: 12px;
   font-style: italic;
   color: var(--text-muted);
-  margin-top: -8px;
+  /* Lives INSIDE .about-hero (gap:10px) — a fixed -4px nets a consistent 6px
+     under the version badge on EVERY surface. The old layout had it as a
+     panel-level sibling with margin-top:-8px, which assumed the in-app
+     panel's 24px gap (→16px, too much) and collapsed to ~0 on the pre-auth
+     login About, whose container has no gap (Georgia's spacing bug). */
+  margin-top: -4px;
 }
 .about-section { display: flex; flex-direction: column; gap: 12px; }
 .about-section-title {
