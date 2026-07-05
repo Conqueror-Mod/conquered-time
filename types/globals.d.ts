@@ -454,6 +454,7 @@ interface Window {
   /** One-shot guards so the delegated dispatchers install only once. */
   __shellDelegated?: boolean;
   __loginDelegated?: boolean;
+  __tooltipsInstalled?: boolean;
 }
 
 // Optional per-page hooks: a page defines these top-level functions if it

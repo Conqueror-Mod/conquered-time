@@ -642,6 +642,7 @@ const Shell = (() => {
 
     // Wire delegated handlers (CSP-safe; replaces inline on* attributes).
     installShellDelegation();
+    installTooltips();
     // Backdrop close is special — must fire only when the modal element itself
     // (not its box children) is clicked, so it can't use the closest() dispatcher.
     document.getElementById('settings-modal')?.addEventListener('click', handleModalBackdrop);
@@ -1658,4 +1659,115 @@ function installShellDelegation() {
     const el = e.target.closest('.nav-item[data-action]');
     if (el) { e.preventDefault(); run(el); }
   });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Hover/focus tooltips. Any element with data-tip="text" shows a themed bubble
+// after a short delay (immediately on keyboard focus). One shared floating
+// element + document-level delegated listeners, so it works on dynamically-
+// injected markup with no re-wiring — same pattern as installShellDelegation.
+// Optional data-tip-pos="top|bottom|left|right" (default top); the preferred
+// side flips automatically if it would clip the viewport. Text is set via
+// textContent, so tip copy can never inject markup.
+// ═══════════════════════════════════════════════════════════════════════════
+function installTooltips() {
+  if (window.__tooltipsInstalled) return;
+  window.__tooltipsInstalled = true;
+
+  const SHOW_DELAY = 400;   // ms before a hover tip appears
+  const GAP = 8;            // px between target and bubble
+  const EDGE = 6;           // min px between bubble and viewport edge
+
+  /** @type {HTMLElement|null} */ let tipEl = null;
+  /** @type {Element|null} */     let currentTarget = null;
+  let showTimer = 0;
+
+  function ensureEl() {
+    if (tipEl) return tipEl;
+    tipEl = document.createElement('div');
+    tipEl.id = 'ct-tooltip';
+    tipEl.setAttribute('role', 'tooltip');
+    document.body.appendChild(tipEl);
+    return tipEl;
+  }
+
+  /** @param {Element} target */
+  function place(target) {
+    const el = ensureEl();
+    const r  = target.getBoundingClientRect();
+    const tw = el.offsetWidth, th = el.offsetHeight;
+    const vw = window.innerWidth, vh = window.innerHeight;
+
+    const fits = {
+      top:    r.top - th - GAP >= EDGE,
+      bottom: r.bottom + th + GAP <= vh - EDGE,
+      left:   r.left - tw - GAP >= EDGE,
+      right:  r.right + tw + GAP <= vw - EDGE,
+    };
+    const pref = target.getAttribute('data-tip-pos') || 'top';
+    const flip = { top: 'bottom', bottom: 'top', left: 'right', right: 'left' };
+    const pos = fits[pref] ? pref : (fits[flip[pref]] ? flip[pref] : (fits.top ? 'top' : 'bottom'));
+
+    let x, y;
+    if (pos === 'top' || pos === 'bottom') {
+      x = r.left + r.width / 2 - tw / 2;
+      y = pos === 'top' ? r.top - th - GAP : r.bottom + GAP;
+    } else {
+      x = pos === 'left' ? r.left - tw - GAP : r.right + GAP;
+      y = r.top + r.height / 2 - th / 2;
+    }
+    // Clamp to the viewport (long tips near an edge).
+    x = Math.max(EDGE, Math.min(x, vw - tw - EDGE));
+    y = Math.max(EDGE, Math.min(y, vh - th - EDGE));
+    el.style.left = `${Math.round(x)}px`;
+    el.style.top  = `${Math.round(y)}px`;
+  }
+
+  /** @param {Element} target */
+  function show(target) {
+    if (!target.isConnected) { hide(); return; }
+    const text = target.getAttribute('data-tip');
+    if (!text) return;
+    const el = ensureEl();
+    el.textContent = text;
+    // Render invisible first so offsetWidth/Height measure the final size.
+    el.classList.remove('visible');
+    place(target);
+    el.classList.add('visible');
+  }
+
+  function hide() {
+    clearTimeout(showTimer);
+    currentTarget = null;
+    if (tipEl) tipEl.classList.remove('visible');
+  }
+
+  /** @param {Element} target @param {number} delay */
+  function schedule(target, delay) {
+    if (target === currentTarget) return;
+    hide();
+    currentTarget = target;
+    showTimer = window.setTimeout(() => { if (currentTarget === target) show(target); }, delay);
+  }
+
+  document.addEventListener('mouseover', e => {
+    const t = e.target instanceof Element ? e.target.closest('[data-tip]') : null;
+    if (t) schedule(t, SHOW_DELAY);
+  });
+  document.addEventListener('mouseout', e => {
+    if (!currentTarget) return;
+    const to = e.relatedTarget instanceof Element ? e.relatedTarget : null;
+    if (!to || !currentTarget.contains(to)) hide();
+  });
+  // Keyboard focus shows immediately (a11y); blur hides.
+  document.addEventListener('focusin', e => {
+    const t = e.target instanceof Element ? e.target.closest('[data-tip]') : null;
+    if (t) schedule(t, 0);
+  });
+  document.addEventListener('focusout', hide);
+  // Anything that changes what's under the cursor kills the tip.
+  document.addEventListener('mousedown', hide, true);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') hide(); }, true);
+  window.addEventListener('scroll', hide, true);
+  window.addEventListener('resize', hide);
 }
