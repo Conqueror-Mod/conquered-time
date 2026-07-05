@@ -260,15 +260,33 @@ const Onboarding = (() => {
     placeCard(card, cardAnchor || anchor, step.cardAt?.side);
     next.focus();
 
-    // Spot + card start invisible and fade in after a couple of follow ticks:
+    // Spot + card start invisible and fade in AS SOON AS the layout is stable:
     // the first placement happens before async layout settles (banners, data,
     // the demo turning the cardAt anchor on), and users saw the card flash at
-    // the pre-settle position before snapping. Position corrections that land
-    // after the reveal slide via the CSS transition instead of snapping.
-    setTimeout(() => {
+    // the pre-settle position before snapping. Reveal on two consecutive
+    // unchanged measurements (~160ms on an already-stable page — perceptually
+    // instant) with a hard cap so a busy page can't hide the tour. Corrections
+    // that land after the reveal slide via the CSS transition instead.
+    const rectKey = () => {
+      const a = measure(step.sel);
+      const c = step.cardAt ? measure(step.cardAt.sel) : null;
+      const k = (r) => r ? `${Math.round(r.left)},${Math.round(r.top)},${Math.round(r.width)},${Math.round(r.height)}` : 'x';
+      return `${k(a)}|${k(c)}`;
+    };
+    let lastKey = rectKey();
+    const revealCap = Date.now() + 700;
+    const reveal = () => {
       document.getElementById('ct-tour-spot')?.classList.add('ct-tour-in');
       document.getElementById('ct-tour-card')?.classList.add('ct-tour-in');
-    }, FOLLOW_TICK * 2 + 50);
+    };
+    const settleTick = () => {
+      if (!document.getElementById('ct-tour-card')) return; // torn down
+      const k = rectKey();
+      if (k === lastKey || Date.now() > revealCap) { reveal(); return; }
+      lastKey = k;
+      setTimeout(settleTick, 80);
+    };
+    setTimeout(settleTick, 80);
 
     // Follow layout shifts briefly: async content (email-required banner, data
     // loads, fonts) can move the target AFTER the first measure — the profile

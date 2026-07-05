@@ -112,9 +112,8 @@ const About = (() => {
         <img class="about-icon" src="../../../assets/icon-256.png" alt="Conquered Time icon">
         <div class="about-wordmark">Conquered Time</div>
         <div class="about-version-badge" id="about-version-badge">v—</div>
+        <div class="about-tagline">"Take back your time."</div>
       </div>
-
-      <div class="about-tagline">"Take back your time."</div>
 
       <div class="about-section">
         <div class="about-section-title">Build Info</div>
