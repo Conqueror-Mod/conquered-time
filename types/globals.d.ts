@@ -278,6 +278,7 @@ interface IpcInvokeMap {
   'win:set-close-to-tray': (on: boolean) => MutResult;
   'win:get-start-minimized': () => boolean;
   'win:set-start-minimized': (on: boolean) => MutResult;
+  'win:set-zoom': (factor: number) => MutResult;
   // beta gate
   'beta:status': () => { required: boolean };
   'beta:redeem': (key: string) => MutResult;

@@ -21,6 +21,12 @@ const Settings = (() => {
 
   let current = { ...DEFAULTS };
 
+  // UI scale → browser-style zoom factor. Applied app-wide via the main process
+  // (win:set-zoom → webContents.setZoomFactor), so the WHOLE window scales
+  // uniformly — sidebar, titlebar, modals, and content together. (Superseded the
+  // old CSS `zoom` on #main-content, which left the chrome unscaled.)
+  const SCALE_ZOOM = { compact: 0.85, normal: 1.0, comfortable: 1.15, large: 1.3 };
+
   // ── Apply settings to DOM ──────────────────────────────────────────────────
   function apply(settings) {
     const root = document.documentElement;
@@ -31,6 +37,12 @@ const Settings = (() => {
     root.setAttribute('data-colorblind',       settings.colorblind  || 'off');
     root.setAttribute('data-focus-indicators', settings.focusIndicators ? 'true' : 'false');
     window.__timeFormat = settings.timeFormat;
+    // App-wide zoom (fire-and-forget). Guarded — apply() also runs on pages
+    // where the preload bridge may not be ready yet.
+    try {
+      const factor = SCALE_ZOOM[settings.scale] ?? 1;
+      if (typeof api !== 'undefined' && api.invoke) api.invoke('win:set-zoom', factor);
+    } catch (e) {}
     // Cache to sessionStorage for login page pre-load
     try {
       sessionStorage.setItem('ct_theme', settings.theme);

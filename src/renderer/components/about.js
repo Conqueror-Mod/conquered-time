@@ -24,6 +24,9 @@ const About = (() => {
   // Changelog — newest first. Edit HERE and both About surfaces update. The two
   // most recent entries render in-panel; older notes live on GitHub Releases.
   const CHANGELOG = [
+    { version: 'v3.12.0', items: [
+      'UI Scale now zooms the whole window uniformly — sidebar, title bar, menus, and content together — and updates instantly, so changing it in Settings gives immediate visible feedback (previously only the main content scaled, behind the Settings window)',
+    ] },
     { version: 'v3.11.9', items: [
       'Fixed a lockout / "attempts remaining" warning from one profile showing on another profile’s login or new-account screen',
       'The account-creation screen now scrolls on smaller monitors, so the buttons are always reachable',

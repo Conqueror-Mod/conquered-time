@@ -447,6 +447,10 @@ function startNewProfile() {
 window.addEventListener('DOMContentLoaded', async () => {
   initGrid();
   installLoginDelegation();
+  // Apply the stored pre-auth UI scale as an app-wide zoom, so the login screen
+  // matches the in-app scale (and doesn't inherit a leftover zoom from a prior
+  // in-app session after logout). login-theme-init already set data-scale.
+  paApplyZoom(localStorage.getItem('ct_pa_scale') || 'normal');
   // Pre-auth settings modal backdrop — fire only on the overlay itself.
   document.getElementById('preauth-settings-modal').addEventListener('click', handlePreauthBackdrop);
 
@@ -937,9 +941,17 @@ function paApplyTheme(theme) {
     c.classList.toggle('active', c.dataset.t === theme));
 }
 
+// UI scale → app-wide zoom factor (must match settings.js SCALE_ZOOM so the
+// login screen and the in-app scale feel identical).
+const PA_ZOOM = { compact: 0.85, normal: 1.0, comfortable: 1.15, large: 1.3 };
+function paApplyZoom(scale) {
+  try { api.invoke('win:set-zoom', PA_ZOOM[scale] ?? 1); } catch (e) {}
+}
+
 function paApplyScale(scale) {
   paSet('scale', scale);
   document.documentElement.setAttribute('data-scale', scale);
+  paApplyZoom(scale);
   document.querySelectorAll('#pa-scale-btns .s-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.s === scale));
 }
