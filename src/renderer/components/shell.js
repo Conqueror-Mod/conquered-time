@@ -610,6 +610,7 @@ const Shell = (() => {
     ]);
     await _injectScript('../store.js'); // store.js depends on IPC
     await _injectScript('../components/pomodoro.js'); // Pomodoro engine (chip + alerts on every page)
+    await _injectScript('../components/onboarding.js'); // first-run coach-mark tour
 
     const [user, profile] = await Promise.all([
       api.invoke('session:get'),
@@ -758,14 +759,30 @@ const Shell = (() => {
     // first inner page. The encryption reassurance (first-run, until opted out)
     // takes precedence; the audit discrepancy reminder is deferred that one
     // login if the encryption notice is shown, to avoid stacked modals.
+    // Modal order on first login: encryption notice → onboarding tour → audit
+    // notice. Whichever earlier surface runs defers the later ones to the next
+    // login — never stack modals.
     let encNoticeShown = false;
+    let tourStarted = false;
     if (sessionStorage.getItem('audit_check_pending')) {
       sessionStorage.removeItem('audit_check_pending');
+      let onboardDone = '1';
+      try { onboardDone = await api.invoke('settings:get', 'ui_onboardingDone'); } catch {}
       try {
         const ack = await api.invoke('settings:get', 'ui_encryptionNoticeAck');
-        if (!ack) { showEncryptionNotice(); encNoticeShown = true; }
+        if (!ack) {
+          // Chain the tour off the notice's dismissal so a brand-new profile
+          // gets both, in order, on the same first login.
+          showEncryptionNotice(!onboardDone ? () => { window.Onboarding?.begin(); } : null);
+          encNoticeShown = true;
+          tourStarted = !onboardDone;
+        }
       } catch {}
-      if (!encNoticeShown) {
+      if (!encNoticeShown && !onboardDone) {
+        window.Onboarding?.begin();
+        tourStarted = true;
+      }
+      if (!encNoticeShown && !tourStarted) {
         try {
           const n = await api.invoke('audit:count');
           if (n > 0) showAuditWarning(n, 'login');
@@ -800,6 +817,8 @@ const Shell = (() => {
 
     // Pomodoro engine (no-op unless the profile's break_style is 'pomodoro').
     window.Pomodoro?.init();
+    // Resume an in-flight onboarding tour after a page swap (no-op otherwise).
+    if (!tourStarted) window.Onboarding?.init();
 
     return user;
   }
@@ -1459,7 +1478,10 @@ function showAuditWarning(count, action) {
 
 // First-login encryption reassurance. Closing with "Don't show this again"
 // ticked persists ui_encryptionNoticeAck so it never reappears for this profile.
-function showEncryptionNotice() {
+// `onDismiss` (optional) chains the next first-login surface — the onboarding
+// tour — off this modal's dismissal so they never stack.
+/** @param {(() => void) | null} [onDismiss] */
+function showEncryptionNotice(onDismiss) {
   const modal = document.getElementById('enc-notice-modal');
   const okBtn = document.getElementById('enc-notice-ok');
   const dont  = document.getElementById('enc-notice-dontshow');
@@ -1474,6 +1496,7 @@ function showEncryptionNotice() {
     if (dont?.checked) {
       try { await api.invoke('settings:set', { key: 'ui_encryptionNoticeAck', value: '1' }); } catch {}
     }
+    if (typeof onDismiss === 'function') onDismiss();
   };
 }
 

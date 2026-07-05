@@ -475,6 +475,18 @@ interface Window {
   __tooltipsInstalled?: boolean;
   /** Pomodoro cycle engine (components/pomodoro.js, injected by Shell.init). */
   Pomodoro?: PomodoroEngine;
+  /** First-run coach-mark tour (components/onboarding.js, injected by Shell.init). */
+  Onboarding?: OnboardingEngine;
+}
+
+/** window.Onboarding surface (components/onboarding.js). */
+interface OnboardingEngine {
+  /** Resume an in-flight tour after a page load (no-op otherwise). */
+  init(): void;
+  /** Start the tour from the first step. */
+  begin(): void;
+  /** Settings → About replay entry point. */
+  replay(): void;
 }
 
 /** window.Pomodoro surface (components/pomodoro.js). */
