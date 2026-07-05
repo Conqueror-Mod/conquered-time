@@ -6,6 +6,7 @@ const { dbAll, dbGet, dbRun, persistDB } = require('../db');
 const { readCache, cacheOwner, invalidateEntriesCache } = require('../cache');
 const { performBackup } = require('../backups');
 const { encrypt, decrypt } = require('../vault-crypto');
+const { localDateStr } = require('../../renderer/row-utils');
 
 function register() {
 // ── IPC: Time entries ──────────────────────────────────────────────────────
@@ -75,7 +76,8 @@ ipcMain.handle('entries:get-active', () => {
 
   // Fallback: find today's entry that has a clocked-in but not clocked-out row
   if (!row) {
-    const today = new Date().toISOString().slice(0, 10);
+    // LOCAL date — toISOString here is UTC and pointed at tomorrow all evening.
+    const today = localDateStr();
     const candidates = dbAll(
       'SELECT rowid as rid, * FROM time_entries WHERE user_id=? AND log_date=? ORDER BY updated_at DESC',
       [session.user.id, today]
@@ -89,7 +91,7 @@ ipcMain.handle('entries:get-active', () => {
     }
     // Also check entries from yesterday in case of overnight sessions
     if (!row) {
-      const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+      const yesterday = localDateStr(new Date(Date.now() - 86400000));
       const prev = dbAll(
         'SELECT rowid as rid, * FROM time_entries WHERE user_id=? AND log_date=? ORDER BY updated_at DESC',
         [session.user.id, yesterday]

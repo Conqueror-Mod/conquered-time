@@ -49,8 +49,9 @@ async function loadData(): Promise<void> {
   companies  = await Store.getCompanies();
   allEntries = await Store.getEntriesSummary();
 
-  const today   = new Date().toISOString().slice(0,10);
-  const weekAgo = new Date(Date.now() - 7*86400000).toISOString().slice(0,10);
+  // LOCAL dates — toISOString is UTC and bucketed evening hours into tomorrow.
+  const today   = RowUtils.localDateStr();
+  const weekAgo = RowUtils.localDateStr(new Date(Date.now() - 7*86400000));
 
   const todayMins   = allEntries.filter(e => e.log_date === today).reduce((a,e) => a+e.total_mins, 0);
   const weekMins    = allEntries.filter(e => e.log_date >= weekAgo).reduce((a,e) => a+e.total_mins, 0);

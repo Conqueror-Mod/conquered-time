@@ -36,7 +36,24 @@
     );
   }
 
-  const api = { rowHasContent, rowDesc };
+  // LOCAL calendar date as YYYY-MM-DD. The app's log_date values are local
+  // dates, but `new Date().toISOString().slice(0,10)` is UTC — in the evening
+  // (US timezones) that's already TOMORROW, which filed punches under the
+  // wrong date and made "today" comparisons miss (the v3.13 stale-punch /
+  // negative-timer bug). Every date-input default and "today" comparison must
+  // go through this instead of toISOString.
+  /**
+   * @param {Date} [d]
+   * @returns {string}
+   */
+  function localDateStr(d = new Date()) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+  const api = { rowHasContent, rowDesc, localDateStr };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.RowUtils = api;
 })(this);
