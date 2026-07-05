@@ -140,8 +140,8 @@
     <div class="page-title">Dashboard</div>
   </div>
   <div class="page-actions">
-    <button class="btn-primary" data-action="navigate" data-arg="tracker">⏱ New Session</button>
-    <button class="btn-neutral" data-action="navigate" data-arg="companies">◉ Companies</button>
+    <button class="btn-primary" data-action="navigate" data-arg="tracker" data-tip="Open the Time Tracker to clock in a new work session.">⏱ New Session</button>
+    <button class="btn-neutral" data-action="navigate" data-arg="companies" data-tip="Manage your companies and their project/platform hierarchy.">◉ Companies</button>
   </div>
 </div>
 
@@ -175,7 +175,7 @@
   <div class="hud-panel fill" id="panel-network">
     <div class="hud-panel-header">
       <div class="hud-panel-title">Company Network</div>
-      <button class="btn-neutral" style="font-size:11px;padding:5px 10px;" data-action="navigate" data-arg="companies">View Full →</button>
+      <button class="btn-neutral" style="font-size:11px;padding:5px 10px;" data-action="navigate" data-arg="companies" data-tip="Open the full company network view.">View Full →</button>
     </div>
     <div class="web-panel-body">
       <div id="web-canvas-wrap"><canvas id="web-canvas"></canvas>
@@ -192,7 +192,7 @@
   <div class="hud-panel fill" id="panel-activity">
     <div class="hud-panel-header">
       <div class="hud-panel-title">Recent Activity</div>
-      <button class="btn-neutral" style="font-size:11px;padding:5px 10px;" data-action="navigate" data-arg="global-log">All Logs →</button>
+      <button class="btn-neutral" style="font-size:11px;padding:5px 10px;" data-action="navigate" data-arg="global-log" data-tip="Open the Global Log — your full session history across all companies.">All Logs →</button>
     </div>
     <div class="hud-panel-body">
       <div class="activity-scroll" id="activity-list">
@@ -209,10 +209,10 @@
     </div>
     <div class="hud-panel-body">
       <div class="quick-actions">
-        <button class="btn-primary"  data-action="navigate" data-arg="tracker">⏱ Open Time Tracker</button>
-        <button class="btn-violet"   data-action="navigate" data-arg="companies">◉ Manage Companies</button>
-        <button class="btn-neutral"  data-action="navigate" data-arg="global-log">≡ View Global Log</button>
-        <button class="btn-neutral"  id="btn-backup-now">⊙ Backup Now</button>
+        <button class="btn-primary"  data-action="navigate" data-arg="tracker" data-tip="Clock in/out, punch breaks, and log task rows.">⏱ Open Time Tracker</button>
+        <button class="btn-violet"   data-action="navigate" data-arg="companies" data-tip="Add or edit companies, projects, platforms, and Navigator IDs.">◉ Manage Companies</button>
+        <button class="btn-neutral"  data-action="navigate" data-arg="global-log" data-tip="Browse, filter, and export your full session history.">≡ View Global Log</button>
+        <button class="btn-neutral"  id="btn-backup-now" data-tip="Save an encrypted backup of your vault to the Backup Library right now.">⊙ Backup Now</button>
       </div>
     </div>
   </div>

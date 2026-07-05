@@ -196,7 +196,8 @@
   </div>
   <div class="topbar-field topbar-session">
     <div class="topbar-label">Session Label</div>
-    <input type="text" id="log-notes" placeholder="e.g. Sprint #12 — Review batch" style="user-select:text;-webkit-user-select:text;">
+    <input type="text" id="log-notes" placeholder="e.g. Sprint #12 — Review batch" style="user-select:text;-webkit-user-select:text;"
+           data-tip="Names this work session — shown in the Global Log and on PDF exports." data-tip-pos="bottom">
   </div>
   <div class="hierarchy-bar" id="hierarchy-bar"></div>
 </div>
@@ -208,10 +209,10 @@
     <div class="clock-module">
       <span class="cp-module-label">Session Clock</span>
       <div class="clock-grid">
-        <button class="btn-primary" id="btn-clock-in">⏱ Clock In</button>
-        <button class="btn-primary" id="btn-clock-out">⏹ Clock Out</button>
-        <button class="btn-neutral" id="btn-break">☕ Break</button>
-        <button class="btn-neutral" id="btn-lunch">🍽 Lunch</button>
+        <button class="btn-primary" id="btn-clock-in" data-tip="Starts a timed row using the Task Label + Name on the right (both required).">⏱ Clock In</button>
+        <button class="btn-primary" id="btn-clock-out" data-tip="Stops the open row and records its duration.">⏹ Clock Out</button>
+        <button class="btn-neutral" id="btn-break" data-tip="Punches a break on the active session — counts toward your break-policy compliance.">☕ Break</button>
+        <button class="btn-neutral" id="btn-lunch" data-tip="Punches a lunch on the active session — counts toward your break-policy compliance.">🍽 Lunch</button>
       </div>
       <div class="bl-compliance-row">
         <span class="bl-compliance" id="compliance-break">—</span>
@@ -224,7 +225,7 @@
       <div class="inputs-top">
         <div class="panel-field">
           <label>Task Label</label>
-          <select id="input-label">
+          <select id="input-label" data-tip="Category for the next row — drives the per-label time subtotals in reports and PDF exports.">
             <option value="">— Select —</option>
             <option>Training</option><option>Evaluation</option>
             <option>Review</option><option>Annotation</option>
@@ -235,12 +236,14 @@
         </div>
         <div class="panel-field panel-field--wide">
           <label>Task Name</label>
-          <input type="text" id="input-name" placeholder="Enter task name…" style="user-select:text;-webkit-user-select:text;">
+          <input type="text" id="input-name" placeholder="Enter task name…" style="user-select:text;-webkit-user-select:text;"
+                 data-tip="What you're working on. Required (with a Task Label) to Clock In; Dispatch's timer pre-fills from it.">
         </div>
       </div>
       <div class="panel-field">
         <label>Description</label>
-        <input type="text" id="input-desc" placeholder="Enter description…" style="user-select:text;-webkit-user-select:text;">
+        <input type="text" id="input-desc" placeholder="Enter description…" style="user-select:text;-webkit-user-select:text;"
+               data-tip="Optional row details. Editable as multi-line in the table; Dispatch's task timer writes its logged time back here.">
       </div>
     </div>
 
@@ -248,7 +251,7 @@
   <div class="panel-divider"></div>
   <div class="row-tools">
     <span class="cp-module-label">Row Tools</span>
-    <button class="btn-neutral" id="btn-manual-entry">+ Manual Entry</button>
+    <button class="btn-neutral" id="btn-manual-entry" data-tip="Adds an editable row to backfill a session you forgot to clock — skips the Task Label/Name requirement.">+ Manual Entry</button>
     <button class="btn-neutral" id="btn-clear-row">Clear Row</button>
     <button class="btn-danger"  id="btn-clear-all" style="margin-left:auto;">Clear All</button>
   </div>
