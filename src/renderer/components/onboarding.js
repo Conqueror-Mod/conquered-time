@@ -24,7 +24,7 @@ const Onboarding = (() => {
    * @property {string} page      inner-page name (navigate target)
    * @property {string|null} sel  CSS selector to spotlight (null = centered)
    * @property {string} title
-   * @property {string} body
+   * @property {string} body  developer-authored copy; may contain <strong>
    */
 
   /** @type {TourStep[]} */
@@ -34,7 +34,7 @@ const Onboarding = (() => {
       body: 'Everything you track here is encrypted on this device with AES-256-GCM and never leaves it. This one-minute tour walks you through your first setup.' },
     { page: 'profile', sel: '#field-work-state',
       title: 'Set your Work State & Break Style',
-      body: 'Your Work state sets the break and lunch rules the tracker warnings and audits check against. Prefer structured focus cycles instead? Switch Break Style to Pomodoro, right below it. While you’re here, add your email address too — reports and audit notifications need it, and you’ll be reminded before you can move on without one.' },
+      body: 'Your Work state sets the break and lunch rules the tracker warnings and audits check against. Prefer structured focus cycles instead? Switch Break Style to Pomodoro, right below it. While you’re here, add your email address too — <strong>reports and audit notifications need it</strong>, and you’ll be reminded before you can move on without one.' },
     { page: 'companies', sel: '#btn-add-company',
       title: 'Add your first company',
       body: 'Companies are who you work for — each holds its own projects, platforms, and hours. Add one here; the web view around it grows as you log time.' },
@@ -163,7 +163,9 @@ const Onboarding = (() => {
     title.textContent = step.title;
     const body = document.createElement('div');
     body.className = 'ct-tour-body';
-    body.textContent = step.body;
+    // Step bodies are developer-authored constants above (never user data), so
+    // limited inline markup (<strong>) is safe here.
+    body.innerHTML = step.body;
     const dots = document.createElement('div');
     dots.className = 'ct-tour-dots';
     dots.textContent = STEPS.map((_, i) => (i === idx ? '●' : '○')).join(' ');

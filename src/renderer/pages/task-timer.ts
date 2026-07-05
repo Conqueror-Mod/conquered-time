@@ -70,7 +70,9 @@ function buildDescString(tasks: TaskItem[]): string {
 }
 
 function elapsedSinceMs(ms: number): string {
-  const diff = Date.now() - ms;
+  // Clamp: a future-dated punch (legacy UTC-date bug data or a hand-edited
+  // time) must read 0m, not a negative duration.
+  const diff = Math.max(0, Date.now() - ms);
   const h = Math.floor(diff / 3600000);
   const m = Math.floor((diff % 3600000) / 60000);
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
@@ -91,9 +93,11 @@ async function updateBanner(): Promise<void> {
   $id('tt-main').style.display        = 'grid';
   $id('live-badge').style.display     = '';
 
-  // Find active row (clocked in, not clocked out)
+  // Find the active row (clocked in, not clocked out). LAST open row — a
+  // stale open punch earlier in the table must not drive the banner clock.
   const rows: EntryRow[] = JSON.parse(activeEntry.rows_json || '[]');
-  const activeRow = rows.find(r => r.clock_in && !r.clock_out);
+  const opens = rows.filter(r => r.clock_in && !r.clock_out);
+  const activeRow = opens.length ? opens[opens.length - 1] : undefined;
   const clockIn = activeRow?.clock_in || null;
   if (clockIn) sessionStartMs = parseHHMMtoMs(clockIn);
 

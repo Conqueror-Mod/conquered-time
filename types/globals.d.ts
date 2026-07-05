@@ -382,6 +382,8 @@ interface RowUtilsApi {
   rowHasContent(r: EntryRow | null | undefined): boolean;
   /** Canonical description accessor — handles the desc/description split. */
   rowDesc(r: EntryRow | null | undefined): string;
+  /** LOCAL calendar date as YYYY-MM-DD (never use toISOString for log dates). */
+  localDateStr(d?: Date): string;
 }
 
 /** Structural on purpose — the unit tests exercise CanvasText with a stub ctx. */

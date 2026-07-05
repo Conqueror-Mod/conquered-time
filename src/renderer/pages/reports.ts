@@ -155,8 +155,8 @@ function setupTabs(): void {
 function initPeriodFilter(): void {
   const to = new Date(), from = new Date();
   from.setDate(from.getDate() - 29);
-  $field('period-to').value   = to.toISOString().slice(0,10);
-  $field('period-from').value = from.toISOString().slice(0,10);
+  $field('period-to').value   = RowUtils.localDateStr(to);   // local, not toISOString (UTC)
+  $field('period-from').value = RowUtils.localDateStr(from);
   $id('btn-apply').addEventListener('click', renderPeriod);
 }
 
@@ -254,7 +254,7 @@ function drawBarChart(entries: TimeEntry[]): void {
     out += `<text x="${pL-5}" y="${(y+4).toFixed(1)}" text-anchor="end" fill="var(--text-dim)" font-size="9" font-family="var(--mono)">${val}h</text>`;
   }
 
-  const today = new Date().toISOString().slice(0,10);
+  const today = RowUtils.localDateStr(); // local — highlights the real "today" bar
   const labelStep = dates.length <= 14 ? 1 : dates.length <= 31 ? 7 : Math.ceil(dates.length/8);
 
   dates.forEach((date, i) => {

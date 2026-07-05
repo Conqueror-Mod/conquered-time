@@ -43,11 +43,15 @@ function fmtClock(hhmm: string | undefined): string {
   return (hhmm && typeof Settings !== 'undefined') ? Settings.formatTime(hhmm) : (hhmm || '');
 }
 
-$input('log-date').valueAsDate = new Date();
-
 window.addEventListener('DOMContentLoaded', async () => {
   await Shell.init('tracker');
   document.documentElement.style.visibility = '';
+  // Default the log date AFTER Shell.init — its innerHTML swap discards
+  // JS-set input values, so a pre-init default never survives. LOCAL date,
+  // not valueAsDate: valueAsDate treats the Date as UTC, so any evening use
+  // (US timezones) defaulted the tracker to TOMORROW and filed punches under
+  // a future date (the v3.13 stale-punch / negative-timer bug).
+  if (!$input('log-date').value) $input('log-date').value = RowUtils.localDateStr();
   await loadCompanies();
 
   $id('company-select').addEventListener('change', onCompanyChange);
@@ -139,7 +143,7 @@ async function onCompanyChange(): Promise<void> {
   currentEntryId = null;
   updateHierarchyBar();
   if (!$input('log-date').value)
-    $input('log-date').valueAsDate = new Date();
+    $input('log-date').value = RowUtils.localDateStr(); // local, never valueAsDate (UTC)
   if (currentCompany) { await loadTodayEntry(); startAutoSaveTimer(); }
 }
 
@@ -288,7 +292,10 @@ function updateDispatchChip(): void {
 // ms at the start of the active (clocked-in, not clocked-out) row, used as the
 // "since clock-in" anchor for compliance. null when nothing is clocked in.
 function sessionStartMs(): number | null {
-  const active = rowsData.find(r => r.clock_in && !r.clock_out);
+  // LAST open row: a stale open punch earlier in the table (never clocked out)
+  // must not hijack the timers from the punch the user actually just made.
+  const open = rowsData.filter(r => r.clock_in && !r.clock_out);
+  const active = open.length ? open[open.length - 1] : null;
   if (!active) return null;
   const [h, m] = active.clock_in.split(':').map(Number);
   const d = new Date(); d.setHours(h, m, 0, 0);
@@ -296,7 +303,9 @@ function sessionStartMs(): number | null {
 }
 
 function elapsedSince(ms: number): string {
-  const diff = Date.now() - ms;
+  // Clamp: a future-dated punch (bad data from the old UTC date bug, or a
+  // hand-edited time) must read 0m, not "-46m".
+  const diff = Math.max(0, Date.now() - ms);
   const h = Math.floor(diff / 3600000);
   const m = Math.floor((diff % 3600000) / 60000);
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
@@ -824,7 +833,9 @@ function clearAutoSaveTimer(): void {
 // same open-punch state and shows the elapsed time.
 function updateStatusDot(): void {
   const badge = document.getElementById('live-badge');
-  const open = rowsData.find(r => r.clock_in && !r.clock_out);
+  // Last open row — same rationale as sessionStartMs().
+  const opens = rowsData.filter(r => r.clock_in && !r.clock_out);
+  const open = opens.length ? opens[opens.length - 1] : undefined;
   if (badge) badge.style.display = open ? 'flex' : 'none';
   // Drive the sidebar nav LIVE badge from the same source of truth.
   try {

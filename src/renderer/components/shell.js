@@ -542,31 +542,6 @@ const Shell = (() => {
     </div>`;
   }
 
-  // First-login reassurance that everything is encrypted at rest. Shown once
-  // until the user opts out via "Don't show this again" (persisted per-profile
-  // under ui_encryptionNoticeAck).
-  function buildEncryptionNoticeModal() {
-    return `
-    <div id="enc-notice-modal" style="display:none;position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,0.75);align-items:center;justify-content:center;">
-      <div style="background:var(--surface-3);border:1px solid var(--border-light);border-radius:var(--radius-xl);padding:28px 32px;max-width:440px;width:90%;box-shadow:var(--shadow-3);display:flex;flex-direction:column;gap:18px;position:relative;">
-        <div style="display:flex;align-items:center;gap:12px;">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-          <div style="font-family:var(--sans);font-size:15px;font-weight:600;color:var(--text-white);">Your data is encrypted</div>
-        </div>
-        <div style="font-family:var(--sans);font-size:13px;color:var(--text);line-height:1.6;">
-          Everything you store in Conquered Time — companies, time entries, and task details — is encrypted at rest with <strong>AES-256-GCM</strong>, using a key derived from your password. Your data stays on this device and is only decrypted in memory while you're signed in.
-        </div>
-        <label style="display:flex;align-items:center;gap:8px;font-family:var(--sans);font-size:12px;color:var(--text-muted);cursor:pointer;user-select:none;">
-          <input type="checkbox" id="enc-notice-dontshow" checked style="cursor:pointer;width:14px;height:14px;accent-color:var(--accent);">
-          Don't show this again
-        </label>
-        <div style="display:flex;gap:10px;justify-content:flex-end;">
-          <button id="enc-notice-ok" style="font-family:var(--sans);font-size:12px;font-weight:600;padding:8px 18px;border-radius:var(--radius);border:none;background:var(--accent);color:#fff;cursor:pointer;transition:all var(--transition);">Got it</button>
-        </div>
-      </div>
-    </div>`;
-  }
-
   function setSidebarAvatar(profile, displayName, username) {
     const el = document.getElementById('sidebar-avatar');
     if (!el) return;
@@ -642,7 +617,6 @@ const Shell = (() => {
       </div>
       ${buildSettingsModal()}
       ${buildAuditWarningModal()}
-      ${buildEncryptionNoticeModal()}
       <div id="toast-container"></div>
     `;
 
@@ -759,30 +733,19 @@ const Shell = (() => {
     // first inner page. The encryption reassurance (first-run, until opted out)
     // takes precedence; the audit discrepancy reminder is deferred that one
     // login if the encryption notice is shown, to avoid stacked modals.
-    // Modal order on first login: encryption notice → onboarding tour → audit
-    // notice. Whichever earlier surface runs defers the later ones to the next
-    // login — never stack modals.
-    let encNoticeShown = false;
+    // First-login surfaces: the onboarding tour (whose welcome step carries the
+    // encryption-at-rest reassurance — the old standalone "Your data is
+    // encrypted" modal was removed in its favor), else the audit login-notice.
+    // Only one runs per login — never stack modals.
     let tourStarted = false;
     if (sessionStorage.getItem('audit_check_pending')) {
       sessionStorage.removeItem('audit_check_pending');
       let onboardDone = '1';
       try { onboardDone = await api.invoke('settings:get', 'ui_onboardingDone'); } catch {}
-      try {
-        const ack = await api.invoke('settings:get', 'ui_encryptionNoticeAck');
-        if (!ack) {
-          // Chain the tour off the notice's dismissal so a brand-new profile
-          // gets both, in order, on the same first login.
-          showEncryptionNotice(!onboardDone ? () => { window.Onboarding?.begin(); } : null);
-          encNoticeShown = true;
-          tourStarted = !onboardDone;
-        }
-      } catch {}
-      if (!encNoticeShown && !onboardDone) {
+      if (!onboardDone) {
         window.Onboarding?.begin();
         tourStarted = true;
-      }
-      if (!encNoticeShown && !tourStarted) {
+      } else {
         try {
           const n = await api.invoke('audit:count');
           if (n > 0) showAuditWarning(n, 'login');
@@ -802,7 +765,10 @@ const Shell = (() => {
         // combine with the entry's log_date for an epoch-ms start.
         try {
           const rows = JSON.parse(entry.rows_json || '[]');
-          const open = rows.find(r => r.clock_in && !r.clock_out);
+          // Last open row — a stale never-clocked-out punch earlier in the
+          // table must not drive the badge (mirrors tracker sessionStartMs).
+          const opens = rows.filter(r => r.clock_in && !r.clock_out);
+          const open = opens.length ? opens[opens.length - 1] : null;
           if (open && entry.log_date) {
             const startMs = new Date(`${entry.log_date}T${open.clock_in}:00`).getTime();
             if (!isNaN(startMs)) showLiveBadge(startMs);
@@ -1476,29 +1442,9 @@ function showAuditWarning(count, action) {
   };
 }
 
-// First-login encryption reassurance. Closing with "Don't show this again"
-// ticked persists ui_encryptionNoticeAck so it never reappears for this profile.
-// `onDismiss` (optional) chains the next first-login surface — the onboarding
-// tour — off this modal's dismissal so they never stack.
-/** @param {(() => void) | null} [onDismiss] */
-function showEncryptionNotice(onDismiss) {
-  const modal = document.getElementById('enc-notice-modal');
-  const okBtn = document.getElementById('enc-notice-ok');
-  const dont  = document.getElementById('enc-notice-dontshow');
-  if (!modal || !okBtn) return;
-
-  modal.style.display = 'flex';
-  setTimeout(() => okBtn.focus(), 50);
-
-  okBtn.onclick = async () => {
-    modal.style.display = 'none';
-    okBtn.onclick = null;
-    if (dont?.checked) {
-      try { await api.invoke('settings:set', { key: 'ui_encryptionNoticeAck', value: '1' }); } catch {}
-    }
-    if (typeof onDismiss === 'function') onDismiss();
-  };
-}
+// (The standalone first-login "Your data is encrypted" modal was removed —
+// the onboarding tour's welcome step now carries that reassurance. Old
+// ui_encryptionNoticeAck values in existing vaults are simply ignored.)
 
 // ── Safe Storage (Windows Hello bridge) ──────────────────────────────────────
 

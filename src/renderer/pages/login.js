@@ -46,9 +46,9 @@ function installLoginDelegation() {
     paApplyCloseToTray:     (a, el) => paApplyCloseToTray(el),
     paApplyStartMinimized:  (a, el) => paApplyStartMinimized(el),
     paApplyPreferredDisplay:a       => paApplyPreferredDisplay(a),
-    paArmDelete:            ()      => paArmDelete(),
-    paExecuteDelete:        ()      => paExecuteDelete(),
-    paDisarmDelete:         ()      => paDisarmDelete(),
+    paArmDelete:            a       => paArmDelete(Number(a)),
+    paExecuteDelete:        a       => paExecuteDelete(Number(a)),
+    paDisarmDelete:         a       => paDisarmDelete(Number(a)),
     // beta gate
     redeemBeta:             ()      => redeemBeta(),
     betaRequestKey:         ()      => api.send('shell:open-external', 'https://github.com/Conqueror-Mod/conquered-time'),
@@ -871,9 +871,6 @@ function toast(msg, type = 'success') {
 // Settings are persisted to localStorage (no vault loaded at this stage).
 // Keys prefixed ct_pa_. When the user logs in, vault settings take precedence.
 
-// Snapshot of selectedProfile at the moment the modal is opened.
-let _paOpenedWithProfile = null;
-
 const PA_KEYS = {
   theme: 'ct_pa_theme', scale: 'ct_pa_scale',
   reducedMotion: 'ct_pa_reducedMotion', highContrast: 'ct_pa_highContrast',
@@ -885,8 +882,6 @@ function paGet(key) { return localStorage.getItem(PA_KEYS[key]); }
 function paSet(key, val) { localStorage.setItem(PA_KEYS[key], String(val)); }
 
 function openPreauthSettings() {
-  // Capture profile state now.
-  try { _paOpenedWithProfile = selectedProfile || null; } catch { _paOpenedWithProfile = null; }
   document.getElementById('preauth-settings-modal').style.display = 'flex';
   paSyncModal();
 }
@@ -1062,23 +1057,34 @@ function paLoadAbout() {
 }
 
 // ── Data — Delete User ────────────────────────────────────────────────────────
-function paRenderDeleteUser() {
+// Lists EVERY profile on this device with its own Delete button — deletion no
+// longer depends on which profile (if any) is selected on the login screen.
+// (The old version only offered the selected profile and showed "select a
+// profile first" from the selector, which made deletion effectively
+// unreachable there.) profiles:delete operates on the LOADED profile, so
+// execute loads the chosen profile just before deleting it.
+/** @type {Profile[]} */
+let _paDeleteProfiles = [];
+
+async function paRenderDeleteUser() {
   const area = document.getElementById('pa-delete-user-area');
   if (!area) return;
 
-  if (!_paOpenedWithProfile) {
-    area.innerHTML = `<div class="pa-no-profile-msg">Select a profile on the login screen first,<br>then open Settings to delete it.</div>`;
+  try { _paDeleteProfiles = (await api.invoke('profiles:list')) || []; }
+  catch { _paDeleteProfiles = []; }
+
+  if (!_paDeleteProfiles.length) {
+    area.innerHTML = `<div class="pa-no-profile-msg">No profiles on this device yet.</div>`;
     return;
   }
 
-  const p   = _paOpenedWithProfile;
-  const initials = (p.display_name || p.username || '?').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
-  const avatarHTML = p.avatar_thumb_48
-    ? `<img src="${escapeHtml(p.avatar_thumb_48)}" alt="">`
-    : escapeHtml(initials);
-
-  area.innerHTML = `
-    <div class="pa-delete-card" id="pa-del-card">
+  area.innerHTML = _paDeleteProfiles.map((p, i) => {
+    const initials = (p.display_name || p.username || '?').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+    const avatarHTML = p.avatar_thumb_48
+      ? `<img src="${escapeHtml(p.avatar_thumb_48)}" alt="">`
+      : escapeHtml(initials);
+    return `
+    <div class="pa-delete-card" id="pa-del-card-${i}" style="margin-bottom:10px;">
       <div class="pa-delete-header">
         <div class="pa-delete-profile">
           <div class="pa-delete-avatar">${avatarHTML}</div>
@@ -1087,43 +1093,60 @@ function paRenderDeleteUser() {
             <div class="pa-delete-user">${escapeHtml(p.username)}</div>
           </div>
         </div>
-        <button class="dba-trigger-btn danger" data-action="paArmDelete">Delete</button>
+        <button class="dba-trigger-btn danger" data-action="paArmDelete" data-arg="${i}">Delete</button>
       </div>
-      <div class="pa-delete-confirm" id="pa-del-confirm" style="display:none;">
+      <div class="pa-delete-confirm" id="pa-del-confirm-${i}" style="display:none;">
         <div class="pa-delete-warning">⚠ This permanently deletes this profile and all its data. This cannot be undone.</div>
         <div class="pa-delete-pw-row">
-          <input type="password" id="pa-del-pw" placeholder="Enter password to confirm" autocomplete="current-password">
-          <button class="dba-confirm-btn danger" data-action="paExecuteDelete">Delete Profile</button>
-          <button class="dba-confirm-btn" data-action="paDisarmDelete">Cancel</button>
+          <input type="password" id="pa-del-pw-${i}" placeholder="Enter this profile's password to confirm" autocomplete="current-password">
+          <button class="dba-confirm-btn danger" data-action="paExecuteDelete" data-arg="${i}">Delete Profile</button>
+          <button class="dba-confirm-btn" data-action="paDisarmDelete" data-arg="${i}">Cancel</button>
         </div>
       </div>
     </div>`;
+  }).join('');
 }
 
-function paArmDelete() {
-  document.getElementById('pa-del-card')?.classList.add('armed');
-  document.getElementById('pa-del-confirm').style.display = 'flex';
-  document.getElementById('pa-del-pw')?.focus();
+/** @param {number} i */
+function paArmDelete(i) {
+  document.getElementById(`pa-del-card-${i}`)?.classList.add('armed');
+  const confirm = document.getElementById(`pa-del-confirm-${i}`);
+  if (confirm) confirm.style.display = 'flex';
+  document.getElementById(`pa-del-pw-${i}`)?.focus();
 }
-function paDisarmDelete() {
-  document.getElementById('pa-del-card')?.classList.remove('armed');
-  document.getElementById('pa-del-confirm').style.display = 'none';
-  const pw = document.getElementById('pa-del-pw');
-  if (pw) pw.value = '';
+/** @param {number} i */
+function paDisarmDelete(i) {
+  document.getElementById(`pa-del-card-${i}`)?.classList.remove('armed');
+  const confirm = document.getElementById(`pa-del-confirm-${i}`);
+  if (confirm) confirm.style.display = 'none';
+  const pw = document.getElementById(`pa-del-pw-${i}`);
+  if (pw) /** @type {HTMLInputElement} */ (pw).value = '';
 }
 
-async function paExecuteDelete() {
-  const pw = document.getElementById('pa-del-pw')?.value || '';
-  if (!pw) { toast('Enter your password to confirm deletion.', 'error'); return; }
+/** @param {number} i */
+async function paExecuteDelete(i) {
+  const p = _paDeleteProfiles[i];
+  if (!p) return;
+  const pwEl = /** @type {HTMLInputElement|null} */ (document.getElementById(`pa-del-pw-${i}`));
+  const pw = pwEl?.value || '';
+  if (!pw) { toast('Enter the profile\'s password to confirm deletion.', 'error'); return; }
+
+  // profiles:delete removes the LOADED profile — load the chosen one first
+  // (deselect any other profile the user had open behind the modal).
+  try { await api.invoke('profiles:deselect'); } catch {}
+  const load = await api.invoke('profiles:load', { username: p.username });
+  if (!load?.ok) { toast(load?.error || 'Could not open that profile.', 'error'); return; }
+
   const res = await api.invoke('profiles:delete', { password: pw });
   if (!res?.ok) {
     toast(res?.error || 'Deletion failed.', 'error');
-    const inp = document.getElementById('pa-del-pw');
-    if (inp) { inp.value = ''; inp.focus(); }
+    if (pwEl) { pwEl.value = ''; pwEl.focus(); }
     return;
   }
   closePreauthSettings();
   toast('Profile deleted.', 'success');
+  // Full reload — the selector rebuilds without the deleted profile, and any
+  // previously-selected profile state is cleanly discarded.
   setTimeout(() => api.send('navigate', 'login'), 1200);
 }
 

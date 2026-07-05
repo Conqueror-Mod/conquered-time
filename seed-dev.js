@@ -36,8 +36,8 @@
  *    an in-progress BREAK on an old entry, a zero-duration task, a 25-hour
  *    task, an emoji/HTML-label task, and 2 ORPHANS (entry_id → nonexistent).
  *  • 3 backup fixtures (vault-<stamp>.db) so the Backup Library has data.
- *  • App settings under REAL ui_* / win_* keys + ui_encryptionNoticeAck=1 so the
- *    first-login modal doesn't block automated sweeps.
+ *  • App settings under REAL ui_* / win_* keys + ui_onboardingDone=1 so the
+ *    first-login tour doesn't block automated sweeps.
  *
  *  AUDIT EXPECTATION = 7  (6 canonical + 1 desc-only probe)
  *  ─────────────────────
@@ -582,15 +582,14 @@ async function seed() {
     ['ui_focusIndicators',       'false'],
     ['ui_autoLockMinutes',       '0'],
     ['ui_autoSaveInterval',      '30'],
-    ['ui_encryptionNoticeAck',   '1'],     // pre-acked so modals don't block automated sweeps
-    ['ui_onboardingDone',        '1'],     // tour pre-done for the same reason
+    ['ui_onboardingDone',        '1'],     // tour pre-done so modals don't block automated sweeps
     ['win_startMaximized',       'true'],
     ['win_rememberPosition',     'false'],
   ];
   for (const [key, value] of settings) {
     db.run('INSERT INTO app_settings (key, value) VALUES (?,?)', [key, value]);
   }
-  console.log(`✓ App settings seeded (theme=${SEED_THEME}, 12h, encryption notice pre-acked)`);
+  console.log(`✓ App settings seeded (theme=${SEED_THEME}, 12h, onboarding tour pre-done)`);
 
   // ── Persist DB ─────────────────────────────────────────────────────────────
   fs.writeFileSync(DB_FILE, Buffer.from(db.export()));

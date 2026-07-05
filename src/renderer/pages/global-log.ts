@@ -83,8 +83,8 @@ function applyQuickRange(): void {
     $field('filter-to').value='';
   } else {
     const to=new Date(), from=new Date(Date.now()-parseInt(val)*86400000);
-    $field('filter-from').value=from.toISOString().slice(0,10);
-    $field('filter-to').value=to.toISOString().slice(0,10);
+    $field('filter-from').value=RowUtils.localDateStr(from); // local, not toISOString (UTC)
+    $field('filter-to').value=RowUtils.localDateStr(to);
   }
   applyFilters();
 }
@@ -127,7 +127,7 @@ function renderTable(): void {
     tbody.innerHTML=`<tr><td colspan="6"><div class="empty-state">No sessions match the current filters.</div></td></tr>`;
     return;
   }
-  const todayStr=new Date().toISOString().slice(0,10); // C6 (D-009): badge future-dated sessions
+  const todayStr=RowUtils.localDateStr(); // C6 (D-009): badge future-dated sessions (LOCAL date)
   tbody.innerHTML=filtered.map((e,idx) => {
     const co=compMap[e.company_id];
     const rows=safeParseRows(e.rows_json);
