@@ -583,6 +583,7 @@ async function seed() {
     ['ui_autoLockMinutes',       '0'],
     ['ui_autoSaveInterval',      '30'],
     ['ui_encryptionNoticeAck',   '1'],     // pre-acked so modals don't block automated sweeps
+    ['ui_onboardingDone',        '1'],     // tour pre-done for the same reason
     ['win_startMaximized',       'true'],
     ['win_rememberPosition',     'false'],
   ];

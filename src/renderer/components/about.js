@@ -146,6 +146,17 @@ const About = (() => {
         </div>
       </div>
 
+      <div class="about-section" id="about-guide-section">
+        <div class="about-section-title">Setup Guide</div>
+        <div class="about-update-row">
+          <button class="about-update-btn" id="about-replay-guide-btn"
+                  data-tip="Runs the first-login walkthrough again — profile, companies, tracker, Dispatch.">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8" fill="currentColor"/></svg>
+            Replay setup guide
+          </button>
+        </div>
+      </div>
+
       <div class="about-section">
         <div class="about-section-title">Links</div>
         <div class="about-links">
@@ -190,6 +201,16 @@ const About = (() => {
         set('ab-platform', info.arch ? `${info.platform} (${info.arch})` : info.platform);
       }
     } catch {}
+
+    // Replay setup guide — in-app only (the pre-auth login About has no tour
+    // engine, so hide the whole section there).
+    const guideSection = document.getElementById('about-guide-section');
+    if (window.Onboarding) {
+      document.getElementById('about-replay-guide-btn')
+        ?.addEventListener('click', () => window.Onboarding.replay());
+    } else if (guideSection) {
+      guideSection.style.display = 'none';
+    }
 
     // Outbound links
     document.getElementById('about-link-github')?.addEventListener('click', () => openExternal('github'));
