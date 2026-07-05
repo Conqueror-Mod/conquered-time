@@ -274,7 +274,7 @@ const Onboarding = (() => {
       return `${k(a)}|${k(c)}`;
     };
     let lastKey = rectKey();
-    const revealCap = Date.now() + 700;
+    const revealCap = Date.now() + 250; // tight — corrections after this slide via CSS
     const reveal = () => {
       document.getElementById('ct-tour-spot')?.classList.add('ct-tour-in');
       document.getElementById('ct-tour-card')?.classList.add('ct-tour-in');
@@ -284,9 +284,9 @@ const Onboarding = (() => {
       const k = rectKey();
       if (k === lastKey || Date.now() > revealCap) { reveal(); return; }
       lastKey = k;
-      setTimeout(settleTick, 80);
+      setTimeout(settleTick, 60);
     };
-    setTimeout(settleTick, 80);
+    setTimeout(settleTick, 60);
 
     // Follow layout shifts briefly: async content (email-required banner, data
     // loads, fonts) can move the target AFTER the first measure — the profile
@@ -430,19 +430,41 @@ const Onboarding = (() => {
 
   // The page's own async renders land AFTER the tour's enter hook and overwrite
   // injected demo content (Global Log's empty-state, Dispatch's no-session
-  // reset, the reports chart redraw). So a demo isn't a one-shot write — it
-  // re-asserts every few hundred ms for the settle window, re-applying whenever
-  // its marker/end-state got clobbered. `stepIdx` stops it the moment the user
-  // moves on within the same page.
+  // reset, the reports chart redraw). Polling re-applied the demo but the
+  // overwrite PAINTED first (a visible zero-data flash between ticks) — so the
+  // re-apply is driven by a MutationObserver instead: the callback runs as a
+  // microtask after the page's own DOM write, BEFORE the next paint, so the
+  // clobbered state never becomes visible. A slow safety poll backs it up.
+  // Everything stops the moment the user moves off the step or ends the tour.
   /** @param {number} stepIdx @param {() => boolean} broken @param {() => void} apply */
   function demoAssert(stepIdx, broken, apply) {
+    const alive = () => renderedIdx === stepIdx && activeStep() != null;
+    const fix = () => { try { if (alive() && broken()) apply(); } catch {} };
+    fix();
+
+    let scheduled = false;
+    const observer = new MutationObserver(() => {
+      if (!alive()) { observer.disconnect(); return; }
+      if (scheduled) return;
+      scheduled = true;
+      // One microtask coalesces bursts of mutations (a full innerHTML render)
+      // and still runs before the browser paints the clobbered state.
+      queueMicrotask(() => { scheduled = false; fix(); });
+    });
+    // attributes:style included — Dispatch's null-render "breaks" the demo via
+    // style.display flips, which childList alone wouldn't see.
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['style'] });
+
+    // Safety poll for changes the observer can't see (e.g. style-only resets).
+    // The poll stops at the settle window; the observer stays for as long as
+    // the user sits on this step (it self-disconnects on step change above).
     const until = Date.now() + FOLLOW_MS;
     const tick = () => {
-      if (renderedIdx !== stepIdx || activeStep() == null || Date.now() > until) return;
-      try { if (broken()) apply(); } catch {}
-      setTimeout(tick, 350);
+      if (!alive()) { observer.disconnect(); return; }
+      fix();
+      if (Date.now() <= until) setTimeout(tick, 250);
     };
-    tick();
+    setTimeout(tick, 250);
   }
 
   async function demoTracker() {
