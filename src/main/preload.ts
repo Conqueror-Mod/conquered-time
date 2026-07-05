@@ -24,6 +24,7 @@ const ALLOWED_INVOKE = new Set([
   'win:set-launch-at-startup', 'win:get-launch-at-startup',
   'win:get-close-to-tray', 'win:set-close-to-tray',
   'win:get-start-minimized', 'win:set-start-minimized',
+  'win:set-zoom',
   'beta:status', 'beta:redeem'
 ]);
 

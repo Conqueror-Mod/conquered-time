@@ -82,6 +82,17 @@ function setAppPref(key: string, val: any) {
 // session.key / session.user / session.activeEntryId + the idle-lock timer
 // live in ./session (imported above); mutate through that shared object only.
 let mainWindow: any = null;
+// App-wide UI scale, applied as a browser-style webContents zoom factor so the
+// WHOLE window scales uniformly (sidebar, titlebar, modals, content). Replaces
+// the old CSS `zoom` on #main-content, which left the chrome unscaled and gave
+// no visible feedback while the Settings modal was open. Held here because the
+// zoom resets on navigation (loadFile) and must be reapplied on every page.
+let zoomFactor = 1;
+function applyZoomFactor(): void {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    try { mainWindow.webContents.setZoomFactor(zoomFactor); } catch {}
+  }
+}
 let forceClose   = false;  // set true after user confirms close through audit prompt
 let tray: any        = null;   // system tray icon (created on whenReady)
 let isQuitting   = false;  // set true when the user really means to quit (tray/menu Quit)
@@ -355,6 +366,9 @@ function createWindow() {
     }
   });
   buildMenu();
+  // webContents zoom resets on each navigation; reapply the stored scale after
+  // every page load (this is not a SPA — each page is a fresh loadFile).
+  mainWindow.webContents.on('did-finish-load', applyZoomFactor);
   mainWindow.loadFile(path.join(RENDERER_DIR, 'pages/login.html'));
   mainWindow.on('close', (event: any) => {
     // Close-to-tray: hide the window instead of quitting, keeping the session alive.
@@ -477,6 +491,15 @@ function navigate(page: string) {
 ipcMain.on('win:minimize', () => mainWindow.minimize());
 ipcMain.on('win:maximize', () => mainWindow.isMaximized() ? mainWindow.unmaximize() : mainWindow.maximize());
 ipcMain.on('win:close',    () => mainWindow.close());
+
+// App-wide UI scale — set the browser-style zoom factor for the whole window.
+// Clamped to a sane range. The renderer (settings.js / login pre-auth) calls
+// this whenever the scale changes; did-finish-load reapplies it per page.
+ipcMain.handle('win:set-zoom', (_: unknown, factor: any) => {
+  const n = Number(factor);
+  if (Number.isFinite(n)) { zoomFactor = Math.max(0.5, Math.min(2, n)); applyZoomFactor(); }
+  return { ok: true };
+});
 ipcMain.on('shell:open-external', (_: unknown, url: any) => {
   const { shell } = require('electron');
   // Only allow http/https URLs to prevent protocol abuse

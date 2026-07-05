@@ -1,5 +1,5 @@
 {
-  "version": "3.11.9",
+  "version": "3.12.0",
   "downloadUrl": "https://github.com/Conqueror-Mod/conquered-time/releases/latest",
-  "notes": "v3.11.9 — Minor fixes: a lockout warning no longer carries between profiles; the account-creation screen scrolls on smaller monitors so the buttons stay reachable; and the QR caption on the setup screen is now legible on the default theme."
+  "notes": "v3.12.0 — UI Scale now zooms the entire window uniformly (sidebar, title bar, menus, and content together) and updates instantly, so changing it in Settings gives immediate visible feedback."
 }

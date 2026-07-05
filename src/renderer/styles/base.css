@@ -1,10 +1,13 @@
 /* ══════════════════════════════════════════════════════════════
    SCALE
+   UI scale is now applied app-wide as a browser-style window zoom
+   (main process: webContents.setZoomFactor, driven by settings.js /
+   the login pre-auth scale). It scales the WHOLE window uniformly —
+   sidebar, titlebar, modals, content — so the old CSS `zoom` on
+   #main-content (which left the chrome unscaled and gave no visible
+   feedback while Settings was open) is gone. `data-scale` is still
+   set on <html> for the active-button state, just no longer a zoom.
    ══════════════════════════════════════════════════════════════ */
-html[data-scale="compact"]     #main-content { zoom: 0.82; }
-html[data-scale="normal"]      #main-content { zoom: 1.00; }
-html[data-scale="comfortable"] #main-content { zoom: 1.14; }
-html[data-scale="large"]       #main-content { zoom: 1.30; }
 
 /* ══════════════════════════════════════════════════════════════
    ACCESSIBILITY
