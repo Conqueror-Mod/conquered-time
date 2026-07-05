@@ -337,10 +337,19 @@ function checkComplianceStatus(type: 'break' | 'lunch'): 'ok' | 'warn' | 'over' 
   const p = auditPolicy;
   let thresholdMs: number, warnMs: number;
   if (type === 'break') {
-    const rawDue  = p?.breakThresholds?.[0]?.[0];
-    thresholdMs   = (rawDue != null) ? rawDue * 60000 : Infinity;
-    const rawWarn = p?.dispatchBreakWarnMins;
-    warnMs        = (rawWarn != null) ? rawWarn * 60000 : Infinity;
+    if (p?.breakStyle === 'pomodoro') {
+      // Pomodoro break style: the LIVE cadence warnings follow the preset —
+      // warn once a focus block has elapsed since the last break, overdue once
+      // the break you should be on has fully passed too. Lunch (below) and the
+      // audit engine stay on the state policy regardless (confirmed decision).
+      warnMs      = p.pomodoro.focusMins * 60000;
+      thresholdMs = (p.pomodoro.focusMins + p.pomodoro.breakMins) * 60000;
+    } else {
+      const rawDue  = p?.breakThresholds?.[0]?.[0];
+      thresholdMs   = (rawDue != null) ? rawDue * 60000 : Infinity;
+      const rawWarn = p?.dispatchBreakWarnMins;
+      warnMs        = (rawWarn != null) ? rawWarn * 60000 : Infinity;
+    }
   } else {
     thresholdMs   = p ? p.lunchThreshMins * 60000 : 5 * 3600000;
     const rawWarn = p?.dispatchLunchWarnMins;

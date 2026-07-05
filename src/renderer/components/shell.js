@@ -94,6 +94,12 @@ const Shell = (() => {
           <div id="sidebar-task-time" class="sidebar-timer-display">00:00</div>
           <span class="sidebar-timer-caption">Dispatch Timer</span>
         </div>
+        <div id="sidebar-pomo" style="display:none;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:12px 0;"
+             data-tip="Your Pomodoro cycle — phase and time remaining. Manage it on the Dispatch page.">
+          <div id="sidebar-pomo-phase" class="sidebar-timer-caption">Focus</div>
+          <div id="sidebar-pomo-time" class="sidebar-timer-display">25:00</div>
+          <span class="sidebar-timer-caption">Pomodoro</span>
+        </div>
       </div>
 
       <div class="sidebar-section" style="margin-bottom:0;">
@@ -603,6 +609,7 @@ const Shell = (() => {
       _injectScript('../validator.js'),
     ]);
     await _injectScript('../store.js'); // store.js depends on IPC
+    await _injectScript('../components/pomodoro.js'); // Pomodoro engine (chip + alerts on every page)
 
     const [user, profile] = await Promise.all([
       api.invoke('session:get'),
@@ -790,6 +797,9 @@ const Shell = (() => {
         showSidebarTimer(active.started_at);
       } catch {}
     })();
+
+    // Pomodoro engine (no-op unless the profile's break_style is 'pomodoro').
+    window.Pomodoro?.init();
 
     return user;
   }

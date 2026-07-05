@@ -223,6 +223,7 @@ interface IpcInvokeMap {
   'settings:get': (key: string) => string | null;
   'settings:set': (payload: { key: string; value: string }) => MutResult;
   // app
+  'app:notify': (payload: { title?: string; body?: string }) => MutResult;
   'app:get-info': () => {
     version: string; electronVersion: string; nodeVersion: string;
     platform: string; arch: string;
@@ -472,6 +473,18 @@ interface Window {
   __shellDelegated?: boolean;
   __loginDelegated?: boolean;
   __tooltipsInstalled?: boolean;
+  /** Pomodoro cycle engine (components/pomodoro.js, injected by Shell.init). */
+  Pomodoro?: PomodoroEngine;
+}
+
+/** window.Pomodoro surface (components/pomodoro.js). */
+interface PomodoroEngine {
+  init(): Promise<void>;
+  start(): Promise<void>;
+  pause(): void;
+  stop(): void;
+  skipPhase(): void;
+  enabled(): boolean;
 }
 
 // Optional per-page hooks: a page defines these top-level functions if it

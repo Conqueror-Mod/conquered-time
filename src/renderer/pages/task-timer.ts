@@ -295,6 +295,14 @@ window.addEventListener('DOMContentLoaded', async () => {
   // ── Banner duration ticker ──
   setInterval(updateBannerDuration, 30000);
 
+  // ── Pomodoro cycle controls ──
+  // The panel itself is shown/hidden and re-rendered by the engine
+  // (components/pomodoro.js, injected by Shell.init) — this just wires clicks.
+  $id('pomo-start').addEventListener('click', () => { void window.Pomodoro?.start(); });
+  $id('pomo-pause').addEventListener('click', () => window.Pomodoro?.pause());
+  $id('pomo-skip').addEventListener('click',  () => window.Pomodoro?.skipPhase());
+  $id('pomo-stop').addEventListener('click',  () => window.Pomodoro?.stop());
+
   // ── Start Task ──
   $id('btn-start').addEventListener('click', async () => {
     const label = $input('task-label-input').value.trim();

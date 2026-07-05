@@ -63,6 +63,23 @@
       <button class="tt-btn-stop"  id="btn-stop"  style="display:none;">■ Stop &amp; Log</button>
       <button class="tt-btn-cancel" id="btn-cancel" style="display:none;">✕</button>
     </div>
+
+    <!-- Pomodoro cycle (hidden unless the profile's Break Style is Pomodoro) -->
+    <div class="pomo-panel" id="pomo-panel" style="display:none;">
+      <div class="tt-panel-title">Pomodoro</div>
+      <div class="pomo-readout">
+        <div class="pomo-phase" id="pomo-phase">Idle</div>
+        <div class="pomo-countdown" id="pomo-countdown">25:00</div>
+        <div class="pomo-cycles" id="pomo-cycles"></div>
+      </div>
+      <div class="pomo-btns">
+        <button class="btn-primary" id="pomo-start" data-tip="Begin a focus block — you'll get a break alert when it ends.">▶ Start</button>
+        <button class="btn-neutral" id="pomo-pause" style="display:none;">⏸ Pause</button>
+        <button class="btn-neutral" id="pomo-skip"  style="display:none;" data-tip="Jump to the next phase without an alert.">⏭ Skip Phase</button>
+        <button class="btn-neutral" id="pomo-stop"  style="display:none;">■ Reset</button>
+      </div>
+      <div class="pomo-hint" id="pomo-hint"></div>
+    </div>
   </div>
 
   <!-- Right: task log panel -->
