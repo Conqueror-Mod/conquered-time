@@ -417,6 +417,18 @@ td {
 }
 .ct-tour-btns button { font-size: 12px; padding: 6px 12px; }
 .ct-tour-btns .btn-neutral:first-child { margin-right: auto; }
+/* "Example data" pill on tour-injected demo content — display-only, wiped on nav */
+.ct-demo-pill {
+  display: inline-block;
+  padding: 3px 10px;
+  border: 1px dashed var(--accent);
+  border-radius: 10px;
+  font-family: var(--sans);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  opacity: 0.85;
+}
 
 /* ══════════════════════════════════════════════════════════════
    MODAL

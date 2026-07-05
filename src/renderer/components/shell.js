@@ -1705,6 +1705,10 @@ function installTooltips() {
   /** @param {Element} target */
   function show(target) {
     if (!target.isConnected) { hide(); return; }
+    // Never compete with the onboarding tour — its overlay/card is the only
+    // guidance on screen while a tour step is up (autofocused fields were
+    // popping their focus-tooltip over the coach-mark card).
+    if (document.getElementById('ct-tour-overlay')) { hide(); return; }
     const text = target.getAttribute('data-tip');
     if (!text) return;
     const el = ensureEl();
