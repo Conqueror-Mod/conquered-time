@@ -18,7 +18,7 @@ const About = (() => {
   // (main validates https?:// before shell.openExternal).
   const URLS = {
     github: 'https://github.com/Conqueror-Mod/conquered-time',
-    donate: 'https://ko-fi.com/christheconquerorbowles',
+    donate: 'https://ko-fi.com/christheconqueror',
   };
 
   // Changelog — newest first. Edit HERE and both About surfaces update. The two
