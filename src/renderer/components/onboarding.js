@@ -73,17 +73,17 @@ const Onboarding = (() => {
       title: 'Reports — Period Summary',
       body: 'Pick a date range and company to see total hours, daily bars, and a task-label breakdown for the period.',
       cardAt: { sel: '.tab-bar', side: 'right' },
-      enter: () => { switchReportsTab('period'); void demoReportsPeriod(); } },
+      enter: () => { assertReportsTab('period', 5); void demoReportsPeriod(); } },
     { page: 'reports', sel: '.tab-bar',
       title: 'Reports — Company Breakdown',
       body: 'Every company gets a card: total hours, session count, last active date, and where the time went by task label.',
       cardAt: { sel: '.tab-bar', side: 'right' },
-      enter: () => { switchReportsTab('company'); void demoReportsCompany(); } },
+      enter: () => { assertReportsTab('company', 6); void demoReportsCompany(); } },
     { page: 'reports', sel: '.tab-bar',
       title: 'Reports — Audit Log',
       body: 'The audit checks every punch for problems — missing clock-outs, skipped breaks, duration drift — and suggests fixes. Nothing is ever changed without your explicit confirmation.',
       cardAt: { sel: '.tab-bar', side: 'right' },
-      enter: () => { switchReportsTab('audit'); void demoReportsAudit(); } },
+      enter: () => { assertReportsTab('audit', 7); void demoReportsAudit(); } },
     { page: 'global-log', sel: null,
       title: 'Review & export',
       body: 'The Global Log is your full history across companies — filter it, expand a session for its punches, export CSV or PDF, or jump back into any session with Open.',
@@ -260,6 +260,16 @@ const Onboarding = (() => {
     placeCard(card, cardAnchor || anchor, step.cardAt?.side);
     next.focus();
 
+    // Spot + card start invisible and fade in after a couple of follow ticks:
+    // the first placement happens before async layout settles (banners, data,
+    // the demo turning the cardAt anchor on), and users saw the card flash at
+    // the pre-settle position before snapping. Position corrections that land
+    // after the reveal slide via the CSS transition instead of snapping.
+    setTimeout(() => {
+      document.getElementById('ct-tour-spot')?.classList.add('ct-tour-in');
+      document.getElementById('ct-tour-card')?.classList.add('ct-tour-in');
+    }, FOLLOW_TICK * 2 + 50);
+
     // Follow layout shifts briefly: async content (email-required banner, data
     // loads, fonts) can move the target AFTER the first measure — the profile
     // step's stranded first-view spotlight was exactly this. Also picks up a
@@ -361,10 +371,22 @@ const Onboarding = (() => {
   }
 
   // ── Reports tab switching ────────────────────────────────────────────────
-  /** @param {string} tab */
-  function switchReportsTab(tab) {
-    const btn = /** @type {HTMLElement|null} */ (document.querySelector(`.tab-btn[data-tab="${tab}"]`));
-    btn?.click();
+  // Retry-asserted: arriving at a Reports step via a fresh page load (Back
+  // from Global Log) fires the enter hook BEFORE the page has wired its tab
+  // listeners, so a single click was a no-op — the Audit step rendered over
+  // the Period tab. Keep clicking until the right tab is actually active.
+  /** @param {string} tab @param {number} stepIdx */
+  function assertReportsTab(tab, stepIdx) {
+    const until = Date.now() + FOLLOW_MS;
+    const tick = () => {
+      if (renderedIdx !== stepIdx || activeStep() == null || Date.now() > until) return;
+      const active = /** @type {HTMLElement|null} */ (document.querySelector('.tab-btn.active'));
+      if (!active || active.dataset.tab !== tab) {
+        /** @type {HTMLElement|null} */ (document.querySelector(`.tab-btn[data-tab="${tab}"]`))?.click();
+      }
+      setTimeout(tick, FOLLOW_TICK);
+    };
+    tick();
   }
 
   // ══════════════════════════════════════════════════════════════════════════
