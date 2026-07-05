@@ -6,7 +6,7 @@ const { session, decryptEntry } = require('../session');
 const { dbAll, dbGet, dbRun, persistDB } = require('../db');
 const { performBackup } = require('../backups');
 const { encrypt } = require('../vault-crypto');
-const { getPolicy, STATE_POLICY, STATE_NAMES } = require('../policies');
+const { getPolicy, STATE_POLICY, STATE_NAMES, getPomodoroPreset } = require('../policies');
 const { countAuditDiscrepancies } = require('../audit');
 const { getProfileEmail, getEmailSmtpConfig } = require('../email');
 
@@ -30,6 +30,12 @@ ipcMain.handle('audit:get-policy', () => {
     lunchThreshMins: policy.lunchThreshMins,
     dispatchBreakWarnMins: isFinite(policy.dispatchBreakWarnMins) ? policy.dispatchBreakWarnMins : null,
     dispatchLunchWarnMins: isFinite(policy.dispatchLunchWarnMins) ? policy.dispatchLunchWarnMins : null,
+    // Break-style preference (Profile page). 'pomodoro' swaps the LIVE cadence
+    // warnings/timer for the preset below; the audit fields above stay state-
+    // policy-driven regardless — compliance is never judged by Pomodoro.
+    breakStyle: session.user?.break_style === 'pomodoro' ? 'pomodoro' : 'state',
+    pomodoroPreset: session.user?.pomodoro_preset || 'classic',
+    pomodoro: getPomodoroPreset(session.user?.pomodoro_preset),
   };
 });
 

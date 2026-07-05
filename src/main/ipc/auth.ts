@@ -14,6 +14,7 @@ const { readCache, invalidateEntriesCache } = require('../cache');
 const { performBackup, setBackupDir } = require('../backups');
 const { encrypt, decrypt, deriveKey, reEncryptVault: reEncryptVaultCore, migrateTimeEntries: migrateTimeEntriesCore } = require('../vault-crypto');
 const { runScheduledEmailCheck, profileEmailMissing } = require('../email');
+const { POMODORO_PRESETS } = require('../policies');
 const betaKeys = require('../beta-keys');
 
 // ctx: main-owned install/profile plumbing.
@@ -250,7 +251,9 @@ ipcMain.handle('auth:safe-login', async () => {
     if (user.profile_enc && user.profile_iv && user.profile_tag) {
       try {
         const pd = JSON.parse(decrypt({ data: user.profile_enc, iv: user.profile_iv, tag: user.profile_tag }, key));
-        session.user.work_state = pd?.work_state || null;
+        session.user.work_state      = pd?.work_state || null;
+        session.user.break_style     = pd?.break_style === 'pomodoro' ? 'pomodoro' : 'state';
+        session.user.pomodoro_preset = pd?.pomodoro_preset || 'classic';
       } catch {}
     }
     dbRun('UPDATE users SET failed_attempts=0, locked_until=NULL WHERE rowid=?', [Number(user.rid)]);
@@ -286,7 +289,9 @@ ipcMain.handle('auth:quick-unlock', async (_: unknown, { password }: Record<stri
     if (user.profile_enc && user.profile_iv && user.profile_tag) {
       try {
         const pd = JSON.parse(decrypt({ data: user.profile_enc, iv: user.profile_iv, tag: user.profile_tag }, key));
-        session.user.work_state = pd?.work_state || null;
+        session.user.work_state      = pd?.work_state || null;
+        session.user.break_style     = pd?.break_style === 'pomodoro' ? 'pomodoro' : 'state';
+        session.user.pomodoro_preset = pd?.pomodoro_preset || 'classic';
       } catch {}
     }
     dbRun('UPDATE users SET failed_attempts=0, locked_until=NULL WHERE rowid=?', [Number(user.rid)]);
@@ -405,7 +410,9 @@ ipcMain.handle('auth:login', async (_: unknown, { username, password, totpCode }
     if (user.profile_enc && user.profile_iv && user.profile_tag) {
       try {
         const profileData = JSON.parse(decrypt({ data: user.profile_enc, iv: user.profile_iv, tag: user.profile_tag }, session.key));
-        session.user.work_state = profileData?.work_state || null;
+        session.user.work_state      = profileData?.work_state || null;
+        session.user.break_style     = profileData?.break_style === 'pomodoro' ? 'pomodoro' : 'state';
+        session.user.pomodoro_preset = profileData?.pomodoro_preset || 'classic';
         if (session.profileDir && !IS_DEV) {
           const manifest = readManifest(session.profileDir);
           if (manifest && !manifest.avatar_thumb_48 && profileData?.avatar) {
@@ -496,14 +503,20 @@ ipcMain.handle('profile:get', () => {
   return { display_name: user.display_name || '', ...profileData };
 });
 
-ipcMain.handle('profile:save', (_: unknown, { display_name, full_name, email, phone, job_title, work_state, avatar, avatar_thumb_48 }: Record<string, any>) => {
+ipcMain.handle('profile:save', (_: unknown, { display_name, full_name, email, phone, job_title, work_state, break_style, pomodoro_preset, avatar, avatar_thumb_48 }: Record<string, any>) => {
   if (!session.key || !session.user) return { ok: false };
   try {
-    const blob = encrypt(JSON.stringify({ full_name: full_name || '', email: email || '', phone: phone || '', job_title: job_title || '', work_state: work_state || null, avatar: avatar || null }), session.key);
+    // Normalize break prefs: only 'pomodoro' opts out of state-policy warnings,
+    // and the preset must be a known key (unknown → classic).
+    const breakStyle = break_style === 'pomodoro' ? 'pomodoro' : 'state';
+    const pomoPreset = POMODORO_PRESETS[pomodoro_preset] ? pomodoro_preset : 'classic';
+    const blob = encrypt(JSON.stringify({ full_name: full_name || '', email: email || '', phone: phone || '', job_title: job_title || '', work_state: work_state || null, break_style: breakStyle, pomodoro_preset: pomoPreset, avatar: avatar || null }), session.key);
     dbRun('UPDATE users SET display_name=?, profile_enc=?, profile_iv=?, profile_tag=? WHERE rowid=?',
       [display_name || null, blob.data, blob.iv, blob.tag, session.user.id]);
-    session.user.display_name = display_name || null;
-    session.user.work_state   = work_state   || null;
+    session.user.display_name    = display_name || null;
+    session.user.work_state      = work_state   || null;
+    session.user.break_style     = breakStyle;
+    session.user.pomodoro_preset = pomoPreset;
     persistDB();
     // Keep profile selector card in sync
     if (session.profileDir && !IS_DEV) {

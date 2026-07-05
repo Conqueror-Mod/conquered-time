@@ -65,6 +65,31 @@ const STATE_NAMES: Record<string, string> = {
   WY:'Wyoming',
 };
 
+// ── Pomodoro break-style presets ────────────────────────────────────────────
+// The "pomodoro" break_style replaces the LIVE break-cadence warnings only.
+// The audit engine always judges against the state policy above — legal
+// compliance is not affected by choosing Pomodoro (see
+// docs/PLAN-pomodoro-tooltips-onboarding.md, confirmed design decision).
+interface PomodoroPreset {
+  label: string;
+  focusMins: number;
+  breakMins: number;
+  /** Long-break length; null = no long-break tier for this preset. */
+  longBreakMins: number | null;
+  /** Every Nth break is a long one; null when longBreakMins is null. */
+  cyclesPerLong: number | null;
+}
+
+const POMODORO_PRESETS: Record<string, PomodoroPreset> = {
+  classic:  { label: 'Classic 25/5',   focusMins: 25, breakMins: 5,  longBreakMins: 15,   cyclesPerLong: 4 },
+  extended: { label: 'Extended 50/10', focusMins: 50, breakMins: 10, longBreakMins: 20,   cyclesPerLong: 3 },
+  gentle:   { label: 'Gentle 90/15',   focusMins: 90, breakMins: 15, longBreakMins: null, cyclesPerLong: null },
+};
+
+function getPomodoroPreset(key: string | null | undefined): PomodoroPreset {
+  return POMODORO_PRESETS[key || ''] || POMODORO_PRESETS.classic;
+}
+
 function getPolicy(workState: string | null | undefined): BreakPolicy {
   const key = workState ? (STATE_POLICY[workState] || 'default') : 'default';
   return BREAK_POLICIES[key];
@@ -78,4 +103,4 @@ function requiredBreaks(totalMins: number, policy?: BreakPolicy | null): number 
   return 0;
 }
 
-module.exports = { BREAK_POLICIES, STATE_POLICY, STATE_NAMES, getPolicy, requiredBreaks };
+module.exports = { BREAK_POLICIES, STATE_POLICY, STATE_NAMES, getPolicy, requiredBreaks, POMODORO_PRESETS, getPomodoroPreset };

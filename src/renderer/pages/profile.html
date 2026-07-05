@@ -390,6 +390,23 @@
                   data-tip="Sets your break/lunch compliance policy — some states mandate rest or meal breaks. Drives the tracker's live warnings and the audit checks."></select>
         </div>
         <div class="field-group">
+          <label class="field-label" for="field-break-style">Break Style</label>
+          <select class="form-input" id="field-break-style"
+                  data-tip="State policy: break warnings follow your Work state's rules. Pomodoro: structured focus/break cycles instead. Audits always check against your state policy either way.">
+            <option value="state">State policy — follow my Work state</option>
+            <option value="pomodoro">Pomodoro — structured focus/break cycles</option>
+          </select>
+        </div>
+        <div class="field-group" id="pomodoro-preset-group" style="display:none;">
+          <label class="field-label" for="field-pomodoro-preset">Pomodoro Preset</label>
+          <select class="form-input" id="field-pomodoro-preset"
+                  data-tip="How long each focus block and break runs. Classic is the traditional Pomodoro rhythm; Gentle suits deep-focus work.">
+            <option value="classic">Classic — 25 min focus / 5 min break (15 min long break every 4th)</option>
+            <option value="extended">Extended — 50 min focus / 10 min break (20 min long break every 3rd)</option>
+            <option value="gentle">Gentle — 90 min focus / 15 min break</option>
+          </select>
+        </div>
+        <div class="field-group">
           <label class="field-label" for="field-email">Email Address</label>
           <input class="form-input" id="field-email" type="email" placeholder="your@email.com" autocomplete="off"
                  data-tip="Where emailed reports and audit notifications are sent (sending is configured under Settings → Reports).">
