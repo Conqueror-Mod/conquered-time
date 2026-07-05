@@ -34,7 +34,7 @@ const Onboarding = (() => {
       body: 'Everything you track here is encrypted on this device with AES-256-GCM and never leaves it. This one-minute tour walks you through your first setup.' },
     { page: 'profile', sel: '#field-work-state',
       title: 'Set your Work State & Break Style',
-      body: 'Your Work state sets the break and lunch rules the tracker warnings and audits check against. Prefer structured focus cycles instead? Switch Break Style to Pomodoro, right below it.' },
+      body: 'Your Work state sets the break and lunch rules the tracker warnings and audits check against. Prefer structured focus cycles instead? Switch Break Style to Pomodoro, right below it. While you’re here, add your email address too — reports and audit notifications need it, and you’ll be reminded before you can move on without one.' },
     { page: 'companies', sel: '#btn-add-company',
       title: 'Add your first company',
       body: 'Companies are who you work for — each holds its own projects, platforms, and hours. Add one here; the web view around it grows as you log time.' },
@@ -124,7 +124,15 @@ const Onboarding = (() => {
     teardown();
     window.addEventListener('resize', onResize);
 
-    const target = step.sel ? document.querySelector(step.sel) : null;
+    // A selector can resolve to an element that isn't actually visible — e.g.
+    // Dispatch's input panel is display:none until a session is clocked in, so
+    // a brand-new user's tour would spotlight a zero-size rect in the corner.
+    // A hidden target measures 0×0; fall back to the centered-card treatment.
+    let target = step.sel ? document.querySelector(step.sel) : null;
+    if (target) {
+      const r = target.getBoundingClientRect();
+      if (!r.width && !r.height) target = null;
+    }
 
     // Click-blocking backdrop. When there's a spotlight, the dim comes from the
     // spot's huge box-shadow instead, so the backdrop itself stays transparent.
