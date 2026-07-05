@@ -2,7 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { app, ipcMain, screen, dialog } = require('electron');
+const { app, ipcMain, screen, dialog, Notification } = require('electron');
 const { session, clearIdleTimer } = require('../session');
 const { dbGet, dbRun, persistDB, hasDb, getDbFile, setDbFile, replaceDb, newDatabase } = require('../db');
 const { readCache, invalidateEntriesCache } = require('../cache');
@@ -216,6 +216,25 @@ ipcMain.handle('db:clear-full', () => {
   }
 
   return { ok: true }; // no persistDB() — directory is gone
+});
+
+// Native OS notification (used by the Pomodoro engine when the window is
+// hidden/tray'd). Clicking it restores the window. Content is length-capped —
+// it renders outside the app, so keep it terse and never include vault data.
+ipcMain.handle('app:notify', (_: unknown, { title, body }: Record<string, any> = {}) => {
+  try {
+    if (!Notification.isSupported()) return { ok: false, error: 'Notifications not supported.' };
+    const n = new Notification({
+      title: String(title || 'Conquered Time').slice(0, 120),
+      body:  String(body || '').slice(0, 300),
+    });
+    n.on('click', () => {
+      const win = getMainWindow();
+      if (win) { win.show(); win.focus(); }
+    });
+    n.show();
+    return { ok: true };
+  } catch (e) { return { ok: false, error: e.message }; }
 });
 
 ipcMain.handle('app:get-info', () => ({

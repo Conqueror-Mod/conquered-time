@@ -306,6 +306,60 @@ td {
 #ct-tooltip.visible { opacity: 1; transform: translateY(0); }
 
 /* ══════════════════════════════════════════════════════════════
+   POMODORO (Dispatch cycle panel + action-toast alerts)
+   ══════════════════════════════════════════════════════════════ */
+.pomo-panel {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pomo-readout {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.pomo-phase {
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-bright);
+}
+.pomo-countdown {
+  font-family: var(--mono);
+  font-size: 26px;
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: 0.03em;
+}
+.pomo-cycles {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.pomo-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.pomo-btns button { font-size: 12px; padding: 6px 12px; }
+.pomo-hint {
+  font-family: var(--sans);
+  font-size: 11px;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+/* Break alerts are toasts that carry action buttons (see actionToast in
+   pomodoro.js) — they need pointer events back on (container disables them). */
+.toast.pomo-alert {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pomo-alert-btns { display: flex; gap: 8px; }
+.pomo-alert-btns button { font-size: 12px; padding: 5px 10px; }
+
+/* ══════════════════════════════════════════════════════════════
    MODAL
    ══════════════════════════════════════════════════════════════ */
 .modal-overlay {

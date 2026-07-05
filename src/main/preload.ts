@@ -13,7 +13,7 @@ const ALLOWED_INVOKE = new Set([
   'entries:list', 'entries:save', 'entries:all', 'entries:summary', 'entries:get-active', 'entries:get',
   'tasks:list', 'tasks:save', 'tasks:delete', 'tasks:recent-labels', 'tasks:summary',
   'settings:get', 'settings:set',
-  'app:get-info', 'app:check-update',
+  'app:get-info', 'app:check-update', 'app:notify',
   'db:clear-timeclock', 'db:clear-timeclock-company', 'db:clear-companies', 'db:clear-full',
   'profile:get', 'profile:save', 'auth:change-password',
   'audit:get-policy', 'audit:get-dismissed', 'audit:dismiss', 'audit:undismiss', 'audit:clear-dismissed', 'audit:apply-fix', 'audit:open-wizard', 'audit:count', 'audit:email-notify',
