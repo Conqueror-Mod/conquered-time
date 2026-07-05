@@ -24,6 +24,12 @@ const About = (() => {
   // Changelog — newest first. Edit HERE and both About surfaces update. The two
   // most recent entries render in-panel; older notes live on GitHub Releases.
   const CHANGELOG = [
+    { version: 'v3.13.0', items: [
+      'Hover help everywhere it matters — tooltips on the tracker fields, Profile settings, Dispatch, and every Dashboard button. Hover (or keyboard-focus) a control for a hint',
+      'New Break Style on your Profile: keep your state’s break/lunch rules, or switch to Pomodoro focus/break cycles (Classic 25/5, Extended 50/10, or Gentle 90/15)',
+      'Pomodoro mode runs a live cycle on the Dispatch page with a countdown in the sidebar; break alerts offer a one-click punch — nothing is ever logged automatically, and audits still follow your state’s rules',
+      'New here? A first-login setup guide now walks you through your profile, first company, clocking in, and Dispatch — replay it anytime from Settings → About',
+    ] },
     { version: 'v3.12.0', items: [
       'UI Scale now zooms the whole window uniformly — sidebar, title bar, menus, and content together — and updates instantly, so changing it in Settings gives immediate visible feedback (previously only the main content scaled, behind the Settings window)',
     ] },
