@@ -1,5 +1,5 @@
 {
-  "version": "3.13.0",
+  "version": "3.13.1",
   "downloadUrl": "https://github.com/Conqueror-Mod/conquered-time/releases/latest",
-  "notes": "v3.13.0 — Hover tooltips across the app, a new Pomodoro break style (live cycle timer, sidebar countdown, one-click break punches), and a first-login setup guide replayable from Settings → About."
+  "notes": "v3.13.1 — Emailed reports carry full task data again, plus a smoother setup guide: cards positioned off the content they explain, clean back-navigation, instant transitions, and consistent About-page spacing."
 }

@@ -24,6 +24,12 @@ const About = (() => {
   // Changelog — newest first. Edit HERE and both About surfaces update. The two
   // most recent entries render in-panel; older notes live on GitHub Releases.
   const CHANGELOG = [
+    { version: 'v3.13.1', items: [
+      'Emailed reports (scheduled and Send Now) carry your full task data again — labels, punches, and descriptions were coming through blank in the CSV and PDF',
+      'Setup guide polish: cards now sit beside the content they explain, going Back through the Reports steps lands on the right tab, steps appear instantly, and the example data no longer flickers',
+      'The About page spacing between the version badge and tagline is now consistent everywhere (it collapsed to nothing on the login screen)',
+      'Updated the Ko-fi link',
+    ] },
     { version: 'v3.13.0', items: [
       'Hover help everywhere it matters — tooltips on the tracker fields, Profile settings, Dispatch, and every Dashboard button. Hover (or keyboard-focus) a control for a hint',
       'New Break Style on your Profile: keep your state’s break/lunch rules, or switch to Pomodoro focus/break cycles (Classic 25/5, Extended 50/10, or Gentle 90/15)',
