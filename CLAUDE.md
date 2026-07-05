@@ -303,8 +303,9 @@ Most feature work is done (auth, recovery, encryption-at-rest, reports/audit, pr
 2. **Multi-DBA handling** (open design question) — one user working several Navigator IDs/accounts; needs a data-model + UI decision before any build.
 3. **Beta keys** — early-access gating (after packaging).
 4. **Contributions / monetization** — Patreon / purchase; email-vs-donation reminder logic (after packaging).
-5. **Language / i18n** — lowest priority, most complex; tackle last.
-6. **Auth & Encryption Reform** (backburner, design-only) — DPAPI/TPM-sealed key blob; do not start until multi-platform packaging is scoped.
+5. **QA deep-clean — property-based testing** (planned 2026-07-05, sketch confirmed) — `fast-check` properties on the pure modules + a differential oracle that mechanically enforces the `audit.ts` ↔ seed-mirror sync contract + whole-vault-space `reEncryptVault` properties. Full plan: `docs/PLAN-property-testing.md` (Phases A/B/C, constraints, out-of-scope list). Phase B extracts `test/vault-fixture.js` builders from `seed-dev.js` — seed ledger output must stay byte-identical.
+6. **Language / i18n** — lowest priority, most complex; tackle last.
+7. **Auth & Encryption Reform** (backburner, design-only) — DPAPI/TPM-sealed key blob; do not start until multi-platform packaging is scoped.
 
 Note: light-theme polish, theme reordering, and the ASCII easter-egg redesign were dropped as not relevant (2026-06-29) — do not reintroduce them as open items.
 
