@@ -110,6 +110,20 @@ interface AuditPolicy {
   lunchThreshMins: number;
   dispatchBreakWarnMins: number | null;
   dispatchLunchWarnMins: number | null;
+  /** Break-style preference — 'pomodoro' swaps the LIVE cadence warnings only;
+   *  the audit/compliance fields above always reflect the state policy. */
+  breakStyle: 'state' | 'pomodoro';
+  pomodoroPreset: string;
+  pomodoro: PomodoroPresetInfo;
+}
+
+/** Pomodoro cadence preset (audit:get-policy .pomodoro). */
+interface PomodoroPresetInfo {
+  label: string;
+  focusMins: number;
+  breakMins: number;
+  longBreakMins: number | null;
+  cyclesPerLong: number | null;
 }
 
 /** session:get response (null when locked/logged out). */
@@ -228,6 +242,9 @@ interface IpcInvokeMap {
     phone: string; job_title: string; avatar: string | null;
     /** Stored inside the encrypted profile blob by profile:save. */
     work_state?: string | null;
+    /** Break-style prefs (encrypted blob); absent on legacy blobs. */
+    break_style?: 'state' | 'pomodoro';
+    pomodoro_preset?: string;
   } | null;
   'profile:save': (payload: object) => MutResult;
   // audit

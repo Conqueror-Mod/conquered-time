@@ -65,6 +65,10 @@ window.addEventListener('DOMContentLoaded', async () => {
   $field('field-work-state').value = profile?.work_state || '';
   $field('field-email').value      = profile?.email      || '';
   $field('field-phone').value      = profile?.phone      || '';
+  // Break-style prefs (absent on legacy profile blobs → state/classic defaults)
+  $field('field-break-style').value     = profile?.break_style === 'pomodoro' ? 'pomodoro' : 'state';
+  $field('field-pomodoro-preset').value = profile?.pomodoro_preset || 'classic';
+  syncPomodoroPresetVisibility();
 
   avatarDataUrl = profile?.avatar || null;
 
@@ -94,7 +98,8 @@ window.addEventListener('DOMContentLoaded', async () => {
   // ── Event listeners ──────────────────────────────────────────────────
   const trackableInputs = [
     'field-display-name', 'field-full-name', 'field-job-title',
-    'field-work-state', 'field-email', 'field-phone'
+    'field-work-state', 'field-email', 'field-phone',
+    'field-break-style', 'field-pomodoro-preset'
   ];
   trackableInputs.forEach(id => {
     $id(id).addEventListener('input', () => {
@@ -105,6 +110,7 @@ window.addEventListener('DOMContentLoaded', async () => {
         $id('identity-display-name-view').textContent = dn || username;
         updateAvatarInitials(dn || username);
       }
+      if (id === 'field-break-style') syncPomodoroPresetVisibility();
     });
   });
 
@@ -314,15 +320,23 @@ function initCropModal(): void {
 }
 
 // ── Dirty tracking ───────────────────────────────────────────────────────
+// The preset picker only applies (and only shows) when Pomodoro is selected.
+function syncPomodoroPresetVisibility(): void {
+  const isPomodoro = $field('field-break-style').value === 'pomodoro';
+  $id('pomodoro-preset-group').style.display = isPomodoro ? '' : 'none';
+}
+
 function snapshotOriginal(): void {
   originalValues = {
-    display_name: $field('field-display-name').value,
-    full_name:    $field('field-full-name').value,
-    job_title:    $field('field-job-title').value,
-    work_state:   $field('field-work-state').value,
-    email:        $field('field-email').value,
-    phone:        $field('field-phone').value,
-    avatar:       avatarDataUrl,
+    display_name:    $field('field-display-name').value,
+    full_name:       $field('field-full-name').value,
+    job_title:       $field('field-job-title').value,
+    work_state:      $field('field-work-state').value,
+    email:           $field('field-email').value,
+    phone:           $field('field-phone').value,
+    break_style:     $field('field-break-style').value,
+    pomodoro_preset: $field('field-pomodoro-preset').value,
+    avatar:          avatarDataUrl,
   };
   dirty = false;
   setDirtyUI(false);
@@ -360,6 +374,8 @@ async function saveProfile(): Promise<void> {
     full_name:       $field('field-full-name').value.trim(),
     job_title:       $field('field-job-title').value.trim(),
     work_state:      $field('field-work-state').value || null,
+    break_style:     $field('field-break-style').value,
+    pomodoro_preset: $field('field-pomodoro-preset').value,
     email:           $field('field-email').value.trim(),
     phone:           $field('field-phone').value.trim(),
     avatar:          avatarDataUrl,
