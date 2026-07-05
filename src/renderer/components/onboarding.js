@@ -42,6 +42,10 @@ const Onboarding = (() => {
    * @property {string} body           developer-authored copy; may contain <strong>
    * @property {(() => void)=} enter   runs when the step renders on its page
    * @property {(() => void)=} leave   runs before a SAME-PAGE step change (navigation resets pages anyway)
+   * @property {{sel: string, side: 'right'|'below'}=} cardAt
+   *   Optional card position override — anchor the CARD to this element (the
+   *   spotlight keeps its own sel). Used where the default below-the-spotlight
+   *   placement would cover the very content the step is explaining.
    */
 
   /** @type {TourStep[]} */
@@ -63,18 +67,22 @@ const Onboarding = (() => {
     { page: 'task-timer', sel: '.tt-input-panel',
       title: 'Time tasks with Dispatch',
       body: 'While clocked in, Dispatch times individual tasks and writes what you did back into the session’s Description. If you chose Pomodoro, your focus/break cycle runs here as well — this is what a live session looks like.',
+      cardAt: { sel: '#sidebar-task-timer', side: 'right' },
       enter: () => { void demoDispatch(); } },
     { page: 'reports', sel: '.tab-bar',
       title: 'Reports — Period Summary',
       body: 'Pick a date range and company to see total hours, daily bars, and a task-label breakdown for the period.',
+      cardAt: { sel: '.tab-bar', side: 'right' },
       enter: () => { switchReportsTab('period'); void demoReportsPeriod(); } },
     { page: 'reports', sel: '.tab-bar',
       title: 'Reports — Company Breakdown',
       body: 'Every company gets a card: total hours, session count, last active date, and where the time went by task label.',
+      cardAt: { sel: '.tab-bar', side: 'right' },
       enter: () => { switchReportsTab('company'); void demoReportsCompany(); } },
     { page: 'reports', sel: '.tab-bar',
       title: 'Reports — Audit Log',
       body: 'The audit checks every punch for problems — missing clock-outs, skipped breaks, duration drift — and suggests fixes. Nothing is ever changed without your explicit confirmation.',
+      cardAt: { sel: '.tab-bar', side: 'right' },
       enter: () => { switchReportsTab('audit'); void demoReportsAudit(); } },
     { page: 'global-log', sel: null,
       title: 'Review & export',
@@ -246,22 +254,35 @@ const Onboarding = (() => {
 
     card.append(title, body, dots, btns);
     document.body.appendChild(card);
-    placeCard(card, anchor);
+    // The card may anchor to a DIFFERENT element than the spotlight (cardAt)
+    // so it doesn't sit on top of the content the step is explaining.
+    let cardAnchor = step.cardAt ? measure(step.cardAt.sel) : anchor;
+    placeCard(card, cardAnchor || anchor, step.cardAt?.side);
     next.focus();
 
     // Follow layout shifts briefly: async content (email-required banner, data
     // loads, fonts) can move the target AFTER the first measure — the profile
-    // step's stranded first-view spotlight was exactly this.
+    // step's stranded first-view spotlight was exactly this. Also picks up a
+    // cardAt anchor that only becomes visible later (e.g. the sidebar Dispatch
+    // timer the demo turns on).
     const followUntil = Date.now() + FOLLOW_MS;
     followTimer = setInterval(() => {
       if (Date.now() > followUntil) { if (followTimer) clearInterval(followTimer); followTimer = null; return; }
       const fresh = measure(step.sel);
-      if (!fresh || !anchor) return;
-      if (Math.abs(fresh.left - anchor.left) > 2 || Math.abs(fresh.top - anchor.top) > 2 ||
-          Math.abs(fresh.width - anchor.width) > 2 || Math.abs(fresh.height - anchor.height) > 2) {
+      if (fresh && anchor &&
+          (Math.abs(fresh.left - anchor.left) > 2 || Math.abs(fresh.top - anchor.top) > 2 ||
+           Math.abs(fresh.width - anchor.width) > 2 || Math.abs(fresh.height - anchor.height) > 2)) {
         anchor = fresh;
         if (spot) placeSpot(spot, anchor);
-        placeCard(card, anchor);
+        if (!step.cardAt) placeCard(card, anchor);
+      }
+      if (step.cardAt) {
+        const freshCard = measure(step.cardAt.sel);
+        if (freshCard && (!cardAnchor ||
+            Math.abs(freshCard.left - cardAnchor.left) > 2 || Math.abs(freshCard.top - cardAnchor.top) > 2)) {
+          cardAnchor = freshCard;
+          placeCard(card, cardAnchor, step.cardAt.side);
+        }
       }
     }, FOLLOW_TICK);
 
@@ -286,10 +307,12 @@ const Onboarding = (() => {
   }
 
   /**
-   * Below the target when it fits, above otherwise; centered when no anchor.
-   * @param {HTMLElement} card @param {DOMRect|null} anchor
+   * Default: below the anchor when it fits, above otherwise; centered when no
+   * anchor. side 'right': to the anchor's right, top-aligned (flips left if it
+   * would clip). side 'below': forced below.
+   * @param {HTMLElement} card @param {DOMRect|null} anchor @param {('right'|'below')=} side
    */
-  function placeCard(card, anchor) {
+  function placeCard(card, anchor, side) {
     const vw = window.innerWidth, vh = window.innerHeight;
     const cw = card.offsetWidth, ch = card.offsetHeight;
     const EDGE = 12, GAP = 14;
@@ -298,9 +321,16 @@ const Onboarding = (() => {
       card.style.top  = `${Math.round((vh - ch) / 2)}px`;
       return;
     }
-    let x = anchor.left + anchor.width / 2 - cw / 2;
-    let y = anchor.bottom + GAP;
-    if (y + ch > vh - EDGE) y = anchor.top - ch - GAP;
+    let x, y;
+    if (side === 'right') {
+      x = anchor.right + GAP;
+      if (x + cw > vw - EDGE) x = anchor.left - cw - GAP; // flip left
+      y = anchor.top;
+    } else {
+      x = anchor.left + anchor.width / 2 - cw / 2;
+      y = anchor.bottom + GAP;
+      if (side !== 'below' && y + ch > vh - EDGE) y = anchor.top - ch - GAP;
+    }
     x = Math.max(EDGE, Math.min(x, vw - cw - EDGE));
     y = Math.max(EDGE, Math.min(y, vh - ch - EDGE));
     card.style.left = `${Math.round(x)}px`;
