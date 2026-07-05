@@ -18,9 +18,9 @@ const path = require('path');
 const nodemailer = require('nodemailer');
 const { app, BrowserWindow } = require('electron');
 const { dbGet, dbAll, dbRun, persistDB, hasDb } = require('./db');
-const { session } = require('./session');
+const { session, decryptEntry } = require('./session');
 const { decrypt } = require('./vault-crypto');
-const { rowHasContent } = require('../renderer/row-utils');
+const { rowHasContent, localDateStr } = require('../renderer/row-utils');
 
 let getMainWindow: () => any = () => null;
 function initEmail(d: { getMainWindow: () => any }): void { getMainWindow = d.getMainWindow; }
@@ -98,8 +98,11 @@ async function doSendReport({ htmlContent, subject, recipients, entriesOverride 
     : (recipients || cfg.defaultTo || '').split(/[,;\s]+/).map((s: any) => s.trim()).filter(Boolean);
   if (!toList.length) throw new Error('No recipients specified.');
 
+  // decryptEntry is mandatory: time entries are encrypted at rest, so the raw
+  // rows_json column is EMPTY — without it the CSV/PDF export only the
+  // plaintext total_mins aggregates (blank labels/punches, header-only CSV).
   const entries = entriesOverride || dbAll('SELECT rowid as rid, * FROM time_entries WHERE user_id=? ORDER BY log_date DESC', [session.user.id])
-    .map((r: any) => ({ ...r, id: Number(r.rid) }));
+    .map((r: any) => ({ ...decryptEntry(r), id: Number(r.rid) }));
   const companies = dbAll('SELECT rowid as rid, * FROM companies WHERE user_id=?', [session.user.id])
     .reduce((m: any, co: any) => {
       try { const d = JSON.parse(decrypt({ data: co.data_enc, iv: co.data_iv, tag: co.data_tag }, session.key)); m[Number(co.rid)] = d.name || ''; } catch {} return m;
@@ -181,13 +184,15 @@ async function runScheduledEmailCheck(force = false) {
     if (!force && new Date() < nextSend) return;
 
     // Time to send — build report covering since lastSent
-    const fromDate = lastSent ? lastSent.slice(0, 10) : new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
-    const toDate   = new Date().toISOString().slice(0, 10);
+    // LOCAL dates — log_date values are local; toISOString is UTC (tomorrow
+    // all evening in US timezones). See the UTC date gotcha (PR #95).
+    const fromDate = lastSent ? lastSent.slice(0, 10) : localDateStr(new Date(Date.now() - 30 * 86400000));
+    const toDate   = localDateStr();
 
     const entries: Array<Record<string, any>> = dbAll(
       'SELECT rowid as rid, * FROM time_entries WHERE user_id=? AND log_date>=? AND log_date<=? ORDER BY log_date',
       [session.user.id, fromDate, toDate]
-    ).map((r: any) => ({ ...r, id: Number(r.rid) }));
+    ).map((r: any) => ({ ...decryptEntry(r), id: Number(r.rid) })); // decrypt: raw rows_json is empty at rest
 
     const companyRows = dbAll('SELECT rowid as rid, * FROM companies WHERE user_id=?', [session.user.id]);
     const companies: Record<number, string> = {};
