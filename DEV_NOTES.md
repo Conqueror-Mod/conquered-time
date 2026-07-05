@@ -65,7 +65,7 @@ Output: `dist/Conquered Time Setup <version>.exe` (NSIS installer). `npm run bui
 ## Beta Keys & Discord Bot
 
 - **Beta gate** (`src/main/ipc/auth.ts` + `beta-keys.js`): new installs must redeem a key before setup. Gate is required only when `!IS_DEV && secret present && no profiles && no valid stored key`. A redeemed key lives in `<ROOT_DATA_DIR>/app-prefs.json` under `betaKey`. Signing secret is `src/shared/beta-secret.js` (gitignored; gate fails **open** if absent). Mint with `node scripts/gen-beta-key.mjs --expires YYYY-MM-DD`. Full scheme: `src/shared/BETA-KEYS.md`.
-- **Community bot** (`discord-bot/`, own package.json): reuses `beta-keys.js` + the same secret so keys validate byte-for-byte. Commands `/betakey /mintkeys /bug /feedback /version /help /faq`; welcome/roles (screening-aware); GitHub release announcements. Runs 24/7 under pm2. Setup/hosting: `discord-bot/README.md`.
+- **Community bot** (private — NOT in this repo; `discord-bot/` is gitignored and lives only on the host machine): reuses `beta-keys.js` + the same secret so keys validate byte-for-byte. Commands `/betakey /mintkeys /bug /feedback /version /help /faq`; welcome/roles (screening-aware); GitHub release announcements. Runs 24/7 under pm2; setup/hosting notes live in the bot's own README on the host.
 - **Clear a tester's key:** delete `%APPDATA%\conquered-time\conquered-data\app-prefs.json` (or just its `betaKey` entry). An uninstall does NOT remove it — user data is intentionally left behind.
 
 ---

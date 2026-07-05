@@ -20,6 +20,9 @@ dev-data/
 .tmp-shots/
 # Private beta-key signing secret — never commit (example template IS tracked).
 src/shared/beta-secret.js
+# Discord community bot — private operational tooling, kept out of the public
+# repo entirely (untracked 2026-07-05; lives only on the host machine).
+discord-bot/
 src/renderer/pages/theme-init.js
 src/renderer/pages/login-theme-init.js
 src/renderer/pages/audit-theme-init.js

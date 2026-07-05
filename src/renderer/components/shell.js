@@ -1001,7 +1001,7 @@ async function executeDbaClear(type) {
 // shell:open-external IPC (which validates https?:// before shell.openExternal).
 const EXTERNAL_URLS = {
   github: 'https://github.com/Conqueror-Mod/conquered-time',
-  donate: 'https://ko-fi.com/christheconquerorbowles',
+  donate: 'https://ko-fi.com/christheconqueror',
   // GitHub Sponsors is pending approval — once live, add a button with
   // data-arg="sponsor" and set the verified URL here.
   // sponsor: 'https://github.com/sponsors/<handle>',

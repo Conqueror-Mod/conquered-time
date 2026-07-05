@@ -53,7 +53,7 @@ A secure, locally-encrypted desktop time tracker built for remote professionals 
 - **electron-builder** — NSIS installer
 - **Node.js v20.11.1** via NVM for Windows (required — v24 breaks Electron prebuilds)
 
-A companion **Discord community bot** (`discord-bot/`, discord.js + TypeScript) handles beta-key distribution, welcome/roles, bug & feedback intake, and release announcements. It's a standalone project with its own dependencies — see `discord-bot/README.md`.
+A companion **Discord community bot** (discord.js + TypeScript) handles beta-key distribution, welcome/roles, bug & feedback intake, and release announcements. It's private operational tooling and is not part of this repository.
 
 ---
 
@@ -98,7 +98,6 @@ conquered-time/
 │   └── shared/
 │       ├── beta-secret.example.js # template (real beta-secret.js is gitignored)
 │       └── BETA-KEYS.md          # beta-key scheme + minting docs
-├── discord-bot/                  # Standalone Discord community bot (own package.json; see its README)
 ├── assets/                       # icon set (icon.ico / .icns / icon-16…1024.png) + installer bitmaps
 ├── test/                         # node --test suites: vault-crypto, read-cache, beta-keys,
 │                                 #   canvas-text, row-utils, time-parse
@@ -166,7 +165,7 @@ Output: `dist/Conquered Time Setup <version>.exe` (NSIS). `npm run build` runs `
 
 The app is in **private beta**. New installs open a beta-gate screen and require a redeemable key before account setup; existing installs and dev runs are never gated (see `src/shared/BETA-KEYS.md`). Keys are offline-verifiable — a signed HMAC blob, no server.
 
-A Discord community bot (`discord-bot/`) distributes keys (`/betakey`), greets and roles new members, collects `/bug` and `/feedback`, and announces new releases from GitHub. Setup and hosting notes are in `discord-bot/README.md`.
+A Discord community bot distributes keys (`/betakey`), greets and roles new members, collects `/bug` and `/feedback`, and announces new releases from GitHub. The bot is private operational tooling, maintained outside this repository.
 
 ---
 
