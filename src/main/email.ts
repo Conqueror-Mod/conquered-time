@@ -20,7 +20,33 @@ const { app, BrowserWindow } = require('electron');
 const { dbGet, dbAll, dbRun, persistDB, hasDb } = require('./db');
 const { session, decryptEntry } = require('./session');
 const { decrypt } = require('./vault-crypto');
-const { rowHasContent, localDateStr } = require('../renderer/row-utils');
+const { localDateStr } = require('../renderer/row-utils');
+const { buildEmailReportHTML, buildReportCSV } = require('./report-html');
+
+// Inter base64 @font-face CSS for the emailed PDF — reuses the renderer's
+// pdf-fonts.js bundle (window.PDF_FONT_CSS) so the emailed report matches the
+// in-app PDF exports typographically. Evaluated with a stub window; falls
+// back to the system font stack if the file is missing.
+let pdfFontCssCache: string | null = null;
+function loadPdfFontCss(): string {
+  if (pdfFontCssCache !== null) return pdfFontCssCache;
+  try {
+    const code = fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'renderer', 'pages', 'pdf-fonts.js'), 'utf8');
+    const w: Record<string, any> = {};
+    new Function('window', code)(w);
+    pdfFontCssCache = String(w.PDF_FONT_CSS || '');
+  } catch { pdfFontCssCache = ''; }
+  return pdfFontCssCache;
+}
+
+// Decrypted company-name map for the logged-in user (rowid → name).
+function getCompanyNames(): Record<number, string> {
+  const map: Record<number, string> = {};
+  dbAll('SELECT rowid as rid, * FROM companies WHERE user_id=?', [session.user.id]).forEach((co: any) => {
+    try { map[Number(co.rid)] = JSON.parse(decrypt({ data: co.data_enc, iv: co.data_iv, tag: co.data_tag }, session.key)).name || ''; } catch {}
+  });
+  return map;
+}
 
 let getMainWindow: () => any = () => null;
 function initEmail(d: { getMainWindow: () => any }): void { getMainWindow = d.getMainWindow; }
@@ -85,10 +111,13 @@ function generatePDF(htmlContent: string): Promise<Buffer> {
 }
 
 // Render and email a report PDF+CSV via the configured SMTP transport.
-// entriesOverride is only set by the scheduled-report path; the manual
-// email:send-report path omits it.
-async function doSendReport({ htmlContent, subject, recipients, entriesOverride }: {
-  htmlContent: string; subject?: string; recipients?: string | string[]; entriesOverride?: Array<Record<string, any>>;
+// `entries` is the SCOPED, decrypted entry set the report covers — the CSV is
+// built from exactly this set, so it can never cover more than the PDF shows
+// (the old manual path dumped the entire vault into the CSV regardless of the
+// chosen period/company filter).
+async function doSendReport({ htmlContent, subject, recipients, entries, fromDate, toDate }: {
+  htmlContent: string; subject?: string; recipients?: string | string[];
+  entries: Array<Record<string, any>>; fromDate: string; toDate: string;
 }) {
   const cfg = getEmailSmtpConfig();
   if (!cfg.host || !cfg.username || !cfg.password) throw new Error('Email not configured. Open Settings → Data to add SMTP credentials.');
@@ -98,36 +127,7 @@ async function doSendReport({ htmlContent, subject, recipients, entriesOverride 
     : (recipients || cfg.defaultTo || '').split(/[,;\s]+/).map((s: any) => s.trim()).filter(Boolean);
   if (!toList.length) throw new Error('No recipients specified.');
 
-  // decryptEntry is mandatory: time entries are encrypted at rest, so the raw
-  // rows_json column is EMPTY — without it the CSV/PDF export only the
-  // plaintext total_mins aggregates (blank labels/punches, header-only CSV).
-  const entries = entriesOverride || dbAll('SELECT rowid as rid, * FROM time_entries WHERE user_id=? ORDER BY log_date DESC', [session.user.id])
-    .map((r: any) => ({ ...decryptEntry(r), id: Number(r.rid) }));
-  const companies = dbAll('SELECT rowid as rid, * FROM companies WHERE user_id=?', [session.user.id])
-    .reduce((m: any, co: any) => {
-      try { const d = JSON.parse(decrypt({ data: co.data_enc, iv: co.data_iv, tag: co.data_tag }, session.key)); m[Number(co.rid)] = d.name || ''; } catch {} return m;
-    }, {});
-
-  const csvHeader = ['Date','Company','Session','Task Label','Task Name','Description','Clock In','Clock Out','Minutes'];
-  const csvRows: any[] = [];
-  entries.forEach((e: any) => {
-    try {
-      JSON.parse(e.rows_json || '[]').forEach((r: any) => {
-        if (!rowHasContent(r)) return; // C3 (D-011): desc-only rows export too
-        // Flatten multi-line descriptions so the CSV column stays single-line.
-        const descFlat = String(r.desc || r.description || '').replace(/\s+/g, ' ').trim();
-        csvRows.push([e.log_date, companies[Number(e.company_id)] || '', e.session_label || '', r.label || '', r.name || '', descFlat, r.clock_in || '', r.clock_out || '', r.total_mins || 0]);
-      });
-    } catch {}
-  });
-  // Quote every field, double embedded quotes, and neutralize CSV formula
-  // injection (leading = + - @ tab CR) by prefixing a single quote.
-  const csvCell = (v: any) => {
-    let s = v == null ? '' : String(v);
-    if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
-    return '"' + s.replace(/"/g, '""') + '"';
-  };
-  const csv = [csvHeader, ...csvRows].map((r: any) => r.map(csvCell).join(',')).join('\n');
+  const csv = buildReportCSV({ entries, companyNames: getCompanyNames(), fromDate, toDate });
 
   const pdfBuf = await generatePDF(htmlContent);
   const dateTag = new Date().toISOString().slice(0, 10);
@@ -145,6 +145,33 @@ async function doSendReport({ htmlContent, subject, recipients, entriesOverride 
       { filename: `conquered-time-report-${dateTag}.csv`, content: csv,    contentType: 'text/csv' },
     ],
   });
+}
+
+// Query + decrypt the entries a report covers. companyId (rowid) narrows to
+// one company; null/undefined means all.
+function getScopedEntries(fromDate: string, toDate: string, companyId?: number | null): Array<Record<string, any>> {
+  const params: unknown[] = [session.user.id, fromDate, toDate];
+  let sql = 'SELECT rowid as rid, * FROM time_entries WHERE user_id=? AND log_date>=? AND log_date<=?';
+  if (companyId) { sql += ' AND company_id=?'; params.push(Number(companyId)); }
+  sql += ' ORDER BY log_date';
+  // decryptEntry is mandatory: time entries are encrypted at rest, so the raw
+  // rows_json column is EMPTY without it.
+  return dbAll(sql, params).map((r: any) => ({ ...decryptEntry(r), id: Number(r.rid) }));
+}
+
+// The one entry point both email paths use: builds the branded HTML + scoped
+// CSV from the SAME entry set and sends them.
+async function sendPeriodReport({ title, fromDate, toDate, companyId, subject, recipients }: {
+  title: string; fromDate: string; toDate: string; companyId?: number | null;
+  subject?: string; recipients?: string | string[];
+}) {
+  const entries = getScopedEntries(fromDate, toDate, companyId);
+  const companyNames = getCompanyNames();
+  const coLabel = companyId ? (companyNames[Number(companyId)] || 'Selected Company') : 'All Companies';
+  const htmlContent = buildEmailReportHTML({
+    title, fromDate, toDate, coLabel, entries, companyNames, fontCss: loadPdfFontCss(),
+  });
+  await doSendReport({ htmlContent, subject, recipients, entries, fromDate, toDate });
 }
 
 function computeNextSendDate(freq: string, lastSent: string | null): Date | null {
@@ -189,51 +216,17 @@ async function runScheduledEmailCheck(force = false) {
     const fromDate = lastSent ? lastSent.slice(0, 10) : localDateStr(new Date(Date.now() - 30 * 86400000));
     const toDate   = localDateStr();
 
-    const entries: Array<Record<string, any>> = dbAll(
-      'SELECT rowid as rid, * FROM time_entries WHERE user_id=? AND log_date>=? AND log_date<=? ORDER BY log_date',
-      [session.user.id, fromDate, toDate]
-    ).map((r: any) => ({ ...decryptEntry(r), id: Number(r.rid) })); // decrypt: raw rows_json is empty at rest
-
-    const companyRows = dbAll('SELECT rowid as rid, * FROM companies WHERE user_id=?', [session.user.id]);
-    const companies: Record<number, string> = {};
-    companyRows.forEach((co: any) => {
-      try { companies[Number(co.rid)] = JSON.parse(decrypt({ data: co.data_enc, iv: co.data_iv, tag: co.data_tag }, session.key)).name || ''; } catch {}
-    });
-
-    const totalMins = entries.reduce((s: any, e: any) => s + (e.total_mins || 0), 0);
-    const fmtM = (m: number) => { const h = Math.floor(m/60), mn = m%60; return `${h}h ${mn}m`; };
-
-    const byLabel: Record<string, number> = {};
-    entries.forEach((e: any) => { try { JSON.parse(e.rows_json||'[]').forEach((r: any) => { if (r.total_mins > 0) { const l = r.label||'Other'; byLabel[l]=(byLabel[l]||0)+r.total_mins; } }); } catch {} });
-    const labelRows = Object.entries(byLabel).sort((a,b)=>b[1]-a[1])
-      .map(([l,m]) => `<tr><td>${l}</td><td style="text-align:right">${fmtM(m)}</td></tr>`).join('');
-
-    const htmlContent = `<!DOCTYPE html><html><head><title>Scheduled Report</title>
-<style>body{font-family:Arial,sans-serif;font-size:12px;color:#111;padding:40px;max-width:900px;margin:0 auto;}
-h1{font-size:20px;font-weight:600;margin:0 0 4px;}h2{font-size:13px;font-weight:600;color:#374151;margin:20px 0 8px;border-bottom:1px solid #e5e7eb;padding-bottom:4px;}
-.meta{color:#666;font-size:11px;margin-bottom:20px;}table{width:100%;border-collapse:collapse;}
-th{background:#f1f5f9;border-bottom:2px solid #2563eb;padding:8px;text-align:left;font-size:11px;font-weight:600;}
-td{padding:7px 8px;border-bottom:1px solid #e5e7eb;}
-.footer{margin-top:32px;color:#9ca3af;font-size:10px;border-top:1px solid #e5e7eb;padding-top:10px;}
-</style></head><body>
-<h1>Conquered Time — Scheduled Report</h1>
-<div class="meta">Period: ${fromDate} → ${toDate} · Total: ${fmtM(totalMins)}</div>
-<h2>Task Label Breakdown</h2>
-<table><thead><tr><th>Label</th><th style="text-align:right">Duration</th></tr></thead>
-<tbody>${labelRows}</tbody></table>
-<div class="footer">Generated by Conquered Time · ${new Date().toLocaleString()} · CONFIDENTIAL</div>
-</body></html>`;
-
     const cfg = getEmailSmtpConfig();
     if (!cfg.host || !cfg.password) throw new Error('SMTP not configured.');
     const toList = (cfg.defaultTo || '').split(/[,;\s]+/).map((s: any) => s.trim()).filter(Boolean);
     if (!toList.length) throw new Error('No default recipient set. Add one in Settings → Data → Email Reports.');
 
-    await doSendReport({
-      htmlContent,
+    // Same branded template + scoped CSV as the manual Email Report path.
+    await sendPeriodReport({
+      title: 'Scheduled Report',
+      fromDate, toDate,
       subject: `Conquered Time Scheduled Report — ${toDate}`,
       recipients: toList,
-      entriesOverride: entries,
     });
 
     dbRun("INSERT OR REPLACE INTO app_settings (key,value) VALUES ('email_schedule_last_sent',?)", [new Date().toISOString()]);
@@ -250,5 +243,5 @@ td{padding:7px 8px;border-bottom:1px solid #e5e7eb;}
 
 module.exports = {
   initEmail, getProfileEmail, profileEmailMissing, getEmailSmtpConfig,
-  generatePDF, doSendReport, computeNextSendDate, runScheduledEmailCheck,
+  generatePDF, doSendReport, sendPeriodReport, computeNextSendDate, runScheduledEmailCheck,
 };
