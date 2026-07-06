@@ -1,6 +1,19 @@
 # PLAN — Property-Based Testing + Differential Audit Oracle
 
-**Status:** Proposed (sketch confirmed with Chris 2026-07-05; build not yet started)
+**Status:** COMPLETE (2026-07-06) — Phase A PR #105 (found + fixed a real
+`rowHasContent` desc-shadowing bug, fc seed 1046959924), Phase B PR #106
+(fixture extraction byte-identical; differential oracle green over randomized
+vaults; reEncrypt B1–B4 green), Phase C in this PR.
+
+**Phase C result:** `npm run coverage:critical` — 100% statements/lines/
+functions on both files; branch 95.45% (vault-crypto.js) / 93.75% (audit.js,
+measured on its 1:1 compiled `dist-main` output — no sourcemaps by design,
+`.map` files would ship in the installer). The 4 uncovered branches are all
+defensive and unreachable through public entry points: `getDismissedSet()`
+without a session user (the caller early-returns first), one arm of the
+missing_break dismissed-set condition, the sql.js `undefined→null` cell
+fallback, and the `db.close()` `catch{}` in the rollback path. Report only —
+not a CI gate.
 **Origin:** Adapted from aerospace-QA suggestions (formal verification, design-by-contract,
 MC/DC coverage, load testing) contributed by a friend with an aerospace background. The
 standards themselves don't fit a JS/TS Electron desktop app; this plan keeps the *methods*
