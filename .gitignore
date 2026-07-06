@@ -36,3 +36,5 @@ src/renderer/pages/tracker.js
 src/renderer/store.js
 src/renderer/ipc.js
 src/renderer/validator.js
+
+coverage/
