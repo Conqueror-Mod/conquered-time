@@ -99,8 +99,9 @@ conquered-time/
 │       ├── beta-secret.example.js # template (real beta-secret.js is gitignored)
 │       └── BETA-KEYS.md          # beta-key scheme + minting docs
 ├── assets/                       # icon set (icon.ico / .icns / icon-16…1024.png) + installer bitmaps
-├── test/                         # node --test suites: vault-crypto, read-cache, beta-keys,
-│                                 #   canvas-text, row-utils, time-parse
+├── test/                         # node --test suites (unit + fast-check property tests):
+│                                 #   vault-crypto, read-cache, beta-keys, canvas-text,
+│                                 #   row-utils, time-parse, audit-oracle, vault-fixture
 ├── .claude/skills/run-app/       # Playwright REPL driver for launching/driving the app (dev tooling)
 ├── CLAUDE.md · DEV_NOTES.md      # full context + quick-reference dev docs
 ├── package.json
@@ -142,14 +143,23 @@ Credentials: `devuser` / `devpass123`
 npm test
 ```
 
-Uses the built-in `node --test` runner (no extra dependencies), plus
-`npm run typecheck` (both TS projects + the checkJs renderer). Suites cover the
-security-critical paths in `src/main/vault-crypto.js` (AES-256-GCM round-trips,
-PBKDF2 key separation, and the all-or-nothing re-encryption used by password
-change / recovery), the main-process read cache in `src/main/read-cache.js`
-(memoization, invalidation, owner-change auto-clear against cross-profile
-leaks), the beta-key mint/verify scheme (`beta-keys`), and the shared renderer
-utilities (`canvas-text`, `row-utils`, `time-parse`).
+Uses the built-in `node --test` runner, plus `npm run typecheck` (both TS
+projects + the checkJs renderer). Suites cover the security-critical paths in
+`src/main/vault-crypto.js` (AES-256-GCM round-trips, PBKDF2 key separation,
+and the all-or-nothing re-encryption used by password change / recovery), the
+main-process read cache in `src/main/read-cache.js` (memoization, invalidation,
+owner-change auto-clear against cross-profile leaks), the beta-key mint/verify
+scheme (`beta-keys`), and the shared renderer utilities (`canvas-text`,
+`row-utils`, `time-parse`).
+
+On top of the example-based suites, **property-based tests** (`fast-check`)
+assert the same contracts across the whole input space, and a **differential
+audit oracle** (`test/audit-oracle.props.test.js`) generates randomized vaults
+through `test/vault-fixture.js` (the same builders `seed-dev.js` uses) to
+mechanically enforce that the audit engine and the seed's expected-count
+mirror never drift apart. `npm run coverage:critical` prints a scoped `c8`
+branch-coverage report over the two security-critical modules (report, not a
+gate). See `docs/PLAN-property-testing.md` for the full design.
 
 ### Build installer
 
