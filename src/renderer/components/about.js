@@ -24,6 +24,11 @@ const About = (() => {
   // Changelog — newest first. Edit HERE and both About surfaces update. The two
   // most recent entries render in-panel; older notes live on GitHub Releases.
   const CHANGELOG = [
+    { version: 'v3.14.0', items: [
+      'Emailed reports redesigned — a branded, professional PDF with a summary band (total time, days worked, sessions, companies) plus Daily Hours, By Company, and Task Label breakdowns. Scheduled and Send Now reports now share the exact same layout',
+      'The CSV attachment now covers exactly the period and company you selected (it previously included your entire history regardless of the filter) and ends with a totals summary — per company and per task label',
+      'Reliability hardening under the hood: a property-based test suite now exercises the encryption, audit, and re-encryption engines against thousands of randomized inputs — one long-standing edge case in row detection was found and fixed along the way',
+    ] },
     { version: 'v3.13.1', items: [
       'Emailed reports (scheduled and Send Now) carry your full task data again — labels, punches, and descriptions were coming through blank in the CSV and PDF',
       'Setup guide polish: cards now sit beside the content they explain, going Back through the Reports steps lands on the right tab, steps appear instantly, and the example data no longer flickers',
