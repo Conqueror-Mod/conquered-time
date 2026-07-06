@@ -1,5 +1,5 @@
 {
-  "version": "3.13.1",
+  "version": "3.14.0",
   "downloadUrl": "https://github.com/Conqueror-Mod/conquered-time/releases/latest",
-  "notes": "v3.13.1 — Emailed reports carry full task data again, plus a smoother setup guide: cards positioned off the content they explain, clean back-navigation, instant transitions, and consistent About-page spacing."
+  "notes": "v3.14.0 — Redesigned emailed reports: a branded professional PDF with summary and per-company/per-label breakdowns, identical for scheduled and Send Now, plus a CSV that now matches your selected period and company exactly and ends with a totals summary."
 }
