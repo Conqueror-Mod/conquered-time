@@ -36,6 +36,21 @@
     return { ok: true, hhmm: `${String(h).padStart(2, '0')}:${min}` };
   }
 
-  if (typeof module !== 'undefined' && module.exports) module.exports = { parseClockInput };
-  else root.parseClockInput = parseClockInput;
+  // Minutes between two 24-hour HH:MM punches. A negative raw diff means the
+  // span crossed midnight (23:30 → 00:15 = 45), so wrap by a full day.
+  /**
+   * @param {string} inT zero-padded 24-hour HH:MM
+   * @param {string} outT zero-padded 24-hour HH:MM
+   * @returns {number}
+   */
+  function computeDiffMins(inT, outT) {
+    const [ih, im] = inT.split(':').map(Number);
+    const [oh, om] = outT.split(':').map(Number);
+    let diff = (oh * 60 + om) - (ih * 60 + im);
+    if (diff < 0) diff += 1440;
+    return diff;
+  }
+
+  if (typeof module !== 'undefined' && module.exports) module.exports = { parseClockInput, computeDiffMins };
+  else { root.parseClockInput = parseClockInput; root.computeDiffMins = computeDiffMins; }
 })(this);

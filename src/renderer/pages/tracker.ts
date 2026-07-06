@@ -579,14 +579,6 @@ function formatMins(total: number): string {
   return h>0 ? `${h}h ${String(m).padStart(2,'0')}m` : `${m}m`;
 }
 
-function computeDiffMins(inT: string, outT: string): number {
-  const [ih,im] = inT.split(':').map(Number);
-  const [oh,om] = outT.split(':').map(Number);
-  let diff = (oh*60+om) - (ih*60+im);
-  if (diff < 0) diff += 1440;
-  return diff;
-}
-
 // ── Clock in/out ──
 function clockIn(): void {
   if (!currentCompany) { Shell.toast('Select a company first.', 'warning'); return; }

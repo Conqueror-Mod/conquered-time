@@ -463,6 +463,7 @@ interface Window {
   Shell: ShellApi;
   About: AboutApi;
   parseClockInput(raw: unknown): ParseClockResult;
+  computeDiffMins(inT: string, outT: string): number;
   escapeHtml(v: unknown): string;
   flattenText(v: unknown): string;
   /** Base64-inlined Inter CSS for the PDF export window (pdf-fonts.js). */
@@ -517,6 +518,7 @@ declare const RowUtils: RowUtilsApi;
 declare const CanvasText: CanvasTextApi;
 declare const Shell: ShellApi;
 declare function parseClockInput(raw: unknown): ParseClockResult;
+declare function computeDiffMins(inT: string, outT: string): number;
 declare function escapeHtml(v: unknown): string;
 declare function flattenText(v: unknown): string;
 declare const PDF_FONT_CSS: string;

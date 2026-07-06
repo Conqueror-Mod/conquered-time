@@ -32,7 +32,12 @@
       (r.clock_out && String(r.clock_out).trim()) ||
       (r.label     && String(r.label).trim())     ||
       (r.name      && String(r.name).trim())      ||
-      String(rowDesc(r)).trim()
+      // Check BOTH desc fields independently — rowDesc()'s desc-first
+      // fallback would let a whitespace-only `desc` shadow a legacy
+      // `description` that holds real content (found by fast-check,
+      // seed 1046959924).
+      (r.desc        && String(r.desc).trim())        ||
+      (r.description && String(r.description).trim())
     );
   }
 
