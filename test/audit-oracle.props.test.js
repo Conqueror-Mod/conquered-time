@@ -61,7 +61,7 @@ const arbEntry = fc.record({
   // enc = normal encrypted; legacy = plaintext rows_json; corrupt = unparsable
   // or non-array rows_json (engine's catch{} path — row flags skipped, the
   // entry-level break/lunch checks still run).
-  kind:     fc.constantFrom('enc', 'enc', 'enc', 'legacy', 'corrupt-json', 'corrupt-shape'),
+  kind:     fc.constantFrom('enc', 'enc', 'enc', 'legacy', 'legacy-empty', 'corrupt-json', 'corrupt-shape'),
   breaks:   fc.integer({ min: 0, max: 3 }),
   lunches:  fc.integer({ min: 0, max: 1 }),
 });
@@ -91,6 +91,8 @@ function buildVault(SQL, spec) {
     let id;
     if (e.kind === 'enc')          id = fixture.insertEntry(db, KEY, userId, base);
     else if (e.kind === 'legacy')  id = fixture.insertLegacyEntry(db, userId, base);
+    // Fresh-entry shape: rows_json '' (engine's `rows_json || '[]'` fallback).
+    else if (e.kind === 'legacy-empty')  id = fixture.insertLegacyEntry(db, userId, { ...base, rowsJson: '' });
     else if (e.kind === 'corrupt-json')  id = fixture.insertLegacyEntry(db, userId, { ...base, rowsJson: '{not json' });
     else /* corrupt-shape */             id = fixture.insertLegacyEntry(db, userId, { ...base, rowsJson: '{"a":1}' });
     entryIds.push(id);

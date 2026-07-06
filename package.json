@@ -23,6 +23,7 @@
     "build:renderer": "tsc -p tsconfig.renderer.json",
     "compile": "npm run build:main && npm run build:renderer",
     "seed": "node seed-dev.js",
+    "coverage:critical": "npm run build:main && c8 --reporter=text --include=src/main/vault-crypto.js --include=dist-main/main/audit.js node --test test/vault-crypto.test.js test/vault-crypto.props.test.js test/vault-crypto-reencrypt.props.test.js test/audit-oracle.props.test.js",
     "build": "npm run compile && electron-builder --win --x64",
     "build:mac": "npm run compile && electron-builder --mac",
     "build:linux": "npm run compile && electron-builder --linux",
@@ -105,6 +106,7 @@
   },
   "devDependencies": {
     "@types/node": "^20.19.43",
+    "c8": "^11.0.0",
     "electron": "^29.0.0",
     "electron-builder": "^24.9.1",
     "fast-check": "^4.8.0",
