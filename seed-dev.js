@@ -96,22 +96,10 @@ const EXPECT = {
   discrepancies:  7,     // 6 on Entry 3 + the edge session's desc-only row (flagged since C3 / D-004 fix)
 };
 
-// ── Crypto (mirrors main.js exactly) ──────────────────────────────────────
-function deriveKey(password, salt) {
-  return crypto.pbkdf2Sync(password, salt, 310000, 32, 'sha256');
-}
-function encrypt(plaintext, key) {
-  const iv     = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
-  const enc    = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
-  const tag    = cipher.getAuthTag();
-  return { iv: iv.toString('hex'), tag: tag.toString('hex'), data: enc.toString('hex') };
-}
-function decrypt(data, iv, tag, key) {
-  const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(iv, 'hex'));
-  decipher.setAuthTag(Buffer.from(tag, 'hex'));
-  return Buffer.concat([decipher.update(Buffer.from(data, 'hex')), decipher.final()]).toString('utf8');
-}
+// ── Crypto + vault builders (extracted to test/vault-fixture.js so the
+//    property tests build arbitrary vaults through the SAME plumbing) ────────
+const fixture = require('./test/vault-fixture');
+const { encrypt, decrypt, deriveKey, computeExpectedDiscrepancies } = fixture;
 
 // ── Date helpers ───────────────────────────────────────────────────────────
 function daysAgo(n) {          // negative n = future
@@ -148,79 +136,8 @@ async function seed() {
     console.error('✗ sql.js not found. Run `npm install` first.\n', e.message);
     process.exit(1);
   }
-  const db = new SQL.Database();
-
-  // ── Full schema (mirrors main.js — keep in sync) ──────────────────────────
-  db.run('PRAGMA foreign_keys = ON;');
-  db.run(`
-    CREATE TABLE IF NOT EXISTS users (
-      id              INTEGER PRIMARY KEY AUTOINCREMENT,
-      username        TEXT    NOT NULL UNIQUE,
-      password_hash   TEXT    NOT NULL,
-      totp_secret     TEXT    NOT NULL,
-      totp_verified   INTEGER NOT NULL DEFAULT 0,
-      recovery_hash   TEXT,
-      key_salt        TEXT,
-      dev_mode        INTEGER NOT NULL DEFAULT 0,
-      failed_attempts INTEGER NOT NULL DEFAULT 0,
-      locked_until    INTEGER,
-      display_name    TEXT,
-      profile_enc      TEXT,
-      profile_iv       TEXT,
-      profile_tag      TEXT,
-      recovery_key_enc  TEXT,
-      recovery_key_iv   TEXT,
-      recovery_key_tag  TEXT,
-      recovery_key_salt TEXT,
-      created_at       INTEGER NOT NULL DEFAULT (strftime('%s','now'))
-    );
-    CREATE TABLE IF NOT EXISTS companies (
-      id         INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id    INTEGER NOT NULL REFERENCES users(id),
-      data_enc   TEXT    NOT NULL,
-      data_iv    TEXT    NOT NULL,
-      data_tag   TEXT    NOT NULL,
-      created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
-      updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
-    );
-    CREATE TABLE IF NOT EXISTS time_entries (
-      id            INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id       INTEGER NOT NULL REFERENCES users(id),
-      company_id    INTEGER NOT NULL REFERENCES companies(id),
-      log_date      TEXT    NOT NULL,
-      session_label TEXT,
-      rows_json     TEXT    NOT NULL DEFAULT '',
-      rows_enc      TEXT,
-      rows_iv       TEXT,
-      rows_tag      TEXT,
-      total_mins    INTEGER NOT NULL DEFAULT 0,
-      created_at    INTEGER NOT NULL DEFAULT (strftime('%s','now')),
-      updated_at    INTEGER NOT NULL DEFAULT (strftime('%s','now'))
-    );
-    CREATE TABLE IF NOT EXISTS app_settings (
-      key   TEXT PRIMARY KEY,
-      value TEXT
-    );
-    CREATE TABLE IF NOT EXISTS task_items (
-      id            INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id       INTEGER NOT NULL,
-      entry_id      INTEGER NOT NULL,
-      label         TEXT    NOT NULL,
-      item_type     TEXT    NOT NULL DEFAULT 'task',
-      started_at    INTEGER NOT NULL,
-      stopped_at    INTEGER,
-      duration_secs INTEGER NOT NULL DEFAULT 0,
-      created_at    INTEGER NOT NULL DEFAULT (strftime('%s','now'))
-    );
-    CREATE TABLE IF NOT EXISTS audit_dismissed (
-      id       INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id  INTEGER NOT NULL,
-      entry_id INTEGER NOT NULL,
-      row_idx  INTEGER NOT NULL,
-      type     TEXT    NOT NULL,
-      UNIQUE(user_id, entry_id, row_idx, type)
-    );
-  `);
+  // ── Full schema (test/vault-fixture.js mirrors main.js — keep in sync) ────
+  const db = fixture.createVaultSchema(SQL);
   console.log('✓ Schema created');
 
   // ── Dev user ───────────────────────────────────────────────────────────────
@@ -253,28 +170,17 @@ async function seed() {
   };
   const profEnc = encrypt(JSON.stringify(profileData), sessionKey);
 
-  db.run(
-    `INSERT INTO users
-       (username, password_hash, totp_secret, totp_verified, recovery_hash,
-        key_salt, dev_mode, display_name, profile_enc, profile_iv, profile_tag,
-        recovery_key_enc, recovery_key_iv, recovery_key_tag, recovery_key_salt)
-     VALUES (?,?,?,1,?,?,1,?,?,?,?,?,?,?,?)`,
-    [
-      DEV_USERNAME, passwordHash, 'DEVMODE_NO_TOTP', recoveryHash, keySalt,
-      'Dev Tester', profEnc.data, profEnc.iv, profEnc.tag,
-      recoveryKeyBlob.data, recoveryKeyBlob.iv, recoveryKeyBlob.tag, recoveryKeySalt
-    ]
-  );
-  const userId = Number(db.exec('SELECT last_insert_rowid()')[0].values[0][0]);
+  const userId = fixture.insertUser(db, {
+    username: DEV_USERNAME, passwordHash, totpSecret: 'DEVMODE_NO_TOTP',
+    recoveryHash, keySalt, devMode: 1, displayName: 'Dev Tester',
+    profileEnc: profEnc.data, profileIv: profEnc.iv, profileTag: profEnc.tag,
+    recoveryKeyEnc: recoveryKeyBlob.data, recoveryKeyIv: recoveryKeyBlob.iv,
+    recoveryKeyTag: recoveryKeyBlob.tag, recoveryKeySalt,
+  });
   console.log(`✓ Dev user created (id: ${userId}, work_state: TX → default policy)`);
 
-  // ── Company helper ─────────────────────────────────────────────────────────
-  function insertCompany(data) {
-    const enc = encrypt(JSON.stringify(data), sessionKey);
-    db.run(`INSERT INTO companies (user_id, data_enc, data_iv, data_tag) VALUES (?,?,?,?)`,
-      [userId, enc.data, enc.iv, enc.tag]);
-    return Number(db.exec('SELECT last_insert_rowid()')[0].values[0][0]);
-  }
+  // ── Company helper (fixture builder, bound to this vault) ────────────────
+  const insertCompany = (data) => fixture.insertCompany(db, sessionKey, userId, data);
   const co = (name, extra = {}) => ({
     name, job_title: '', work_type: '', location: '', pay_rate: '',
     date_start: '', date_end: '', hier_company: '', hier_project: '',
@@ -387,25 +293,12 @@ async function seed() {
   const blank = (n) => Array(n).fill(null).map(() => ({
     label: '', name: '', desc: '', total_mins: 0, clock_in: '', clock_out: ''
   }));
-  function insertEntry(companyId, dayOffset, label, rows, totalMins) {
-    const enc = encrypt(JSON.stringify(rows), sessionKey);
-    db.run(
-      `INSERT INTO time_entries (user_id, company_id, log_date, session_label, rows_json, rows_enc, rows_iv, rows_tag, total_mins)
-       VALUES (?,?,?,?,?,?,?,?,?)`,
-      [userId, companyId, daysAgo(dayOffset), label, '', enc.data, enc.iv, enc.tag, totalMins]
-    );
-    return Number(db.exec('SELECT last_insert_rowid()')[0].values[0][0]);
-  }
+  const insertEntry = (companyId, dayOffset, label, rows, totalMins) =>
+    fixture.insertEntry(db, sessionKey, userId, { companyId, logDate: daysAgo(dayOffset), label, rows, totalMins });
   // Legacy shape: PLAINTEXT rows_json, no rows_enc — the app must migrate it
   // to encrypted at first login (migrateTimeEntries). Probe for that path.
-  function insertLegacyEntry(companyId, dayOffset, label, rows, totalMins) {
-    db.run(
-      `INSERT INTO time_entries (user_id, company_id, log_date, session_label, rows_json, total_mins)
-       VALUES (?,?,?,?,?,?)`,
-      [userId, companyId, daysAgo(dayOffset), label, JSON.stringify(rows), totalMins]
-    );
-    return Number(db.exec('SELECT last_insert_rowid()')[0].values[0][0]);
-  }
+  const insertLegacyEntry = (companyId, dayOffset, label, rows, totalMins) =>
+    fixture.insertLegacyEntry(db, userId, { companyId, logDate: daysAgo(dayOffset), label, rows, totalMins });
 
   // ═══════════════════════════════════════════════════════════════════════════
   //  CANONICAL ENTRIES 1–6  (default policy: breaks ≥210m; lunch >300m)
@@ -549,8 +442,7 @@ async function seed() {
   // ═══════════════════════════════════════════════════════════════════════════
   const now = unixNow();
   const ti = (entryId, label, type, start, stop, dur) =>
-    db.run(`INSERT INTO task_items (user_id, entry_id, label, item_type, started_at, stopped_at, duration_secs) VALUES (?,?,?,?,?,?,?)`,
-      [userId, entryId, label, type, start, stop, dur]);
+    fixture.insertTaskItem(db, userId, { entryId, label, itemType: type, startedAt: start, stoppedAt: stop, durationSecs: dur });
 
   // Entry 1 compliance + Dispatch set (canonical, unchanged)
   ti(entry1Id, 'Morning break',   'break', now - 7200, now - 6300, 900);
@@ -679,46 +571,9 @@ async function seed() {
   printPacket();
 }
 
-// Mirror of countAuditDiscrepancies() in main.js — kept here ONLY to assert the
-// seed's expected count at seed time. If main.js's detection changes, update both.
-// NOTE: legacy plaintext entries can't be decrypted here (rows_enc NULL) → their
-// rows are skipped, matching a fresh pre-migration DB; the legacy entry is kept
-// clean and short (<210m) so it contributes no flags either way.
-function computeExpectedDiscrepancies(db, userId, sessionKey) {
-  const BREAK = { default: [[210, 0], [360, 1], [600, 2], [Infinity, 3]] };
-  const LUNCH = 300;
-  const reqBreaks = (m) => { for (const [t, c] of BREAK.default) if (m < t) return c; return 0; };
-  const rows = db.exec('SELECT rowid, rows_enc, rows_iv, rows_tag, total_mins FROM time_entries WHERE user_id=' + userId);
-  if (!rows.length) return 0;
-  let count = 0;
-  for (const v of rows[0].values) {
-    const [rid, enc, iv, tag, total] = v;
-    let parsed = [];
-    try { parsed = JSON.parse(decrypt(enc, iv, tag, sessionKey)); } catch {}
-    parsed.forEach((r) => {
-      // Exact mirror of main.js's rowHasContent() (src/renderer/row-utils.js):
-      // any punch, label, name, OR description counts (C3 / D-004).
-      const desc = r.desc || r.description || '';
-      if (!String(r.clock_in||'').trim() && !String(r.clock_out||'').trim() &&
-          !String(r.label||'').trim() && !String(r.name||'').trim() && !String(desc).trim()) return;
-      if (!r.clock_in) count++;
-      else if (!r.clock_out) count++;
-      else if (!r.total_mins) count++;
-      else if (r.total_mins > 720) count++;
-    });
-    const tm = Number(total || 0);
-    const rb = reqBreaks(tm);
-    if (rb > 0) {
-      const bc = Number(db.exec(`SELECT COUNT(*) FROM task_items WHERE entry_id=${rid} AND item_type='break'`)[0].values[0][0]);
-      if (bc < rb) count++;
-    }
-    if (tm > LUNCH) {
-      const hl = Number(db.exec(`SELECT COUNT(*) FROM task_items WHERE entry_id=${rid} AND item_type='lunch'`)[0].values[0][0]);
-      if (!hl) count++;
-    }
-  }
-  return count;
-}
+// computeExpectedDiscrepancies (the mirror of countAuditDiscrepancies) now
+// lives in test/vault-fixture.js — the differential oracle imports the SAME
+// mirror, so seed-time assertion and the property test can never drift apart.
 
 function printPacket() {
   console.log(`

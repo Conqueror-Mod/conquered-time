@@ -6,8 +6,10 @@
 //  The audit engine detects exactly 6 discrepancy types: no_clock_in,
 //  no_clock_out, zero_duration, over_12h, missing_break, missing_lunch.
 //  It does NOT flag row overlaps or stored-vs-span mismatches.
-//  seed-dev.js's computeExpectedDiscrepancies() mirrors this logic — keep
-//  them in sync.
+//  computeExpectedDiscrepancies() in test/vault-fixture.js mirrors this logic
+//  (used by both seed-dev.js's self-check and the differential oracle in
+//  test/audit-oracle.props.test.js) — keep them in sync; the oracle fails on
+//  randomized vaults within seconds if either side drifts.
 // ════════════════════════════════════════════════════════════════════════════
 
 const { dbGet, dbAll } = require('./db');
