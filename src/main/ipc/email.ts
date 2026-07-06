@@ -5,7 +5,7 @@ const nodemailer = require('nodemailer');
 const { session } = require('../session');
 const { dbGet, dbRun, persistDB, hasDb } = require('../db');
 const { encrypt } = require('../vault-crypto');
-const { getEmailSmtpConfig, doSendReport, runScheduledEmailCheck, computeNextSendDate } = require('../email');
+const { getEmailSmtpConfig, sendPeriodReport, runScheduledEmailCheck, computeNextSendDate } = require('../email');
 
 function register() {
 ipcMain.handle('email:save-config', (_: unknown, { host, port, username, password, fromName, defaultTo }: Record<string, any>) => {
@@ -66,10 +66,14 @@ ipcMain.handle('email:test-smtp', async () => {
 
 // doSendReport lives in ./email.
 
-ipcMain.handle('email:send-report', async (_: unknown, { htmlContent, subject, recipients }: Record<string, any>) => {
+// The report (PDF + CSV) is built entirely in main from the given filters, so
+// both attachments always cover exactly the same scoped entry set. The old
+// contract took renderer-built htmlContent — and its CSV ignored the filters.
+ipcMain.handle('email:send-report', async (_: unknown, { fromDate, toDate, companyId, subject, recipients }: Record<string, any>) => {
   if (!session.key || !session.user) return { ok: false, error: 'Not logged in.' };
   try {
-    await doSendReport({ htmlContent, subject, recipients });
+    if (!fromDate || !toDate) return { ok: false, error: 'Missing report period.' };
+    await sendPeriodReport({ title: 'Period Report', fromDate, toDate, companyId: companyId || null, subject, recipients });
     return { ok: true };
   } catch (e) { return { ok: false, error: e.message }; }
 });

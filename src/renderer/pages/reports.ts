@@ -558,8 +558,14 @@ function exportPeriodPDF(): void {
 }
 
 // ── Email modal ──
+// The emailed PDF+CSV are built in MAIN from these filters (shared branded
+// template with the scheduled report) — buildPeriodReportHTML() is only used
+// by the in-app print/PDF path now.
 async function openEmailModal(): Promise<void> {
-  const { html, from, to, coLabel } = buildPeriodReportHTML();
+  const from    = $field('period-from').value;
+  const to      = $field('period-to').value;
+  const coSel   = document.getElementById('period-company') as HTMLSelectElement;
+  const coLabel = coSel.value ? coSel.options[coSel.selectedIndex].text : 'All Companies';
   const defaultSubject = `Conquered Time — Period Report — ${to}`;
   let defaultTo = '';
   try { const cfg = await api.invoke('email:get-config'); defaultTo = cfg.defaultTo || ''; } catch {}
@@ -596,15 +602,15 @@ async function openEmailModal(): Promise<void> {
   $id('em-send-btn').addEventListener('click', async () => {
     const btn      = document.getElementById('em-send-btn') as HTMLButtonElement;
     const statusEl = $id('em-status');
-    const to       = ((document.getElementById('em-to') as HTMLInputElement | null)?.value || '').trim();
+    const recips   = ((document.getElementById('em-to') as HTMLInputElement | null)?.value || '').trim();
     const subject  = ((document.getElementById('em-subject') as HTMLInputElement | null)?.value || '').trim();
-    if (!to) { statusEl.textContent = 'Enter at least one recipient.'; statusEl.style.color = 'var(--error,#e05252)'; return; }
+    if (!recips) { statusEl.textContent = 'Enter at least one recipient.'; statusEl.style.color = 'var(--error,#e05252)'; return; }
     btn.disabled = true;
     btn.textContent = 'Sending…';
     statusEl.textContent = 'Generating PDF…';
     statusEl.style.color = 'var(--text-muted)';
     try {
-      const res = await api.invoke('email:send-report', { htmlContent: html, subject, recipients: to });
+      const res = await api.invoke('email:send-report', { fromDate: from, toDate: to, companyId: coSel.value ? Number(coSel.value) : null, subject, recipients: recips });
       if (res.ok) {
         Shell.toast('Report sent successfully!', 'success');
         closeModal();
