@@ -9,8 +9,8 @@ import androidx.compose.ui.graphics.Color
 
 /**
  * The five Final Fantasy city palettes, ported from the desktop themes.css
- * (var(--bg)/--surface-*/--accent/--text-*). Kept in the desktop's picker
- * order: Zanarkand, Memoria, Rabanastre, Treno, Nibelheim.
+ * (the --bg, --surface, --accent and --text custom properties). Kept in the
+ * desktop's picker order: Zanarkand, Memoria, Rabanastre, Treno, Nibelheim.
  */
 enum class AppTheme(val id: String, val label: String, val isLight: Boolean) {
     ZANARKAND("zanarkand", "Zanarkand", false),
