@@ -1,0 +1,6 @@
+<resources>
+    <!-- Framework Material theme (no extra deps). Compose MaterialTheme drives
+         the real in-app colors; this just gives the Activity a no-action-bar
+         host window. -->
+    <style name="Theme.ConqueredTime" parent="android:Theme.Material.NoActionBar" />
+</resources>
