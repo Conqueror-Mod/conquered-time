@@ -441,6 +441,13 @@ const Shell = (() => {
                     <div class="settings-row-label" style="margin-bottom:4px;">Send At</div>
                     <input class="sc-input" id="sched-time" type="time" value="08:00" data-action-change="saveScheduleConfig">
                   </div>
+                  <div style="grid-column:1 / -1;">
+                    <div class="settings-row-label" style="margin-bottom:4px;">Companies</div>
+                    <select class="sc-input" id="sched-scope" data-action-change="saveScheduleConfig" data-tip="One combined report, one report per company (each to its own Report Recipient when set), or a single company only">
+                      <option value="">All Companies — one combined report</option>
+                      <option value="each">Each company separately</option>
+                    </select>
+                  </div>
                 </div>
                 <div style="margin-top:12px;display:flex;gap:8px;align-items:center;">
                   <button class="s-btn" id="sched-send-now-btn" data-action="sendScheduledNow">Send Now</button>
@@ -1213,12 +1220,31 @@ async function loadEmailConfig() {
     }
 
     // Schedule fields
-    const freq = await api.invoke('settings:get', 'email_schedule_freq') || 'off';
-    const time = await api.invoke('settings:get', 'email_schedule_time') || '08:00';
+    const freq  = await api.invoke('settings:get', 'email_schedule_freq') || 'off';
+    const time  = await api.invoke('settings:get', 'email_schedule_time') || '08:00';
+    const scope = await api.invoke('settings:get', 'email_schedule_scope') || '';
     const freqEl = document.getElementById('sched-freq');
     const timeEl = document.getElementById('sched-time');
     if (freqEl) freqEl.value = freq;
     if (timeEl) timeEl.value = time;
+    // Scope select: the two fixed options live in the markup; individual
+    // companies are appended here so the list always matches the vault.
+    const scopeEl = document.getElementById('sched-scope');
+    if (scopeEl) {
+      try {
+        const companies = await Store.getCompanies();
+        scopeEl.querySelectorAll('option[data-co]').forEach(o => o.remove());
+        (companies || []).forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = String(c.id);
+          opt.textContent = `Only: ${c.name}`;
+          opt.dataset.co = '1';
+          scopeEl.appendChild(opt);
+        });
+      } catch {}
+      scopeEl.value = scope;
+      if (scopeEl.value !== scope) scopeEl.value = ''; // stored company no longer exists
+    }
     updateNextSendLabel();
   } catch {}
 }
@@ -1299,11 +1325,13 @@ async function sendScheduledNow() {
 }
 
 async function saveScheduleConfig() {
-  const freq = (document.getElementById('sched-freq') || {}).value || 'off';
-  const time = (document.getElementById('sched-time') || {}).value || '08:00';
+  const freq  = (document.getElementById('sched-freq') || {}).value || 'off';
+  const time  = (document.getElementById('sched-time') || {}).value || '08:00';
+  const scope = (document.getElementById('sched-scope') || {}).value || '';
   await Promise.all([
     api.invoke('settings:set', { key: 'email_schedule_freq', value: freq }),
     api.invoke('settings:set', { key: 'email_schedule_time', value: time }),
+    api.invoke('settings:set', { key: 'email_schedule_scope', value: scope }),
   ]);
   api.invoke('email:trigger-schedule-check');
   updateNextSendLabel();

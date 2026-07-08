@@ -24,6 +24,12 @@ const About = (() => {
   // Changelog — newest first. Edit HERE and both About surfaces update. The two
   // most recent entries render in-panel; older notes live on GitHub Releases.
   const CHANGELOG = [
+    { version: 'v3.15.0', items: [
+      'Scheduled reports can now be scoped by company: one combined report (as before), a single company only, or one report per company — pick under Settings → Reports → Scheduled Reports → Companies',
+      'New Report Recipient field on each company — per-company scheduled reports are emailed there instead of your default recipient, so each client can get their own report automatically',
+      'In per-company mode, companies with no work in the period are skipped — clients never receive an empty report',
+      'Dropdown menus now open with the theme’s colors on dark themes instead of a white popup with washed-out text',
+    ] },
     { version: 'v3.14.1', items: [
       'Scheduled email reports are skipped when there was no work in the period — no more empty reports the morning after a day off (manual Send Now still always sends)',
       'The display picker in Settings → Window now highlights the monitor the app is actually on, and dragging the window to another monitor updates the preference — the app reopens on that monitor next launch',

@@ -39,12 +39,22 @@ function loadPdfFontCss(): string {
   return pdfFontCssCache;
 }
 
+// Decrypted company list for the logged-in user (rowid, name, report_email).
+function getReportCompanies(): Array<{ id: number; name: string; report_email: string }> {
+  const list: Array<{ id: number; name: string; report_email: string }> = [];
+  dbAll('SELECT rowid as rid, * FROM companies WHERE user_id=?', [session.user.id]).forEach((co: any) => {
+    try {
+      const data = JSON.parse(decrypt({ data: co.data_enc, iv: co.data_iv, tag: co.data_tag }, session.key));
+      list.push({ id: Number(co.rid), name: data.name || '', report_email: (data.report_email || '').trim() });
+    } catch {}
+  });
+  return list;
+}
+
 // Decrypted company-name map for the logged-in user (rowid → name).
 function getCompanyNames(): Record<number, string> {
   const map: Record<number, string> = {};
-  dbAll('SELECT rowid as rid, * FROM companies WHERE user_id=?', [session.user.id]).forEach((co: any) => {
-    try { map[Number(co.rid)] = JSON.parse(decrypt({ data: co.data_enc, iv: co.data_iv, tag: co.data_tag }, session.key)).name || ''; } catch {}
-  });
+  getReportCompanies().forEach(c => { map[c.id] = c.name; });
   return map;
 }
 
@@ -216,36 +226,90 @@ async function runScheduledEmailCheck(force = false) {
     const fromDate = lastSent ? lastSent.slice(0, 10) : localDateStr(new Date(Date.now() - 30 * 86400000));
     const toDate   = localDateStr();
 
-    // No work in the period → skip the scheduled send, but still advance
-    // last_sent: otherwise the catch-up logic retries the empty send every
-    // 5 minutes and the next real report stretches back over the idle period.
-    // Manual "Send Now" (force) still sends regardless.
-    if (!force && getScopedEntries(fromDate, toDate).length === 0) {
-      console.log(`[schedule-email] No entries ${fromDate}..${toDate} — skipping scheduled report.`);
-      dbRun("INSERT OR REPLACE INTO app_settings (key,value) VALUES ('email_schedule_last_sent',?)", [new Date().toISOString()]);
-      dbRun("INSERT OR REPLACE INTO app_settings (key,value) VALUES ('email_schedule_last_error','')", []);
-      persistDB();
-      return;
-    }
+    // Scope: '' = all companies (one combined report), 'each' = one report per
+    // company with work, '<rowid>' = a single company only.
+    const scope = get('email_schedule_scope') || '';
 
     const cfg = getEmailSmtpConfig();
     if (!cfg.host || !cfg.password) throw new Error('SMTP not configured.');
-    const toList = (cfg.defaultTo || '').split(/[,;\s]+/).map((s: any) => s.trim()).filter(Boolean);
+    const defaultTo = (cfg.defaultTo || '').split(/[,;\s]+/).map((s: any) => s.trim()).filter(Boolean);
+
+    // No work in the scoped period → skip the scheduled send, but still advance
+    // last_sent: otherwise the catch-up logic retries the empty send every
+    // 5 minutes and the next real report stretches back over the idle period.
+    // Manual "Send Now" (force) still sends regardless (except in 'each' mode,
+    // where idle companies are always skipped — an empty per-client report is
+    // never useful).
+    const markSent = (errMsg = '') => {
+      dbRun("INSERT OR REPLACE INTO app_settings (key,value) VALUES ('email_schedule_last_sent',?)", [new Date().toISOString()]);
+      dbRun("INSERT OR REPLACE INTO app_settings (key,value) VALUES ('email_schedule_last_error',?)", [errMsg]);
+      persistDB();
+    };
+    const toast = (msg: string, kind = 'success') => {
+      const mainWindow = getMainWindow();
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('toast', msg, kind);
+    };
+
+    if (scope === 'each') {
+      // One branded report per company that has work in the period, each to its
+      // own Report Recipient override (falling back to the default recipient).
+      const companies = getReportCompanies();
+      const failures: string[] = [];
+      let sent = 0;
+      for (const co of companies) {
+        if (getScopedEntries(fromDate, toDate, co.id).length === 0) continue;
+        const recipients = co.report_email ? [co.report_email] : defaultTo;
+        if (!recipients.length) { failures.push(`${co.name}: no recipient (set a Report Recipient on the company or a default recipient)`); continue; }
+        try {
+          await sendPeriodReport({
+            title: 'Scheduled Report',
+            fromDate, toDate, companyId: co.id,
+            subject: `Conquered Time Scheduled Report — ${co.name} — ${toDate}`,
+            recipients,
+          });
+          sent++;
+        } catch (e) {
+          failures.push(`${co.name}: ${(e as Error).message}`);
+        }
+      }
+      if (failures.length && sent === 0 && !failures.every(f => f.includes('no recipient'))) {
+        // Nothing went out and at least one real send failed — leave last_sent
+        // alone so the catch-up retries the whole window.
+        throw new Error(`Per-company reports failed: ${failures.join('; ')}`);
+      }
+      // Partial success (or all skipped/no-recipient): advance the window so the
+      // companies that DID send don't get duplicates on the next check.
+      markSent(failures.join('; '));
+      if (sent) toast(`Scheduled reports sent for ${sent} ${sent === 1 ? 'company' : 'companies'}${failures.length ? ` (${failures.length} failed — see Settings → Reports)` : ''}!`, failures.length ? 'warning' : 'success');
+      else if (force) toast('No company had work in the period — nothing to send.', 'warning');
+      else console.log(`[schedule-email] No company had entries ${fromDate}..${toDate} — nothing to send.`);
+      return;
+    }
+
+    // Combined (all companies) or single-company scope.
+    const companyId = scope ? Number(scope) : null;
+    if (!force && getScopedEntries(fromDate, toDate, companyId).length === 0) {
+      console.log(`[schedule-email] No entries ${fromDate}..${toDate}${companyId ? ` for company ${companyId}` : ''} — skipping scheduled report.`);
+      markSent();
+      return;
+    }
+
+    const scopedCo = companyId ? getReportCompanies().find(c => c.id === companyId) : null;
+    const coName = scopedCo?.name || '';
+    const coOverride = scopedCo?.report_email || '';
+    const toList = coOverride ? [coOverride] : defaultTo;
     if (!toList.length) throw new Error('No default recipient set. Add one in Settings → Data → Email Reports.');
 
     // Same branded template + scoped CSV as the manual Email Report path.
     await sendPeriodReport({
       title: 'Scheduled Report',
-      fromDate, toDate,
-      subject: `Conquered Time Scheduled Report — ${toDate}`,
+      fromDate, toDate, companyId,
+      subject: `Conquered Time Scheduled Report — ${coName ? coName + ' — ' : ''}${toDate}`,
       recipients: toList,
     });
 
-    dbRun("INSERT OR REPLACE INTO app_settings (key,value) VALUES ('email_schedule_last_sent',?)", [new Date().toISOString()]);
-    dbRun("INSERT OR REPLACE INTO app_settings (key,value) VALUES ('email_schedule_last_error','')", []);
-    persistDB();
-    const mainWindow = getMainWindow();
-    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('toast', 'Scheduled report sent successfully!', 'success');
+    markSent();
+    toast('Scheduled report sent successfully!');
   } catch (e) {
     console.error('[schedule-email]', e.message);
     if (hasDb()) { try { dbRun("INSERT OR REPLACE INTO app_settings (key,value) VALUES ('email_schedule_last_error',?)", [e.message]); persistDB(); } catch {} }

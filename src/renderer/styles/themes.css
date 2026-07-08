@@ -30,6 +30,10 @@
    ══════════════════════════════════════════════════════════════ */
 :root,
 [data-theme="memoria"] {
+  /* Tells Chromium which mode to render native UI in (the <select> dropdown
+     popup, scrollbars) — without it every theme gets a light popup with the
+     theme's pale option text on white. Dark themes override to dark below. */
+  color-scheme: light;
   /* Moonlit crystal — cool silver-white base, amethyst accent.
      Barely perceptible blue tint at a glance; reveals itself on closer inspection. */
   --bg:           #f2f3f9;
@@ -78,6 +82,7 @@
    Warmth lives only in the light — everything else is shadow.
    ══════════════════════════════════════════════════════════════ */
 [data-theme="treno"] {
+  color-scheme: dark;
   /* Warm plum-charcoal — not cold, not brown. The dark between gas lamps. */
   --bg:           #0e0b10;
   --bg-deep:      #09070b;
@@ -127,6 +132,7 @@
    Something is slightly wrong. Controlled. Precise.
    ══════════════════════════════════════════════════════════════ */
 [data-theme="nibelheim"] {
+  color-scheme: dark;
   /* Cold stone and ash — each surface a shade lighter, like slate layers */
   --bg:           #0a0c10;
   --bg-deep:      #050608;
@@ -177,6 +183,7 @@
    Semi-dark. Deep oceanic base, bioluminescent aqua, twilight violet.
    ══════════════════════════════════════════════════════════════ */
 [data-theme="zanarkand"] {
+  color-scheme: dark;
   /* Deep ocean at night — deeper black-water base, wider ramp so elevation
      reads unmistakably. Upper surfaces are cooler-lit, as if catching the
      bioluminescence rising through the water. (challenge/theme-refactor) */
@@ -230,6 +237,7 @@
    Conquered and proud. Warmth without softness.
    ══════════════════════════════════════════════════════════════ */
 [data-theme="rabanastre"] {
+  color-scheme: light;
   /* Sun-baked sandstone — warm, bright, not yellow */
   --bg:           #f2ebe0;
   --bg-deep:      #e8dece;
