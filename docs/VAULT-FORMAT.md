@@ -44,6 +44,12 @@ to the data, TOTP is **not** a real boundary for an offline vault file — the
 password (key derivation) is the only cryptographic gate. Treat TOTP as optional
 UX parity on mobile.
 
+The Android port (`Totp.kt`, verified by `TotpParityTest.kt` against speakeasy
+vectors) implements this. In the mobile unlock UI the code is **optional**: a
+non-blank code must verify (±1 window), a blank one is skipped — so a vault
+whose desktop `dev_mode` bypasses TOTP is still openable without an
+authenticator app.
+
 ## Rowid discipline (gotcha #1)
 
 sql.js does not reliably populate the `id` AUTOINCREMENT column. Every read that

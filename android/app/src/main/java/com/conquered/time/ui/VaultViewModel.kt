@@ -74,9 +74,21 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Derive the key, validate it, and load the read-only data on success. */
-    fun unlock(profile: Profile, password: String) {
+    /**
+     * Derive the key, validate it, and load the read-only data on success.
+     * [totpCode] is optional (parity with the desktop's authenticator gate) —
+     * when non-blank it must verify against the profile's secret; when blank it
+     * is skipped, since for an offline vault the password is the real gate.
+     */
+    fun unlock(profile: Profile, password: String, totpCode: String) {
         val r = repo ?: run { error = "No vault open."; return }
+        val code = totpCode.trim()
+        if (code.isNotEmpty() && profile.totpSecret.isNotEmpty() &&
+            !com.conquered.time.crypto.Totp.verify(profile.totpSecret, code)
+        ) {
+            error = "Invalid authenticator code."
+            return
+        }
         error = null
         busy = true
         viewModelScope.launch {

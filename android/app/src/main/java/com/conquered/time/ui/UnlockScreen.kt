@@ -23,8 +23,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.conquered.time.data.Profile
@@ -43,7 +44,7 @@ fun UnlockScreen(
     profiles: List<Profile>,
     busy: Boolean,
     error: String?,
-    onUnlock: (Profile, String) -> Unit,
+    onUnlock: (Profile, String, String) -> Unit,
     onBack: () -> Unit,
     onPasswordChange: () -> Unit,
 ) {
@@ -67,6 +68,7 @@ fun UnlockScreen(
         } else {
             ProfileBanner(current)
             var password by remember(current) { mutableStateOf("") }
+            var totp by remember(current) { mutableStateOf("") }
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it; onPasswordChange() },
@@ -74,6 +76,14 @@ fun UnlockScreen(
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+            )
+            OutlinedTextField(
+                value = totp,
+                onValueChange = { totp = it.filter(Char::isDigit).take(6); onPasswordChange() },
+                label = { Text("Authenticator code (optional)") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
             )
             if (error != null) {
                 Text(
@@ -83,7 +93,7 @@ fun UnlockScreen(
                 )
             }
             Button(
-                onClick = { onUnlock(current, password) },
+                onClick = { onUnlock(current, password, totp) },
                 enabled = !busy && password.isNotEmpty(),
                 modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
             ) {
