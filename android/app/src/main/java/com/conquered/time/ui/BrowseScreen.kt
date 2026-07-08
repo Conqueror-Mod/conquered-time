@@ -13,6 +13,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
 import androidx.compose.material3.Divider
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -28,6 +30,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.runtime.Composable
@@ -55,6 +58,8 @@ import com.conquered.time.data.TimeEntry
 fun BrowseScreen(
     companies: List<Company>,
     entries: List<TimeEntry>,
+    theme: com.conquered.time.ui.theme.AppTheme,
+    onThemeChange: (com.conquered.time.ui.theme.AppTheme) -> Unit,
     onLock: () -> Unit,
 ) {
     val companyNames = remember(companies) { companies.associate { it.id to it.name } }
@@ -75,6 +80,7 @@ fun BrowseScreen(
                 },
                 actions = {
                     if (current == null) {
+                        ThemeMenu(theme, onThemeChange)
                         IconButton(onClick = onLock) {
                             Icon(Icons.Filled.Lock, contentDescription = "Lock")
                         }
@@ -97,6 +103,25 @@ fun BrowseScreen(
                 0 -> CompaniesList(companies, entries) { detail = it }
                 else -> GlobalLog(entries, companyNames)
             }
+        }
+    }
+}
+
+@Composable
+private fun ThemeMenu(
+    theme: com.conquered.time.ui.theme.AppTheme,
+    onThemeChange: (com.conquered.time.ui.theme.AppTheme) -> Unit,
+) {
+    var open by remember { mutableStateOf(false) }
+    IconButton(onClick = { open = true }) {
+        Icon(Icons.Filled.Palette, contentDescription = "Theme")
+    }
+    DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+        com.conquered.time.ui.theme.AppTheme.entries.forEach { t ->
+            DropdownMenuItem(
+                text = { Text(t.label + if (t == theme) "  ✓" else "") },
+                onClick = { onThemeChange(t); open = false },
+            )
         }
     }
 }

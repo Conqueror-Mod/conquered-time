@@ -20,9 +20,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            ConqueredTimeTheme {
+            val vm: VaultViewModel = viewModel()
+            ConqueredTimeTheme(theme = vm.theme) {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    val vm: VaultViewModel = viewModel()
                     when (val s = vm.screen) {
                         is VaultScreen.Import -> ImportScreen(
                             busy = vm.busy,
@@ -40,6 +40,8 @@ class MainActivity : ComponentActivity() {
                         is VaultScreen.Browse -> BrowseScreen(
                             companies = s.companies,
                             entries = s.entries,
+                            theme = vm.theme,
+                            onThemeChange = vm::setTheme,
                             onLock = vm::reset,
                         )
                     }

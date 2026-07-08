@@ -12,6 +12,7 @@ import com.conquered.time.data.Company
 import com.conquered.time.data.Profile
 import com.conquered.time.data.TimeEntry
 import com.conquered.time.data.VaultRepository
+import com.conquered.time.ui.theme.AppTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -39,6 +40,18 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var error by mutableStateOf<String?>(null)
         private set
+
+    private val prefs = app.getSharedPreferences("ct_prefs", Application.MODE_PRIVATE)
+
+    /** Active theme. Seeded from the last-used theme; adopts the profile's
+     *  ui_theme on unlock (per-profile parity with the desktop). */
+    var theme by mutableStateOf(AppTheme.fromId(prefs.getString("theme", null)))
+        private set
+
+    fun setTheme(t: AppTheme) {
+        theme = t
+        prefs.edit().putString("theme", t.id).apply()
+    }
 
     private var repo: VaultRepository? = null
 
@@ -93,11 +106,12 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
         busy = true
         viewModelScope.launch {
             try {
-                val (companies, entries) = withContext(Dispatchers.IO) {
+                val result = withContext(Dispatchers.IO) {
                     r.unlock(profile, password)
-                    r.listCompanies() to r.listEntries()
+                    Triple(r.listCompanies(), r.listEntries(), r.getSetting("ui_theme"))
                 }
-                screen = VaultScreen.Browse(profile, companies, entries)
+                AppTheme.fromId(result.third).let(::setTheme) // adopt the profile's theme
+                screen = VaultScreen.Browse(profile, result.first, result.second)
             } catch (e: VaultRepository.BadPasswordException) {
                 error = "Incorrect password."
             } catch (e: Exception) {

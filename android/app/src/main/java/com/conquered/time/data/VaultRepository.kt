@@ -40,6 +40,13 @@ class VaultRepository private constructor(
         }
     }
 
+    /** Read one app_settings value (plaintext), or null. e.g. "ui_theme". */
+    fun getSetting(key: String): String? {
+        db.rawQuery("SELECT value FROM app_settings WHERE key=?", arrayOf(key)).use { c ->
+            return if (c.moveToNext()) c.str("value") else null
+        }
+    }
+
     /** All unlockable profiles in the vault. */
     fun listProfiles(): List<Profile> {
         val out = ArrayList<Profile>()
