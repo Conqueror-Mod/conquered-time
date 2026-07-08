@@ -22,22 +22,26 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.conquered.time.data.Company
+import com.conquered.time.data.CsvExport
 import com.conquered.time.data.EntryRow
 import com.conquered.time.data.TimeEntry
 
@@ -189,17 +193,30 @@ private fun GlobalLog(entries: List<TimeEntry>, companyNames: Map<Int, String>) 
         }
     }
 
+    val context = LocalContext.current
     Column(Modifier.fillMaxSize()) {
         FilterBar(
             query = query, onQuery = { query = it },
             from = from, onFrom = { from = it.filter { c -> c.isDigit() || c == '-' } },
             to = to, onTo = { to = it.filter { c -> c.isDigit() || c == '-' } },
         )
-        Text(
-            "${filtered.size} of ${entries.size} sessions — ${formatMinutes(filtered.sumOf { it.totalMins })}",
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-        )
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+        ) {
+            Text(
+                "${filtered.size} of ${entries.size} sessions — ${formatMinutes(filtered.sumOf { it.totalMins })}",
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(
+                onClick = { CsvShare.share(context, CsvExport.build(filtered, companyNames)) },
+                enabled = filtered.isNotEmpty(),
+            ) {
+                Icon(Icons.Filled.Share, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
+                Text("Export CSV")
+            }
+        }
         if (filtered.isEmpty()) {
             EmptyState("No sessions match the current filter.")
         } else {
