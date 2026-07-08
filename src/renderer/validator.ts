@@ -22,6 +22,12 @@ window.Validator = (() => {
     if (data.hier_project)  data.hier_project  = data.hier_project.trim();
     if (data.hier_platform) data.hier_platform = data.hier_platform.trim();
     if (data.nav_id)        data.nav_id        = data.nav_id.trim();
+    if (data.report_email) {
+      data.report_email = data.report_email.trim();
+      if (data.report_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.report_email)) {
+        return { ok: false, error: 'Report Recipient must be a valid email address (or left blank).' };
+      }
+    }
     return { ok: true };
   }
 
