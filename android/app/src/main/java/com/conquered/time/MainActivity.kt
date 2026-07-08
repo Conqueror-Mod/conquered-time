@@ -41,7 +41,7 @@ class MainActivity : ComponentActivity() {
                             companies = s.companies,
                             entries = s.entries,
                             theme = vm.theme,
-                            onThemeChange = vm::setTheme,
+                            onThemeChange = vm::selectTheme,
                             onLock = vm::reset,
                         )
                     }

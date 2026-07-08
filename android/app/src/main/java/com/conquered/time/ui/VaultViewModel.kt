@@ -48,7 +48,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
     var theme by mutableStateOf(AppTheme.fromId(prefs.getString("theme", null)))
         private set
 
-    fun setTheme(t: AppTheme) {
+    fun selectTheme(t: AppTheme) {
         theme = t
         prefs.edit().putString("theme", t.id).apply()
     }
@@ -110,7 +110,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
                     r.unlock(profile, password)
                     Triple(r.listCompanies(), r.listEntries(), r.getSetting("ui_theme"))
                 }
-                AppTheme.fromId(result.third).let(::setTheme) // adopt the profile's theme
+                AppTheme.fromId(result.third).let(::selectTheme) // adopt the profile's theme
                 screen = VaultScreen.Browse(profile, result.first, result.second)
             } catch (e: VaultRepository.BadPasswordException) {
                 error = "Incorrect password."
