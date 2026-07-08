@@ -17,6 +17,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
@@ -24,7 +25,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -168,9 +171,97 @@ private fun GlobalLog(entries: List<TimeEntry>, companyNames: Map<Int, String>) 
         EmptyState("No time entries in this vault.")
         return
     }
-    LazyColumn(Modifier.fillMaxSize().padding(12.dp)) {
-        items(entries, key = { it.id }) { e ->
-            SessionCard(e, companyName = companyNames[e.companyId] ?: "Unknown company")
+
+    var query by remember { mutableStateOf("") }
+    var from by remember { mutableStateOf("") }
+    var to by remember { mutableStateOf("") }
+
+    val filtered = remember(entries, query, from, to) {
+        val q = query.trim().lowercase()
+        val lo = from.trim()
+        val hi = to.trim()
+        entries.filter { e ->
+            // Date range — log_date is YYYY-MM-DD, so lexical bounds are correct.
+            (lo.isEmpty() || e.logDate >= lo) &&
+                (hi.isEmpty() || e.logDate <= hi) &&
+                // Text — company name, session label, and every row's fields.
+                (q.isEmpty() || entryMatches(e, companyNames[e.companyId], q))
+        }
+    }
+
+    Column(Modifier.fillMaxSize()) {
+        FilterBar(
+            query = query, onQuery = { query = it },
+            from = from, onFrom = { from = it.filter { c -> c.isDigit() || c == '-' } },
+            to = to, onTo = { to = it.filter { c -> c.isDigit() || c == '-' } },
+        )
+        Text(
+            "${filtered.size} of ${entries.size} sessions — ${formatMinutes(filtered.sumOf { it.totalMins })}",
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+        )
+        if (filtered.isEmpty()) {
+            EmptyState("No sessions match the current filter.")
+        } else {
+            LazyColumn(Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
+                items(filtered, key = { it.id }) { e ->
+                    SessionCard(e, companyName = companyNames[e.companyId] ?: "Unknown company")
+                }
+            }
+        }
+    }
+}
+
+private fun entryMatches(e: TimeEntry, companyName: String?, q: String): Boolean {
+    if (companyName?.lowercase()?.contains(q) == true) return true
+    if (e.sessionLabel.lowercase().contains(q)) return true
+    return e.rows.any {
+        it.label.lowercase().contains(q) ||
+            it.name.lowercase().contains(q) ||
+            it.desc.lowercase().contains(q)
+    }
+}
+
+@Composable
+private fun FilterBar(
+    query: String, onQuery: (String) -> Unit,
+    from: String, onFrom: (String) -> Unit,
+    to: String, onTo: (String) -> Unit,
+) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
+        OutlinedTextField(
+            value = query,
+            onValueChange = onQuery,
+            label = { Text("Search company, label, or notes") },
+            singleLine = true,
+            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+            trailingIcon = {
+                if (query.isNotEmpty()) {
+                    IconButton(onClick = { onQuery("") }) {
+                        Icon(Icons.Filled.Clear, contentDescription = "Clear search")
+                    }
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Row(Modifier.fillMaxWidth().padding(top = 8.dp)) {
+            OutlinedTextField(
+                value = from,
+                onValueChange = onFrom,
+                label = { Text("From") },
+                placeholder = { Text("YYYY-MM-DD") },
+                singleLine = true,
+                modifier = Modifier.weight(1f),
+            )
+            Spacer(Modifier.width(8.dp))
+            OutlinedTextField(
+                value = to,
+                onValueChange = onTo,
+                label = { Text("To") },
+                placeholder = { Text("YYYY-MM-DD") },
+                singleLine = true,
+                modifier = Modifier.weight(1f),
+            )
         }
     }
 }
