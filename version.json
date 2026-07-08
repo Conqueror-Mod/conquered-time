@@ -1,5 +1,5 @@
 {
-  "version": "3.14.1",
+  "version": "3.15.0",
   "downloadUrl": "https://github.com/Conqueror-Mod/conquered-time/releases/latest",
-  "notes": "v3.14.1 — Scheduled email reports no longer send when the period has no work, and the Settings display picker (plus next-launch monitor) now follows the window when you drag it to another display."
+  "notes": "v3.15.0 — Per-company scheduled reports: scope the schedule to one company, all companies, or one report per company — each client report can go to its own Report Recipient email set on the company. Plus the v3.14.1 fixes: no more empty scheduled reports, and the display setting follows the monitor you drag the window to."
 }

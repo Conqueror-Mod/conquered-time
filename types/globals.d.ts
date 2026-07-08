@@ -81,6 +81,8 @@ interface Company {
   platform_url?: string;
   supervisors?: string;
   notes?: string;
+  /** Per-company scheduled-report recipient override; falls back to the SMTP default recipient. */
+  report_email?: string;
 }
 
 /** Row of task_items (Dispatch tasks + break/lunch), entry_id-scoped. */
