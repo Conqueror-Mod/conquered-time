@@ -976,13 +976,14 @@ async function paLoadDisplayPicker() {
   const area = document.getElementById('pa-display-picker');
   if (!area) return;
   try {
-    const [displays, savedDisp, savedMax, savedRemember] = await Promise.all([
+    const [displays, currentDisp, savedMax, savedRemember] = await Promise.all([
       api.invoke('win:get-displays'),
-      Promise.resolve(paGet('winPreferredDisplay')),
+      // highlight from the display the window is actually on, not localStorage
+      api.invoke('win:get-current-display').catch(() => 'primary'),
       Promise.resolve(paGet('winStartMaximized')),
       Promise.resolve(paGet('winRememberPosition')),
     ]);
-    const saved = savedDisp || 'primary';
+    const saved = currentDisp || 'primary';
     const btns  = [
       `<button class="s-btn${saved === 'primary' ? ' active' : ''}" data-action="paApplyPreferredDisplay" data-arg="primary">Primary Display</button>`,
       ...(displays || []).filter(d => !d.isPrimary).map(d =>

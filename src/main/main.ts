@@ -613,8 +613,29 @@ app.whenReady().then(async () => {
     dbRun("INSERT OR REPLACE INTO app_settings (key,value) VALUES ('win_lastBounds',?)", [JSON.stringify(b)]);
     persistDB();
   }
-  mainWindow.on('moved',   saveWindowBounds);
+  // Dragging the window to another monitor updates the stored preferred
+  // display, so the picker highlight and the next launch both follow the
+  // monitor the window actually lives on.
+  function syncPreferredDisplay() {
+    if (!hasDb()) return;
+    const d = screen.getDisplayMatching(mainWindow.getBounds());
+    const val = d.id === screen.getPrimaryDisplay().id ? 'primary' : String(d.id);
+    if (dbGet("SELECT value FROM app_settings WHERE key='win_preferredDisplay'")?.value === val) return;
+    dbRun("INSERT OR REPLACE INTO app_settings (key,value) VALUES ('win_preferredDisplay',?)", [val]);
+    persistDB();
+  }
+  mainWindow.on('moved',   () => { saveWindowBounds(); syncPreferredDisplay(); });
   mainWindow.on('resized', saveWindowBounds);
+  // 'moved' only fires at the end of a REAL drag (WM_EXITSIZEMOVE) — programmatic
+  // setPosition/maximize emit only 'move'. Debounced so a drag doesn't write on
+  // every pixel.
+  let moveDebounce: ReturnType<typeof setTimeout> | null = null;
+  mainWindow.on('move', () => {
+    if (moveDebounce) clearTimeout(moveDebounce);
+    moveDebounce = setTimeout(() => {
+      if (mainWindow && !mainWindow.isDestroyed()) syncPreferredDisplay();
+    }, 400);
+  });
 
   if (startHidden) {
     // Stay in the tray: no splash, window created hidden, user opens it from the

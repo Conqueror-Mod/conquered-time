@@ -290,6 +290,8 @@ interface IpcInvokeMap {
     id: number; index: number; isPrimary: boolean; width: number; height: number;
   }>;
   'win:move-to-display': (id: number) => MutResult;
+  // resolves the display the window actually sits on: 'primary' or a display id string
+  'win:get-current-display': () => string;
   'win:set-launch-at-startup': (on: boolean) => MutResult;
   'win:get-launch-at-startup': () => boolean;
   'win:get-close-to-tray': () => boolean;

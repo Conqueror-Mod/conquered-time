@@ -1,5 +1,5 @@
 {
-  "version": "3.14.0",
+  "version": "3.14.1",
   "downloadUrl": "https://github.com/Conqueror-Mod/conquered-time/releases/latest",
-  "notes": "v3.14.0 — Redesigned emailed reports: a branded professional PDF with summary and per-company/per-label breakdowns, identical for scheduled and Send Now, plus a CSV that now matches your selected period and company exactly and ends with a totals summary."
+  "notes": "v3.14.1 — Scheduled email reports no longer send when the period has no work, and the Settings display picker (plus next-launch monitor) now follows the window when you drag it to another display."
 }

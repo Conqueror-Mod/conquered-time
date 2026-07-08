@@ -216,6 +216,18 @@ async function runScheduledEmailCheck(force = false) {
     const fromDate = lastSent ? lastSent.slice(0, 10) : localDateStr(new Date(Date.now() - 30 * 86400000));
     const toDate   = localDateStr();
 
+    // No work in the period → skip the scheduled send, but still advance
+    // last_sent: otherwise the catch-up logic retries the empty send every
+    // 5 minutes and the next real report stretches back over the idle period.
+    // Manual "Send Now" (force) still sends regardless.
+    if (!force && getScopedEntries(fromDate, toDate).length === 0) {
+      console.log(`[schedule-email] No entries ${fromDate}..${toDate} — skipping scheduled report.`);
+      dbRun("INSERT OR REPLACE INTO app_settings (key,value) VALUES ('email_schedule_last_sent',?)", [new Date().toISOString()]);
+      dbRun("INSERT OR REPLACE INTO app_settings (key,value) VALUES ('email_schedule_last_error','')", []);
+      persistDB();
+      return;
+    }
+
     const cfg = getEmailSmtpConfig();
     if (!cfg.host || !cfg.password) throw new Error('SMTP not configured.');
     const toList = (cfg.defaultTo || '').split(/[,;\s]+/).map((s: any) => s.trim()).filter(Boolean);

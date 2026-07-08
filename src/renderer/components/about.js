@@ -24,6 +24,10 @@ const About = (() => {
   // Changelog — newest first. Edit HERE and both About surfaces update. The two
   // most recent entries render in-panel; older notes live on GitHub Releases.
   const CHANGELOG = [
+    { version: 'v3.14.1', items: [
+      'Scheduled email reports are skipped when there was no work in the period — no more empty reports the morning after a day off (manual Send Now still always sends)',
+      'The display picker in Settings → Window now highlights the monitor the app is actually on, and dragging the window to another monitor updates the preference — the app reopens on that monitor next launch',
+    ] },
     { version: 'v3.14.0', items: [
       'Emailed reports redesigned — a branded, professional PDF with a summary band (total time, days worked, sessions, companies) plus Daily Hours, By Company, and Task Label breakdowns. Scheduled and Send Now reports now share the exact same layout',
       'The CSV attachment now covers exactly the period and company you selected (it previously included your entire history regardless of the filter) and ends with a totals summary — per company and per task label',

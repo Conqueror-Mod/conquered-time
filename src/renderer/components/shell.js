@@ -1313,16 +1313,18 @@ async function saveScheduleConfig() {
 async function loadDisplayPicker() {
   const area = document.getElementById('display-picker');
   if (!area) return;
-  const [displays, savedDisp, savedMax, savedRemember, savedLaunch, savedCloseTray] = await Promise.all([
+  const [displays, currentDisp, savedMax, savedRemember, savedLaunch, savedCloseTray] = await Promise.all([
     api.invoke('win:get-displays'),
-    api.invoke('settings:get', 'win_preferredDisplay'),
+    // highlight from the display the window is ACTUALLY on (follows manual
+    // drags), not the stored win_preferredDisplay pref
+    api.invoke('win:get-current-display').catch(() => 'primary'),
     api.invoke('settings:get', 'win_startMaximized'),
     api.invoke('settings:get', 'win_rememberPosition'),
     api.invoke('win:get-launch-at-startup'),  // OS login item is source of truth
     api.invoke('win:get-close-to-tray'),       // app-global pref (not per-profile)
   ]);
   const savedStartMin = await api.invoke('win:get-start-minimized');
-  const saved = savedDisp || 'primary';
+  const saved = currentDisp || 'primary';
   const btns = [
     `<button class="s-btn${saved === 'primary' ? ' active' : ''}" data-action="applyPreferredDisplay" data-arg="primary">Primary Display</button>`
   ];

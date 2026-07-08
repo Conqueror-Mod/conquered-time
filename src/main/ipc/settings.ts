@@ -25,6 +25,16 @@ ipcMain.handle('win:get-displays', () => {
   }));
 });
 
+// The OS window position is the source of truth for "which display" — the
+// picker highlights from this, not from the stored pref, so a manual drag to
+// another monitor is reflected the next time Settings opens.
+ipcMain.handle('win:get-current-display', () => {
+  const win = getMainWindow();
+  if (!win || win.isDestroyed()) return 'primary';
+  const d = screen.getDisplayMatching(win.getBounds());
+  return d.id === screen.getPrimaryDisplay().id ? 'primary' : String(d.id);
+});
+
 ipcMain.handle('win:move-to-display', (_: unknown, displayId: any) => {
   const displays = screen.getAllDisplays();
   const target = displayId === 'primary'
