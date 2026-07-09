@@ -10,20 +10,27 @@ The keystore is the app's permanent signing identity. **Back it up privately and
 never lose or leak it** — like `src/shared/beta-secret.js`. If it's lost, no
 future build can update an already-installed copy signed with it.
 
-From the `android/` directory, run (JDK 17's keytool):
+From the `android/` directory, run (JDK 17's keytool). Use **PKCS12** (the
+modern default): in a PKCS12 keystore the key password always equals the store
+password, which removes the #1 signing pitfall (a store/key password mismatch →
+"Keystore was tampered with, or password was incorrect" at `packageRelease`).
 
-```
-"C:\Program Files\BellSoft\LibericaJDK-17\bin\keytool" -genkeypair -v ^
-  -keystore conquered-time-release.jks ^
-  -alias conquered-time ^
-  -keyalg RSA -keysize 2048 -validity 10000 ^
-  -storetype JKS
+Non-interactive — replace `<PASSWORD>` in BOTH places with the same value:
+
+```powershell
+& "C:\Program Files\BellSoft\LibericaJDK-17\bin\keytool" -genkeypair -v `
+  -keystore conquered-time-release.jks `
+  -alias conquered-time `
+  -keyalg RSA -keysize 2048 -validity 10000 `
+  -storetype PKCS12 `
+  -dname "CN=Chris Bowles, O=Conquered Time" `
+  -storepass <PASSWORD> -keypass <PASSWORD>
 ```
 
-It will prompt for a keystore password, key password (press Enter to reuse the
-store password), and a name/org (any values — e.g. "Chris Bowles"). A 10000-day
-validity is the Android-recommended minimum for an app you intend to keep
-updating.
+A 10000-day validity is the Android-recommended minimum for an app you intend to
+keep updating. (If you'd rather be prompted instead of putting the password on
+the command line, drop the last two lines — keytool will ask; just make sure the
+key password matches the store password.)
 
 ## 2. Point Gradle at it (gitignored — never committed)
 
@@ -35,10 +42,14 @@ copy keystore.properties.example keystore.properties
 
 ```properties
 storeFile=conquered-time-release.jks
-storePassword=<your store password>
+storePassword=<PASSWORD>
 keyAlias=conquered-time
-keyPassword=<your key password>
+keyPassword=<PASSWORD>
 ```
+
+With a PKCS12 keystore `storePassword` and `keyPassword` are the **same value**
+(the one you passed to keytool). The `keyAlias` must exactly match `-alias`
+above (`conquered-time`).
 
 Both `keystore.properties` and `*.jks` are gitignored. Keep a private backup of
 both the `.jks` file and these passwords (e.g. a password manager).
