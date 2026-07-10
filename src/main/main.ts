@@ -114,6 +114,7 @@ require('./ipc/companies').register();
 require('./ipc/entries').register();
 require('./ipc/audit').register({ createAuditWizardWindow });
 require('./ipc/email').register();
+require('./ipc/invoices').register();
 require('./ipc/settings').register({
   getMainWindow: () => mainWindow,
   applyLaunchAtStartup, loginItemOpts, getAppPref, setAppPref,
@@ -252,6 +253,19 @@ async function initProfileDB(profileDir: string) {
       row_idx  INTEGER NOT NULL,
       type     TEXT    NOT NULL,
       UNIQUE(user_id, entry_id, row_idx, type)
+    );
+    CREATE TABLE IF NOT EXISTS invoices (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id    INTEGER NOT NULL REFERENCES users(id),
+      seq        INTEGER NOT NULL,
+      status     TEXT    NOT NULL DEFAULT 'unpaid',
+      paid_at    INTEGER,
+      issued_at  INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+      data_enc   TEXT    NOT NULL,
+      data_iv    TEXT    NOT NULL,
+      data_tag   TEXT    NOT NULL,
+      created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+      updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
     );
   `);
 

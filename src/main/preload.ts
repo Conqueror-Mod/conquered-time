@@ -20,6 +20,8 @@ const ALLOWED_INVOKE = new Set([
   'backup:list', 'backup:preview', 'backup:restore',
   'email:save-config', 'email:get-config', 'email:test-smtp', 'email:send-report',
   'email:send-scheduled-now', 'email:get-schedule-status', 'email:trigger-schedule-check',
+  'invoices:context', 'invoices:preview', 'invoices:issue', 'invoices:list', 'invoices:get',
+  'invoices:set-status', 'invoices:save-pdf', 'invoices:email', 'invoices:get-counter', 'invoices:set-counter',
   'win:get-displays', 'win:move-to-display', 'win:get-current-display',
   'win:set-launch-at-startup', 'win:get-launch-at-startup',
   'win:get-close-to-tray', 'win:set-close-to-tray',

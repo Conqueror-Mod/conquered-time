@@ -176,6 +176,28 @@ interface AuditDismissedRow {
   emailed_at?: number | null;
 }
 
+// ── Invoicing (Phase 3) ──────────────────────────────────────────────────────
+interface InvoiceLineItem { date: string; minutes: number; hours: number; rate: number; amount: number; }
+interface InvoiceParty { name?: string; address?: string; email?: string; taxId?: string; paymentInstructions?: string; }
+/** The frozen invoice snapshot stored (encrypted) at issue time. */
+interface InvoiceDoc {
+  number: string; issueDate: string; dueDate?: string; terms?: string;
+  periodFrom: string; periodTo: string; currency: string; companyId: number;
+  billFrom: InvoiceParty; billTo: InvoiceParty; rate: number;
+  lineItems: InvoiceLineItem[]; totalMinutes: number; totalHours: number;
+  subtotal: number; taxRate: number; taxAmount: number; total: number; notes?: string;
+}
+/** One row in the ledger list. */
+interface InvoiceListRow {
+  id: number; seq: number; status: 'unpaid' | 'paid' | 'void'; paid_at: number | null;
+  issued_at: number; number: string; company_name: string;
+  period_from: string; period_to: string; due_date: string; total: number; currency: string;
+}
+interface InvoicePreviewParams {
+  companyId: number; fromDate: string; toDate: string;
+  taxRate?: number; netDays?: string | number; issueDate?: string; notes?: string;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 //  IPC channel map — single source of truth for both sides of every handler
 //  (Phase 2 types the ipcMain.handle side from this same interface).
@@ -299,6 +321,17 @@ interface IpcInvokeMap {
     lastError?: string | null; nextSend?: string | null;
   };
   'email:trigger-schedule-check': () => MutResult;
+  // invoices (Phase 3)
+  'invoices:context': () => { ok: boolean; nextNumber?: string; prefix?: string; next?: number; billFrom?: InvoiceParty & { defaultCurrency?: string }; billFromReady?: boolean };
+  'invoices:preview': (params: InvoicePreviewParams) => { ok: boolean; doc?: InvoiceDoc; error?: string };
+  'invoices:issue': (params: InvoicePreviewParams) => { ok: boolean; id?: number; number?: string; error?: string };
+  'invoices:list': () => InvoiceListRow[];
+  'invoices:get': (id: number) => { ok: boolean; doc?: InvoiceDoc; status?: string; paid_at?: number | null; error?: string };
+  'invoices:set-status': (payload: { id: number; status: string }) => MutResult;
+  'invoices:save-pdf': (id: number) => { ok: boolean; path?: string; canceled?: boolean; error?: string };
+  'invoices:email': (id: number) => { ok: boolean; to?: string; error?: string };
+  'invoices:get-counter': () => { ok: boolean; prefix?: string; pad?: number; next?: number };
+  'invoices:set-counter': (payload: { prefix?: string; next?: number }) => { ok: boolean; prefix?: string; next?: number };
   // window / prefs
   'win:get-displays': () => Array<{
     id: number; index: number; isPrimary: boolean; width: number; height: number;

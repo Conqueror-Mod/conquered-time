@@ -317,7 +317,36 @@ async function runScheduledEmailCheck(force = false) {
   }
 }
 
+// Render an invoice PDF and email it (used by ipc/invoices). Reuses the report
+// SMTP config + generatePDF; a single PDF attachment, no CSV.
+async function sendInvoiceEmail({ htmlContent, recipients, subject, invoiceNumber }: {
+  htmlContent: string; recipients?: string | string[]; subject?: string; invoiceNumber?: string;
+}) {
+  const cfg = getEmailSmtpConfig();
+  if (!cfg.host || !cfg.username || !cfg.password) throw new Error('Email not configured. Open Settings → Reports to add SMTP credentials.');
+
+  const toList = Array.isArray(recipients)
+    ? recipients.filter(Boolean)
+    : (recipients || cfg.defaultTo || '').split(/[,;\s]+/).map((s: string) => s.trim()).filter(Boolean);
+  if (!toList.length) throw new Error('No recipient — set a Report Recipient on the company or a default recipient in Settings → Reports.');
+
+  const num = invoiceNumber || 'invoice';
+  const pdfBuf = await generatePDF(htmlContent);
+  const transport = nodemailer.createTransport({
+    host: cfg.host, port: cfg.port, secure: cfg.port === 465,
+    auth: { user: cfg.username, pass: cfg.password },
+  });
+  const fromAddr = cfg.fromName ? `"${cfg.fromName}" <${cfg.username}>` : cfg.username;
+  await transport.sendMail({
+    from: fromAddr, to: toList.join(', '),
+    subject: subject || `Invoice ${num}`,
+    html: `<p>Please find invoice <strong>${num.replace(/[<>&]/g, '')}</strong> attached.</p><p style="color:#6b7280;font-size:12px">Sent via Conquered Time · ${new Date().toLocaleString()}</p>`,
+    attachments: [{ filename: `${num}.pdf`, content: pdfBuf, contentType: 'application/pdf' }],
+  });
+  return toList;
+}
+
 module.exports = {
-  initEmail, getProfileEmail, profileEmailMissing, getEmailSmtpConfig,
-  generatePDF, doSendReport, sendPeriodReport, computeNextSendDate, runScheduledEmailCheck,
+  initEmail, getProfileEmail, profileEmailMissing, getEmailSmtpConfig, loadPdfFontCss,
+  generatePDF, doSendReport, sendPeriodReport, sendInvoiceEmail, computeNextSendDate, runScheduledEmailCheck,
 };
