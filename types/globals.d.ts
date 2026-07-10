@@ -544,6 +544,12 @@ interface Window {
   Onboarding?: OnboardingEngine;
   /** Idle forgotten-punch nudge (components/punch-watch.js, injected by Shell.init). */
   PunchWatch?: PunchWatchEngine;
+  /**
+   * Tracker-page hook (pages/tracker.ts) letting punch-watch close the active
+   * punch at an explicit ms time on the tracker's own consistent save path.
+   * Returns true if a punch was open. Absent off the tracker page.
+   */
+  __trackerClockOutActive?: (atMs: number) => boolean;
 }
 
 /** window.PunchWatch surface (components/punch-watch.js). */

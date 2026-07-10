@@ -60,7 +60,12 @@ const PunchWatch = (() => {
       const rows = JSON.parse(entry.rows_json || '[]');
       const open = rows.find(r => r.clock_in && !r.clock_out);
       return open ? { entry, rows, open } : null;
-    } catch { return null; }
+    } catch (e) {
+      // A decrypt/IPC failure here looks identical to "no open punch" — log it
+      // so a silently-stopped watcher is diagnosable.
+      console.warn('[punch-watch] getOpenPunch failed:', e);
+      return null;
+    }
   }
 
   // ── Activity tracking ─────────────────────────────────────────────────────
@@ -113,8 +118,21 @@ const PunchWatch = (() => {
     return (typeof Settings !== 'undefined') ? Settings.formatTime(raw) : raw;
   }
 
-  // ── Close the open punch (reuses entries:save; never automatic) ───────────
+  // ── Close the open punch (never automatic) ────────────────────────────────
   async function clockOutActive(atMs) {
+    // On the Time Tracker the page owns the in-memory rows AND runs its own
+    // autosave timer. If we saved independently via entries:save, that timer
+    // could fire in between with the stale (still-open) rows and blind-overwrite
+    // us — silently reopening the punch. So route through the tracker's own
+    // clockOut(), which mutates rowsData and saves on one consistent path.
+    const trackerHook = window.__trackerClockOutActive;
+    if (typeof trackerHook === 'function') {
+      if (trackerHook(atMs)) { Shell.toast(`Clocked out at ${trimDisplay(atMs)}.`, 'success'); return; }
+      // Hook reports no open punch on this page — fall through to the generic
+      // path (the open punch belongs to an entry this page isn't showing).
+    }
+
+    // Off the tracker there's no competing writer, so a direct save is safe.
     const punch = await getOpenPunch();
     if (!punch) {
       Shell.toast('That punch is already closed.', 'info');
@@ -134,14 +152,8 @@ const PunchWatch = (() => {
         rows_json: JSON.stringify(rows),
         total_mins: total,
       });
-      if (res?.ok) {
-        Shell.toast(`Clocked out at ${trimDisplay(atMs)}.`, 'success');
-        // The tracker holds its own in-memory copy of these rows; reload it so
-        // the table (and its autoSave baseline) picks up the closed punch.
-        if (document.getElementById('tracker-table')) setTimeout(() => location.reload(), 600);
-      } else {
-        Shell.toast('Clock-out failed: ' + (res?.error || 'unknown error'), 'error');
-      }
+      if (res?.ok) Shell.toast(`Clocked out at ${trimDisplay(atMs)}.`, 'success');
+      else Shell.toast('Clock-out failed: ' + (res?.error || 'unknown error'), 'error');
     } catch { Shell.toast('Clock-out failed.', 'error'); }
   }
 
