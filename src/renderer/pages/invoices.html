@@ -50,16 +50,16 @@
   table.ledger td { padding: 9px 10px; border-bottom: 1px solid var(--border); font-size: 12.5px; color: var(--text-bright); }
   table.ledger td.mono, table.ledger th.num { font-family: var(--mono); }
   table.ledger .num { text-align: right; }
-  .empty-row td { text-align: center; color: var(--text-dim); font-style: italic; padding: 26px 0; }
+  .empty-row td { text-align: center; color: var(--text-muted); font-style: italic; padding: 26px 0; }
 
   .status-pill { font-size: 10.5px; font-weight: 600; padding: 2px 9px; border-radius: 20px; white-space: nowrap; }
   .status-unpaid { color: var(--yellow); border: 1px solid var(--yellow); background: rgba(245,158,11,0.08); }
   .status-paid   { color: var(--green,#22c55e); border: 1px solid var(--green,#22c55e); background: rgba(34,197,94,0.1); }
-  .status-void   { color: var(--text-dim); border: 1px solid var(--border); background: var(--surface-2); text-decoration: line-through; }
+  .status-void   { color: var(--text-muted); border: 1px solid var(--border); background: var(--surface-2); text-decoration: line-through; }
 
   .row-actions { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
   .mini-btn {
-    background: var(--surface-2); border: 1px solid var(--border); color: var(--text-dim);
+    background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
     border-radius: var(--radius); font-size: 11px; padding: 4px 9px; cursor: pointer; font-family: var(--sans);
   }
   .mini-btn:hover { border-color: var(--accent); color: var(--accent); }
@@ -85,8 +85,8 @@
   .pv-parties { display: flex; justify-content: space-between; gap: 20px; margin-bottom: 16px; }
   .pv-lbl { font-size: 9.5px; letter-spacing: 1px; text-transform: uppercase; color: var(--accent); font-weight: 600; margin-bottom: 3px; }
   .pv-who { font-size: 13px; font-weight: 600; color: var(--text-bright); }
-  .pv-addr { font-size: 11px; color: var(--text-dim); white-space: pre-line; margin-top: 2px; }
-  .pv-meta { text-align: right; font-size: 11.5px; color: var(--text-dim); }
+  .pv-addr { font-size: 11px; color: var(--text-muted); white-space: pre-line; margin-top: 2px; }
+  .pv-meta { text-align: right; font-size: 11.5px; color: var(--text-muted); }
   .pv-meta b { color: var(--text-bright); }
   table.pv { width: 100%; border-collapse: collapse; margin: 8px 0; }
   table.pv th { text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); padding: 6px 8px; border-bottom: 1px solid var(--border); }
@@ -114,7 +114,7 @@
 
   <!-- Generate -->
   <div class="panel">
-    <div class="panel-head"><div class="panel-h">Generate Invoice</div><div class="panel-h" style="color:var(--text-dim)" id="next-number-tag"></div></div>
+    <div class="panel-head"><div class="panel-h">Generate Invoice</div><div class="panel-h" style="color:var(--text-muted)" id="next-number-tag"></div></div>
     <div class="warn-banner" id="billing-warn">
       <span>Add your business details on the Profile page so invoices have a “Bill From” block.</span>
     </div>
@@ -167,7 +167,7 @@
 
   <!-- Ledger -->
   <div class="panel" style="display:flex;flex-direction:column;min-height:0;flex:1;">
-    <div class="panel-head"><div class="panel-h">Invoice Ledger</div><div class="panel-h" style="color:var(--text-dim)" id="ledger-count"></div></div>
+    <div class="panel-head"><div class="panel-h">Invoice Ledger</div><div class="panel-h" style="color:var(--text-muted)" id="ledger-count"></div></div>
     <div class="ledger-wrap">
       <table class="ledger">
         <thead>
