@@ -16,9 +16,6 @@ _Last curated: 2026-07-10_
 - **Analytics & insights dashboard** — put the captured time series to work: an
   hours-over-time trend, per-company distribution, busiest days, and task-label
   breakdowns, so the dashboard shows insight, not just identity.
-- **Proactive punch detection** — catch a forgotten running punch *before* it
-  becomes an audit issue: a gentle idle-based prompt ("still working?") that
-  offers to trim or close the session.
 - **Report redesign** — the emailed CSV and PDF report layouts get a proper
   redesign (not just fixes), based on beta feedback.
 
@@ -38,6 +35,11 @@ _Last curated: 2026-07-10_
 
 ## ✅ Recently shipped
 
+- **Proactive punch reminder** (v3.18) — leave a session running and step away,
+  and Conquered Time nudges you to trim or close the punch *before* it becomes
+  an audit issue. Opt-in under Settings → Security → Idle Punch Reminder; the
+  prompt offers to clock out at the time you actually went idle, clock out now,
+  or keep working — it never punches for you.
 - **Automatic updates** (v3.17) — the app checks GitHub Releases for new
   versions, downloads the update in the background with a progress bar, and
   installs on restart (check anytime under Settings → About → Updates). Shipped

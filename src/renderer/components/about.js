@@ -24,6 +24,9 @@ const About = (() => {
   // Changelog — newest first. Edit HERE and both About surfaces update. The two
   // most recent entries render in-panel; older notes live on GitHub Releases.
   const CHANGELOG = [
+    { version: 'v3.18.0', items: [
+      'Proactive punch reminder — if you leave a session running and step away, Conquered Time can now nudge you to trim or close the punch before it turns into an audit discrepancy. Turn it on under Settings → Security → Idle Punch Reminder (off by default; choose 10 / 15 / 30 / 60 minutes). The reminder offers to clock out at the time you actually went idle, clock out now, or keep working — it never punches for you',
+    ] },
     { version: 'v3.17.0', items: [
       'Automatic updates — the app now checks GitHub for new versions, downloads the update in the background with a progress bar, and installs it on restart. Check anytime under Settings → About → Updates',
       'Fixed: exported and emailed invoice PDFs were missing the invoice number in the header — they now show it correctly',
