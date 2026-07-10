@@ -607,6 +607,7 @@ const Shell = (() => {
     await _injectScript('../store.js'); // store.js depends on IPC
     await _injectScript('../components/pomodoro.js'); // Pomodoro engine (chip + alerts on every page)
     await _injectScript('../components/punch-watch.js'); // idle forgotten-punch nudge
+    await _injectScript('../components/update-notice.js'); // auto-updater toast (in-app)
     await _injectScript('../components/onboarding.js'); // first-run coach-mark tour
 
     const [user, profile] = await Promise.all([
@@ -817,6 +818,8 @@ const Shell = (() => {
     window.Pomodoro?.init();
     // Idle forgotten-punch nudge (no-op unless ui_idlePunchMinutes > 0).
     window.PunchWatch?.init();
+    // Auto-updater surface: available/staged toast + post-update confirmation.
+    window.UpdateNotice?.init();
     // Resume an in-flight onboarding tour after a page swap (no-op otherwise).
     if (!tourStarted) window.Onboarding?.init();
 

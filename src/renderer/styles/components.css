@@ -359,6 +359,19 @@ td {
 .pomo-alert-btns { display: flex; gap: 8px; }
 .pomo-alert-btns button { font-size: 12px; padding: 5px 10px; }
 
+/* Auto-updater notice (see components/update-notice.js) — an actionable toast
+   that must stand out, with an accent edge. Same action-toast layout as above. */
+.toast.update-toast {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-left: 3px solid var(--accent);
+}
+.update-toast-msg { font-weight: 600; }
+.update-toast-btns { display: flex; gap: 8px; }
+.update-toast-btns button { font-size: 12px; padding: 5px 10px; }
+
 /* ══════════════════════════════════════════════════════════════
    ONBOARDING TOUR (coach-marks — see components/onboarding.js)
    ══════════════════════════════════════════════════════════════ */
