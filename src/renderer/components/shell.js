@@ -52,7 +52,7 @@ const Shell = (() => {
     return `
     <div class="titlebar">
       <div class="titlebar-left">
-        <svg width="20" height="20" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0;border-radius:3px;"><defs><radialGradient id="tb-bg" cx="40%" cy="35%" r="65%"><stop offset="0%" stop-color="#1a1a3a"/><stop offset="100%" stop-color="#020408"/></radialGradient></defs><circle cx="256" cy="256" r="250" fill="url(#tb-bg)"/><circle cx="256" cy="256" r="244" fill="none" stroke="#d4a030" stroke-width="6"/><path d="M110 82 L402 82 L256 256 L402 430 L110 430 L256 256 Z" fill="none" stroke="#b07818" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/><path d="M110 82 L402 82 L256 256 L402 430 L110 430 L256 256 Z" fill="none" stroke="#f0d060" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/><line x1="110" y1="82" x2="402" y2="82" stroke="#f0c060" stroke-width="16" stroke-linecap="round"/><line x1="110" y1="430" x2="402" y2="430" stroke="#f0c060" stroke-width="16" stroke-linecap="round"/><path d="M118 90 L394 90 L256 248 Z" fill="#7c3aed" fill-opacity="0.35"/><path d="M256 264 L384 422 L128 422 Z" fill="#0ea5e9" fill-opacity="0.4"/><circle cx="256" cy="256" r="10" fill="#fff4c0" opacity="0.95"/></svg>
+        <img src="../../../assets/icon-48.png" width="20" height="20" alt="Conquered Time" style="flex-shrink:0;border-radius:3px;display:block;">
         <span class="titlebar-logo">Conquered</span>
         <div class="titlebar-divider"></div>
         <span class="titlebar-page">${pageLabel}</span>
