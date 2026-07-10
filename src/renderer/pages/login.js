@@ -447,6 +447,9 @@ function startNewProfile() {
 window.addEventListener('DOMContentLoaded', async () => {
   initGrid();
   installLoginDelegation();
+  // Auto-updater surface: post-update confirmation + actionable "update available"
+  // toast right here on the profile selector (no-op in dev / when up to date).
+  window.UpdateNotice?.init();
   // Apply the stored pre-auth UI scale as an app-wide zoom, so the login screen
   // matches the in-app scale (and doesn't inherit a leftover zoom from a prior
   // in-app session after logout). login-theme-init already set data-scale.

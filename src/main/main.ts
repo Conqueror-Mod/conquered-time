@@ -127,7 +127,7 @@ require('./ipc/auth').register({
 });
 // Auto-updater (electron-updater ↔ GitHub Releases). No-ops in dev.
 const updater = require('./updater');
-updater.register({ getMainWindow: () => mainWindow });
+updater.register({ getMainWindow: () => mainWindow, getAppPref, setAppPref });
 
 // The main-process read cache (memoized decrypted reads) lives in ./cache.
 

@@ -17,6 +17,26 @@ const { ipcMain, app } = require('electron');
 
 interface UpdaterCtx {
   getMainWindow: () => any;
+  getAppPref: (key: string, dflt: any) => any;
+  setAppPref: (key: string, val: any) => void;
+}
+
+// Post-install confirmation: computed once at register() by comparing the
+// running version to the last version we recorded in app-prefs. Consumed once
+// by the renderer (update:just-updated) so the profile selector can show a
+// "✓ Updated to vX" notice — the install itself is otherwise invisible.
+let justUpdated: { from: string; to: string } | null = null;
+
+// Numeric-aware semver-ish "is a greater than b" (major.minor.patch). Guards the
+// confirmation against a downgrade/reinstall showing a bogus "updated" message.
+function versionGreater(a: string, b: string): boolean {
+  const pa = String(a).split('.').map(n => parseInt(n, 10) || 0);
+  const pb = String(b).split('.').map(n => parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const d = (pa[i] || 0) - (pb[i] || 0);
+    if (d !== 0) return d > 0;
+  }
+  return false;
 }
 
 // State forwarded to the renderer via the 'update:status' channel. `state` is
@@ -40,6 +60,26 @@ function register(ctx: UpdaterCtx): void {
     const win = ctx.getMainWindow();
     if (win && !win.isDestroyed()) win.webContents.send('update:status', status);
   };
+
+  // Detect a completed self-update: the recorded version differs from (and is
+  // older than) the running one. Only meaningful in a packaged build; recorded
+  // regardless so the FIRST packaged launch just seeds the baseline (no notice).
+  const current = app.getVersion();
+  if (app.isPackaged) {
+    const last = ctx.getAppPref('appVersion', null);
+    if (last && last !== current && versionGreater(current, last)) {
+      justUpdated = { from: last, to: current };
+    }
+    if (last !== current) ctx.setAppPref('appVersion', current);
+  }
+  // Consume-once: the renderer asks on load, we hand it over and clear it so the
+  // confirmation shows exactly once after an update (survives listener-attach
+  // races that a fire-and-forget event would lose). Registered in BOTH branches.
+  ipcMain.handle('update:just-updated', () => {
+    const ju = justUpdated;
+    justUpdated = null;
+    return ju ? { updated: true, ...ju } : { updated: false };
+  });
 
   // In dev (not packaged) electron-updater has no app-update.yml — don't even
   // require it. Report a stable 'dev' status for the UI and no-op the actions.

@@ -261,6 +261,7 @@ interface IpcInvokeMap {
   'update:status': () => UpdateStatus;
   'update:download': () => MutResult;
   'update:install': () => MutResult;
+  'update:just-updated': () => { updated: boolean; from?: string; to?: string };
   // db maintenance
   'db:clear-timeclock': () => MutResult;
   'db:clear-timeclock-company': (payload: { companyId: number }) => MutResult;
@@ -544,6 +545,8 @@ interface Window {
   Onboarding?: OnboardingEngine;
   /** Idle forgotten-punch nudge (components/punch-watch.js, injected by Shell.init). */
   PunchWatch?: PunchWatchEngine;
+  /** Auto-updater UI surface (components/update-notice.js; login page + Shell.init). */
+  UpdateNotice?: { init(): Promise<void> };
   /**
    * Tracker-page hook (pages/tracker.ts) letting punch-watch close the active
    * punch at an explicit ms time on the tracker's own consistent save path.
