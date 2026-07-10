@@ -59,10 +59,13 @@ stateless (recomputed live); only **Issue** persists a frozen snapshot.
    Form/persistence only, no invoice UI yet.
 2. **Engine** — pure `src/main/invoice-html.ts` + compute (per-day lines, tax,
    terms, totals), unit-tested, mirroring `report-html.ts` + its test.
-3. **Invoices page** — generate → preview → issue → ledger (mark paid/void,
-   re-download, email); new `invoices` table + IPC surface.
-4. **Polish** — seed fixture invoices, run-app verification, version bump +
-   GitHub release.
+3. **Invoices page** ✅ — new `invoices` table + `ipc/invoices.ts` (context /
+   preview / issue / list / get / set-status / save-pdf / email / counter); a
+   top-level Invoices page with generate → preview → issue and a ledger (mark
+   paid/unpaid/void, save PDF, email). Snapshot-at-issue enforced (frozen
+   encrypted doc). PDF reuses email.ts `generatePDF`; email reuses the report
+   SMTP path (`sendInvoiceEmail`) → company `report_email` fallback default.
+4. **Polish** — seed fixture invoices, version bump + GitHub release.
 
 ## Notes / open for later
 

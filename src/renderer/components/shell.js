@@ -36,6 +36,7 @@ const Shell = (() => {
     settings:  `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" style="display:block"><line x1="1" y1="4" x2="15" y2="4"/><circle cx="5" cy="4" r="2" fill="currentColor" fill-opacity="0.22"/><line x1="1" y1="8" x2="15" y2="8"/><circle cx="10.5" cy="8" r="2" fill="currentColor" fill-opacity="0.22"/><line x1="1" y1="12" x2="15" y2="12"/><circle cx="6" cy="12" r="2" fill="currentColor" fill-opacity="0.22"/></svg>`,
     tasktimer: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:block"><circle cx="8" cy="9" r="5.5"/><line x1="8" y1="9" x2="8" y2="5.8"/><line x1="8" y1="9" x2="10.2" y2="10.3"/><line x1="6.5" y1="1.5" x2="9.5" y2="1.5"/><line x1="8" y1="1.5" x2="8" y2="3.5"/><line x1="13" y1="5" x2="14" y2="4"/></svg>`,
     profile:   `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:block"><circle cx="8" cy="5.5" r="2.8"/><path d="M2 14c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/></svg>`,
+    invoices:  `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M3.5 1.5h6.5l2.5 2.5v10.5l-1.5-1-1.5 1-1.5-1-1.5 1-1.5-1-1.5 1V1.5z"/><line x1="5.5" y1="5.5" x2="9.5" y2="5.5"/><line x1="5.5" y1="8" x2="10.5" y2="8"/><line x1="5.5" y1="10.5" x2="8.5" y2="10.5"/></svg>`,
   };
 
   const NAV = [
@@ -45,6 +46,7 @@ const Shell = (() => {
     { id: 'tracker',    icon: IC.tracker,    label: 'Time Tracker' },
     { id: 'task-timer', icon: IC.tasktimer,  label: 'Dispatch'     },
     { id: 'reports',    icon: IC.reports,    label: 'Reports'      },
+    { id: 'invoices',   icon: IC.invoices,   label: 'Invoices'     },
     { id: 'global-log', icon: IC.globallog,  label: 'Global Log'   },
   ];
 
@@ -608,6 +610,7 @@ const Shell = (() => {
       tracker:      'Time Tracker',
       'task-timer': 'Dispatch',
       reports:      'Reports',
+      invoices:     'Invoices',
       'global-log': 'Global Log',
     };
 
@@ -676,9 +679,9 @@ const Shell = (() => {
         return;
       }
 
-      // ── Module switching: Ctrl+1–6 ─────────────────────────────────────────
+      // ── Module switching: Ctrl+1–7 ─────────────────────────────────────────
       if (e.ctrlKey && !e.shiftKey && !e.altKey) {
-        const pages = ['dashboard', 'companies', 'tracker', 'task-timer', 'reports', 'global-log'];
+        const pages = ['dashboard', 'companies', 'tracker', 'task-timer', 'reports', 'invoices', 'global-log'];
         const idx   = parseInt(e.key, 10) - 1;
         if (idx >= 0 && idx < pages.length) {
           e.preventDefault();
@@ -1442,6 +1445,12 @@ function showAuditWarning(count, action) {
   const viewBtn    = document.getElementById('audit-warn-view');
   const dismissBtn = document.getElementById('audit-warn-dismiss');
   if (!modal || !body) return;
+
+  // An exit/lock/login interrupt supersedes any transient in-page modal (e.g.
+  // the invoice preview / numbering dialogs). Close open .modal-overlay layers
+  // first so we never stack the audit warning on top of another modal —
+  // discarding them is safe (nothing there is committed until its own action).
+  document.querySelectorAll('.modal-overlay.show').forEach(el => el.classList.remove('show'));
 
   const noun = count === 1 ? 'discrepancy' : 'discrepancies';
   if (action === 'login') {
