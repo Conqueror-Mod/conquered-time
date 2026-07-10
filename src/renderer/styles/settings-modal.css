@@ -525,8 +525,10 @@
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--border);
+  /* No divider rule here: sections are already separated by .about-panel's 24px
+     gap, and a full-width line under a short title read as detaching it from its
+     own button/links (Updates, Links). The title now sits directly above its
+     content with the section's 12px gap. */
 }
 .about-build-grid {
   display: grid;
