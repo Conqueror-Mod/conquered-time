@@ -17,6 +17,7 @@ const Settings = (() => {
     timeFormat:       '24h',
     autoLockMinutes:   0,         // 0 = disabled
     autoSaveInterval:  60,        // seconds; 0 = disabled
+    idlePunchMinutes:  0,         // idle forgotten-punch nudge; 0 = disabled
   };
 
   let current = { ...DEFAULTS };
@@ -53,11 +54,11 @@ const Settings = (() => {
   // ── Load from DB and apply ─────────────────────────────────────────────────
   async function load() {
     try {
-      const keys = ['theme','scale','reducedMotion','highContrast','colorblind','focusIndicators','timeFormat','autoLockMinutes','autoSaveInterval'];
+      const keys = ['theme','scale','reducedMotion','highContrast','colorblind','focusIndicators','timeFormat','autoLockMinutes','autoSaveInterval','idlePunchMinutes'];
       for (const key of keys) {
         const val = await api.invoke('settings:get', `ui_${key}`);
         if (val !== null && val !== undefined) {
-          if (key === 'autoLockMinutes' || key === 'autoSaveInterval') current[key] = parseInt(val, 10);
+          if (key === 'autoLockMinutes' || key === 'autoSaveInterval' || key === 'idlePunchMinutes') current[key] = parseInt(val, 10);
           else if (key === 'colorblind') current[key] = val;
           else if (val === 'true')  current[key] = true;
           else if (val === 'false') current[key] = false;

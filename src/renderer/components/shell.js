@@ -477,6 +477,18 @@ const Shell = (() => {
               </div>
 
               <div class="settings-group">
+                <div class="settings-group-title">Idle Punch Reminder</div>
+                <div class="settings-row-label">Nudge you to trim or close a running punch after a stretch of inactivity — before it becomes an audit issue</div>
+                <div class="settings-btn-group" id="idlepunch-btns" style="margin-top:8px;">
+                  <button class="s-btn" data-ip="0"  data-action="applyIdlePunch" data-arg="0">Off</button>
+                  <button class="s-btn" data-ip="10" data-action="applyIdlePunch" data-arg="10">10 min</button>
+                  <button class="s-btn" data-ip="15" data-action="applyIdlePunch" data-arg="15">15 min</button>
+                  <button class="s-btn" data-ip="30" data-action="applyIdlePunch" data-arg="30">30 min</button>
+                  <button class="s-btn" data-ip="60" data-action="applyIdlePunch" data-arg="60">1 hour</button>
+                </div>
+              </div>
+
+              <div class="settings-group">
                 <div class="settings-group-title">Windows Hello / Secure Sign-in</div>
                 <div class="settings-row-label">Sign in without your password using your Windows account credentials</div>
                 <div id="safe-storage-status" style="margin-top:12px;">
@@ -594,6 +606,7 @@ const Shell = (() => {
     ]);
     await _injectScript('../store.js'); // store.js depends on IPC
     await _injectScript('../components/pomodoro.js'); // Pomodoro engine (chip + alerts on every page)
+    await _injectScript('../components/punch-watch.js'); // idle forgotten-punch nudge
     await _injectScript('../components/onboarding.js'); // first-run coach-mark tour
 
     const [user, profile] = await Promise.all([
@@ -802,6 +815,8 @@ const Shell = (() => {
 
     // Pomodoro engine (no-op unless the profile's break_style is 'pomodoro').
     window.Pomodoro?.init();
+    // Idle forgotten-punch nudge (no-op unless ui_idlePunchMinutes > 0).
+    window.PunchWatch?.init();
     // Resume an in-flight onboarding tour after a page swap (no-op otherwise).
     if (!tourStarted) window.Onboarding?.init();
 
@@ -1177,6 +1192,11 @@ function syncSettingsModal() {
   // Auto-lock buttons
   document.querySelectorAll('[data-al]').forEach(b => {
     b.classList.toggle('active', parseInt(b.dataset.al, 10) === s.autoLockMinutes);
+  });
+
+  // Idle-punch reminder buttons
+  document.querySelectorAll('[data-ip]').forEach(b => {
+    b.classList.toggle('active', parseInt(b.dataset.ip, 10) === s.idlePunchMinutes);
   });
 
   // Auto-save buttons
@@ -1617,6 +1637,12 @@ async function applyAutoLock(minutes) {
   syncSettingsModal();
 }
 
+async function applyIdlePunch(minutes) {
+  await Settings.set('idlePunchMinutes', Number(minutes));
+  // The watcher reads the live Settings value each tick, so no restart needed.
+  syncSettingsModal();
+}
+
 // ── Event delegation (CSP: no inline on* handlers) ────────────────────────────
 // Every interactive element rendered by shell.js uses data-action (click) or
 // data-action-change (change) instead of an inline handler, so the pages can run
@@ -1641,6 +1667,7 @@ function installShellDelegation() {
     applyTimeFormat:       a       => applyTimeFormat(a),
     applyAutoSave:         a       => applyAutoSave(Number(a)),
     applyAutoLock:         a       => applyAutoLock(Number(a)),
+    applyIdlePunch:        a       => applyIdlePunch(Number(a)),
     applyColorblind:       a       => applyColorblind(a),
     applyToggle:           (a, el) => applyToggle(a, el),
     applyWinToggle:        (a, el) => applyWinToggle(a, el),
