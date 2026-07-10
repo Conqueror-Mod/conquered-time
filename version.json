@@ -1,0 +1,5 @@
+{
+  "version": "3.17.0",
+  "downloadUrl": "https://github.com/Conqueror-Mod/conquered-time/releases/latest",
+  "notes": "v3.17.0 — Automatic updates: from this version on, Conquered Time updates itself (download + install in-app). Also fixes the invoice-PDF number, the active-session timer, and a stray window on Windows auto-launch. NOTE: this file is a legacy bridge for pre-3.17 installs' Check for Updates — v3.17+ uses the built-in auto-updater and ignores it."
+}

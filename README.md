@@ -64,6 +64,7 @@ A companion **Discord community bot** (discord.js + TypeScript) handles beta-key
 ```
 conquered-time/
 ├── seed-dev.js                   # Dev seed script (bypasses TOTP) — 10-company / 103-entry stress fixture
+├── version.json                  # Legacy update manifest — bridges pre-3.17 installs to the auto-updater
 ├── tsconfig.json                 # checkJs project (renderer JS + types/)
 ├── tsconfig.main.json            # main-process TS build → dist-main/ (strict)
 ├── tsconfig.renderer.json        # renderer page TS → sibling .js
