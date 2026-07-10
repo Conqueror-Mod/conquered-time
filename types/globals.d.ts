@@ -542,6 +542,22 @@ interface Window {
   Pomodoro?: PomodoroEngine;
   /** First-run coach-mark tour (components/onboarding.js, injected by Shell.init). */
   Onboarding?: OnboardingEngine;
+  /** Idle forgotten-punch nudge (components/punch-watch.js, injected by Shell.init). */
+  PunchWatch?: PunchWatchEngine;
+  /**
+   * Tracker-page hook (pages/tracker.ts) letting punch-watch close the active
+   * punch at an explicit ms time on the tracker's own consistent save path.
+   * Returns true if a punch was open. Absent off the tracker page.
+   */
+  __trackerClockOutActive?: (atMs: number) => boolean;
+}
+
+/** window.PunchWatch surface (components/punch-watch.js). */
+interface PunchWatchEngine {
+  /** Begin watching for idle open punches (no-op unless ui_idlePunchMinutes > 0). */
+  init(): void;
+  /** Whether the reminder is currently enabled. */
+  enabled(): boolean;
 }
 
 /** window.Onboarding surface (components/onboarding.js). */

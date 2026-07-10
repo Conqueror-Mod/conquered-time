@@ -61,7 +61,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   $id('company-select').addEventListener('change', onCompanyChange);
   $id('btn-clock-in').addEventListener('click', clockIn);
-  $id('btn-clock-out').addEventListener('click', clockOut);
+  $id('btn-clock-out').addEventListener('click', () => clockOut());
   $id('btn-manual-entry').addEventListener('click', addManualRow);
   $id('btn-clear-row').addEventListener('click', clearSelectedRow);
   $id('btn-clear-all').addEventListener('click', () => clearAll());
@@ -631,14 +631,16 @@ function clockIn(): void {
   autoSave();
 }
 
-function clockOut(): void {
+// atTime (24h HH:MM) overrides "now" — used by punch-watch's idle nudge to trim
+// a forgotten punch to when the user actually went idle. Omitted → clock out now.
+function clockOut(atTime?: string): void {
   let idx = -1;
   if (selectedIndex != null && rowsData[selectedIndex] && rowsData[selectedIndex].clock_in && !rowsData[selectedIndex].clock_out) idx = selectedIndex;
   if (idx === -1) idx = rowsData.findIndex(r => r.clock_in && !r.clock_out);
   if (idx === -1) { Shell.toast('No active clock-in found.', 'warning'); return; }
 
   const row = rowsData[idx];
-  const t = nowTime();
+  const t = atTime || nowTime();
   const diff = computeDiffMins(row.clock_in, t);
   row.clock_out = t;
   row.total_mins = (row.total_mins||0) + diff;
@@ -983,5 +985,16 @@ function pdfLabelBreakdown(rows: RowData[]): Array<[string, number]> {
 // this module is IIFE-scoped, publish them onto window explicitly.
 (window as any).onExportPDF = () => exportPDF();
 (window as any).onAutoSaveSettingChanged = (_seconds: number) => startAutoSaveTimer();
+
+// punch-watch.js hook: close the active punch from its idle nudge at an explicit
+// time (ms). Routing through clockOut() keeps rowsData authoritative and reuses
+// this page's autoSave — so the tracker's autosave timer can't race a separate
+// entries:save and silently reopen the punch. Returns true if a punch was open.
+(window as any).__trackerClockOutActive = (atMs: number): boolean => {
+  if (!rowsData.some(r => r.clock_in && !r.clock_out)) return false;
+  const d = new Date(atMs);
+  clockOut(`${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`);
+  return true;
+};
 
 })();
