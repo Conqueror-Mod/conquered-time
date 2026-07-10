@@ -1,5 +1,5 @@
 {
-  "version": "3.15.0",
+  "version": "3.16.0",
   "downloadUrl": "https://github.com/Conqueror-Mod/conquered-time/releases/latest",
-  "notes": "v3.15.0 — Per-company scheduled reports: scope the schedule to one company, all companies, or one report per company — each client report can go to its own Report Recipient email set on the company. Plus the v3.14.1 fixes: no more empty scheduled reports, and the display setting follows the monitor you drag the window to."
+  "notes": "v3.16.0 — Invoicing: turn your tracked hours into client invoices. Set a rate and currency per company, add your business details on the Profile page, then generate numbered invoice PDFs with per-day line items, optional tax and payment terms, and a paid/unpaid ledger. Find it in the new Invoices tab. Also: the titlebar now shows the current app icon."
 }

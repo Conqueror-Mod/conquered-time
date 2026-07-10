@@ -64,7 +64,9 @@ conquered-time/
 │   │   ├── policies.ts               # break/lunch policy tiers (pure data)
 │   │   ├── audit.ts                  # countAuditDiscrepancies + dismissed set
 │   │   ├── backups.ts                # performBackup + backups-dir state
-│   │   ├── email.ts                  # SMTP config, doSendReport, schedule engine (gotcha #9)
+│   │   ├── email.ts                  # SMTP config, doSendReport, sendInvoiceEmail, schedule engine (gotcha #9)
+│   │   ├── report-html.ts            # emailed-report PDF/CSV builders (pure, unit-tested)
+│   │   ├── invoice-html.ts           # invoice compute + PDF-HTML builder (pure, unit-tested)
 │   │   ├── vault-crypto.js           # AES-256-GCM/PBKDF2 primitives (pure, unit-tested)
 │   │   ├── read-cache.js             # cache factory (pure, unit-tested)
 │   │   ├── beta-keys.js              # beta-key mint/verify (pure, unit-tested)
@@ -74,14 +76,16 @@ conquered-time/
 │   │       ├── entries.ts            # entries:*, tasks:*
 │   │       ├── audit.ts              # audit:*
 │   │       ├── settings.ts           # settings:*, win:* prefs, app:*, db:clear-*, backup:*
-│   │       └── email.ts              # email:*
+│   │       ├── email.ts              # email:*
+│   │       └── invoices.ts           # invoices:*
 │   ├── renderer/                     # plain JS — loaded directly by loadFile(), no build step
 │   │   ├── pages/
 │   │   │   ├── login.html            # TOTP login/setup/recovery + profile selector + cosmetic grid background
 │   │   │   ├── dashboard.html        # Stat chips, mini spiderweb, recent activity, quick actions
 │   │   │   ├── companies.html        # Full spiderweb (force-graph), company CRUD modal
 │   │   │   ├── tracker.html          # Dynamic time-entry table, clock in/out, inline editing
-│   │   │   └── global-log.html       # Filterable cross-company history, CSV/PDF export
+│   │   │   ├── global-log.html       # Filterable cross-company history, CSV/PDF export
+│   │   │   └── invoices.html         # Generate → preview → issue invoices; encrypted ledger (PDF/email)
 │   │   ├── components/
 │   │   │   ├── shell.js              # Injects titlebar/sidebar/toast into every inner page; settings modal logic
 │   │   │   └── settings.js           # Settings engine: theme/scale/accessibility, persisted to DB
@@ -117,13 +121,15 @@ Whitelisted channels only, enforced in `preload.js`:
 - `entries:list/save/all/summary`
   - **Two read paths:** `entries:all` decrypts every entry's `rows_json` (per-row clock detail) — used by global log, audit, reports. `entries:summary` returns only the plaintext aggregate columns (`company_id`, `log_date`, `session_label`, `total_mins`) and does **no** decryption — used by dashboard and company hour rollups to avoid paying AES-GCM on the whole history every page load. In the renderer these are `Store.getEntries()` vs `Store.getEntriesSummary()` (separate cache slots, both invalidated together on `entries`). Do not read `rows_json` off a summary result — it isn't there.
 - `settings:get/set`
+- `invoices:context/preview/issue/list/get/set-status/save-pdf/email/get-counter/set-counter`
+  - **Invoicing (v3.16, `src/main/ipc/invoices.ts`).** Generate → preview → issue → ledger. **Snapshot-at-issue:** issuing freezes a full `InvoiceDoc` (parties, per-day line items, totals) into an encrypted `invoices` row (same AES-GCM blob pattern as `companies`); later edits to entries or a company's rate never mutate an issued invoice. `preview` recomputes live and persists nothing. Per-day billable minutes come from the plaintext `time_entries` aggregate columns (no `rows_json` decrypt). Pure math/render lives in `src/main/invoice-html.ts` (`computeInvoice`/`computeDueDate`/`formatMoney`/`buildInvoiceHTML`, unit-tested). Numbering is in `app_settings` (`invoice_prefix`, `invoice_next`) with a `max(seq)+1` floor so a number is never reused. Rate = the company's existing `pay_rate`; currency = company `currency` → profile `default_currency` → USD. "Bill From" = the Profile billing fields. PDF reuses `email.ts generatePDF`; email reuses the report SMTP path (`sendInvoiceEmail`) → company `report_email` / SMTP default. **Gotcha:** `ipc/*` modules reach `renderer/` via `../../renderer/...` (two levels), not `../` like the sibling `main/` modules do.
 - `win:minimize/maximize/close`, `navigate`
 
 ### Electron Security Hardening
 - `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true` on all renderer processes.
 - Frameless window with custom titlebar (drag region + minimize/maximize/close).
-- **CSP** (identical `<meta>` on all 10 pages): `default-src 'self'`, `script-src 'self'` (**no `'unsafe-inline'`** — hardened in v3.6), `style-src 'self' 'unsafe-inline'`, `font-src 'self' data:`, `img-src 'self' data:`, `object-src 'none'`, `base-uri 'self'`. Fonts are bundled locally (no `fonts.googleapis.com`/`fonts.gstatic.com` origins) — `font-src 'self'` covers the local `.woff2` files and `data:` covers the base64-inlined Inter used in the PDF-export window (which inherits the opener's CSP). `'unsafe-inline'` is **still retained for `style-src` only** — inline `style=""` attributes are pervasive, can't be nonced, and style injection is a far weaker vector; removing it was judged not worth the churn.
-  - **Consequence — no inline `<script>` and no inline `on*=` handlers anywhere.** Each page's logic lives in a sibling `.js` file (`dashboard.js`, `tracker.js`, `login.js`, etc.) loaded via `<script src>`. Every interactive element uses `data-action="fnName"` (+ optional `data-arg`, and `data-action-change` for `change` events) routed through a single document-level **delegated dispatcher** — `installShellDelegation()` in `shell.js` for the 9 inner pages, `installLoginDelegation()` in `login.js` for the standalone login. Delegation covers dynamically-injected HTML automatically (no re-wiring after `innerHTML`). The settings-modal/preauth-modal backdrops keep dedicated `addEventListener` (closest() would misfire).
+- **CSP** (identical `<meta>` on all 11 pages): `default-src 'self'`, `script-src 'self'` (**no `'unsafe-inline'`** — hardened in v3.6), `style-src 'self' 'unsafe-inline'`, `font-src 'self' data:`, `img-src 'self' data:`, `object-src 'none'`, `base-uri 'self'`. Fonts are bundled locally (no `fonts.googleapis.com`/`fonts.gstatic.com` origins) — `font-src 'self'` covers the local `.woff2` files and `data:` covers the base64-inlined Inter used in the PDF-export window (which inherits the opener's CSP). `'unsafe-inline'` is **still retained for `style-src` only** — inline `style=""` attributes are pervasive, can't be nonced, and style injection is a far weaker vector; removing it was judged not worth the churn.
+  - **Consequence — no inline `<script>` and no inline `on*=` handlers anywhere.** Each page's logic lives in a sibling `.js` file (`dashboard.js`, `tracker.js`, `login.js`, etc.) loaded via `<script src>`. Every interactive element uses `data-action="fnName"` (+ optional `data-arg`, and `data-action-change` for `change` events) routed through a single document-level **delegated dispatcher** — `installShellDelegation()` in `shell.js` for the 10 inner pages, `installLoginDelegation()` in `login.js` for the standalone login. Delegation covers dynamically-injected HTML automatically (no re-wiring after `innerHTML`). The settings-modal/preauth-modal backdrops keep dedicated `addEventListener` (closest() would misfire).
   - **Theme-flash guards** are externalized too: `theme-init.js` (sessionStorage `ct_theme`/`ct_scale`, inner pages), `login-theme-init.js` (localStorage `ct_pa_*`, login), `audit-theme-init.js` (query-param `theme`, audit wizard), `splash.js`. The login screen themes from the **global** pre-auth `ct_pa_*` localStorage keys (no vault loaded yet), which are distinct from the per-profile vault `ui_*` settings. To keep them from drifting, `postLoginNavigate()` (login.js) mirrors the vault's `ui_theme`/`ui_scale`/a11y settings into `ct_pa_*` on every login, so the login screen adopts the last-used profile's theme on the next logout/lock. (Before this sync the login screen could show one theme while the app showed another — e.g. login Nibelheim vs app Zanarkand; the two stores were split in the CSP refactor.)
   - **When adding UI:** never write an inline `onclick`/`<script>` — add the handler fn, register it in the page's ACTIONS map (or wire by id in the page's `DOMContentLoaded`), and use `data-action` in markup. The XSS defense remains `window.escapeHtml()` (in `shell.js`; local copies in `login.js`/`audit-wizard.js`) at every `${userField}` interpolation — don't reintroduce unescaped user data into `innerHTML`/`document.write`.
 
@@ -170,6 +176,7 @@ Native `<input type="time">` renders in the OS locale's format (often 12-hour wi
 ## Feature Inventory (as of this handoff)
 
 ### Implemented & Tested Working
+- **Invoicing (v3.16)** — new top-level Invoices page: generate → preview → issue → ledger (mark Paid/Unpaid/Void, save branded PDF, email). Per-company rate/currency + billing address, profile "Bill From" business details, per-day line items, optional tax + net terms, snapshot-at-issue into an encrypted ledger. See the IPC Surface note (`invoices:*`) for the architecture. Seed ships 2 demo invoices (INV-0001 paid / INV-0002 unpaid).
 - TOTP MFA login (QR setup, Google Authenticator compatible)
 - AES-256-GCM encryption of company PPI fields, PBKDF2 key derivation from password + stable salt
 - 3-attempt lockout with 24h countdown UI

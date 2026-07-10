@@ -97,6 +97,19 @@ const SCHEMA_SQL = `
       type     TEXT    NOT NULL,
       UNIQUE(user_id, entry_id, row_idx, type)
     );
+    CREATE TABLE IF NOT EXISTS invoices (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id    INTEGER NOT NULL REFERENCES users(id),
+      seq        INTEGER NOT NULL,
+      status     TEXT    NOT NULL DEFAULT 'unpaid',
+      paid_at    INTEGER,
+      issued_at  INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+      data_enc   TEXT    NOT NULL,
+      data_iv    TEXT    NOT NULL,
+      data_tag   TEXT    NOT NULL,
+      created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+      updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+    );
   `;
 
 /** New in-memory vault with the full schema. Caller closes. */
@@ -179,6 +192,17 @@ function insertDismissed(db, userId, { entryId, rowIdx, type }) {
     [userId, entryId, rowIdx, type]);
 }
 
+/** Insert an issued invoice — the frozen InvoiceDoc encrypted under `key`. */
+function insertInvoice(db, key, userId, { seq, status = 'unpaid', paidAt = null, issuedAt, doc }) {
+  const enc = encrypt(JSON.stringify(doc), key);
+  db.run(
+    `INSERT INTO invoices (user_id, seq, status, paid_at, issued_at, data_enc, data_iv, data_tag)
+     VALUES (?,?,?,?,?,?,?,?)`,
+    [userId, seq, status, paidAt, issuedAt, enc.data, enc.iv, enc.tag]
+  );
+  return lastId(db);
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 //  computeExpectedDiscrepancies — independent mirror of
 //  countAuditDiscrepancies() in src/main/audit.ts. If the engine's detection
@@ -257,7 +281,7 @@ function computeExpectedDiscrepancies(db, userId, sessionKey, workState) {
 
 module.exports = {
   SCHEMA_SQL, createVaultSchema,
-  insertUser, insertCompany, insertEntry, insertLegacyEntry, insertTaskItem, insertDismissed,
+  insertUser, insertCompany, insertEntry, insertLegacyEntry, insertTaskItem, insertDismissed, insertInvoice,
   computeExpectedDiscrepancies,
   encrypt, decrypt, deriveKey,
 };
