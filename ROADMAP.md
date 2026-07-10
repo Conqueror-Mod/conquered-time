@@ -40,11 +40,13 @@ _Last curated: 2026-07-10_
   an audit issue. Opt-in under Settings → Security → Idle Punch Reminder; the
   prompt offers to clock out at the time you actually went idle, clock out now,
   or keep working — it never punches for you.
-- **Automatic updates** (v3.17) — the app checks GitHub Releases for new
-  versions, downloads the update in the background with a progress bar, and
-  installs on restart (check anytime under Settings → About → Updates). Shipped
-  alongside fixes for the invoice-PDF number, the active-session timer starting
-  a few seconds in, and a stray window on Windows auto-launch.
+- **Automatic updates** (v3.17, refined v3.18.1) — the app checks GitHub
+  Releases for new versions, downloads the update in the background with a
+  progress bar, and installs on restart (check anytime under Settings → About →
+  Updates). An available update now shows a clear one-click notice on the
+  sign-in screen and in-app, and a completed update is confirmed on next launch.
+  First shipped alongside fixes for the invoice-PDF number, the active-session
+  timer starting a few seconds in, and a stray window on Windows auto-launch.
 - **Billable rates & invoicing** (v3.16) — turn tracked hours into client
   invoices: pick a company + date range, preview, and issue a numbered invoice
   with per-day line items, optional tax, and payment terms. Set a rate/currency

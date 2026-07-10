@@ -24,6 +24,10 @@ const About = (() => {
   // Changelog — newest first. Edit HERE and both About surfaces update. The two
   // most recent entries render in-panel; older notes live on GitHub Releases.
   const CHANGELOG = [
+    { version: 'v3.18.1', items: [
+      'Updates are easier to notice — when a new version is available you now get a clear notice on the sign-in screen (and inside the app) with a one-click Download & Install, instead of it only showing under Settings → About',
+      'After an update installs, the app confirms it on next launch with a "Updated to vX" message, so you can tell the update actually went through',
+    ] },
     { version: 'v3.18.0', items: [
       'Proactive punch reminder — if you leave a session running and step away, Conquered Time can now nudge you to trim or close the punch before it turns into an audit discrepancy. Turn it on under Settings → Security → Idle Punch Reminder (off by default; choose 10 / 15 / 30 / 60 minutes). The reminder offers to clock out at the time you actually went idle, clock out now, or keep working — it never punches for you',
     ] },
