@@ -8,9 +8,6 @@ const { dbGet, dbRun, persistDB, hasDb, getDbFile, setDbFile, replaceDb, newData
 const { readCache, invalidateEntriesCache } = require('../cache');
 const { setBackupDir, getBackupDir, performBackup } = require('../backups');
 
-// Update check URL — point this at the raw version.json in your GitHub repo once published
-const UPDATE_CHECK_URL = 'https://raw.githubusercontent.com/Conqueror-Mod/conquered-time/master/version.json';
-
 // ctx: main-owned window/prefs helpers.
 function register(ctx: Record<string, any>) {
   const { getMainWindow, applyLaunchAtStartup, loginItemOpts, getAppPref, setAppPref, rendererDir, IS_DEV } = ctx;
@@ -259,33 +256,8 @@ ipcMain.handle('app:get-info', () => ({
 
 
 
-ipcMain.handle('app:check-update', () => new Promise((resolve) => {
-  const https = require('https');
-  const current = app.getVersion();
-  const req = https.get(UPDATE_CHECK_URL, { timeout: 8000 }, (res: any) => {
-    let raw = '';
-    res.on('data', (chunk: any) => raw += chunk);
-    res.on('end', () => {
-      try {
-        const data = JSON.parse(raw);
-        const latest = data.version || current;
-        // Simple semver comparison: split on dots, compare each segment numerically
-        const parse = (v: string) => v.replace(/[^0-9.]/g, '').split('.').map(Number);
-        const [aMaj, aMin, aPat] = parse(latest);
-        const [bMaj, bMin, bPat] = parse(current);
-        const hasUpdate =
-          aMaj > bMaj ||
-          (aMaj === bMaj && aMin > bMin) ||
-          (aMaj === bMaj && aMin === bMin && aPat > bPat);
-        resolve({ ok: true, current, latest, hasUpdate, downloadUrl: data.downloadUrl || '', notes: data.notes || '' });
-      } catch {
-        resolve({ ok: false, error: 'Invalid response from update server.' });
-      }
-    });
-  });
-  req.on('error', () => resolve({ ok: false, error: 'Could not reach update server. Check your connection.' }));
-  req.on('timeout', () => { req.destroy(); resolve({ ok: false, error: 'Update check timed out.' }); });
-}));
+// Update checking moved to the electron-updater flow (src/main/updater.ts,
+// channels update:*). The old version.json poll was removed as unused.
 
 ipcMain.handle('settings:get', (_: unknown, key: any) => {
   if (!hasDb()) return null;

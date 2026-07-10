@@ -256,10 +256,11 @@ interface IpcInvokeMap {
     version: string; electronVersion: string; nodeVersion: string;
     platform: string; arch: string;
   };
-  'app:check-update': () => {
-    ok: boolean; error?: string; hasUpdate?: boolean;
-    latest?: string; current?: string; downloadUrl?: string;
-  };
+  // auto-updater (electron-updater); status also pushed via 'update:status' event
+  'update:check': () => UpdateStatus;
+  'update:status': () => UpdateStatus;
+  'update:download': () => MutResult;
+  'update:install': () => MutResult;
   // db maintenance
   'db:clear-timeclock': () => MutResult;
   'db:clear-timeclock-company': (payload: { companyId: number }) => MutResult;
@@ -358,7 +359,19 @@ type IpcSendChannel =
 
 type IpcReceiveChannel =
   | 'menu:export-pdf' | 'menu:export-csv' | 'toast' | 'modal:security-info'
-  | 'audit:close-warning' | 'audit:wizard-done';
+  | 'audit:close-warning' | 'audit:wizard-done' | 'update:status';
+
+/** Auto-updater status pushed from main (src/main/updater.ts). */
+interface UpdateStatus {
+  state: 'idle' | 'checking' | 'available' | 'not-available' | 'download-progress' | 'downloaded' | 'error' | 'dev';
+  version?: string;
+  notes?: string;
+  percent?: number;
+  transferred?: number;
+  total?: number;
+  bytesPerSecond?: number;
+  error?: string;
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  Renderer globals

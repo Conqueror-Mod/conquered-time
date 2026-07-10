@@ -127,7 +127,10 @@ interface Party {
 }
 
 interface InvoiceDoc {
-  invoiceNumber: string;
+  /** Frozen snapshots issued by ipc/invoices.ts store this as `number`; the
+   *  builder tolerates both keys (see the buildInvoiceHTML normalization). */
+  invoiceNumber?: string;
+  number?: string;
   issueDate: string;
   dueDate?: string;
   /** Display label for terms, e.g. "Net 30" or "Due on receipt". */
@@ -157,6 +160,9 @@ const HOURGLASS_SVG =
 function buildInvoiceHTML(doc: InvoiceDoc): string {
   const cur = doc.currency || 'USD';
   const money = (n: number) => escapeHtml(formatMoney(n, cur));
+  // Issued snapshots carry the number under `number`; the live preview/tests use
+  // `invoiceNumber`. Accept either so exported/emailed PDFs never render blank.
+  const invNo = doc.invoiceNumber || doc.number || '';
 
   const lineRows = doc.lineItems.length
     ? doc.lineItems.map((li) =>
@@ -190,7 +196,7 @@ function buildInvoiceHTML(doc: InvoiceDoc): string {
     ? `<div class="pay"><div class="pay-h">Notes</div><div>${nl2br(doc.notes)}</div></div>`
     : '';
 
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Invoice ${escapeHtml(doc.invoiceNumber)}</title>
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Invoice ${escapeHtml(invNo)}</title>
 <style>
 ${doc.fontCss || ''}
 :root{color-scheme:light;}
@@ -229,7 +235,7 @@ td{padding:7px 10px;border-bottom:1px solid #e5e7eb;font-size:11.5px;}
 </style></head><body>
 <div class="brand">
   <div class="brand-left">${HOURGLASS_SVG}<div class="wordmark">CONQUERED <span>TIME</span></div></div>
-  <div class="doc-title"><h1>INVOICE</h1><div class="num mono">${escapeHtml(doc.invoiceNumber)}</div></div>
+  <div class="doc-title"><h1>INVOICE</h1><div class="num mono">${escapeHtml(invNo)}</div></div>
 </div>
 <div class="parties">
   <div class="party">
@@ -243,7 +249,7 @@ td{padding:7px 10px;border-bottom:1px solid #e5e7eb;font-size:11.5px;}
     ${toBits}
   </div>
   <div class="party meta">
-    <div><span class="mk">Invoice #</span><span class="mv mono">${escapeHtml(doc.invoiceNumber)}</span></div>
+    <div><span class="mk">Invoice #</span><span class="mv mono">${escapeHtml(invNo)}</span></div>
     <div><span class="mk">Issued</span><span class="mv mono">${escapeHtml(doc.issueDate)}</span></div>
     ${dueLine}
     <div><span class="mk">Period</span><span class="mv mono">${escapeHtml(doc.periodFrom)} → ${escapeHtml(doc.periodTo)}</span></div>

@@ -525,8 +525,10 @@
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--border);
+  /* No divider rule here: sections are already separated by .about-panel's 24px
+     gap, and a full-width line under a short title read as detaching it from its
+     own button/links (Updates, Links). The title now sits directly above its
+     content with the section's 12px gap. */
 }
 .about-build-grid {
   display: grid;
@@ -653,6 +655,23 @@
   border: none;
   padding: 0;
   font: inherit;
+}
+/* Auto-updater download progress bar */
+.about-update-progress {
+  margin-top: 10px;
+  height: 6px;
+  width: 100%;
+  max-width: 320px;
+  border-radius: 4px;
+  background: var(--surface-2, rgba(127,127,127,0.18));
+  overflow: hidden;
+}
+.about-update-bar {
+  height: 100%;
+  width: 0%;
+  background: var(--accent);
+  border-radius: 4px;
+  transition: width 0.2s ease;
 }
 
 /* Email config inputs */

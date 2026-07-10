@@ -23,7 +23,6 @@
       "Bash(gh pr *)",
       "Bash(git fetch *)",
       "Bash(node clear-users.js)",
-      "Bash(node -e \"const fs=require\\('fs'\\);const b64=fs.readFileSync\\('D:/My Projects/CURRENT-RELEASE/conquered-time/assets/ruxin_dev.gif'\\).toString\\('base64'\\);console.log\\('data:image/gif;base64,'+b64\\);\")",
       "Bash(Start-Process npm *)",
       "Bash(Start-Sleep -Milliseconds 2000)",
       "PowerShell(Get-ChildItem \"$env:APPDATA\\\\conquered-time\\\\conquered-data\\\\\" | Select-Object Name, LastWriteTime)",

@@ -125,6 +125,9 @@ require('./ipc/auth').register({
   getAppPref, setAppPref,
   initProfileDB, writeManifest, readManifest,
 });
+// Auto-updater (electron-updater ↔ GitHub Releases). No-ops in dev.
+const updater = require('./updater');
+updater.register({ getMainWindow: () => mainWindow });
 
 // The main-process read cache (memoized decrypted reads) lives in ./cache.
 
@@ -478,9 +481,15 @@ function loginItemOpts(extra?: object) {
   // --startup lets the launched instance know it was auto-started (vs manual),
   // so "start minimized to tray" can apply only then. The same args are used to
   // read the item back, so the marker doesn't break openAtLogin detection.
+  // NOTE the quotes around the app path: setLoginItemSettings joins args with
+  // spaces and does NOT quote them, so an unquoted app path containing a space
+  // (e.g. "…\My Projects\…") gets split — electron.exe then launches with no
+  // valid app and shows its default "welcome" window on every Windows login /
+  // RDP reconnect. Quoting keeps the path a single argument. (Packaged builds
+  // don't hit this: execPath is the real exe and needs no app-path arg.)
   const o = app.isPackaged
     ? { args: ['--startup'] }
-    : { path: process.execPath, args: [app.getAppPath(), '--startup'] };
+    : { path: process.execPath, args: [`"${app.getAppPath()}"`, '--startup'] };
   return Object.assign(o, extra);
 }
 function applyLaunchAtStartup(enabled: boolean) {
@@ -546,7 +555,8 @@ ipcMain.on('session:confirm-lock',   () => lockSession(true));
 
 // db:clear-* handlers live in ./ipc/settings.
 
-// app:get-info / app:check-update / settings:* live in ./ipc/settings.
+// app:get-info / settings:* live in ./ipc/settings. Update checking lives in
+// ./updater (electron-updater, channels update:*).
 
 // ── App lifecycle ──────────────────────────────────────────────────────────
 // ── Context menu (right-click) ─────────────────────────────────────────────
@@ -580,6 +590,9 @@ app.whenReady().then(async () => {
   setInterval(() => runScheduledEmailCheck().catch((e: any) => {
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('toast', `Scheduled report failed: ${e.message}`, 'error', 8000);
   }), 5 * 60 * 1000);
+
+  // Silent update check ~10s after launch (packaged builds only).
+  updater.checkOnLaunch({ getMainWindow: () => mainWindow });
 
   // Load the sql.js WASM module once (needed for migration peek reads too)
   await loadSqlJs();
