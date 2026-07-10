@@ -152,14 +152,13 @@ async function seed() {
   const recoveryEncKey  = deriveKey(DEV_RECOVERY, recoveryKeySalt);
   const recoveryKeyBlob = encrypt(sessionKey.toString('hex'), recoveryEncKey);
 
-  // Dev avatar fixture — optional. assets/ruxin_dev.gif was deleted with the
-  // Georgia icon replacement (42ef6a3), which made the seed abort AFTER wiping
-  // dev-data (no vault at all → app boots to the Setup screen). Fall back to
-  // no avatar (initials render) rather than dying.
+  // Dev avatar fixture — optional. Falls back to no avatar (initials render)
+  // rather than dying if the asset is missing, so a stripped checkout still
+  // seeds a usable vault instead of aborting AFTER wiping dev-data.
   let avatarDataUrl = null;
   try {
-    avatarDataUrl = `data:image/gif;base64,${fs.readFileSync(path.join(__dirname, 'assets', 'ruxin_dev.gif')).toString('base64')}`;
-  } catch { console.log('  (no assets/ruxin_dev.gif — seeding without a dev avatar)'); }
+    avatarDataUrl = `data:image/png;base64,${fs.readFileSync(path.join(__dirname, 'assets', 'Yuri The Witch Doctor.png')).toString('base64')}`;
+  } catch { console.log('  (no assets/Yuri The Witch Doctor.png — seeding without a dev avatar)'); }
 
   const profileData = {
     full_name:  'Dev Tester',

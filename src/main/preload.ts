@@ -13,7 +13,8 @@ const ALLOWED_INVOKE = new Set([
   'entries:list', 'entries:save', 'entries:all', 'entries:summary', 'entries:get-active', 'entries:get',
   'tasks:list', 'tasks:save', 'tasks:delete', 'tasks:recent-labels', 'tasks:summary',
   'settings:get', 'settings:set',
-  'app:get-info', 'app:check-update', 'app:notify',
+  'app:get-info', 'app:notify',
+  'update:check', 'update:download', 'update:install', 'update:status',
   'db:clear-timeclock', 'db:clear-timeclock-company', 'db:clear-companies', 'db:clear-full',
   'profile:get', 'profile:save', 'auth:change-password',
   'audit:get-policy', 'audit:get-dismissed', 'audit:dismiss', 'audit:undismiss', 'audit:clear-dismissed', 'audit:apply-fix', 'audit:open-wizard', 'audit:count', 'audit:email-notify',
@@ -38,7 +39,7 @@ const ALLOWED_SEND = new Set([
 
 const ALLOWED_RECEIVE = new Set([
   'menu:export-pdf', 'menu:export-csv', 'toast', 'modal:security-info',
-  'audit:close-warning', 'audit:wizard-done'
+  'audit:close-warning', 'audit:wizard-done', 'update:status'
 ]);
 
 // The exposed surface is typed as PreloadApi in types/globals.d.ts — the

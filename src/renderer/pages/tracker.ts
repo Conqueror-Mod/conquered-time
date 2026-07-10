@@ -14,6 +14,11 @@ interface RowData {
   label: string; name: string; desc: string;
   clock_in: string; clock_out: string; total_mins: number;
   _manual?: boolean;
+  /** Precise epoch-ms captured at clock-in so the live timer starts at 0:00
+   *  instead of the seconds already elapsed in the current minute (clock_in is
+   *  minute-truncated HH:MM). Trusted only while it still matches clock_in's
+   *  minute; edits/legacy rows fall back to the HH:MM computation. */
+  clock_in_ms?: number;
 }
 // Editable string-valued fields (duration is display-only, never edited).
 type StrField = 'label' | 'name' | 'desc' | 'clock_in' | 'clock_out';
@@ -297,9 +302,22 @@ function sessionStartMs(): number | null {
   const open = rowsData.filter(r => r.clock_in && !r.clock_out);
   const active = open.length ? open[open.length - 1] : null;
   if (!active) return null;
+  const precise = preciseStartMs(active);
+  if (precise != null) return precise;
   const [h, m] = active.clock_in.split(':').map(Number);
   const d = new Date(); d.setHours(h, m, 0, 0);
   return d.getTime();
+}
+
+// If a row carries a precise clock_in_ms AND it still matches the row's
+// (possibly hand-edited) HH:MM minute, trust it — otherwise return null so the
+// caller falls back to the minute-truncated computation. This is what makes a
+// fresh clock-in read 0:00 rather than the current seconds-into-the-minute.
+function preciseStartMs(row: RowData): number | null {
+  if (!row.clock_in_ms) return null;
+  const d = new Date(row.clock_in_ms);
+  const hh = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  return hh === row.clock_in ? row.clock_in_ms : null;
 }
 
 function elapsedSince(ms: number): string {
@@ -603,6 +621,7 @@ function clockIn(): void {
 
   const row = rowsData[idx];
   row.label = label; row.name = name; row.desc = desc; row.clock_in = t;
+  row.clock_in_ms = Date.now();   // precise start so the live timer begins at 0:00
   selectedIndex = idx;
 
   normalizeRows();
@@ -833,7 +852,7 @@ function updateStatusDot(): void {
   try {
     const logDate = $input('log-date')?.value;
     if (open && logDate) {
-      Shell.showLiveBadge(punchStartMs(logDate, open.clock_in));
+      Shell.showLiveBadge(preciseStartMs(open) ?? punchStartMs(logDate, open.clock_in));
     } else {
       Shell.hideLiveBadge();
     }

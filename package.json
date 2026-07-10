@@ -25,6 +25,7 @@
     "seed": "node seed-dev.js",
     "coverage:critical": "npm run build:main && c8 --reporter=text --include=src/main/vault-crypto.js --include=dist-main/main/audit.js node --test test/vault-crypto.test.js test/vault-crypto.props.test.js test/vault-crypto-reencrypt.props.test.js test/audit-oracle.props.test.js",
     "build": "npm run compile && electron-builder --win --x64",
+    "release": "npm run compile && electron-builder --win --x64 --publish always",
     "build:mac": "npm run compile && electron-builder --mac",
     "build:linux": "npm run compile && electron-builder --linux",
     "pack": "npm run compile && electron-builder --dir"
@@ -92,12 +93,20 @@
       "package.json"
     ],
     "extraResources": [],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Conqueror-Mod",
+        "repo": "conquered-time"
+      }
+    ],
     "directories": {
       "output": "dist"
     }
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
+    "electron-updater": "^6.8.9",
     "nodemailer": "^9.0.1",
     "qrcode": "^1.5.3",
     "speakeasy": "^2.0.0",

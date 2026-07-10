@@ -654,6 +654,23 @@
   padding: 0;
   font: inherit;
 }
+/* Auto-updater download progress bar */
+.about-update-progress {
+  margin-top: 10px;
+  height: 6px;
+  width: 100%;
+  max-width: 320px;
+  border-radius: 4px;
+  background: var(--surface-2, rgba(127,127,127,0.18));
+  overflow: hidden;
+}
+.about-update-bar {
+  height: 100%;
+  width: 0%;
+  background: var(--accent);
+  border-radius: 4px;
+  transition: width 0.2s ease;
+}
 
 /* Email config inputs */
 .sc-input {

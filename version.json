@@ -1,5 +1,0 @@
-{
-  "version": "3.16.0",
-  "downloadUrl": "https://github.com/Conqueror-Mod/conquered-time/releases/latest",
-  "notes": "v3.16.0 — Invoicing: turn your tracked hours into client invoices. Set a rate and currency per company, add your business details on the Profile page, then generate numbered invoice PDFs with per-day line items, optional tax and payment terms, and a paid/unpaid ledger. Find it in the new Invoices tab. Also: the titlebar now shows the current app icon."
-}

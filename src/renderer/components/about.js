@@ -175,7 +175,11 @@ const About = (() => {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
             Check for Updates
           </button>
+          <button class="about-update-btn" id="about-update-action-btn" style="display:none;"></button>
           <span class="about-update-result" id="about-update-result"></span>
+        </div>
+        <div class="about-update-progress" id="about-update-progress" style="display:none;">
+          <div class="about-update-bar" id="about-update-bar" style="width:0%;"></div>
         </div>
       </div>
 
@@ -250,37 +254,101 @@ const About = (() => {
     document.getElementById('about-link-donate')?.addEventListener('click', () => openExternal('donate'));
     document.getElementById('about-more-github')?.addEventListener('click', () => openExternal('github'));
 
-    // Check for updates
-    const btn = document.getElementById('about-check-update-btn');
-    btn?.addEventListener('click', async () => {
-      const result = document.getElementById('about-update-result');
-      btn.disabled = true;
-      result.className = 'about-update-result';
-      result.textContent = 'Checking…';
-      try {
-        const res = await api.invoke('app:check-update');
-        if (!res.ok) {
-          result.className = 'about-update-result update-error';
-          result.textContent = res.error;
-        } else if (res.hasUpdate) {
-          result.className = 'about-update-result update-available';
-          result.innerHTML = `v${esc(res.latest)} available — <a class="update-download-link" href="#">Download</a>`;
-          result.querySelector('.update-download-link')?.addEventListener('click', (e) => {
-            e.preventDefault();
-            if (res.downloadUrl) api.send('shell:open-external', res.downloadUrl);
-            else notify('No download URL configured yet.', 'info', 2500);
+    // Check for updates — real electron-updater flow (packaged builds). The main
+    // process streams status through the 'update:status' event; every UI state
+    // (checking / available / downloading / downloaded / error) is driven by
+    // renderStatus below rather than the return value of a single call.
+    wireUpdates({ api, notify });
+  }
+
+  // ── Auto-updater UI ─────────────────────────────────────────────────────────
+  // Idempotent: safe to call each time the About tab mounts. Keeps a single
+  // 'update:status' subscription per module load (see _updateSub).
+  let _updateSub = null;
+
+  function wireUpdates({ api, notify }) {
+    const checkBtn  = document.getElementById('about-check-update-btn');
+    const actionBtn = document.getElementById('about-update-action-btn');
+    const result    = document.getElementById('about-update-result');
+    const progress  = document.getElementById('about-update-progress');
+    const bar       = document.getElementById('about-update-bar');
+    if (!checkBtn || !actionBtn || !result) return;
+
+    let latestVersion = '';
+
+    const setResult = (cls, text) => { result.className = `about-update-result ${cls || ''}`.trim(); result.textContent = text; };
+    const showAction = (label, handler) => {
+      actionBtn.style.display = '';
+      actionBtn.textContent = label;
+      actionBtn.onclick = handler;
+    };
+    const hideAction = () => { actionBtn.style.display = 'none'; actionBtn.onclick = null; };
+    const showProgress = (pct) => { if (progress) { progress.style.display = ''; if (bar) bar.style.width = `${Math.max(0, Math.min(100, pct))}%`; } };
+    const hideProgress = () => { if (progress) progress.style.display = 'none'; };
+
+    function renderStatus(s) {
+      if (!s || !s.state) return;
+      switch (s.state) {
+        case 'checking':
+          checkBtn.disabled = true; hideAction(); hideProgress();
+          setResult('', 'Checking for updates…');
+          break;
+        case 'available':
+          checkBtn.disabled = false; hideProgress();
+          latestVersion = s.version || '';
+          setResult('update-available', `v${esc(latestVersion)} available.`);
+          showAction('Download', async () => {
+            actionBtn.disabled = true;
+            setResult('', 'Starting download…');
+            const r = await api.invoke('update:download');
+            if (r && !r.ok) { actionBtn.disabled = false; setResult('update-error', r.error || 'Download failed.'); }
           });
-        } else {
-          result.className = 'about-update-result update-current';
-          result.textContent = `You're up to date (v${esc(res.current)}).`;
-        }
-      } catch {
-        result.className = 'about-update-result update-error';
-        result.textContent = 'Update check failed.';
-      } finally {
-        btn.disabled = false;
+          break;
+        case 'download-progress':
+          checkBtn.disabled = true; actionBtn.disabled = true;
+          showProgress(s.percent || 0);
+          setResult('', `Downloading… ${Math.round(s.percent || 0)}%`);
+          break;
+        case 'downloaded':
+          checkBtn.disabled = false; hideProgress();
+          setResult('update-available', `v${esc(s.version || latestVersion)} ready to install.`);
+          showAction('Restart & Install', async () => {
+            actionBtn.disabled = true;
+            await api.invoke('update:install');
+          });
+          break;
+        case 'not-available':
+          checkBtn.disabled = false; hideAction(); hideProgress();
+          setResult('update-current', `You're up to date (v${esc(s.version || '')}).`);
+          break;
+        case 'error':
+          checkBtn.disabled = false; actionBtn.disabled = false; hideProgress();
+          setResult('update-error', s.error || 'Update check failed.');
+          break;
+        case 'dev':
+          checkBtn.disabled = false; hideAction(); hideProgress();
+          setResult('', 'Auto-update runs in installed builds only.');
+          break;
+        default:
+          break;
       }
-    });
+    }
+
+    // Single live subscription to main → renderer status pushes.
+    if (_updateSub) { try { _updateSub(); } catch {} _updateSub = null; }
+    if (typeof api.on === 'function') _updateSub = api.on('update:status', renderStatus);
+
+    // Reflect any status already known (e.g. the on-launch check found one).
+    api.invoke('update:status').then(renderStatus).catch(() => {});
+
+    checkBtn.onclick = async () => {
+      hideAction();
+      setResult('', 'Checking for updates…');
+      checkBtn.disabled = true;
+      try { renderStatus(await api.invoke('update:check')); }
+      catch { setResult('update-error', 'Update check failed.'); }
+      finally { checkBtn.disabled = false; }
+    };
   }
 
   return { buildPanel, mount, wire, URLS, CHANGELOG };

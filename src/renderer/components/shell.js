@@ -780,7 +780,16 @@ const Shell = (() => {
           const opens = rows.filter(r => r.clock_in && !r.clock_out);
           const open = opens.length ? opens[opens.length - 1] : null;
           if (open && entry.log_date) {
-            const startMs = new Date(`${entry.log_date}T${open.clock_in}:00`).getTime();
+            // Prefer the precise clock-in stamp (starts the badge at 0:00) when
+            // it still matches the row's HH:MM minute; else fall back to the
+            // minute-truncated computation (legacy rows / hand-edited times).
+            let startMs = NaN;
+            if (open.clock_in_ms) {
+              const d = new Date(open.clock_in_ms);
+              const hh = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+              if (hh === open.clock_in) startMs = open.clock_in_ms;
+            }
+            if (isNaN(startMs)) startMs = new Date(`${entry.log_date}T${open.clock_in}:00`).getTime();
             if (!isNaN(startMs)) showLiveBadge(startMs);
           }
         } catch {}
