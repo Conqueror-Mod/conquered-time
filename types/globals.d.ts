@@ -83,6 +83,10 @@ interface Company {
   notes?: string;
   /** Per-company scheduled-report recipient override; falls back to the SMTP default recipient. */
   report_email?: string;
+  /** Invoice currency (ISO code) override; blank falls back to the profile's default_currency. */
+  currency?: string;
+  /** Client address for the invoice "Bill To" block. */
+  billing_address?: string;
 }
 
 /** Row of task_items (Dispatch tasks + break/lunch), entry_id-scoped. */
@@ -248,6 +252,14 @@ interface IpcInvokeMap {
     /** Break-style prefs (encrypted blob); absent on legacy blobs. */
     break_style?: 'state' | 'pomodoro';
     pomodoro_preset?: string;
+    /** Billing identity (encrypted blob) — the invoice "Bill From". Absent on
+     *  legacy blobs; drives the invoicing feature. */
+    business_name?: string;
+    business_address?: string;
+    business_email?: string;
+    tax_id?: string;
+    payment_instructions?: string;
+    default_currency?: string;
   } | null;
   'profile:save': (payload: object) => MutResult;
   // audit

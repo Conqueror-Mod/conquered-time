@@ -503,14 +503,17 @@ ipcMain.handle('profile:get', () => {
   return { display_name: user.display_name || '', ...profileData };
 });
 
-ipcMain.handle('profile:save', (_: unknown, { display_name, full_name, email, phone, job_title, work_state, break_style, pomodoro_preset, avatar, avatar_thumb_48 }: Record<string, any>) => {
+ipcMain.handle('profile:save', (_: unknown, { display_name, full_name, email, phone, job_title, work_state, break_style, pomodoro_preset, avatar, avatar_thumb_48, business_name, business_address, business_email, tax_id, payment_instructions, default_currency }: Record<string, any>) => {
   if (!session.key || !session.user) return { ok: false };
   try {
     // Normalize break prefs: only 'pomodoro' opts out of state-policy warnings,
     // and the preset must be a known key (unknown → classic).
     const breakStyle = break_style === 'pomodoro' ? 'pomodoro' : 'state';
     const pomoPreset = POMODORO_PRESETS[pomodoro_preset] ? pomodoro_preset : 'classic';
-    const blob = encrypt(JSON.stringify({ full_name: full_name || '', email: email || '', phone: phone || '', job_title: job_title || '', work_state: work_state || null, break_style: breakStyle, pomodoro_preset: pomoPreset, avatar: avatar || null }), session.key);
+    // Billing identity (invoice "Bill From"). Currency normalized to a 3-letter
+    // uppercase ISO code, defaulting to USD.
+    const currency = String(default_currency || 'USD').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3) || 'USD';
+    const blob = encrypt(JSON.stringify({ full_name: full_name || '', email: email || '', phone: phone || '', job_title: job_title || '', work_state: work_state || null, break_style: breakStyle, pomodoro_preset: pomoPreset, avatar: avatar || null, business_name: business_name || '', business_address: business_address || '', business_email: business_email || '', tax_id: tax_id || '', payment_instructions: payment_instructions || '', default_currency: currency }), session.key);
     dbRun('UPDATE users SET display_name=?, profile_enc=?, profile_iv=?, profile_tag=? WHERE rowid=?',
       [display_name || null, blob.data, blob.iv, blob.tag, session.user.id]);
     session.user.display_name    = display_name || null;

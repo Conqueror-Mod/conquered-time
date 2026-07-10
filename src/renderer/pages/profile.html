@@ -146,6 +146,14 @@
     margin-bottom: 16px;
   }
 
+  .panel-hint {
+    font-family: var(--sans);
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--text-dim);
+    margin: -8px 0 16px;
+  }
+
   .fields-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -414,6 +422,55 @@
         <div class="field-group">
           <label class="field-label" for="field-phone">Phone Number</label>
           <input class="form-input" id="field-phone" type="tel" placeholder="+1 (555) 000-0000" autocomplete="off">
+        </div>
+      </div>
+    </div>
+
+    <!-- Billing (invoice "Bill From") -->
+    <div class="profile-panel">
+      <div class="panel-title">Billing</div>
+      <p class="panel-hint">Used as the “Bill From” details on invoices you generate. All optional — fill in what you want to appear.</p>
+      <div class="fields-grid">
+        <div class="field-group">
+          <label class="field-label" for="field-business-name">Business / Trading Name</label>
+          <input class="form-input" id="field-business-name" type="text" placeholder="e.g. Your Name or Studio LLC" autocomplete="off"
+                 data-tip="Appears at the top of your invoices as the sender. Defaults to your display name if left blank.">
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="field-business-email">Billing Email</label>
+          <input class="form-input" id="field-business-email" type="email" placeholder="billing@yourbusiness.com" autocomplete="off"
+                 data-tip="Contact email shown on invoices. Falls back to your profile email if blank.">
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="field-default-currency">Default Currency</label>
+          <select class="form-input" id="field-default-currency"
+                  data-tip="Currency invoices are issued in by default. A company can override this.">
+            <option value="USD">USD — US Dollar</option>
+            <option value="EUR">EUR — Euro</option>
+            <option value="GBP">GBP — British Pound</option>
+            <option value="CAD">CAD — Canadian Dollar</option>
+            <option value="AUD">AUD — Australian Dollar</option>
+            <option value="NZD">NZD — New Zealand Dollar</option>
+            <option value="JPY">JPY — Japanese Yen</option>
+            <option value="CHF">CHF — Swiss Franc</option>
+            <option value="INR">INR — Indian Rupee</option>
+            <option value="ZAR">ZAR — South African Rand</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="field-tax-id">Tax ID / VAT No.</label>
+          <input class="form-input" id="field-tax-id" type="text" placeholder="Optional" autocomplete="off"
+                 data-tip="Shown on invoices when set (e.g. VAT number, EIN). Leave blank if not applicable.">
+        </div>
+        <div class="field-group span-2">
+          <label class="field-label" for="field-business-address">Business Address</label>
+          <textarea class="form-input" id="field-business-address" rows="2" placeholder="Street, city, region, postal code, country" autocomplete="off"
+                    data-tip="Your address block on the invoice."></textarea>
+        </div>
+        <div class="field-group span-2">
+          <label class="field-label" for="field-payment-instructions">Payment Instructions</label>
+          <textarea class="form-input" id="field-payment-instructions" rows="2" placeholder="e.g. Pay via PayPal to …, or bank transfer details" autocomplete="off"
+                    data-tip="Printed near the total so clients know how to pay."></textarea>
         </div>
       </div>
     </div>

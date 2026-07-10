@@ -70,6 +70,14 @@ window.addEventListener('DOMContentLoaded', async () => {
   $field('field-pomodoro-preset').value = profile?.pomodoro_preset || 'classic';
   syncPomodoroPresetVisibility();
 
+  // Billing identity (invoice "Bill From"); absent on legacy blobs → blank/USD.
+  $field('field-business-name').value         = profile?.business_name         || '';
+  $field('field-business-email').value        = profile?.business_email        || '';
+  $field('field-default-currency').value      = profile?.default_currency      || 'USD';
+  $field('field-tax-id').value                = profile?.tax_id                || '';
+  $field('field-business-address').value      = profile?.business_address      || '';
+  $field('field-payment-instructions').value  = profile?.payment_instructions  || '';
+
   avatarDataUrl = profile?.avatar || null;
 
   // Snapshot original values for dirty tracking
@@ -99,7 +107,9 @@ window.addEventListener('DOMContentLoaded', async () => {
   const trackableInputs = [
     'field-display-name', 'field-full-name', 'field-job-title',
     'field-work-state', 'field-email', 'field-phone',
-    'field-break-style', 'field-pomodoro-preset'
+    'field-break-style', 'field-pomodoro-preset',
+    'field-business-name', 'field-business-email', 'field-default-currency',
+    'field-tax-id', 'field-business-address', 'field-payment-instructions'
   ];
   trackableInputs.forEach(id => {
     $id(id).addEventListener('input', () => {
@@ -336,6 +346,12 @@ function snapshotOriginal(): void {
     phone:           $field('field-phone').value,
     break_style:     $field('field-break-style').value,
     pomodoro_preset: $field('field-pomodoro-preset').value,
+    business_name:         $field('field-business-name').value,
+    business_email:        $field('field-business-email').value,
+    default_currency:      $field('field-default-currency').value,
+    tax_id:                $field('field-tax-id').value,
+    business_address:      $field('field-business-address').value,
+    payment_instructions:  $field('field-payment-instructions').value,
     avatar:          avatarDataUrl,
   };
   dirty = false;
@@ -378,6 +394,12 @@ async function saveProfile(): Promise<void> {
     pomodoro_preset: $field('field-pomodoro-preset').value,
     email:           $field('field-email').value.trim(),
     phone:           $field('field-phone').value.trim(),
+    business_name:         $field('field-business-name').value.trim(),
+    business_email:        $field('field-business-email').value.trim(),
+    default_currency:      $field('field-default-currency').value,
+    tax_id:                $field('field-tax-id').value.trim(),
+    business_address:      $field('field-business-address').value.trim(),
+    payment_instructions:  $field('field-payment-instructions').value.trim(),
     avatar:          avatarDataUrl,
     avatar_thumb_48: await makeThumb48(avatarDataUrl),
   };
