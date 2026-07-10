@@ -8,15 +8,22 @@ Discord's **#roadmap** channel mirrors this file automatically.
 
 _Last curated: 2026-07-10_
 
+## 🔨 In progress
+
+- **Billable rates & invoicing** — turning the hours you already track into
+  client invoices. Set an hourly rate and currency per company, add your
+  business "bill-from" details, then generate numbered invoice PDFs for a
+  company + date range with per-day line items, optional tax, payment terms, and
+  a running paid/unpaid ledger. **Now building:** the billing setup — per-company
+  rate/currency, client billing address, and your business details on the
+  Profile page — is the first piece landing. The invoice generator + ledger
+  follow.
+
 ## 🗓️ Planned (next up)
 
 - **Company search / filter** — a search box on the Companies tab to filter the
   list and spiderweb as you type; grows unwieldy past a handful of companies.
   _(First community feature request — thank you!)_
-- **Billable rates & invoicing** — set an hourly rate per company (with optional
-  per-project overrides) and generate numbered invoice PDFs for a company + date
-  range: line items, subtotals, and totals built from the hours you already
-  track. Turns Conquered Time from time-tracking into getting-paid.
 - **Analytics & insights dashboard** — put the captured time series to work: an
   hours-over-time trend, per-company distribution, busiest days, and task-label
   breakdowns, so the dashboard shows insight, not just identity.
