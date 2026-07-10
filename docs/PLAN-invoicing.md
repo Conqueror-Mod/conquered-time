@@ -65,7 +65,11 @@ stateless (recomputed live); only **Issue** persists a frozen snapshot.
    paid/unpaid/void, save PDF, email). Snapshot-at-issue enforced (frozen
    encrypted doc). PDF reuses email.ts `generatePDF`; email reuses the report
    SMTP path (`sendInvoiceEmail`) → company `report_email` fallback default.
-4. **Polish** — seed fixture invoices, version bump + GitHub release.
+4. **Polish** — seed fixture invoices ✅ (2 demo invoices + billing profile in
+   the seed; fixture schema mirror + `insertInvoice`; self-check asserts
+   `invoices.count`), version bump to **v3.16.0** ✅ (package.json, version.json,
+   About changelog), README/CLAUDE.md docs ✅. **GitHub release cut is deferred**
+   until the PDF-save-dialog + SMTP-email buttons get a real-app smoke test.
 
 ## Notes / open for later
 

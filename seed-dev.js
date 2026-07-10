@@ -94,6 +94,7 @@ const EXPECT = {
   legacyEntries:  1,
   backups:        3,
   discrepancies:  7,     // 6 on Entry 3 + the edge session's desc-only row (flagged since C3 / D-004 fix)
+  invoices:       2,     // INV-0001 (paid) + INV-0002 (unpaid) for Zenith
 };
 
 // ── Crypto + vault builders (extracted to test/vault-fixture.js so the
@@ -167,6 +168,14 @@ async function seed() {
     job_title:  'QA Engineer',
     work_state: 'TX',           // not in STATE_POLICY → default break/lunch policy
     avatar:     avatarDataUrl,
+    // Billing identity (invoice "Bill From") — populated so the seeded Invoices
+    // ledger renders a complete demo.
+    business_name:        'Dev Tester Consulting',
+    business_address:     '742 Evergreen Terrace\nAustin, TX 78701',
+    business_email:       'billing@conqueredtime.app',
+    tax_id:               'EIN 00-0000000',
+    payment_instructions: 'Bank transfer or PayPal to billing@conqueredtime.app. Net terms as stated.',
+    default_currency:     'USD',
   };
   const profEnc = encrypt(JSON.stringify(profileData), sessionKey);
 
@@ -484,11 +493,59 @@ async function seed() {
     ['ui_onboardingDone',        '1'],     // tour pre-done so modals don't block automated sweeps
     ['win_startMaximized',       'true'],
     ['win_rememberPosition',     'false'],
+    ['invoice_prefix',           'INV-'],
+    ['invoice_next',             '3'],     // two invoices seeded below (INV-0001/0002)
   ];
   for (const [key, value] of settings) {
     db.run('INSERT INTO app_settings (key, value) VALUES (?,?)', [key, value]);
   }
   console.log(`✓ App settings seeded (theme=${SEED_THEME}, 12h, onboarding tour pre-done)`);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  //  INVOICES — two issued invoices for Zenith so the ledger has demo data.
+  //  Frozen InvoiceDoc snapshot (mirrors ipc/invoices.ts buildDoc); per-day
+  //  lines rounded so amounts sum to the subtotal.
+  // ═══════════════════════════════════════════════════════════════════════════
+  const round2 = n => Math.round((Number(n) || 0) * 100) / 100;
+  const billFrom = {
+    name: profileData.business_name, address: profileData.business_address,
+    email: profileData.business_email, taxId: profileData.tax_id,
+    paymentInstructions: profileData.payment_instructions,
+  };
+  const makeInvoiceDoc = ({ number, issueDate, dueDate, terms, from, to, days, rate, taxRate = 0, notes = '' }) => {
+    const lineItems = days.map(([date, mins]) => {
+      const hours = round2(mins / 60);
+      return { date, minutes: mins, hours, rate, amount: round2(hours * rate) };
+    });
+    const totalMinutes = lineItems.reduce((s, l) => s + l.minutes, 0);
+    const subtotal = round2(lineItems.reduce((s, l) => s + l.amount, 0));
+    const taxAmount = round2((subtotal * taxRate) / 100);
+    return {
+      number, issueDate, dueDate, terms, periodFrom: from, periodTo: to,
+      currency: 'USD', companyId: companyIdA,
+      billFrom, billTo: { name: 'Zenith Analytics', address: '' }, rate,
+      lineItems, totalMinutes, totalHours: round2(totalMinutes / 60),
+      subtotal, taxRate, taxAmount, total: round2(subtotal + taxAmount), notes,
+    };
+  };
+  const nowSecs = Math.floor(Date.now() / 1000);
+  fixture.insertInvoice(db, sessionKey, userId, {
+    seq: 1, status: 'paid', paidAt: nowSecs - 5 * 86400, issuedAt: nowSecs - 20 * 86400,
+    doc: makeInvoiceDoc({
+      number: 'INV-0001', issueDate: daysAgo(20), dueDate: daysAgo(-10), terms: 'Net 30',
+      from: daysAgo(50), to: daysAgo(21), rate: 22.50,
+      days: [[daysAgo(48), 360], [daysAgo(45), 480], [daysAgo(30), 300]], notes: 'Thank you for your business.',
+    }),
+  });
+  fixture.insertInvoice(db, sessionKey, userId, {
+    seq: 2, status: 'unpaid', issuedAt: nowSecs - 2 * 86400,
+    doc: makeInvoiceDoc({
+      number: 'INV-0002', issueDate: daysAgo(2), dueDate: daysAgo(-28), terms: 'Net 30',
+      from: daysAgo(20), to: daysAgo(1), rate: 22.50, taxRate: 8.25,
+      days: [[daysAgo(10), 450], [daysAgo(5), 390], [daysAgo(2), 180]],
+    }),
+  });
+  console.log('✓ Invoices: INV-0001 (paid) + INV-0002 (unpaid, taxed) for Zenith; next = INV-0003');
 
   // ── Persist DB ─────────────────────────────────────────────────────────────
   fs.writeFileSync(DB_FILE, Buffer.from(db.export()));
@@ -538,7 +595,8 @@ async function seed() {
   expect('ui_theme.valid', true, VALID_THEMES.includes(
     db.exec("SELECT value FROM app_settings WHERE key='ui_theme'")[0].values[0][0]));
   expect('no_bare_setting_keys', 0, one(
-    "SELECT COUNT(*) FROM app_settings WHERE key NOT LIKE 'ui\\_%' ESCAPE '\\' AND key NOT LIKE 'win\\_%' ESCAPE '\\'"));
+    "SELECT COUNT(*) FROM app_settings WHERE key NOT LIKE 'ui\\_%' ESCAPE '\\' AND key NOT LIKE 'win\\_%' ESCAPE '\\' AND key NOT LIKE 'invoice\\_%' ESCAPE '\\'"));
+  expect('invoices.count', EXPECT.invoices, one('SELECT COUNT(*) FROM invoices'));
   expect('backups.count', EXPECT.backups,
     fs.readdirSync(BACKUP_DIR).filter(f => f.startsWith('vault-') && f.endsWith('.db')).length);
   // Encryption round-trips with the derived session key

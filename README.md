@@ -27,6 +27,7 @@ A secure, locally-encrypted desktop time tracker built for remote professionals 
 - **Reports & Audit** — period summary, company breakdown, audit log with per-row dismiss/fix/suggest/**email**; dismissed & emailed items persisted (emailed stay visible, badged); a discrepancy notice is shown at login; US state policy named in suggestion text
 - **PDF & CSV export** — clean timesheet format; work type, location, supervisors in header; per-label subtotals; Export All includes summary section; NavID excluded from all exports
 - **Email Reports** — send PDF + CSV directly via SMTP from the Reports page; scheduled delivery (daily/weekly/monthly/quarterly/annual). Note: scheduled sends fire only while the app is open and unlocked — a missed send is caught up on next sign-in (any login method)
+- **Invoicing** — turn tracked hours into client invoices: pick a company + date range, preview, and issue a numbered invoice with per-day line items, optional tax and payment terms (with due date), your business "Bill From" details (set on the Profile page), and per-company rate/currency. Issued invoices are frozen into an encrypted ledger you can mark Paid/Unpaid/Void, save as a branded PDF, or email to the company's Report Recipient
 - **Auto-save & backup** — configurable autosave interval; dated `.db` backups on every save (last 30 kept)
 - **Backup Library** — browse, preview, and restore from any saved backup in Settings; current data safety-saved before any restore
 - **Session auto-lock** — configurable idle timeout (Off / 5 / 15 / 30 / 60 min)

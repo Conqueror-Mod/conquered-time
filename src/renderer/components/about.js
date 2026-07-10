@@ -24,6 +24,13 @@ const About = (() => {
   // Changelog — newest first. Edit HERE and both About surfaces update. The two
   // most recent entries render in-panel; older notes live on GitHub Releases.
   const CHANGELOG = [
+    { version: 'v3.16.0', items: [
+      'New Invoices tab — turn your tracked hours into client invoices. Pick a company and date range, preview, and issue a numbered invoice with per-day line items built from your logged time',
+      'Set an hourly rate and currency per company, and add your business details (name, address, tax ID, payment instructions) on the Profile page — they become the invoice’s “Bill From” block',
+      'Each invoice supports optional tax and payment terms (Net 15/30/etc. with a due date), and lives in a ledger you can mark Paid, Unpaid, or Void',
+      'Save any invoice as a branded PDF or email it straight to the company’s Report Recipient',
+      'The window titlebar now shows the current app icon (it was still using an older one)',
+    ] },
     { version: 'v3.15.0', items: [
       'Scheduled reports can now be scoped by company: one combined report (as before), a single company only, or one report per company — pick under Settings → Reports → Scheduled Reports → Companies',
       'New Report Recipient field on each company — per-company scheduled reports are emailed there instead of your default recipient, so each client can get their own report automatically',
