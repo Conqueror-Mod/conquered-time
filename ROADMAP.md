@@ -38,6 +38,11 @@ _Last curated: 2026-07-10_
 
 ## ✅ Recently shipped
 
+- **Automatic updates** (v3.17) — the app checks GitHub Releases for new
+  versions, downloads the update in the background with a progress bar, and
+  installs on restart (check anytime under Settings → About → Updates). Shipped
+  alongside fixes for the invoice-PDF number, the active-session timer starting
+  a few seconds in, and a stray window on Windows auto-launch.
 - **Billable rates & invoicing** (v3.16) — turn tracked hours into client
   invoices: pick a company + date range, preview, and issue a numbered invoice
   with per-day line items, optional tax, and payment terms. Set a rate/currency

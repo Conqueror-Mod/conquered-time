@@ -38,6 +38,7 @@ A secure, locally-encrypted desktop time tracker built for remote professionals 
 - **Electron security** — contextIsolation enabled, nodeIntegration disabled, sandboxed renderers, whitelisted IPC channels, strict Content-Security-Policy (`script-src 'self'` on every page — no inline scripts or event handlers)
 - **Centralized data layer** — shared Store / IPC / Validator modules give the renderer one source of truth for fetching, record-ID normalization, and input validation
 - **Cross-navigation caching** — a main-process read cache reuses decrypted company/entry data across page navigations, so the dashboard, companies, and reports don't re-decrypt your history on every visit
+- **Automatic updates** — checks GitHub Releases for new versions, downloads the update in the background with a progress bar, and installs on restart; check manually anytime in Settings → About → Updates
 
 
 ---
@@ -63,7 +64,6 @@ A companion **Discord community bot** (discord.js + TypeScript) handles beta-key
 ```
 conquered-time/
 ├── seed-dev.js                   # Dev seed script (bypasses TOTP) — 10-company / 103-entry stress fixture
-├── version.json                  # Version manifest read by Check for Updates
 ├── tsconfig.json                 # checkJs project (renderer JS + types/)
 ├── tsconfig.main.json            # main-process TS build → dist-main/ (strict)
 ├── tsconfig.renderer.json        # renderer page TS → sibling .js
@@ -79,6 +79,7 @@ conquered-time/
 │   │   ├── session.ts            # session key/user/activeEntry, idle lock, orphan sweep
 │   │   ├── cache.ts              # main-process read cache singleton
 │   │   ├── policies.ts           # break/lunch compliance tiers (pure data)
+│   │   ├── updater.ts            # auto-updater (electron-updater ↔ GitHub Releases)
 │   │   ├── audit.ts backups.ts email.ts   # audit counting, backups, SMTP + schedule engine
 │   │   ├── vault-crypto.js       # Pure AES-256-GCM / PBKDF2 + atomic re-encryption (unit-tested)
 │   │   ├── read-cache.js         # Pure main-process read cache (owner-keyed; unit-tested)
@@ -168,7 +169,12 @@ gate). See `docs/PLAN-property-testing.md` for the full design.
 npm run build
 ```
 
-Output: `dist/Conquered Time Setup <version>.exe` (NSIS). `npm run build` runs `npm run compile` (both TS projects) first. Signed installers for each version are published on GitHub Releases.
+Output: `dist/Conquered Time Setup <version>.exe` (NSIS). `npm run build` runs `npm run compile` (both TS projects) first.
+
+To **publish a release** for the in-app auto-updater, run `npm run release` with a
+GitHub token in the environment (`GH_TOKEN`): it builds the installer and uploads
+it plus the `latest.yml` update manifest to GitHub Releases, which the app's
+updater (`src/main/updater.ts`) reads to detect and download new versions.
 
 ---
 

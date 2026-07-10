@@ -24,6 +24,13 @@ const About = (() => {
   // Changelog — newest first. Edit HERE and both About surfaces update. The two
   // most recent entries render in-panel; older notes live on GitHub Releases.
   const CHANGELOG = [
+    { version: 'v3.17.0', items: [
+      'Automatic updates — the app now checks GitHub for new versions, downloads the update in the background with a progress bar, and installs it on restart. Check anytime under Settings → About → Updates',
+      'Fixed: exported and emailed invoice PDFs were missing the invoice number in the header — they now show it correctly',
+      'Fixed: the active-session timer sometimes started a few seconds in (5, 12, 24s…) instead of at 0:00',
+      'Fixed: a stray default window could pop up first when the app auto-launched at Windows login — it now opens straight to the app',
+      'Tidied the About page spacing',
+    ] },
     { version: 'v3.16.0', items: [
       'New Invoices tab — turn your tracked hours into client invoices. Pick a company and date range, preview, and issue a numbered invoice with per-day line items built from your logged time',
       'Set an hourly rate and currency per company, and add your business details (name, address, tax ID, payment instructions) on the Profile page — they become the invoice’s “Bill From” block',
