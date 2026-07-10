@@ -8,24 +8,28 @@ Discord's **#roadmap** channel mirrors this file automatically.
 
 _Last curated: 2026-07-10_
 
-## 🔨 In progress
-
-- **Community roadmap channel** — this very roadmap, auto-synced from the repo to
-  the Discord so testers can always see where things stand.
-
 ## 🗓️ Planned (next up)
 
 - **Company search / filter** — a search box on the Companies tab to filter the
   list and spiderweb as you type; grows unwieldy past a handful of companies.
   _(First community feature request — thank you!)_
-- **Multi-platform packaging** — the Windows installer ships today; macOS and
-  Linux builds via GitHub Actions CI are the next big unlock. macOS/Linux icons
-  are already prepared.
+- **Billable rates & invoicing** — set an hourly rate per company (with optional
+  per-project overrides) and generate numbered invoice PDFs for a company + date
+  range: line items, subtotals, and totals built from the hours you already
+  track. Turns Conquered Time from time-tracking into getting-paid.
+- **Analytics & insights dashboard** — put the captured time series to work: an
+  hours-over-time trend, per-company distribution, busiest days, and task-label
+  breakdowns, so the dashboard shows insight, not just identity.
+- **Proactive punch detection** — catch a forgotten running punch *before* it
+  becomes an audit issue: a gentle idle-based prompt ("still working?") that
+  offers to trim or close the session.
 - **Report redesign** — the emailed CSV and PDF report layouts get a proper
   redesign (not just fixes), based on beta feedback.
 
 ## 💡 Under consideration
 
+- **Multi-platform packaging** — macOS and Linux builds via GitHub Actions CI
+  (icons are already prepared). On the backburner while feature work leads.
 - **Global search** — a shell-wide omnibox (⌘/Ctrl+K) that jumps to companies
   and entries across pages, beyond the per-tab Companies filter above.
 - **Profile placement** — making the Profile screen less prominent / more
@@ -38,6 +42,8 @@ _Last curated: 2026-07-10_
 
 ## ✅ Recently shipped
 
+- **Community roadmap channel** — this roadmap, auto-synced from the repo into
+  the Discord so testers always see where things stand.
 - **Per-company scheduled reports** (v3.15) — schedule one combined report, one
   report per company, or a single company; optional per-company recipient
   override.
