@@ -1446,6 +1446,12 @@ function showAuditWarning(count, action) {
   const dismissBtn = document.getElementById('audit-warn-dismiss');
   if (!modal || !body) return;
 
+  // An exit/lock/login interrupt supersedes any transient in-page modal (e.g.
+  // the invoice preview / numbering dialogs). Close open .modal-overlay layers
+  // first so we never stack the audit warning on top of another modal —
+  // discarding them is safe (nothing there is committed until its own action).
+  document.querySelectorAll('.modal-overlay.show').forEach(el => el.classList.remove('show'));
+
   const noun = count === 1 ? 'discrepancy' : 'discrepancies';
   if (action === 'login') {
     body.innerHTML = `<strong style="color:var(--text-white);">${count} audit ${noun}</strong> detected in your session log — entries with missing clock-ins/outs, zero duration, unusual hours, or missing breaks.<br><br>Review now?`;
