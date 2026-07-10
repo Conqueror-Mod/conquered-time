@@ -8,17 +8,6 @@ Discord's **#roadmap** channel mirrors this file automatically.
 
 _Last curated: 2026-07-10_
 
-## 🔨 In progress
-
-- **Billable rates & invoicing** — turning the hours you already track into
-  client invoices. Set an hourly rate and currency per company, add your
-  business "bill-from" details, then generate numbered invoice PDFs for a
-  company + date range with per-day line items, optional tax, payment terms, and
-  a running paid/unpaid ledger. **Now building:** the billing setup — per-company
-  rate/currency, client billing address, and your business details on the
-  Profile page — is the first piece landing. The invoice generator + ledger
-  follow.
-
 ## 🗓️ Planned (next up)
 
 - **Company search / filter** — a search box on the Companies tab to filter the
@@ -49,6 +38,12 @@ _Last curated: 2026-07-10_
 
 ## ✅ Recently shipped
 
+- **Billable rates & invoicing** (v3.16) — turn tracked hours into client
+  invoices: pick a company + date range, preview, and issue a numbered invoice
+  with per-day line items, optional tax, and payment terms. Set a rate/currency
+  per company and your business "Bill From" details on the Profile page. Issued
+  invoices live in a paid/unpaid ledger you can save as a branded PDF or email
+  to the client.
 - **Community roadmap channel** — this roadmap, auto-synced from the repo into
   the Discord so testers always see where things stand.
 - **Per-company scheduled reports** (v3.15) — schedule one combined report, one
