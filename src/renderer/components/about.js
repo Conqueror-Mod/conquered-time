@@ -24,6 +24,9 @@ const About = (() => {
   // Changelog — newest first. Edit HERE and both About surfaces update. The two
   // most recent entries render in-panel; older notes live on GitHub Releases.
   const CHANGELOG = [
+    { version: 'v3.18.2', items: [
+      'Maintenance release — verifies the new in-app update notice end to end. No feature changes',
+    ] },
     { version: 'v3.18.1', items: [
       'Updates are easier to notice — when a new version is available you now get a clear notice on the sign-in screen (and inside the app) with a one-click Download & Install, instead of it only showing under Settings → About',
       'After an update installs, the app confirms it on next launch with a "Updated to vX" message, so you can tell the update actually went through',
