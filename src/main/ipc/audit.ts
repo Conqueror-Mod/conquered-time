@@ -70,7 +70,7 @@ ipcMain.handle('audit:clear-dismissed', () => {
   return { ok: true };
 });
 
-ipcMain.handle('audit:apply-fix', (_: unknown, { entry_id, row_idx, fix_type }: Record<string, any>) => {
+ipcMain.handle('audit:apply-fix', (_: unknown, { entry_id, row_idx, fix_type, updated_at }: Record<string, any>) => {
   if (!session.key || !session.user) return { ok: false };
   // Only these discrepancy types have an automated fix. Everything else
   // (e.g. missing_break / missing_lunch) is acknowledge-only by design — reject
@@ -82,6 +82,15 @@ ipcMain.handle('audit:apply-fix', (_: unknown, { entry_id, row_idx, fix_type }: 
   const row = dbGet('SELECT rowid as rid, * FROM time_entries WHERE rowid=? AND user_id=?',
     [Number(entry_id), session.user.id]);
   if (!row) return { ok: false, error: 'Entry not found' };
+  // Optimistic-concurrency guard (mirrors entries:save). Apply Fix operates on a
+  // row_idx and a discrepancy the audit view captured from an entries:all
+  // snapshot; if that row was saved by another writer (the tracker) since, the
+  // index/discrepancy may no longer be valid and applying blindly could target
+  // the wrong row or re-apply a stale fix. When the caller supplies the
+  // updated_at it last read, reject a stale apply so the audit view re-fetches.
+  if (updated_at != null && Number(row.updated_at) !== Number(updated_at)) {
+    return { ok: false, stale: true };
+  }
   try {
     decryptEntry(row);
     const rows = JSON.parse(row.rows_json || '[]');

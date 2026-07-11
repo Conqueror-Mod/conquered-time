@@ -233,14 +233,24 @@ async function writeDescToEntry(): Promise<void> {
   if (activeRowIdx === -1) return;
   rows[activeRowIdx].desc = desc;
   activeEntry.rows_json = JSON.stringify(rows);
-  await api.invoke('entries:save', {
+  const res = await api.invoke('entries:save', {
     id: activeEntry.id,
     company_id: activeEntry.company_id,
     log_date: activeEntry.log_date,
     session_label: activeEntry.session_label || '',
     rows_json: activeEntry.rows_json,
     total_mins: activeEntry.total_mins || 0,
+    // Optimistic-concurrency token: don't clobber a newer save of this session.
+    updated_at: activeEntry.updated_at,
   });
+  if (res && res.stale) {
+    // Another writer updated the session since we loaded it. Re-fetch the latest
+    // and re-apply the description onto the fresh copy rather than overwriting.
+    const fresh = await api.invoke('entries:get-active');
+    if (fresh) { activeEntry = fresh; await writeDescToEntry(); }
+    return;
+  }
+  if (res && res.ok && res.updated_at != null) activeEntry.updated_at = res.updated_at;
 }
 
 // ── Delete task ────────────────────────────────────────────────────────────

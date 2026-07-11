@@ -494,7 +494,22 @@ function toggleShowDismissed(): void {
 }
 
 async function applyAuditFix(entryId: string | number, rowIdx: string | number, fixType: string, dKey: string): Promise<void> {
-  const res = await api.invoke('audit:apply-fix', { entry_id: Number(entryId), row_idx: Number(rowIdx), fix_type: fixType });
+  // Optimistic-concurrency token: the updated_at the audit view read for this
+  // entry (from the entries:all snapshot in allEntries).
+  const entry = allEntries.find(e => Number(e.id) === Number(entryId));
+  const res = await api.invoke('audit:apply-fix', {
+    entry_id: Number(entryId), row_idx: Number(rowIdx), fix_type: fixType, updated_at: entry?.updated_at,
+  });
+  if (res?.stale) {
+    // The entry changed elsewhere (e.g. the tracker saved it) since audit loaded
+    // it — the row index / discrepancy may be stale. Re-fetch and re-render
+    // rather than applying against outdated data.
+    Shell.toast('This entry changed elsewhere — refreshing the audit log.', 'warning');
+    Store.invalidate('entries');
+    allEntries = await Store.getEntries();
+    renderAuditLog();
+    return;
+  }
   if (!res?.ok) { Shell.toast('Fix could not be applied: ' + (res?.error || 'unknown error'), 'error'); return; }
   // Reload entries so the fix is reflected
   Store.invalidate('entries');
