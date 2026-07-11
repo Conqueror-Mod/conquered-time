@@ -125,7 +125,7 @@ const Shell = (() => {
              opens a small menu with Edit Profile. Keyboard: Enter/Space via
              the delegated dispatcher (it's a focusable data-action element). -->
         <div class="sidebar-user-identity sidebar-user-clickable" id="sidebar-user-identity"
-             tabindex="0" role="button" aria-haspopup="menu" title="Profile"
+             tabindex="0" role="button" aria-haspopup="menu" aria-label="Profile"
              data-action="toggleProfileMenu" data-tip="Your profile — click to edit">
           <div class="sidebar-avatar" id="sidebar-avatar"></div>
           <div class="sidebar-user-text">
