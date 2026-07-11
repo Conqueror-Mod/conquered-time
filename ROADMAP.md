@@ -6,18 +6,12 @@ Discord's **#roadmap** channel mirrors this file automatically.
 
 **Status legend:** ✅ Shipped · 🔨 In progress · 🗓️ Planned · 💡 Under consideration
 
-_Last curated: 2026-07-10_
+_Last curated: 2026-07-11_
 
 ## 🗓️ Planned (next up)
 
-- **Company search / filter** — a search box on the Companies tab to filter the
-  list and spiderweb as you type; grows unwieldy past a handful of companies.
-  _(First community feature request — thank you!)_
-- **Analytics & insights dashboard** — put the captured time series to work: an
-  hours-over-time trend, per-company distribution, busiest days, and task-label
-  breakdowns, so the dashboard shows insight, not just identity.
-- **Report redesign** — the emailed CSV and PDF report layouts get a proper
-  redesign (not just fixes), based on beta feedback.
+- _Nothing queued — the planned list is fully shipped as of v3.19. Community
+  suggestions decide what lands here next._
 
 ## 💡 Under consideration
 
@@ -35,6 +29,19 @@ _Last curated: 2026-07-10_
 
 ## ✅ Recently shipped
 
+- **Insights dashboard** (v3.19) — a new analytics page: hours trends over time
+  (with a moving-average line), busiest days & times, client mix, and estimated
+  earnings from each client's billing rate, across 30-day / 90-day / 1-year /
+  all-time ranges.
+- **Company search & filters** (v3.19) — live search across names, projects and
+  roles on the Companies page, plus Active/Ended and work-type filters; the
+  company web dims non-matching companies so the graph follows your filter.
+  _(First community feature request — thank you!)_
+- **Redesigned exports** (v3.19) — the tracker and Global Log PDF timesheets now
+  carry the same branded look as the emailed reports (summary band, label
+  breakdown), and the Global Log CSV ends with a totals summary. Also: larger,
+  easier-to-notice toast notifications, and two save paths hardened against
+  silently overwriting newer data.
 - **Proactive punch reminder** (v3.18) — leave a session running and step away,
   and Conquered Time nudges you to trim or close the punch *before* it becomes
   an audit issue. Opt-in under Settings → Security → Idle Punch Reminder; the

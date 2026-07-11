@@ -24,6 +24,13 @@ const About = (() => {
   // Changelog — newest first. Edit HERE and both About surfaces update. The two
   // most recent entries render in-panel; older notes live on GitHub Releases.
   const CHANGELOG = [
+    { version: 'v3.19.0', items: [
+      'New Insights page — an analytics dashboard with hours trends over time, busiest days & times, client mix, and estimated earnings (hours × each client\'s rate). Pick a range: 30 days, 90 days, 1 year, or all time',
+      'Company search & filters — find a client fast on the Companies page: live search across names, projects and roles, plus Active/Ended and work-type filters. The company web dims non-matching companies so the graph follows your filter',
+      'Redesigned exports — the tracker and Global Log PDF timesheets now match the branded report style (with a summary band and label breakdown), and the Global Log CSV gains a totals summary at the end',
+      'Bigger toast notifications — all in-app notices are ~35% larger and easier to catch',
+      'Reliability: two save paths that could silently overwrite a newer change (session autosave and the audit Apply Fix) now detect the conflict and refresh instead of losing data',
+    ] },
     { version: 'v3.18.2', items: [
       'Maintenance release — verifies the new in-app update notice end to end. No feature changes',
     ] },
