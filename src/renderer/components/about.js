@@ -24,6 +24,11 @@ const About = (() => {
   // Changelog — newest first. Edit HERE and both About surfaces update. The two
   // most recent entries render in-panel; older notes live on GitHub Releases.
   const CHANGELOG = [
+    { version: 'v3.19.1', items: [
+      'Profile moved — it now lives behind your avatar in the bottom-left corner (click it → Edit Profile) and under Settings → Profile, instead of taking a slot in the navigation. (Community request)',
+      'Setup guide polish — the Profile step now points at your avatar and walks through saving your billing details, a new Insights step explains the analytics page, and the flash between tour steps is gone (the dim now carries smoothly across pages)',
+      'Multi-monitor fix — the audit wizard and the startup splash now open on the monitor the app is actually on, instead of always the primary display',
+    ] },
     { version: 'v3.19.0', items: [
       'New Insights page — an analytics dashboard with hours trends over time, busiest days & times, client mix, and estimated earnings (hours × each client\'s rate). Pick a range: 30 days, 90 days, 1 year, or all time',
       'Company search & filters — find a client fast on the Companies page: live search across names, projects and roles, plus Active/Ended and work-type filters. The company web dims non-matching companies so the graph follows your filter',

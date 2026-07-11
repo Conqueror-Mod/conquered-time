@@ -6,7 +6,7 @@ Discord's **#roadmap** channel mirrors this file automatically.
 
 **Status legend:** ✅ Shipped · 🔨 In progress · 🗓️ Planned · 💡 Under consideration
 
-_Last curated: 2026-07-11_
+_Last curated: 2026-07-11 (v3.19.1)_
 
 ## 🗓️ Planned (next up)
 
@@ -19,9 +19,6 @@ _Last curated: 2026-07-11_
   (icons are already prepared). On the backburner while feature work leads.
 - **Global search** — a shell-wide omnibox (⌘/Ctrl+K) that jumps to companies
   and entries across pages, beyond the per-tab Companies filter above.
-- **Profile placement** — making the Profile screen less prominent / more
-  tucked-away once an account is set up, without burying the settings that
-  actually get revisited (Work State, break style). _(Community suggestion.)_
 - **Multi-account (DBA) handling** — one person working several Navigator IDs /
   accounts; needs a data-model and UI decision before any build.
 - **Language / internationalization** — lowest priority, highest complexity;
@@ -29,6 +26,12 @@ _Last curated: 2026-07-11_
 
 ## ✅ Recently shipped
 
+- **Profile placement** (v3.19.1) — Profile left the navigation bar and now
+  lives behind your avatar (bottom-left; click → Edit Profile) and under
+  Settings → Profile. _(Community suggestion — thank you!)_ Shipped with setup-guide
+  polish (avatar-anchored Profile step with billing guidance, a new Insights
+  step, smooth step transitions) and a multi-monitor fix: the audit wizard and
+  startup splash now open on the monitor the app is actually on.
 - **Insights dashboard** (v3.19) — a new analytics page: hours trends over time
   (with a moving-average line), busiest days & times, client mix, and estimated
   earnings from each client's billing rate, across 30-day / 90-day / 1-year /
