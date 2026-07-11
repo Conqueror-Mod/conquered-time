@@ -38,7 +38,7 @@ window.IPC = (() => {
       list:    (compId: number)   => call('entries:list', compId),
       all:     ()                 => call('entries:all'),
       summary: ()                 => call('entries:summary'),
-      save:    (entry: any)       => callMut('entries:save', entry),
+      save:    (entry: any)       => callMut('entries:save', entry) as Promise<EntrySaveResult>,
       active:  ()                 => call('entries:get-active'),
     },
     tasks: {

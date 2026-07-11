@@ -28,6 +28,10 @@ const $input = (id: string): HTMLInputElement => document.getElementById(id) as 
 
 let companies: Company[] = [], currentCompany: Company | null = null;
 let currentEntryId: number | null = null;
+// Optimistic-concurrency token: the `updated_at` we last read/saved for
+// currentEntryId. Sent with every save so entries:save can reject a stale write
+// (a concurrent writer saved a newer version) instead of clobbering it.
+let currentEntryUpdatedAt: number | null = null;
 let rowsData: RowData[] = [];          // [{label,name,desc,clock_in,clock_out,total_mins}]
 let selectedIndex: number | null = null;
 let autoSaveTimer: ReturnType<typeof setInterval> | null = null;
@@ -146,6 +150,7 @@ async function onCompanyChange(): Promise<void> {
   if (!id) { currentCompany = null; clearAutoSaveTimer(); updateHierarchyBar(); return; }
   currentCompany = companies.find(c => Number(c.id) === id) || null;
   currentEntryId = null;
+  currentEntryUpdatedAt = null;
   updateHierarchyBar();
   if (!$input('log-date').value)
     $input('log-date').value = RowUtils.localDateStr(); // local, never valueAsDate (UTC)
@@ -191,6 +196,7 @@ async function loadTodayEntry(): Promise<void> {
 async function loadEntryIntoTracker(existing: TimeEntry | null): Promise<void> {
   if (existing) {
     currentEntryId = existing.id;
+    currentEntryUpdatedAt = existing.updated_at ?? null;
     $input('log-notes').value = existing.session_label || '';
     restoreRows(JSON.parse(existing.rows_json || '[]'));
     $id('session-status').textContent =
@@ -200,6 +206,7 @@ async function loadEntryIntoTracker(existing: TimeEntry | null): Promise<void> {
     await loadTaskItems(existing.id);
   } else {
     currentEntryId = null;
+    currentEntryUpdatedAt = null;
     clearAll(true);
     await loadTaskItems(null);
   }
@@ -881,13 +888,28 @@ async function saveSession(silent = false, fromTimer = false): Promise<void> {
     log_date: $input('log-date').value,
     session_label: $input('log-notes').value.trim(),
     rows_json: JSON.stringify(rowsData),
-    total_mins: total
+    total_mins: total,
+    // Optimistic-concurrency token from the last read/save of this row.
+    updated_at: currentEntryUpdatedAt ?? undefined
   };
   const valid = Validator.validateEntry(entry as Partial<TimeEntry>);
   if (!valid.ok) { if (!silent) Shell.toast(valid.error || 'Invalid entry.', 'error'); return; }
   const res = await IPC.entries.save(entry as Partial<TimeEntry>);
+  if (res.stale) {
+    // A concurrent writer saved a newer version of this session. Don't clobber
+    // it — surface a toast and reload the latest into the tracker (safe default;
+    // no silent auto-merge for time data). The user re-applies their edit on the
+    // fresh copy.
+    Shell.toast('This session was updated elsewhere — reloading the latest.', 'warning');
+    Store.invalidate('entries');
+    await loadTodayEntry();
+    return;
+  }
   if (res.ok) {
     if (!currentEntryId && res.id) currentEntryId = res.id;
+    // Advance our concurrency token to the server's fresh timestamp so the next
+    // autosave doesn't falsely conflict with our own prior save.
+    if (res.updated_at != null) currentEntryUpdatedAt = res.updated_at;
     Store.invalidate('entries');
     loadTaskItems(currentEntryId);
     if (!silent) Shell.toast('Session saved.', 'success');

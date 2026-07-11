@@ -157,6 +157,17 @@ interface MutResult {
   id?: number | null;
 }
 
+/** entries:save result — adds optimistic-concurrency signalling.
+ *  `stale:true` means a concurrent writer saved a newer version since the client
+ *  last read the row; the write was rejected (nothing was overwritten).
+ *  `updated_at` is the row's current server timestamp: after a successful save the
+ *  client stores it to guard its next save; on a stale reject it reflects the
+ *  newer stored value. */
+interface EntrySaveResult extends MutResult {
+  stale?: boolean;
+  updated_at?: number | null;
+}
+
 /** Auth-flow result — login/recover/unlock add lockout + recovery flags. */
 interface AuthResult extends MutResult {
   locked?: boolean;
@@ -235,7 +246,7 @@ interface IpcInvokeMap {
   'companies:delete': (id: number) => MutResult;
   // entries
   'entries:list': (companyId: number) => TimeEntry[];
-  'entries:save': (entry: Partial<TimeEntry>) => MutResult;
+  'entries:save': (entry: Partial<TimeEntry>) => EntrySaveResult;
   'entries:all': () => TimeEntry[];
   'entries:summary': () => EntrySummary[];
   'entries:get-active': () => TimeEntry | null;
@@ -400,7 +411,7 @@ interface IpcWrapper {
     list(compId: number): Promise<TimeEntry[] | null>;
     all(): Promise<TimeEntry[] | null>;
     summary(): Promise<EntrySummary[] | null>;
-    save(entry: Partial<TimeEntry>): Promise<MutResult>;
+    save(entry: Partial<TimeEntry>): Promise<EntrySaveResult>;
     active(): Promise<TimeEntry | null>;
   };
   tasks: {

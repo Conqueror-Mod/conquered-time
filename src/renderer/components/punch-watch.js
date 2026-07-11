@@ -151,8 +151,12 @@ const PunchWatch = (() => {
         session_label: entry.session_label || '',
         rows_json: JSON.stringify(rows),
         total_mins: total,
+        // Optimistic-concurrency token: reject rather than clobber if the row
+        // changed since getOpenPunch() read it.
+        updated_at: entry.updated_at,
       });
-      if (res?.ok) Shell.toast(`Clocked out at ${trimDisplay(atMs)}.`, 'success');
+      if (res?.stale) Shell.toast('That session was updated elsewhere — reopen it to clock out.', 'warning');
+      else if (res?.ok) Shell.toast(`Clocked out at ${trimDisplay(atMs)}.`, 'success');
       else Shell.toast('Clock-out failed: ' + (res?.error || 'unknown error'), 'error');
     } catch { Shell.toast('Clock-out failed.', 'error'); }
   }

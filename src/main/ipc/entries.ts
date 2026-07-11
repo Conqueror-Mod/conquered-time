@@ -21,6 +21,18 @@ ipcMain.handle('entries:save', (_: unknown, entry: any) => {
   try {
     const enc = encrypt(entry.rows_json || '[]', session.key);
     if (entry.id) {
+      // Optimistic-concurrency guard (gotcha: blind last-write-wins). The client
+      // sends the `updated_at` it last read for this row; if the stored row has
+      // since moved on (a concurrent writer saved a newer version), reject the
+      // write as stale instead of silently clobbering that newer data. Keyed on
+      // rowid (gotcha #1). The guard only engages when the client supplies
+      // updated_at — legacy callers that don't fall back to the old behavior.
+      const cur = dbGet('SELECT updated_at FROM time_entries WHERE rowid=? AND user_id=?',
+        [Number(entry.id), session.user.id]);
+      if (!cur) return { ok: false, error: 'Entry not found.' };
+      if (entry.updated_at != null && Number(cur.updated_at) !== Number(entry.updated_at)) {
+        return { ok: false, stale: true, updated_at: Number(cur.updated_at) };
+      }
       dbRun(
         'UPDATE time_entries SET rows_enc=?,rows_iv=?,rows_tag=?,rows_json=?,total_mins=?,session_label=?,updated_at=strftime(\'%s\',\'now\') WHERE rowid=? AND user_id=?',
         [enc.data, enc.iv, enc.tag, '', entry.total_mins, entry.session_label || '', entry.id, session.user.id]
@@ -28,7 +40,11 @@ ipcMain.handle('entries:save', (_: unknown, entry: any) => {
       session.activeEntryId = Number(entry.id);
       persistDB(); performBackup();
       invalidateEntriesCache();
-      return { ok: true, id: entry.id };
+      // Return the fresh updated_at so the client can guard its NEXT save against
+      // its own prior one (autosave fires repeatedly on the same row).
+      const after = dbGet('SELECT updated_at FROM time_entries WHERE rowid=? AND user_id=?',
+        [Number(entry.id), session.user.id]);
+      return { ok: true, id: entry.id, updated_at: after ? Number(after.updated_at) : null };
     } else {
       dbRun(
         'INSERT INTO time_entries (user_id,company_id,log_date,session_label,rows_json,rows_enc,rows_iv,rows_tag,total_mins) VALUES (?,?,?,?,?,?,?,?,?)',
@@ -39,7 +55,13 @@ ipcMain.handle('entries:save', (_: unknown, entry: any) => {
       session.activeEntryId = newId;
       persistDB(); performBackup();
       invalidateEntriesCache();
-      return { ok: true, id: newId };
+      let newTs: number | null = null;
+      if (newId != null) {
+        const after = dbGet('SELECT updated_at FROM time_entries WHERE rowid=? AND user_id=?',
+          [newId, session.user.id]);
+        newTs = after ? Number(after.updated_at) : null;
+      }
+      return { ok: true, id: newId, updated_at: newTs };
     }
   } catch (e) { return { ok: false, error: e.message }; }
 });
