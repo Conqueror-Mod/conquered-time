@@ -87,6 +87,9 @@ interface Company {
   currency?: string;
   /** Client address for the invoice "Bill To" block. */
   billing_address?: string;
+  /** User-picked identity hue for the Company Web (#rrggbb). Overrides the
+   *  auto hash-assigned hue in Identity mode; unset = auto. */
+  color?: string;
 }
 
 /** Row of task_items (Dispatch tasks + break/lunch), entry_id-scoped. */
@@ -517,6 +520,23 @@ interface CanvasTextApi {
                  baseR: number, maxR: number, padding?: number | null): number;
 }
 
+/** Company Web v2 packed-bubble engine (src/renderer/bubble-web.ts). */
+interface BubbleWebController {
+  update(companies: Company[], entries: EntrySummary[], range: '30' | '90' | 'all'): void;
+  setMatcher(fn: ((co: Company) => boolean) | null): void;
+  destroy(): void;
+}
+interface BubbleWebApi {
+  attach(opts: {
+    canvas: HTMLCanvasElement;
+    wrap: HTMLElement;
+    tooltip: { root: HTMLElement; name: HTMLElement; hier: HTMLElement; detail: HTMLElement };
+    onCompanyClick?: (co: Company, ev: MouseEvent) => void;
+    onCompanyContext?: (co: Company, ev: MouseEvent) => void;
+    mini?: boolean;
+  }): BubbleWebController;
+}
+
 /** hhmm is present exactly when ok is true. */
 interface ParseClockResult { ok: boolean; hhmm?: string; }
 
@@ -581,6 +601,7 @@ interface Window {
   InsightsCompute: InsightsComputeApi;
   ExportHtml: ExportHtmlApi;
   CanvasText: CanvasTextApi;
+  BubbleWeb: BubbleWebApi;
   Shell: ShellApi;
   About: AboutApi;
   parseClockInput(raw: unknown): ParseClockResult;
@@ -657,6 +678,7 @@ declare const RowUtils: RowUtilsApi;
 declare const InsightsCompute: InsightsComputeApi;
 declare const ExportHtml: ExportHtmlApi;
 declare const CanvasText: CanvasTextApi;
+declare const BubbleWeb: BubbleWebApi;
 declare const Shell: ShellApi;
 declare function parseClockInput(raw: unknown): ParseClockResult;
 declare function computeDiffMins(inT: string, outT: string): number;

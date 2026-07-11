@@ -42,6 +42,7 @@
     "src/renderer/pages/tracker.js",
     "src/renderer/pages/invoices.js",
     "src/renderer/pages/insights.js",
+    "src/renderer/bubble-web.js",
     "src/renderer/store.js",
     "src/renderer/ipc.js",
     "src/renderer/validator.js"
