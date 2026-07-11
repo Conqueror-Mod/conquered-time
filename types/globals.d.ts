@@ -303,7 +303,7 @@ interface IpcInvokeMap {
   'audit:dismiss': (payload: { entry_id: number; row_idx: number; type: string }) => MutResult;
   'audit:undismiss': (payload: { entry_id: number; row_idx: number; type: string }) => MutResult;
   'audit:clear-dismissed': () => MutResult;
-  'audit:apply-fix': (payload: object) => MutResult;
+  'audit:apply-fix': (payload: object) => MutResult & { stale?: boolean };
   'audit:open-wizard': (payload?: { mode?: string; theme?: string }) => MutResult;
   'audit:count': () => number;
   'audit:email-notify': (payload: {

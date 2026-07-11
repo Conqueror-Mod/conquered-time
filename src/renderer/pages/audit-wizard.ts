@@ -12,6 +12,8 @@ interface AuditRow extends EntryRow { req_breaks?: number; has_breaks?: number; 
 interface WizardIssue {
   date: string; company: string; entryId: number; rowIdx: number;
   type: string; dKey: string; r: AuditRow;
+  /** updated_at the wizard read for this entry (optimistic-concurrency token). */
+  updatedAt?: number;
 }
 interface AuditMeta { flag: string; cls: string; suggestion: string; fix: string | null; }
 
@@ -117,7 +119,7 @@ window.addEventListener('DOMContentLoaded', async () => {
         if (type === 'ok') return;
         const dKey = `${entryId}:${idx}:${type}`;
         if (dismissedSet.has(dKey)) return;
-        issues.push({ date: e.log_date, company: co?.name || `#${e.company_id}`, entryId, rowIdx: idx, type, dKey, r });
+        issues.push({ date: e.log_date, company: co?.name || `#${e.company_id}`, entryId, rowIdx: idx, type, dKey, r, updatedAt: e.updated_at });
       });
     } catch {}
 
@@ -235,7 +237,17 @@ async function applyFix(): Promise<void> {
   const issue = issues[current];
   const { fix } = auditMeta(issue.type, issue.r);
   if (!fix) return;
-  const res = await api.invoke('audit:apply-fix', { entry_id: issue.entryId, row_idx: issue.rowIdx, fix_type: fix });
+  const res = await api.invoke('audit:apply-fix', {
+    entry_id: issue.entryId, row_idx: issue.rowIdx, fix_type: fix, updated_at: issue.updatedAt,
+  });
+  if (res?.stale) {
+    // The entry changed elsewhere since the wizard snapshotted it. The wizard is
+    // a linear one-shot over that snapshot and can't safely re-index mid-flow, so
+    // skip this issue (no acknowledge) — it'll resurface next time audit is run
+    // against fresh data.
+    advance();
+    return;
+  }
   if (res?.ok) {
     // Auto-acknowledge after successful fix
     await api.invoke('audit:dismiss', { entry_id: issue.entryId, row_idx: issue.rowIdx, type: issue.type });
