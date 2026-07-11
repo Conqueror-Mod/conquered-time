@@ -40,9 +40,10 @@ const Shell = (() => {
     insights:  `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="display:block"><polyline points="1.5,10.5 5.5,6.5 8.5,9 14.5,3" fill="none"/><polyline points="10.5,3 14.5,3 14.5,7" fill="none"/><line x1="1.5" y1="14.5" x2="14.5" y2="14.5" stroke-opacity="0.5"/></svg>`,
   };
 
+  // Profile is deliberately NOT in the nav (community request, v3.19.x): it
+  // lives behind the sidebar avatar (bottom-left) and Settings → Profile.
   const NAV = [
     { id: 'dashboard',  icon: IC.dashboard,  label: 'Dashboard'    },
-    { id: 'profile',    icon: IC.profile,    label: 'Profile'      },
     { id: 'companies',  icon: IC.companies,  label: 'Companies'    },
     { id: 'tracker',    icon: IC.tracker,    label: 'Time Tracker' },
     { id: 'task-timer', icon: IC.tasktimer,  label: 'Dispatch'     },
@@ -120,12 +121,22 @@ const Shell = (() => {
       </div>
 
       <div class="sidebar-user">
-        <div class="sidebar-user-identity">
+        <!-- Profile lives here (not in the nav): clicking the identity block
+             opens a small menu with Edit Profile. Keyboard: Enter/Space via
+             the delegated dispatcher (it's a focusable data-action element). -->
+        <div class="sidebar-user-identity sidebar-user-clickable" id="sidebar-user-identity"
+             tabindex="0" role="button" aria-haspopup="menu" title="Profile"
+             data-action="toggleProfileMenu" data-tip="Your profile — click to edit">
           <div class="sidebar-avatar" id="sidebar-avatar"></div>
           <div class="sidebar-user-text">
             <div class="sidebar-user-name">${user?.display_name || user?.username || '—'}</div>
             ${user?.display_name ? `<div class="sidebar-user-sub">${user.username}</div>` : ''}
           </div>
+        </div>
+        <div id="sidebar-profile-menu" class="sidebar-profile-menu" style="display:none;" role="menu">
+          <button class="sidebar-profile-menu-item" role="menuitem" data-action="navigate" data-arg="profile">
+            <span style="display:inline-flex;align-items:center;">${IC.profile}</span> Edit Profile
+          </button>
         </div>
         <div class="sidebar-active-badge">Active Session</div>
       </div>
@@ -134,6 +145,7 @@ const Shell = (() => {
 
   function buildSettingsModal() {
     const NAV_ITEMS = [
+      { id: 'profile',      label: 'Profile',        icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="7" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg>' },
       { id: 'appearance',   label: 'Appearance',    icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>' },
       { id: 'window',       label: 'Window',         icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 9h20"/><path d="M7 4v5"/></svg>' },
       { id: 'security',     label: 'Security',       icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>' },
@@ -165,6 +177,23 @@ const Shell = (() => {
 
           <!-- Right content -->
           <div class="settings-content">
+
+            <!-- ── PROFILE ──────────────────────────────────── -->
+            <!-- Access point only — the editor stays on the Profile page.
+                 (Profile left the sidebar nav in v3.19.x; it lives behind the
+                 avatar, and here, so there are two ways in.) -->
+            <div id="settings-cat-profile" class="settings-cat-panel" style="display:none;">
+              <div class="sc-title">Profile</div>
+              <div class="settings-group">
+                <div class="settings-group-title">Your Profile</div>
+                <div class="settings-row-label" style="line-height:1.6;">
+                  Display name, avatar, email, password, Work State &amp; break style, and your
+                  business “Bill From” details for invoicing all live on the Profile page.
+                  You can also open it any time by clicking your avatar in the bottom-left corner.
+                </div>
+                <button class="btn-primary" style="margin-top:12px;" data-action="openProfileFromSettings">Open Profile Page</button>
+              </div>
+            </div>
 
             <!-- ── APPEARANCE ───────────────────────────────── -->
             <div id="settings-cat-appearance" class="settings-cat-panel">
@@ -1698,11 +1727,24 @@ function installShellDelegation() {
     armSafeDisable:        ()      => armSafeDisable(),
     disarmSafeDisable:     ()      => disarmSafeDisable(),
     executeSafeDisable:    ()      => executeSafeDisable(),
+    toggleProfileMenu:     ()      => toggleProfileMenu(),
+    openProfileFromSettings: ()    => { closeSettingsModal(); api.send('navigate', 'profile'); },
   };
+
+  function toggleProfileMenu() {
+    const menu = document.getElementById('sidebar-profile-menu');
+    if (menu) menu.style.display = menu.style.display === 'none' ? '' : 'none';
+  }
 
   const run = el => { const fn = ACTIONS[el.dataset.action]; if (fn) fn(el.dataset.arg, el); };
 
   document.addEventListener('click', e => {
+    // Any click outside the identity block closes the profile menu (including
+    // clicks on its own Edit Profile item — navigation replaces the page anyway).
+    const menu = document.getElementById('sidebar-profile-menu');
+    if (menu && menu.style.display !== 'none' && !e.target.closest('#sidebar-user-identity')) {
+      menu.style.display = 'none';
+    }
     const el = e.target.closest('[data-action]');
     if (el) run(el);
   });
@@ -1712,10 +1754,11 @@ function installShellDelegation() {
     if (el) { const fn = ACTIONS[el.dataset.actionChange]; if (fn) fn(el.dataset.arg, el); }
   });
 
-  // Enter activates a focused sidebar nav item (replaces its old inline onkeydown).
+  // Enter activates a focused sidebar nav item (replaces its old inline
+  // onkeydown); also the avatar identity block (role="button") and its menu.
   document.addEventListener('keydown', e => {
-    if (e.key !== 'Enter') return;
-    const el = e.target.closest('.nav-item[data-action]');
+    if (e.key !== 'Enter' && !(e.key === ' ' && e.target.closest('[role="button"]'))) return;
+    const el = e.target.closest('.nav-item[data-action], [role="button"][data-action], .sidebar-profile-menu-item[data-action]');
     if (el) { e.preventDefault(); run(el); }
   });
 }
