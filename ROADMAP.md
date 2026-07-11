@@ -6,12 +6,20 @@ Discord's **#roadmap** channel mirrors this file automatically.
 
 **Status legend:** ✅ Shipped · 🔨 In progress · 🗓️ Planned · 💡 Under consideration
 
-_Last curated: 2026-07-11 (v3.19.1)_
+_Last curated: 2026-07-11 (v3.19.1 + next-up queue)_
 
 ## 🗓️ Planned (next up)
 
-- _Nothing queued — the planned list is fully shipped as of v3.19. Community
-  suggestions decide what lands here next._
+- **Company Web v2 — packed bubbles** — the company web redesigned to stay
+  readable at 25+ companies: bubbles sized by hours in a selectable window
+  (30d / 90d / all-time) with harnessed sizing so no client can drown the rest,
+  dormant and ended companies folded into an expandable **Archive** cluster,
+  and per-company colors — auto-assigned identity hues that fade as a client
+  goes idle, with a right-click **Edit Color** picker to set your own.
+  _(Driven by beta feedback on large company counts.)_
+- **Richer right-click menus** — grow the context menus across the app
+  (starting with the company web: Edit Color, and more quick actions where
+  you'd expect them).
 
 ## 💡 Under consideration
 
