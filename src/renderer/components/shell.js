@@ -37,6 +37,7 @@ const Shell = (() => {
     tasktimer: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:block"><circle cx="8" cy="9" r="5.5"/><line x1="8" y1="9" x2="8" y2="5.8"/><line x1="8" y1="9" x2="10.2" y2="10.3"/><line x1="6.5" y1="1.5" x2="9.5" y2="1.5"/><line x1="8" y1="1.5" x2="8" y2="3.5"/><line x1="13" y1="5" x2="14" y2="4"/></svg>`,
     profile:   `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:block"><circle cx="8" cy="5.5" r="2.8"/><path d="M2 14c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/></svg>`,
     invoices:  `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M3.5 1.5h6.5l2.5 2.5v10.5l-1.5-1-1.5 1-1.5-1-1.5 1-1.5-1-1.5 1V1.5z"/><line x1="5.5" y1="5.5" x2="9.5" y2="5.5"/><line x1="5.5" y1="8" x2="10.5" y2="8"/><line x1="5.5" y1="10.5" x2="8.5" y2="10.5"/></svg>`,
+    insights:  `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="display:block"><polyline points="1.5,10.5 5.5,6.5 8.5,9 14.5,3" fill="none"/><polyline points="10.5,3 14.5,3 14.5,7" fill="none"/><line x1="1.5" y1="14.5" x2="14.5" y2="14.5" stroke-opacity="0.5"/></svg>`,
   };
 
   const NAV = [
@@ -46,6 +47,7 @@ const Shell = (() => {
     { id: 'tracker',    icon: IC.tracker,    label: 'Time Tracker' },
     { id: 'task-timer', icon: IC.tasktimer,  label: 'Dispatch'     },
     { id: 'reports',    icon: IC.reports,    label: 'Reports'      },
+    { id: 'insights',   icon: IC.insights,   label: 'Insights'     },
     { id: 'invoices',   icon: IC.invoices,   label: 'Invoices'     },
     { id: 'global-log', icon: IC.globallog,  label: 'Global Log'   },
   ];

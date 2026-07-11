@@ -460,6 +460,26 @@ interface RowUtilsApi {
   localDateStr(d?: Date): string;
 }
 
+/** Insights entry shape — the parsed rows_json is attached as `rows`. */
+interface InsightEntry {
+  log_date: string; total_mins: number; company_id: number;
+  rows: Array<{ clock_in?: string; clock_out?: string; total_mins?: number }>;
+}
+interface TrendBucket { key: string; label: string; mins: number; }
+/** Pure aggregation helpers for the Insights page (src/renderer/insights-compute.js). */
+interface InsightsComputeApi {
+  parseLocalDate(str: string): Date;
+  filterByRange(entries: InsightEntry[], cutoff: string | null): InsightEntry[];
+  sumMins(entries: InsightEntry[]): number;
+  byCompany(entries: InsightEntry[]): Record<number, number>;
+  byDayOfWeek(entries: InsightEntry[]): number[];
+  byHourOfDay(entries: InsightEntry[]): number[];
+  earningsByCompany(entries: InsightEntry[], rateMap: Record<number, number>): Record<number, number>;
+  trendBuckets(entries: InsightEntry[], bucket: 'week' | 'month'): TrendBucket[];
+  movingAverage(values: number[], window: number): number[];
+  weekKey(d: Date): string;
+}
+
 /** Structural on purpose — the unit tests exercise CanvasText with a stub ctx. */
 interface MeasuringCtx {
   font: string;
@@ -533,6 +553,7 @@ interface Window {
   Store: StoreApi;
   Validator: ValidatorApi;
   RowUtils: RowUtilsApi;
+  InsightsCompute: InsightsComputeApi;
   CanvasText: CanvasTextApi;
   Shell: ShellApi;
   About: AboutApi;
@@ -607,6 +628,7 @@ declare const IPC: IpcWrapper;
 declare const Store: StoreApi;
 declare const Validator: ValidatorApi;
 declare const RowUtils: RowUtilsApi;
+declare const InsightsCompute: InsightsComputeApi;
 declare const CanvasText: CanvasTextApi;
 declare const Shell: ShellApi;
 declare function parseClockInput(raw: unknown): ParseClockResult;

@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy"
+  content="default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'self';">
+<title>Conquered Time — Insights</title>
+<link rel="stylesheet" href="../styles/design-system.css">
+<script src="theme-init.js"></script>
+<style>
+  #insights-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding-right: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  /* Range preset toggles */
+  .range-toggles { display: flex; gap: 6px; }
+  .range-btn {
+    padding: 6px 14px;
+    font-size: 12px;
+    font-family: var(--sans);
+    font-weight: 500;
+    color: var(--text-muted);
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all var(--transition);
+  }
+  .range-btn:hover  { border-color: var(--accent); color: var(--text-bright); }
+  .range-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+
+  /* Summary chips */
+  .insight-chips {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+  .insight-chip {
+    position: relative;
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 14px 16px;
+    box-shadow: var(--shadow-1);
+    overflow: hidden;
+  }
+  .insight-chip::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: var(--accent);
+  }
+  .insight-chip.violet::before { background: var(--accent-2, var(--accent)); }
+  .insight-chip.yellow::before { background: var(--yellow); }
+  .insight-chip.green::before  { background: var(--green); }
+  .chip-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
+  .chip-value { font-family: var(--mono); font-size: 22px; font-weight: 600; color: var(--text-bright); margin-top: 4px; line-height: 1.15; word-break: break-word; }
+  .chip-sub   { font-size: 11px; color: var(--text-dim); margin-top: 3px; }
+
+  /* Panel grid */
+  .insight-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .insight-panel { display: flex; flex-direction: column; }
+  .insight-panel.full { grid-column: 1 / -1; }
+  .insight-panel-body { padding: 14px 16px 16px; flex: 1; min-height: 0; }
+  .insight-hint { font-size: 11px; color: var(--text-dim); margin-top: 8px; line-height: 1.5; }
+
+  .chart-svg-wrap { width: 100%; height: 200px; }
+  .chart-svg-wrap.tall { height: 240px; }
+  .chart-svg-wrap svg { width: 100%; height: 100%; display: block; }
+
+  /* Horizontal breakdown bars (client mix / earnings) */
+  .hbar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; }
+  .hbar-row:last-child { margin-bottom: 0; }
+  .hbar-label {
+    flex: 0 0 34%;
+    font-size: 12px;
+    color: var(--text-bright);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .hbar-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .hbar-dot.ended { opacity: 0.4; }
+  .hbar-track { flex: 1; height: 16px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
+  .hbar-fill { height: 100%; background: var(--accent); border-radius: 4px; min-width: 2px; transition: width 0.3s ease; }
+  .hbar-fill.gold { background: var(--yellow); }
+  .hbar-value { flex: 0 0 auto; font-family: var(--mono); font-size: 11px; color: var(--text-muted); min-width: 62px; text-align: right; }
+
+  .insight-empty { font-size: 12px; color: var(--text-dim); text-align: center; padding: 28px 12px; line-height: 1.6; }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <div class="page-title-block">
+    <div class="page-eyebrow">Analytics</div>
+    <div class="page-title">Insights</div>
+  </div>
+  <div class="page-actions">
+    <div class="range-toggles" id="range-toggles">
+      <button class="range-btn" data-range="30">30d</button>
+      <button class="range-btn active" data-range="90">90d</button>
+      <button class="range-btn" data-range="365">1yr</button>
+      <button class="range-btn" data-range="all">All</button>
+    </div>
+  </div>
+</div>
+
+<div id="insights-scroll">
+
+  <!-- Summary chips -->
+  <div class="insight-chips" id="insight-chips"></div>
+
+  <!-- Trends over time (full width) -->
+  <div class="hud-panel insight-panel full">
+    <div class="hud-panel-header">
+      <div class="hud-panel-title">Trends Over Time</div>
+      <span class="hud-panel-title" style="font-weight:400;color:var(--text-dim);font-size:11px;" id="trend-unit"></span>
+    </div>
+    <div class="insight-panel-body">
+      <div class="chart-svg-wrap tall" id="trend-wrap"><svg id="trend-svg" preserveAspectRatio="none"></svg></div>
+      <div class="insight-hint">Bars are hours per bucket; the line is a moving-average trend.</div>
+    </div>
+  </div>
+
+  <div class="insight-grid">
+    <!-- Busiest days -->
+    <div class="hud-panel insight-panel">
+      <div class="hud-panel-header"><div class="hud-panel-title">Busiest Days</div></div>
+      <div class="insight-panel-body">
+        <div class="chart-svg-wrap" id="dow-wrap"><svg id="dow-svg" preserveAspectRatio="none"></svg></div>
+      </div>
+    </div>
+
+    <!-- Busiest times -->
+    <div class="hud-panel insight-panel">
+      <div class="hud-panel-header"><div class="hud-panel-title">Busiest Times</div></div>
+      <div class="insight-panel-body">
+        <div class="chart-svg-wrap" id="hour-wrap"><svg id="hour-svg" preserveAspectRatio="none"></svg></div>
+        <div class="insight-hint">Distribution of clocked minutes across the hours of the day.</div>
+      </div>
+    </div>
+
+    <!-- Client mix -->
+    <div class="hud-panel insight-panel">
+      <div class="hud-panel-header"><div class="hud-panel-title">Client Mix</div></div>
+      <div class="insight-panel-body" id="client-mix-body"></div>
+    </div>
+
+    <!-- Earnings -->
+    <div class="hud-panel insight-panel">
+      <div class="hud-panel-header">
+        <div class="hud-panel-title">Estimated Earnings</div>
+      </div>
+      <div class="insight-panel-body" id="earnings-body"></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="../components/settings.js"></script>
+<script src="../components/about.js"></script>
+<script src="../components/shell.js"></script>
+<script src="../row-utils.js"></script>
+<script src="../insights-compute.js"></script>
+<script src="insights.js"></script>
+</body>
+</html>
