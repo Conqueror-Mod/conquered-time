@@ -319,12 +319,20 @@ async function initProfileDB(profileDir: string) {
 // reEncryptVault / migrateTimeEntries wrappers live in ./ipc/auth.
 
 // ── Window ─────────────────────────────────────────────────────────────────
-function createSplashWindow(theme: string) {
+function createSplashWindow(theme: string, display?: any) {
+  const W = 600, H = 400;
+  // Center on the display the main window will occupy (preferred display /
+  // remembered bounds) — `center: true` would put the splash on the primary
+  // monitor while the app then opens elsewhere.
+  const pos = display ? {
+    x: Math.round(display.workArea.x + (display.workArea.width - W) / 2),
+    y: Math.round(display.workArea.y + (display.workArea.height - H) / 2),
+  } : null;
   const splash = new BrowserWindow({
-    width: 600, height: 400,
+    width: W, height: H,
+    ...(pos ? pos : { center: true }),
     frame: false,
     resizable: false,
-    center: true,
     alwaysOnTop: true,
     backgroundColor: '#0a0c12',
     icon: path.join(__dirname, '../../assets/icon.ico'),
@@ -340,12 +348,26 @@ function createSplashWindow(theme: string) {
   return splash;
 }
 
+// Center child windows on the display the MAIN WINDOW currently occupies —
+// `center: true` centers on the PRIMARY display, which strands the window on
+// another monitor in multi-display setups.
+function centerOnAppDisplay(width: number, height: number): { x: number; y: number } | null {
+  if (!mainWindow || mainWindow.isDestroyed()) return null;
+  const wa = screen.getDisplayMatching(mainWindow.getBounds()).workArea;
+  return {
+    x: Math.round(wa.x + (wa.width - width) / 2),
+    y: Math.round(wa.y + (wa.height - height) / 2),
+  };
+}
+
 function createAuditWizardWindow(mode?: string, theme?: string) {
+  const W = 680, H = 520;
+  const pos = centerOnAppDisplay(W, H);
   const wizard = new BrowserWindow({
-    width: 680, height: 520,
+    width: W, height: H,
+    ...(pos ? pos : { center: true }),
     frame: false,
     resizable: false,
-    center: true,
     alwaysOnTop: true,
     backgroundColor: '#0d0f14',
     icon: path.join(__dirname, '../../assets/icon.ico'),
@@ -607,19 +629,27 @@ app.whenReady().then(async () => {
   // user opted in. Skips the splash and leaves the window hidden in the tray.
   const startHidden = STARTED_AT_LOGIN && getAppPref('startMinimized', false) === true;
 
-  // Splash always uses zanarkand — it's a brand moment, not a user preference moment.
-  const splash = startHidden ? null : createSplashWindow('zanarkand');
-  createWindow(); // creates hidden (show: false)
-  createTray();
-  // No launch-at-startup re-sync needed here: the OS login item is its own
-  // persistent source of truth (toggled via win:set-launch-at-startup).
-
-  // Apply window position/size settings before show
+  // Window position/size settings — read BEFORE the splash so it can open on
+  // the same display the main window will land on (not always the primary).
   const rememberPos   = readStartupSetting('win_rememberPosition') === 'true';
   const lastBoundsRaw = readStartupSetting('win_lastBounds');
   const prefDisplay   = readStartupSetting('win_preferredDisplay') || 'primary';
   // Default to true — only false when user has explicitly toggled it off
   const startMax      = readStartupSetting('win_startMaximized') !== 'false';
+
+  let splashDisplay: any = null;
+  try {
+    if (rememberPos && lastBoundsRaw) splashDisplay = screen.getDisplayMatching(JSON.parse(lastBoundsRaw));
+    else if (prefDisplay !== 'primary')
+      splashDisplay = screen.getAllDisplays().find((d: any) => d.id === Number(prefDisplay)) || null;
+  } catch {}
+
+  // Splash always uses zanarkand — it's a brand moment, not a user preference moment.
+  const splash = startHidden ? null : createSplashWindow('zanarkand', splashDisplay);
+  createWindow(); // creates hidden (show: false)
+  createTray();
+  // No launch-at-startup re-sync needed here: the OS login item is its own
+  // persistent source of truth (toggled via win:set-launch-at-startup).
 
   if (rememberPos && lastBoundsRaw) {
     try {
