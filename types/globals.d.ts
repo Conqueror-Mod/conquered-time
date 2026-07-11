@@ -460,6 +460,31 @@ interface RowUtilsApi {
   localDateStr(d?: Date): string;
 }
 
+/** Branded in-app export builders (src/renderer/export-html.js) — the tracker
+ *  and Global Log PDF exports share the emailed-report visual identity. */
+interface ExportRow {
+  label?: string; name?: string; desc?: string;
+  clock_in?: string; clock_out?: string; total_mins?: number;
+}
+interface ExportSessionInput {
+  companyName: string; hier: string; metaLines: string[];
+  dateLabel: string; sessionLabel: string;
+  rows: ExportRow[]; totalMins: number; fontCss?: string;
+}
+interface ExportLogInput {
+  companyName: string; hier: string; metaLines: string[];
+  fromDate: string; toDate: string;
+  sessions: Array<{ dateLabel: string; sessionLabel: string; rows: ExportRow[]; totalMins: number }>;
+  grandTotalMins: number; fontCss?: string;
+}
+interface ExportHtmlApi {
+  buildSessionExportHTML(input: ExportSessionInput): string;
+  buildLogExportHTML(input: ExportLogInput): string;
+  labelBreakdown(rows: ExportRow[]): Array<[string, number]>;
+  fmtMins(m: number): string;
+  escapeHtml(v: unknown): string;
+}
+
 /** Insights entry shape — the parsed rows_json is attached as `rows`. */
 interface InsightEntry {
   log_date: string; total_mins: number; company_id: number;
@@ -554,6 +579,7 @@ interface Window {
   Validator: ValidatorApi;
   RowUtils: RowUtilsApi;
   InsightsCompute: InsightsComputeApi;
+  ExportHtml: ExportHtmlApi;
   CanvasText: CanvasTextApi;
   Shell: ShellApi;
   About: AboutApi;
@@ -629,6 +655,7 @@ declare const Store: StoreApi;
 declare const Validator: ValidatorApi;
 declare const RowUtils: RowUtilsApi;
 declare const InsightsCompute: InsightsComputeApi;
+declare const ExportHtml: ExportHtmlApi;
 declare const CanvasText: CanvasTextApi;
 declare const Shell: ShellApi;
 declare function parseClockInput(raw: unknown): ParseClockResult;
