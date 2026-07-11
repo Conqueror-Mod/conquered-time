@@ -250,13 +250,25 @@ td {
 /* ══════════════════════════════════════════════════════════════
    TOASTS
    ══════════════════════════════════════════════════════════════ */
+/* Toast sizing tokens — bumped ~35% larger (in-field feedback: toasts read too
+   small). Change these to rescale ALL toasts (plain + action variants) at once. */
+:root {
+  --toast-font:      18px;   /* base 13 → 18 */
+  --toast-pad-y:     14px;   /* base 10 → 14 */
+  --toast-pad-x:     22px;   /* base 16 → 22 */
+  --toast-max-w:     432px;  /* base 320 → 432 */
+  --toast-gap:       11px;   /* container gap 8 → 11 */
+  --toast-btn-font:  16px;   /* action-button 12 → 16 */
+  --toast-btn-pad-y: 7px;    /* action-button 5 → 7 */
+  --toast-btn-pad-x: 14px;   /* action-button 10 → 14 */
+}
 #toast-container {
   position: fixed;
   bottom: 20px;
   right: 20px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--toast-gap);
   z-index: 9999;
   pointer-events: none;
 }
@@ -264,14 +276,14 @@ td {
   background: var(--surface-3);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-lg);
-  padding: 10px 16px;
+  padding: var(--toast-pad-y) var(--toast-pad-x);
   font-family: var(--sans);
-  font-size: 13px;
+  font-size: var(--toast-font);
   font-weight: 400;
   color: var(--text-bright);
   box-shadow: var(--shadow-3);
   animation: toast-in 0.2s ease forwards;
-  max-width: 320px;
+  max-width: var(--toast-max-w);
 }
 .toast.success { border-left: 3px solid var(--green);  }
 .toast.error   { border-left: 3px solid var(--red);    }
@@ -357,7 +369,7 @@ td {
   gap: 8px;
 }
 .pomo-alert-btns { display: flex; gap: 8px; }
-.pomo-alert-btns button { font-size: 12px; padding: 5px 10px; }
+.pomo-alert-btns button { font-size: var(--toast-btn-font); padding: var(--toast-btn-pad-y) var(--toast-btn-pad-x); }
 
 /* Auto-updater notice (see components/update-notice.js) — an actionable toast
    that must stand out, with an accent edge. Same action-toast layout as above. */
@@ -370,7 +382,7 @@ td {
 }
 .update-toast-msg { font-weight: 600; }
 .update-toast-btns { display: flex; gap: 8px; }
-.update-toast-btns button { font-size: 12px; padding: 5px 10px; }
+.update-toast-btns button { font-size: var(--toast-btn-font); padding: var(--toast-btn-pad-y) var(--toast-btn-pad-x); }
 
 /* ══════════════════════════════════════════════════════════════
    ONBOARDING TOUR (coach-marks — see components/onboarding.js)
