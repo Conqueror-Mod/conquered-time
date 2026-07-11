@@ -36,6 +36,7 @@ const Onboarding = (() => {
 
   /**
    * @typedef {Object} TourStep
+   * @property {string} id             stable id — hooks look indices up by id
    * @property {string} page           inner-page name (navigate target)
    * @property {string|string[]|null} sel  CSS selector(s) to spotlight (null = centered)
    * @property {string} title
@@ -50,51 +51,65 @@ const Onboarding = (() => {
 
   /** @type {TourStep[]} */
   const STEPS = [
-    { page: 'dashboard', sel: null,
+    { id: 'welcome', page: 'dashboard', sel: null,
       title: 'Welcome to Conquered Time',
       body: 'Everything you track here is encrypted on this device with AES-256-GCM and never leaves it. This quick tour walks you through your first setup.' },
-    { page: 'profile', sel: ['#field-work-state', '#field-break-style', '#pomodoro-preset-group', '#field-email'],
-      title: 'Set your Work State & Break Style',
-      body: 'Your Work state sets the break and lunch rules the tracker warnings and audits check against. Prefer structured focus cycles instead? Switch Break Style to Pomodoro and pick a preset. While you’re here, add your email address too — <strong>reports and audit notifications need it</strong>, and you’ll be reminded before you can move on without one.',
+    // Spotlights the sidebar avatar (Profile's home since it left the nav,
+    // v3.19.x) while the page behind IS the profile editor — the union
+    // spotlight isn't used here because icon + fields span the whole viewport.
+    { id: 'profile', page: 'profile', sel: '#sidebar-user-identity',
+      cardAt: { sel: '#sidebar-user-identity', side: 'right' },
+      title: 'Your Profile — behind your avatar',
+      body: 'This is your profile — it lives behind <strong>your avatar, right here in the corner</strong> (and under Settings → Profile). Click it any time to edit. You’re on the profile page now: set your <strong>Work State</strong> (it drives break & lunch rules), add your <strong>email</strong> — reports and audit notifications need it — and scroll down to save your <strong>Billing details</strong>: your business name, address, and currency become the “Bill From” block on every invoice you issue, so filling them in now pays off later.',
       enter: profileStepEnter, leave: profileStepLeave },
-    { page: 'companies', sel: '#btn-add-company',
+    { id: 'companies', page: 'companies', sel: '#btn-add-company',
       title: 'Add your first company',
       body: 'Companies are who you work for — each holds its own projects, platforms, and hours. Add one here; the web view around it grows as you log time.' },
-    { page: 'tracker', sel: '.clock-module',
+    { id: 'tracker', page: 'tracker', sel: '.clock-module',
       title: 'Clock in to work',
       body: 'Pick a company and date, give the work a Task Label and Task Name, then Clock In. Breaks and lunches are punched here too, and every action autosaves. The table below shows what a logged session looks like.',
       enter: () => { void demoTracker(); } },
-    { page: 'task-timer', sel: '.tt-input-panel',
+    { id: 'dispatch', page: 'task-timer', sel: '.tt-input-panel',
       title: 'Time tasks with Dispatch',
       body: 'While clocked in, Dispatch times individual tasks and writes what you did back into the session’s Description. If you chose Pomodoro, your focus/break cycle runs here as well — this is what a live session looks like.',
       cardAt: { sel: '#sidebar-task-timer', side: 'right' },
       enter: () => { void demoDispatch(); } },
-    { page: 'reports', sel: '.tab-bar',
+    { id: 'rpt-period', page: 'reports', sel: '.tab-bar',
       title: 'Reports — Period Summary',
       body: 'Pick a date range and company to see total hours, daily bars, and a task-label breakdown for the period.',
       cardAt: { sel: '.tab-bar', side: 'right' },
-      enter: () => { assertReportsTab('period', 5); void demoReportsPeriod(); } },
-    { page: 'reports', sel: '.tab-bar',
+      enter: () => { assertReportsTab('period', stepIndexOf('rpt-period')); void demoReportsPeriod(); } },
+    { id: 'rpt-company', page: 'reports', sel: '.tab-bar',
       title: 'Reports — Company Breakdown',
       body: 'Every company gets a card: total hours, session count, last active date, and where the time went by task label.',
       cardAt: { sel: '.tab-bar', side: 'right' },
-      enter: () => { assertReportsTab('company', 6); void demoReportsCompany(); } },
-    { page: 'reports', sel: '.tab-bar',
+      enter: () => { assertReportsTab('company', stepIndexOf('rpt-company')); void demoReportsCompany(); } },
+    { id: 'rpt-audit', page: 'reports', sel: '.tab-bar',
       title: 'Reports — Audit Log',
       body: 'The audit checks every punch for problems — missing clock-outs, skipped breaks, duration drift — and suggests fixes. Nothing is ever changed without your explicit confirmation.',
       cardAt: { sel: '.tab-bar', side: 'right' },
-      enter: () => { assertReportsTab('audit', 7); void demoReportsAudit(); } },
-    { page: 'invoices', sel: null,
+      enter: () => { assertReportsTab('audit', stepIndexOf('rpt-audit')); void demoReportsAudit(); } },
+    { id: 'insights', page: 'insights', sel: '#range-toggles',
+      title: 'Insights — your time, analyzed',
+      body: 'Insights turns your tracked hours into analytics: <strong>trends over time</strong> (with a moving-average line), your <strong>busiest days and times</strong>, the <strong>client mix</strong>, and <strong>estimated earnings</strong> from each client’s billing rate. Use the 30d / 90d / 1yr / All toggles to change the window — everything on the page recalculates. The more you track, the sharper it gets.',
+      enter: () => { void demoInsights(); } },
+    { id: 'invoices', page: 'invoices', sel: null,
       title: 'Invoices — bill your hours',
       body: 'Turn tracked time into client invoices. Pick a company and date range, preview, then issue a numbered invoice — per-day line items are built from your logged hours, with optional tax and payment terms. Each invoice lands in the ledger below where you can mark it Paid, save a branded PDF, or email it to the client. Set each client’s rate and currency on its Company, and your own “Bill From” business details on your Profile.' },
-    { page: 'global-log', sel: null,
+    { id: 'global-log', page: 'global-log', sel: null,
       title: 'Review & export',
       body: 'The Global Log is your full history across companies — filter it, expand a session for its punches, export CSV or PDF, or jump back into any session with Open.',
       enter: () => { void demoGlobalLog(); } },
-    { page: 'dashboard', sel: null,
+    { id: 'finish', page: 'dashboard', sel: null,
       title: 'You’re all set',
       body: 'Hover any control for a hint — tooltips are everywhere. Settings is Ctrl+, whenever you need it, and you can replay this guide from Settings → About.' },
   ];
+
+  // Step index by id — enter/demo hooks must NEVER hardcode indices: the
+  // invoices-step insertion (v3.16) silently broke demoGlobalLog because its
+  // hardcoded demoAssert(8) kept pointing at the shifted invoices slot.
+  /** @param {string} id */
+  const stepIndexOf = id => STEPS.findIndex(s => s.id === id);
 
   let escBound = false;
   /** Index of the step currently rendered ON THIS PAGE (for leave hooks). */
@@ -152,7 +167,13 @@ const Onboarding = (() => {
     sessionStorage.setItem(KEY, String(idx));
     if (currentPage() !== step.page) {
       renderedIdx = null;
-      teardown();
+      // Deliberately NO teardown() here: removing the dim before loadFile()
+      // swaps the page let the old page paint fully lit for a beat — a visible
+      // "flash" between tour steps. The navigation wipes the DOM (overlay
+      // included) anyway; the incoming page rebuilds the dim inside Shell.init
+      // while it is still visibility:hidden, so the dim now carries across.
+      // Freeze the outgoing card's buttons so a double-click can't re-fire.
+      document.querySelectorAll('#ct-tour-card button').forEach(b => { /** @type {HTMLButtonElement} */ (b).disabled = true; });
       api.send('navigate', step.page);
       return;
     }
@@ -378,7 +399,7 @@ const Onboarding = (() => {
     // again) — so re-assert for a few seconds rather than setting it once.
     const until = Date.now() + FOLLOW_MS;
     const assert = () => {
-      if (renderedIdx !== 1 || Date.now() > until) return;
+      if (renderedIdx !== stepIndexOf('profile') || Date.now() > until) return;
       const pg = document.getElementById('pomodoro-preset-group');
       if (pg && pg.style.display === 'none') pg.style.display = '';
       setTimeout(assert, FOLLOW_TICK);
@@ -472,7 +493,7 @@ const Onboarding = (() => {
 
   async function demoTracker() {
     if (await vaultHasEntries()) return;
-    demoAssert(3, () => !demoAlready('tracker'), () => {
+    demoAssert(stepIndexOf('tracker'), () => !demoAlready('tracker'), () => {
       const tbody = document.getElementById('tbody');
       if (!tbody) return;
       const cell = (v, mono) => `<td style="${mono ? 'font-family:var(--mono);' : ''}color:var(--text-muted);">${v}</td>`;
@@ -541,7 +562,7 @@ const Onboarding = (() => {
     };
 
     // Broken when the page's null-activeEntry render has re-hidden the demo.
-    demoAssert(4, () => {
+    demoAssert(stepIndexOf('dispatch'), () => {
       const noMsg = document.getElementById('no-session-msg');
       const main  = document.getElementById('tt-main');
       return (noMsg ? noMsg.style.display !== 'none' : false)
@@ -552,7 +573,7 @@ const Onboarding = (() => {
 
   async function demoReportsPeriod() {
     if (await vaultHasEntries()) return;
-    demoAssert(5, () => {
+    demoAssert(stepIndexOf('rpt-period'), () => {
       // The page's chart redraw replaces the SVG's CONTENT while the marker
       // attribute survives — detect the overwrite by bar count, not marker.
       const svg = document.getElementById('bar-svg');
@@ -599,7 +620,7 @@ const Onboarding = (() => {
 
   async function demoReportsCompany() {
     try { if (((await api.invoke('companies:list')) || []).length > 0) return; } catch { return; }
-    demoAssert(6, () => !demoAlready('rpt-company'), () => {
+    demoAssert(stepIndexOf('rpt-company'), () => !demoAlready('rpt-company'), () => {
     const cards = document.getElementById('company-cards');
     if (!cards) return;
     cards.innerHTML = `<div data-tour-demo="rpt-company" style="grid-column:1/-1;">${demoPill()}</div>
@@ -626,7 +647,7 @@ const Onboarding = (() => {
 
   async function demoReportsAudit() {
     if (await vaultHasEntries()) return;
-    demoAssert(7, () => !demoAlready('rpt-audit'), () => {
+    demoAssert(stepIndexOf('rpt-audit'), () => !demoAlready('rpt-audit'), () => {
     const tbody = document.getElementById('audit-tbody');
     if (!tbody) return;
     const label = document.getElementById('audit-count-label');
@@ -642,7 +663,7 @@ const Onboarding = (() => {
 
   async function demoGlobalLog() {
     if (await vaultHasEntries()) return;
-    demoAssert(8, () => !demoAlready('global-log'), () => {
+    demoAssert(stepIndexOf('global-log'), () => !demoAlready('global-log'), () => {
     const tbody = document.getElementById('log-tbody');
     if (!tbody) return;
     tbody.innerHTML = `
@@ -657,6 +678,74 @@ const Onboarding = (() => {
       </tr>`;
     const count = document.getElementById('row-count');
     if (count) count.textContent = 'Showing 1 session (example)';
+    });
+  }
+
+  async function demoInsights() {
+    if (await vaultHasEntries()) return;
+    demoAssert(stepIndexOf('insights'), () => {
+      // The page's own render replaces SVG content while markers survive —
+      // detect the overwrite by bar count (same trick as demoReportsPeriod).
+      const svg = document.getElementById('trend-svg');
+      return !document.querySelector('#insight-chips [data-tour-demo="insights"]')
+        || !(svg && svg.querySelectorAll('rect').length >= 8);
+    }, () => {
+      const chips = document.getElementById('insight-chips');
+      if (chips && !chips.querySelector('[data-tour-demo="insights"]')) {
+        chips.innerHTML = `
+          <div class="insight-chip" data-tour-demo="insights"><div class="chip-label">Total Hours</div><div class="chip-value">142.5h</div><div class="chip-sub">61 sessions (example)</div></div>
+          <div class="insight-chip green"><div class="chip-label">Est. Earnings</div><div class="chip-value" style="font-size:19px;">$3,990</div><div class="chip-sub">estimated</div></div>
+          <div class="insight-chip violet"><div class="chip-label">Avg / Week</div><div class="chip-value">11.1h</div><div class="chip-sub">over 90d</div></div>
+          <div class="insight-chip yellow"><div class="chip-label">Active Clients</div><div class="chip-value">2</div><div class="chip-sub">with logged time</div></div>`;
+        chips.insertAdjacentHTML('beforebegin', `<div data-tour-demo="insights-pill">${demoPill()}</div>`);
+      }
+      const svg = document.getElementById('trend-svg');
+      if (svg && svg.querySelectorAll('rect').length < 8) {
+        const heights = [22, 35, 30, 48, 42, 58, 50, 66, 60, 72, 68, 80];
+        let out = '';
+        for (let i = 0; i <= 4; i++) {
+          const y = 108 - i * 25;
+          out += `<line x1="30" y1="${y}" x2="392" y2="${y}" stroke="var(--border)" stroke-width="0.5"/>`;
+        }
+        const pts = [];
+        heights.forEach((h, i) => {
+          const x = 34 + i * 30;
+          out += `<rect x="${x}" y="${108 - h}" width="18" height="${h}" rx="1.5" fill="var(--accent)" fill-opacity="0.55"/>`;
+          pts.push(`${x + 9},${108 - h + 6}`);
+        });
+        out += `<polyline points="${pts.join(' ')}" fill="none" stroke="var(--yellow)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
+        svg.setAttribute('viewBox', '0 0 400 116');
+        svg.setAttribute('data-tour-demo', 'insights-trend');
+        svg.innerHTML = out;
+      }
+      const mix = document.getElementById('client-mix-body');
+      if (mix && !mix.querySelector('[data-tour-demo="insights"]')) {
+        mix.innerHTML = `
+          <div class="hbar-row" data-tour-demo="insights">
+            <div class="hbar-label"><span class="hbar-dot" style="background:var(--accent);"></span>Example Co</div>
+            <div class="hbar-track"><div class="hbar-fill" style="width:100%;"></div></div>
+            <div class="hbar-value">98.0h · 69%</div>
+          </div>
+          <div class="hbar-row">
+            <div class="hbar-label"><span class="hbar-dot" style="background:var(--accent);"></span>Sample Client</div>
+            <div class="hbar-track"><div class="hbar-fill" style="width:45%;"></div></div>
+            <div class="hbar-value">44.5h · 31%</div>
+          </div>`;
+      }
+      const earn = document.getElementById('earnings-body');
+      if (earn && !earn.querySelector('[data-tour-demo="insights"]')) {
+        earn.innerHTML = `
+          <div class="hbar-row" data-tour-demo="insights">
+            <div class="hbar-label">Example Co</div>
+            <div class="hbar-track"><div class="hbar-fill gold" style="width:100%;"></div></div>
+            <div class="hbar-value">$2,740</div>
+          </div>
+          <div class="hbar-row">
+            <div class="hbar-label">Sample Client</div>
+            <div class="hbar-track"><div class="hbar-fill gold" style="width:45%;"></div></div>
+            <div class="hbar-value">$1,250</div>
+          </div>`;
+      }
     });
   }
 

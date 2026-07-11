@@ -22,6 +22,22 @@ const electronBin = process.platform === 'win32'
 let app = null, page = null;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
+// Playwright pins an emulated viewport (~1280×800) on Electron windows, so a
+// maximized OS window renders its content in the top-left corner with dead
+// space around it — it LOOKS like a broken app during driven tests, but users
+// can never see it (harness-only artifact). Sync the emulated viewport to the
+// window's real content size whenever we (re)bind a page.
+async function syncViewport() {
+  if (!page || page.isClosed()) return;
+  try {
+    const [w, h] = await app.evaluate(({ BrowserWindow }) => {
+      const win = BrowserWindow.getAllWindows().find(b => b.isVisible()) || BrowserWindow.getAllWindows()[0];
+      return win ? win.getContentSize() : [1280, 800];
+    });
+    await page.setViewportSize({ width: w, height: h });
+  } catch {}
+}
+
 async function waitURL(frag, timeout = 20000) {
   const t0 = Date.now();
   while (Date.now() - t0 < timeout) {
@@ -51,6 +67,7 @@ const COMMANDS = {
     page = await app.firstWindow();
     await waitURL('login');                       // splash may precede this
     await page.waitForSelector('#login-username', { timeout: 15_000 });
+    await syncViewport();
     console.log('launched — at login screen');
   },
 
@@ -62,6 +79,7 @@ const COMMANDS = {
     await page.evaluate(() => doLogin());
     await waitURL('dashboard');
     await sleep(1200);
+    await syncViewport();
     console.log('logged in — at dashboard');
   },
 
@@ -70,6 +88,7 @@ const COMMANDS = {
     await page.evaluate(d => api.send('navigate', d), dest);
     await waitURL(dest);
     await sleep(800);
+    await syncViewport();
     console.log('navigated to', dest);
   },
 

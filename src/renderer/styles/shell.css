@@ -143,6 +143,48 @@
   width: 100%;
   margin-bottom: 5px;
 }
+/* Profile entry point (v3.19.x — replaced the Profile nav item): the identity
+   block is clickable and opens a small Edit Profile menu above it. */
+.sidebar-user { position: relative; }
+.sidebar-user-clickable {
+  cursor: pointer;
+  border-radius: var(--radius);
+  padding: 4px 6px;
+  transition: background var(--transition), box-shadow var(--transition);
+}
+.sidebar-user-clickable:hover,
+.sidebar-user-clickable:focus-visible {
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--border-light);
+  outline: none;
+}
+.sidebar-profile-menu {
+  position: absolute;
+  left: 12px; right: 12px;
+  bottom: calc(100% + 4px);
+  background: var(--surface-3);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-3);
+  padding: 4px;
+  z-index: 50;
+}
+.sidebar-profile-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--text-bright);
+  background: none;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.sidebar-profile-menu-item:hover { background: var(--accent-dim); color: var(--accent); }
 .sidebar-user-text {
   display: flex;
   flex-direction: column;
