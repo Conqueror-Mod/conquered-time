@@ -193,133 +193,60 @@ function exportAllPDF(): void {
   const co=compMap[coId];
   const sessions=[...filtered].reverse(); // chronological order
   const grandTotal=filtered.reduce((s,e)=>s+e.total_mins,0);
-  const dateFrom=sessions[0]?.log_date;
-  const dateTo=sessions[sessions.length-1]?.log_date;
-  const allRows: EntryRow[]=[];
-  sessions.forEach(e=>safeParseRows(e.rows_json).forEach(r=>{if(RowUtils.rowHasContent(r))allRows.push(r);}));
-  const hierParts=co?[co.hier_company,co.hier_project,co.hier_platform,co.name].filter(Boolean).join(' › '):'—';
-  const summaryBreakdown=buildLabelBreakdown(allRows);
-  const summaryBdHtml=summaryBreakdown.length>=2?`
-    <h2 style="font-size:13px;font-weight:600;color:#374151;margin:20px 0 8px;border-bottom:1px solid #e5e7eb;padding-bottom:4px;">Time by Label</h2>
-    <table style="width:260px;">
-      <thead><tr><th>Label</th><th style="text-align:right;">Total</th></tr></thead>
-      <tbody>${summaryBreakdown.map(([lbl,mins])=>`<tr><td>${escapeHtml(lbl)}</td><td style="text-align:right;font-variant-numeric:tabular-nums;">${fmtHFull(mins)}</td></tr>`).join('')}
-      <tr class="total-row"><td>Total</td><td style="text-align:right;">${fmtHFull(grandTotal)}</td></tr></tbody>
-    </table>`:'';
-  const sessionBlocks=sessions.map(e=>{
-    const sRows=safeParseRows(e.rows_json).filter(r=>RowUtils.rowHasContent(r));
-    const taskRows=sRows.map((r,i)=>`<tr>
-      <td>${String(i+1).padStart(2,'0')}</td>
-      <td>${escapeHtml(r.label)}</td><td>${escapeHtml(r.name)}</td>
-      <td>${escapeHtml(flattenText(r.desc||r.description))}</td>
-      <td>${r.clock_in||''}</td><td>${r.clock_out||''}</td>
-      <td>${fmtHFull(r.total_mins)}</td>
-    </tr>`).join('');
-    const bd=buildLabelBreakdown(sRows);
-    const bdHtml=bd.length>=2?`
-      <div style="margin-top:8px;">
-        <table style="width:260px;">
-          <thead><tr><th>Label</th><th style="text-align:right;">Total</th></tr></thead>
-          <tbody>${bd.map(([lbl,mins])=>`<tr><td>${escapeHtml(lbl)}</td><td style="text-align:right;font-variant-numeric:tabular-nums;">${fmtHFull(mins)}</td></tr>`).join('')}</tbody>
-        </table>
-      </div>`:'';
-    return `<div class="session-block">
-      <div class="session-header">${escapeHtml(e.log_date)}${e.session_label?' · '+escapeHtml(e.session_label):''}</div>
-      <table>
-        <thead><tr><th>#</th><th>Label</th><th>Name</th><th>Description</th><th>Clock In</th><th>Clock Out</th><th>Duration</th></tr></thead>
-        <tbody>${taskRows}<tr class="total-row"><td colspan="6" style="text-align:right;">Session Total</td><td>${fmtHFull(e.total_mins)}</td></tr></tbody>
-      </table>${bdHtml}
-    </div>`;
-  }).join('');
-  const metaLines=[
-    co.job_title?`<div class="meta">${escapeHtml(co.job_title)}</div>`:'',
-    co.work_type?`<div class="meta">Work type: ${escapeHtml(co.work_type)}</div>`:'',
-    co.location?`<div class="meta">Location: ${escapeHtml(co.location)}</div>`:'',
-    co.supervisors?`<div class="meta">Submitted to: ${escapeHtml(co.supervisors)}</div>`:'',
-  ].join('');
+
+  const html = ExportHtml.buildLogExportHTML({
+    companyName: co.name,
+    hier: [co.hier_company, co.hier_project, co.hier_platform, co.name].filter(Boolean).join(' › '),
+    metaLines: exportMeta(co),
+    fromDate: sessions[0]?.log_date || '',
+    toDate: sessions[sessions.length-1]?.log_date || '',
+    sessions: sessions.map(e => ({
+      dateLabel: e.log_date,
+      sessionLabel: e.session_label || '',
+      rows: toExportRows(safeParseRows(e.rows_json)),
+      totalMins: e.total_mins || 0,
+    })),
+    grandTotalMins: grandTotal,
+    fontCss: window.PDF_FONT_CSS || '',
+  });
   const win=window.open('','_blank')!;
-  win.document.write(`<!DOCTYPE html><html><head><title>Timesheet</title>
-  <style>${window.PDF_FONT_CSS || ''}</style>
-  <style>
-    body{font-family:Inter,system-ui,sans-serif;font-size:12px;color:#111;padding:40px;max-width:960px;margin:0 auto;}
-    h1{font-size:20px;font-weight:600;margin:0 0 3px;}
-    .meta{color:#666;font-size:11px;margin-bottom:3px;}
-    .hier{color:#2563eb;font-size:11px;font-weight:500;margin-bottom:4px;}
-    .summary-period{font-size:11px;color:#374151;margin-bottom:4px;}
-    table{width:100%;border-collapse:collapse;margin-top:8px;}
-    th{background:#f1f5f9;border-bottom:2px solid #2563eb;padding:9px 8px;text-align:left;font-size:11px;font-weight:600;color:#374151;}
-    td{padding:8px;border-bottom:1px solid #e5e7eb;font-size:12px;}
-    .total-row{font-weight:600;background:#f9fafb;}
-    .session-block{margin-top:28px;page-break-inside:avoid;}
-    .session-header{font-size:12px;font-weight:600;color:#374151;border-bottom:2px solid #2563eb;padding-bottom:4px;margin-bottom:0;}
-    .footer{margin-top:32px;color:#9ca3af;font-size:10px;border-top:1px solid #e5e7eb;padding-top:10px;display:flex;justify-content:space-between;}
-  </style></head><body>
-  <h1>${escapeHtml(co.name)}</h1>
-  ${metaLines}
-  <div class="hier">${escapeHtml(hierParts)}</div>
-  <div class="summary-period">Period: ${dateFrom} – ${dateTo} &nbsp;·&nbsp; ${sessions.length} session${sessions.length!==1?'s':''} &nbsp;·&nbsp; Grand total: ${fmtHFull(grandTotal)}</div>
-  ${summaryBdHtml}
-  ${sessionBlocks}
-  <div class="footer"><span>Generated by Conquered Time · ${new Date().toLocaleString()}</span><span>CONFIDENTIAL</span></div>
-  </body></html>`);
+  win.document.write(html);
   win.document.close(); win.print();
 }
 
-function buildLabelBreakdown(rows: EntryRow[]): Array<[string, number]> {
-  const map: Record<string, number>={};
-  rows.filter(r=>r.label).forEach(r=>{ map[r.label!]=(map[r.label!]||0)+(r.total_mins||0); });
-  return Object.entries(map).sort((a,b)=>b[1]-a[1]);
+// Shared meta lines for both export shapes (NavID deliberately excluded).
+function exportMeta(co: Company | undefined): string[] {
+  return [
+    co?.job_title || '',
+    co?.work_type ? `Work type: ${co.work_type}` : '',
+    co?.location ? `Location: ${co.location}` : '',
+    co?.supervisors ? `Submitted to: ${co.supervisors}` : '',
+  ];
 }
 
+function toExportRows(rows: EntryRow[]): ExportRow[] {
+  return rows.filter(r => RowUtils.rowHasContent(r)).map(r => ({
+    label: r.label, name: r.name, desc: flattenText(r.desc || r.description),
+    clock_in: r.clock_in, clock_out: r.clock_out, total_mins: r.total_mins || 0,
+  }));
+}
+
+// Renders through the shared branded builder (src/renderer/export-html.js) so
+// this export matches the emailed report's identity.
 function printTimesheet(co: Company | undefined, dateStr: string, sessionLabel: string,
                         rows: EntryRow[], totalMins: number): void {
-  const hierParts=co?[co.hier_company,co.hier_project,co.hier_platform,co.name].filter(Boolean).join(' › '):'—';
-  const filledRows=rows.filter(r=>RowUtils.rowHasContent(r));
-  const taskRows=filledRows.map((r,i)=>`<tr>
-    <td>${String(i+1).padStart(2,'0')}</td>
-    <td>${escapeHtml(r.label)}</td><td>${escapeHtml(r.name)}</td>
-    <td>${escapeHtml(flattenText(r.desc||r.description))}</td>
-    <td>${r.clock_in||''}</td><td>${r.clock_out||''}</td>
-    <td>${fmtHFull(r.total_mins)}</td>
-  </tr>`).join('');
-  const breakdown=buildLabelBreakdown(filledRows);
-  const bdHtml=breakdown.length>=2?`
-    <h2 style="font-size:12px;font-weight:600;color:#374151;margin:20px 0 6px;border-bottom:1px solid #e5e7eb;padding-bottom:4px;">Time by Label</h2>
-    <table style="width:260px;">
-      <thead><tr><th>Label</th><th style="text-align:right;">Total</th></tr></thead>
-      <tbody>${breakdown.map(([lbl,mins])=>`<tr><td>${escapeHtml(lbl)}</td><td style="text-align:right;font-variant-numeric:tabular-nums;">${fmtHFull(mins)}</td></tr>`).join('')}</tbody>
-    </table>`:'';
-  const metaLines=[
-    co?.job_title?`<div class="meta">${escapeHtml(co.job_title)}${sessionLabel?' · '+escapeHtml(sessionLabel):''}</div>`:(sessionLabel?`<div class="meta">${escapeHtml(sessionLabel)}</div>`:''),
-    co?.work_type?`<div class="meta">Work type: ${escapeHtml(co.work_type)}</div>`:'',
-    co?.location?`<div class="meta">Location: ${escapeHtml(co.location)}</div>`:'',
-    co?.supervisors?`<div class="meta">Submitted to: ${escapeHtml(co.supervisors)}</div>`:'',
-  ].join('');
+  const html = ExportHtml.buildSessionExportHTML({
+    companyName: co?.name || 'Timesheet',
+    hier: co ? [co.hier_company, co.hier_project, co.hier_platform, co.name].filter(Boolean).join(' › ') : '',
+    metaLines: exportMeta(co),
+    dateLabel: dateStr,
+    sessionLabel,
+    rows: toExportRows(rows),
+    totalMins,
+    fontCss: window.PDF_FONT_CSS || '',
+  });
   const win=window.open('','_blank')!;
-  win.document.write(`<!DOCTYPE html><html><head><title>Timesheet</title>
-  <style>${window.PDF_FONT_CSS || ''}</style>
-  <style>
-    body{font-family:Inter,system-ui,sans-serif;font-size:12px;color:#111;padding:40px;max-width:960px;margin:0 auto;}
-    h1{font-size:20px;font-weight:600;margin:0 0 3px;}
-    .meta{color:#666;font-size:11px;margin-bottom:3px;}
-    .hier{color:#2563eb;font-size:11px;font-weight:500;margin-bottom:20px;}
-    table{width:100%;border-collapse:collapse;margin-top:12px;}
-    th{background:#f1f5f9;border-bottom:2px solid #2563eb;padding:9px 8px;text-align:left;font-size:11px;font-weight:600;color:#374151;}
-    td{padding:8px;border-bottom:1px solid #e5e7eb;font-size:12px;}
-    .total-row{font-weight:600;background:#f9fafb;}
-    .footer{margin-top:32px;color:#9ca3af;font-size:10px;border-top:1px solid #e5e7eb;padding-top:10px;display:flex;justify-content:space-between;}
-  </style></head><body>
-  <h1>${escapeHtml(co?.name)||'Timesheet'}</h1>
-  ${metaLines}
-  <div class="hier">${escapeHtml(hierParts)}</div>
-  <div class="meta">Period: ${escapeHtml(dateStr)}</div>
-  <table>
-    <thead><tr><th>#</th><th>Label</th><th>Name</th><th>Description</th><th>Clock In</th><th>Clock Out</th><th>Duration</th></tr></thead>
-    <tbody>${taskRows}<tr class="total-row"><td colspan="6" style="text-align:right;">Total</td><td>${fmtHFull(totalMins)}</td></tr></tbody>
-  </table>
-  ${bdHtml}
-  <div class="footer"><span>Generated by Conquered Time · ${new Date().toLocaleString()}</span><span>CONFIDENTIAL</span></div>
-  </body></html>`);
+  win.document.write(html);
   win.document.close(); win.print();
 }
 
@@ -336,14 +263,43 @@ function csvCell(v: unknown): string {
 function exportCSV(): void {
   if (filtered.length===0) { Shell.toast('No data to export.','warning'); return; }
   const lines=['Company,Date,Session,Task Label,Task Name,Description,Clock In,Clock Out,Duration (mins)'];
+  const byCompany: Record<string, { mins: number; sessions: number }> = {};
+  const byLabel: Record<string, number> = {};
+  let totalMins = 0;
   filtered.forEach(e => {
     const co=compMap[e.company_id];
+    const coName = co?.name || '(unknown)';
+    const agg = byCompany[coName] || (byCompany[coName] = { mins: 0, sessions: 0 });
+    agg.mins += e.total_mins || 0; agg.sessions += 1;
+    totalMins += e.total_mins || 0;
     safeParseRows(e.rows_json).filter(r=>RowUtils.rowHasContent(r)).forEach(r => {
+      if (r.label && (r.total_mins||0) > 0) byLabel[r.label] = (byLabel[r.label]||0) + (r.total_mins||0);
       lines.push([csvCell(co?.name),csvCell(e.log_date),csvCell(e.session_label),
         csvCell(r.label),csvCell(r.name),csvCell(flattenText(r.desc||r.description)),
         csvCell(r.clock_in),csvCell(r.clock_out),r.total_mins||0].join(','));
     });
   });
+
+  // Summary block — mirrors the emailed CSV (src/main/report-html.ts
+  // buildReportCSV) so both attachments carry detail AND totals.
+  const dates = filtered.map(e => e.log_date).sort();
+  const from = $field('filter-from').value || dates[0] || '';
+  const to   = $field('filter-to').value   || dates[dates.length-1] || '';
+  lines.push('');
+  lines.push(csvCell('SUMMARY'));
+  lines.push([csvCell('Period'), csvCell(`${from} to ${to}`)].join(','));
+  lines.push([csvCell('Total Minutes'), csvCell(String(totalMins))].join(','));
+  lines.push([csvCell('Total Time'), csvCell(fmtHFull(totalMins))].join(','));
+  lines.push([csvCell('Sessions'), csvCell(String(filtered.length))].join(','));
+  lines.push('');
+  lines.push([csvCell('BY COMPANY'), csvCell('Sessions'), csvCell('Minutes')].join(','));
+  Object.entries(byCompany).sort((a,b)=>b[1].mins-a[1].mins).forEach(([name,c]) =>
+    lines.push([csvCell(name), csvCell(String(c.sessions)), csvCell(String(c.mins))].join(',')));
+  lines.push('');
+  lines.push([csvCell('BY TASK LABEL'), csvCell('Minutes')].join(','));
+  Object.entries(byLabel).sort((a,b)=>b[1]-a[1]).forEach(([l,m]) =>
+    lines.push([csvCell(l), csvCell(String(m))].join(',')));
+
   const blob=new Blob([lines.join('\n')],{type:'text/csv'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
