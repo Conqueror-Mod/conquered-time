@@ -6,7 +6,7 @@ Discord's **#roadmap** channel mirrors this file automatically.
 
 **Status legend:** ✅ Shipped · 🔨 In progress · 🗓️ Planned · 💡 Under consideration
 
-_Last curated: 2026-07-11 (v3.19.1 + next-up queue)_
+_Last curated: 2026-07-11 (v3.19.1 + full next-cycle queue)_
 
 ## 🗓️ Planned (next up)
 
@@ -20,6 +20,32 @@ _Last curated: 2026-07-11 (v3.19.1 + next-up queue)_
 - **Richer right-click menus** — grow the context menus across the app
   (starting with the company web: Edit Color, and more quick actions where
   you'd expect them).
+- **Punch from the tray + global hotkey** — Clock In / Clock Out without
+  opening the app: tray-menu punch actions and a system-wide keyboard shortcut,
+  so starting the clock is instant instead of launch-login-navigate-click.
+- **Week view** — see your week spatially: a 7-day grid of session blocks
+  (colored per company) alongside the day-based tracker and the aggregate
+  Insights — the "Tuesday was heavy, Thursday was empty" view.
+- **Data safety net** — an automatic backup snapshot before every destructive
+  action (deletes, clears), plus a full portable vault export so your history
+  is never one misclick from gone.
+
+### Polish pass (smaller items, mixed in between features)
+
+- **Company colors everywhere** — the Web v2 identity hues carried through the
+  whole app: color dots on Recent Activity, the Global Log, the invoice ledger,
+  and Insights' client mix. _(Ships with Company Web v2.)_
+- **Smarter dashboard stats** — the Today / This Week tiles gain deltas
+  ("up 1.2h vs last week") and a 7-day micro-sparkline, so the numbers tell a
+  story at a glance.
+- **Interactive Insights** — hover values on every chart and click-through
+  (click a client's bar to jump to its filtered Global Log).
+- **UI Scale & responsiveness fixes** — live feedback while changing UI Scale
+  in Settings, and layouts that adapt properly to unusual window shapes.
+  _(Two known beta reports.)_
+- **Branded empty states** — first-run screens (no companies, no sessions, no
+  invoices yet) get a proper illustration and a clear call-to-action instead of
+  plain text.
 
 ## 💡 Under consideration
 

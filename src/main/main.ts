@@ -379,7 +379,7 @@ function createAuditWizardWindow(mode?: string, theme?: string) {
     }
   });
   wizard.loadFile(path.join(RENDERER_DIR, 'pages/audit-wizard.html'), {
-    query: { mode: mode || 'fix', theme: theme || 'arctic' }
+    query: { mode: mode || 'fix', theme: theme || 'memoria' }
   });
   wizard.on('closed', () => {
     if (mainWindow && !mainWindow.isDestroyed()) {
