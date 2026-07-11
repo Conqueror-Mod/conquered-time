@@ -19,9 +19,17 @@ interface WebNode {
   x: number; y: number; vx: number; vy: number; r: number;
   label: string; sublabel: string; isCenter: boolean;
   co: Company | null; fixed?: boolean; hours?: number;
+  /** Set by the search/filter — a company node not matching the current filter
+   *  is drawn faded so the web stays in sync with the list. */
+  dimmed?: boolean;
 }
 
 let companies: Company[] = [], entries: EntrySummary[] = [], nodes: WebNode[] = [];
+
+// ── Search / filter state ──────────────────────────────────────────────────
+let searchQuery = '';                    // lowercased text query
+let statusFilter: 'all' | 'active' | 'ended' = 'all';
+let typeFilter = '';                     // '' = all work types
 let editingId: number | null = null, selectedId: number | null = null;
 let ctxTarget: Company | null = null;
 let animFrame: number | null = null;
@@ -65,6 +73,28 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (item) selectCompany(Number(item.dataset.id));
   });
 
+  // ── Search / filter controls ───────────────────────────────────────────
+  const searchInput = $field('company-search') as HTMLInputElement;
+  searchInput.addEventListener('input', () => {
+    searchQuery = searchInput.value.trim().toLowerCase();
+    ($id('company-search-clear')).style.display = searchInput.value ? '' : 'none';
+    applyFilters();
+  });
+  $id('company-search-clear').addEventListener('click', () => {
+    searchInput.value = ''; searchQuery = '';
+    $id('company-search-clear').style.display = 'none';
+    applyFilters();
+    searchInput.focus();
+  });
+  ($field('company-status-filter') as HTMLSelectElement).addEventListener('change', e => {
+    statusFilter = (e.target as HTMLSelectElement).value as typeof statusFilter;
+    applyFilters();
+  });
+  ($field('company-type-filter') as HTMLSelectElement).addEventListener('change', e => {
+    typeFilter = (e.target as HTMLSelectElement).value;
+    applyFilters();
+  });
+
   $id('company-modal').addEventListener('click', e => {
     if (e.target === e.currentTarget) closeModal();
   });
@@ -73,12 +103,68 @@ window.addEventListener('DOMContentLoaded', async () => {
 async function loadCompanies(): Promise<void> {
   companies = await Store.getCompanies();
   entries   = await Store.getEntriesSummary();
+  populateTypeFilter();
   renderList();
-  $id('company-count').textContent = String(companies.length);
+  updateCount();
   if (selectedId) {
     const co = companies.find(c => c.id === selectedId);
     if (co) renderDetail(co); else closeDetail();
   }
+}
+
+// Rebuild the work-type dropdown from the distinct work_type values present,
+// preserving the current selection when still valid.
+function populateTypeFilter(): void {
+  const sel = $field('company-type-filter') as HTMLSelectElement;
+  const types = [...new Set(companies.map(c => (c.work_type || '').trim()).filter(Boolean))].sort();
+  const prev = typeFilter;
+  sel.innerHTML = `<option value="">All types</option>` +
+    types.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
+  if (prev && types.includes(prev)) { sel.value = prev; }
+  else if (prev) { typeFilter = ''; sel.value = ''; }   // selected type no longer exists
+}
+
+// A company matches when it passes ALL active facets: text query, status, type.
+function matchesFilters(co: Company): boolean {
+  if (statusFilter === 'active' && co.date_end) return false;
+  if (statusFilter === 'ended'  && !co.date_end) return false;
+  if (typeFilter && (co.work_type || '') !== typeFilter) return false;
+  if (searchQuery) {
+    const haystack = [
+      co.name, co.hier_company, co.hier_project, co.hier_platform,
+      co.job_title, co.work_type, co.location, co.nav_id,
+    ].filter(Boolean).join(' ').toLowerCase();
+    if (!haystack.includes(searchQuery)) return false;
+  }
+  return true;
+}
+
+function filteredCompanies(): Company[] {
+  return companies.filter(matchesFilters);
+}
+
+const isFiltering = (): boolean => !!searchQuery || statusFilter !== 'all' || !!typeFilter;
+
+// Re-run every filter-dependent view: list, count, web dimming.
+function applyFilters(): void {
+  renderList();
+  updateCount();
+  applyWebDimming();
+}
+
+function updateCount(): void {
+  const total = companies.length;
+  const shown = isFiltering() ? filteredCompanies().length : total;
+  $id('company-count').textContent = isFiltering() ? `${shown}/${total}` : String(total);
+}
+
+// Mark web nodes whose company is filtered out so render() can fade them.
+function applyWebDimming(): void {
+  const filtering = isFiltering();
+  nodes.forEach(n => {
+    if (n.isCenter || !n.co) return;
+    n.dimmed = filtering && !matchesFilters(n.co);
+  });
 }
 
 function compMinsMap(): Record<number, number> {
@@ -90,11 +176,16 @@ function compMinsMap(): Record<number, number> {
 function renderList(): void {
   const el = $id('company-list');
   if (companies.length === 0) {
-    el.innerHTML = `<div style="font-size:12px;color:var(--text-dim);text-align:center;padding:24px 0;">No companies yet.<br>Add one to begin.</div>`;
+    el.innerHTML = `<div class="company-list-empty">No companies yet.<br>Add one to begin.</div>`;
+    return;
+  }
+  const list = filteredCompanies();
+  if (list.length === 0) {
+    el.innerHTML = `<div class="company-list-empty">No companies match your filters.<br>Try a different search or clear the filters.</div>`;
     return;
   }
   const mins = compMinsMap();
-  el.innerHTML = companies.map(co => {
+  el.innerHTML = list.map(co => {
     const hier = [co.hier_project, co.hier_platform].filter(Boolean).join(' › ');
     const sub  = hier || co.job_title || co.work_type || '';
     const sel  = co.id === selectedId ? ' selected' : '';
@@ -370,6 +461,7 @@ function drawWeb(): void {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.scale(devicePixelRatio, devicePixelRatio);
     nodes = initNodes(W, H);
+    applyWebDimming();   // re-mark dimmed nodes — initNodes rebuilds the array
   }
   resizeCanvas();
 
@@ -438,16 +530,19 @@ function startRender(): void {
     for (let gx = 0; gx < W; gx += 40) { ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, H); ctx.stroke(); }
     for (let gy = 0; gy < H; gy += 40) { ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke(); }
 
-    // Edges
+    // Edges (faded for companies filtered out of the list)
     nodes.slice(1).forEach(n => {
+      ctx.globalAlpha = n.dimmed ? 0.12 : 1;
       const grad = ctx.createLinearGradient(cx, cy, n.x, n.y);
       grad.addColorStop(0, c.edge1); grad.addColorStop(1, c.edge2);
       ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(n.x, n.y);
       ctx.strokeStyle = grad; ctx.lineWidth = 2; ctx.stroke();
     });
+    ctx.globalAlpha = 1;
 
     // Company nodes
     nodes.slice(1).forEach(n => {
+      ctx.globalAlpha = n.dimmed ? 0.18 : 1;
       drawSphereNode(ctx, n.x, n.y, n.r, false, n.label, n.sublabel);
       if (n.hours) {
         ctx.fillStyle = c.hours;
@@ -456,6 +551,7 @@ function startRender(): void {
         ctx.fillText(fmtH(n.hours), n.x, n.y + n.r + 6);
       }
     });
+    ctx.globalAlpha = 1;
 
     // Center node — pulsing
     const pR = nodes[0].r + 4 * Math.sin(pulse);
