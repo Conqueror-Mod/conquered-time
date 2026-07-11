@@ -352,6 +352,23 @@
   .ctx-item.danger       { color: var(--red); }
   .ctx-item.danger:hover { background: var(--red-dim); }
   .ctx-divider { height: 1px; background: var(--border); margin: 4px 0; }
+
+  /* Range preset toggles (same treatment as Insights) */
+  .range-toggles { display: flex; gap: 6px; }
+  .range-btn {
+    padding: 6px 14px;
+    font-size: 12px;
+    font-family: var(--sans);
+    font-weight: 500;
+    color: var(--text-muted);
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all var(--transition);
+  }
+  .range-btn:hover  { border-color: var(--accent); color: var(--text-bright); }
+  .range-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
 </style>
 </head>
 <body>
@@ -362,6 +379,11 @@
     <div class="page-title">Company Web</div>
   </div>
   <div class="page-actions">
+    <div class="range-toggles" id="web-range" data-tip="Bubble size window — companies with no work in it fold into the Archive">
+      <button class="range-btn" data-range="30">30d</button>
+      <button class="range-btn active" data-range="90">90d</button>
+      <button class="range-btn" data-range="all">All</button>
+    </div>
     <button class="btn-primary" id="btn-add-company">+ Add Company</button>
   </div>
 </div>
@@ -377,9 +399,13 @@
     <div id="ctx-menu">
       <div class="ctx-item" id="ctx-open-tracker">⏱ Open Time Tracker</div>
       <div class="ctx-item" id="ctx-edit">✎ Edit Company</div>
+      <div class="ctx-item" id="ctx-edit-color">🎨 Edit Color…</div>
+      <div class="ctx-item" id="ctx-reset-color">↺ Reset to auto color</div>
       <div class="ctx-divider"></div>
       <div class="ctx-item danger" id="ctx-delete">⊗ Delete</div>
     </div>
+    <!-- Hidden picker for 🎨 Edit Color — opens the OS color dialog. -->
+    <input type="color" id="ctx-color-pick" style="position:absolute;width:0;height:0;opacity:0;border:0;padding:0;pointer-events:none;">
   </div>
 
   <div class="company-panel" id="company-panel">
@@ -569,6 +595,8 @@
 <script src="../components/about.js"></script>
 <script src="../components/shell.js"></script>
 <script src="../canvas-text.js"></script>
+<script src="../row-utils.js"></script>
+<script src="../bubble-web.js"></script>
 <script src="companies.js"></script>
 </body>
 </html>

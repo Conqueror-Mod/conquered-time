@@ -1,0 +1,306 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Company Web — packed-bubble concept</title>
+<style>
+  :root{
+    --bg:#0d1526; --surface-1:#14203a; --surface-3:#1b2b46; --border:#22375c;
+    --border-light:#33568c; --accent:#10d6e8; --accent-dim:rgba(16,214,232,0.12);
+    --yellow:#e6b84e; --green:#3ee0a0; --text-bright:#d6ecf8; --text-muted:#7e9cc0;
+    --text-dim:#54719a; --sans:'DM Sans','Segoe UI',system-ui,sans-serif;
+    --mono:'JetBrains Mono',Consolas,monospace;
+  }
+  body{margin:0;background:var(--bg);color:var(--text-bright);font-family:var(--sans);padding:22px;}
+  .hdr{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;}
+  .eyebrow{font-size:11px;color:var(--text-muted);}
+  h1{font-size:22px;font-weight:600;margin:0;letter-spacing:-0.02em;}
+  .controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+  .rbtn{padding:6px 14px;font-size:12px;font-family:var(--sans);font-weight:500;color:var(--text-muted);
+    background:var(--surface-1);border:1px solid var(--border);border-radius:6px;cursor:pointer;}
+  .rbtn.active{border-color:var(--accent);color:var(--accent);background:var(--accent-dim);}
+  #search{padding:7px 12px;font-size:12px;color:var(--text-bright);background:var(--surface-1);
+    border:1px solid var(--border);border-radius:6px;width:200px;font-family:var(--sans);}
+  #search:focus{outline:none;border-color:var(--accent);}
+  #wrap{position:relative;background:var(--surface-1);border:1px solid var(--border);border-radius:12px;
+    overflow:hidden;height:640px;box-shadow:inset 0 1px 8px rgba(0,0,0,.3);}
+  #wrap::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--accent);opacity:.6;}
+  canvas{position:absolute;inset:0;width:100%;height:100%;cursor:default;}
+  #tip{position:absolute;background:var(--surface-3);border:1px solid var(--border-light);border-radius:8px;
+    padding:9px 13px;font-size:12px;pointer-events:none;display:none;box-shadow:0 10px 28px rgba(0,0,0,.5);max-width:230px;z-index:5;}
+  #tip .n{font-weight:600;margin-bottom:2px;} #tip .d{font-size:11px;color:var(--text-muted);}
+  .ctx-i{padding:8px 12px;font-size:12.5px;color:var(--text-bright);cursor:pointer;border-radius:6px;}
+  .ctx-i:hover{background:var(--accent-dim);color:var(--accent);}
+  .legend{margin-top:10px;font-size:11px;color:var(--text-dim);line-height:1.7;}
+  .legend b{color:var(--text-muted);font-weight:600;}
+</style>
+<div class="hdr">
+  <div><div class="eyebrow">Network — CONCEPT MOCK</div><h1>Company Web · packed bubbles</h1></div>
+  <div class="controls">
+    <input id="search" placeholder="Search companies…">
+    <button class="rbtn" data-r="30">30d</button>
+    <button class="rbtn active" data-r="90">90d</button>
+    <button class="rbtn" data-r="all">All</button>
+    <button class="rbtn" id="whale" title="Give one client 5,000h to prove sizes stay harnessed">🐋 Whale test</button>
+    <span style="width:1px;height:20px;background:var(--border);"></span>
+    <button class="rbtn cbtn active" data-c="identity">Identity</button>
+    <button class="rbtn cbtn" data-c="type">Work type</button>
+    <button class="rbtn cbtn" data-c="heat">Recency heat</button>
+  </div>
+</div>
+<div id="wrap"><canvas id="cv"></canvas>
+  <div id="tip"><div class="n"></div><div class="d"></div></div>
+  <div id="ctx" style="position:absolute;display:none;z-index:9;background:var(--surface-3);border:1px solid var(--border-light);border-radius:8px;padding:4px;min-width:170px;box-shadow:0 12px 30px rgba(0,0,0,.55);">
+    <div class="ctx-i" data-a="tracker">⏱ Open Time Tracker</div>
+    <div class="ctx-i" data-a="color">🎨 Edit Color…</div>
+    <div class="ctx-i" data-a="reset">↺ Reset to auto color</div>
+  </div>
+  <input type="color" id="pick" style="position:absolute;width:0;height:0;opacity:0;border:0;padding:0;">
+</div>
+<div class="legend">
+  <b>Bubble area = share of hours within a fixed canvas budget (~40%), clamped to a readable floor and a ~24%-of-height ceiling</b> — a 5,000h whale client (try the 🐋 button) can't drown the pack, and any number of companies fits. Companies with no work in the window (or an end date)
+  fold into the <b>Archive</b> cluster — click it to expand/collapse. Hover any bubble for detail;
+  search dims non-matches. 25 companies total: 7 live, 18 archived.<br>
+<b>Color modes:</b> <b>Identity</b> = a stable hue per company (recent clients vivid, fading ones desaturate) ·
+<b>Work type</b> = categorical (all Annotation teal, QA gold…) ·
+<b>Recency heat</b> = one ramp, hot amber (this week) → cold steel (months idle).<br>
+<b>Right-click a bubble</b> → 🎨 Edit Color to hand-pick that client's hue (wins over the auto hue in Identity mode; the recency fade still applies; ↺ resets to auto).
+</div>
+<script>
+'use strict';
+// ── Fake data: 7 active + 18 dormant/ended (clearly-fake names) ─────────────
+const ACTIVE = [
+  { name:'Zenith Analytics', h30: 46, h90: 128, hall: 610, type:'Annotation' },
+  { name:'Apex Digital',     h30: 31, h90:  84, hall: 402, type:'Code Review' },
+  { name:'Meridian Ops',     h30: 18, h90:  77, hall: 955, type:'QA' },
+  { name:'Café Müller 東京',  h30: 12, h90:  30, hall: 118, type:'Evaluation' },
+  { name:'Northwind',        h30:  7, h90:  25, hall:  64, type:'Training' },
+  { name:"O'Brien & Sons",   h30:  4, h90:   9, hall: 210, type:'Research' },
+  { name:'Solstice Labs',    h30:  2, h90:   3, hall:   3, type:'Annotation' },
+];
+const ARCHIVED = Array.from({length:18},(_,i)=>({ name:'Archived Co '+(i+1), hall: 5+((i*37)%160) }));
+
+// Days since last worked — drives the recency modulation / heat ramp.
+ACTIVE[0].last=1; ACTIVE[1].last=2; ACTIVE[2].last=6; ACTIVE[3].last=12;
+ACTIVE[4].last=20; ACTIVE[5].last=45; ACTIVE[6].last=80;
+
+// ── Color modes ──────────────────────────────────────────────────────────────
+// identity: stable hue per company (name hash → curated palette), saturation
+//           eased by recency so fading clients literally fade.
+// type:     categorical hue per work type.
+// heat:     one ramp — hot amber (this week) → cold steel (months ago).
+const PALETTE = [187, 262, 43, 12, 152, 210, 322, 88, 280, 335]; // hues tuned for the dark ground
+function hashHue(name){ let h=0; for (const ch of name) h=(h*31+ch.codePointAt(0))>>>0; return PALETTE[h%PALETTE.length]; }
+const TYPE_HUE = { 'Annotation':187, 'Code Review':262, 'QA':43, 'Evaluation':12, 'Training':152, 'Research':322 };
+function recencyT(c){ return Math.max(0, Math.min(1, 1 - (c.last||0)/60)); } // 1=today → 0=60d+
+const OVERRIDES = {};   // name → {h,s} — user picks from the context menu
+function hexToHS(hex){
+  const n=parseInt(hex.slice(1),16), r=(n>>16&255)/255, g=(n>>8&255)/255, b=(n&255)/255;
+  const mx=Math.max(r,g,b), mn=Math.min(r,g,b), d=mx-mn;
+  let h=0; if(d){ h= mx===r ? ((g-b)/d)%6 : mx===g ? (b-r)/d+2 : (r-g)/d+4; h=Math.round(h*60); if(h<0)h+=360; }
+  const l=(mx+mn)/2, sat=d? d/(1-Math.abs(2*l-1)) : 0;
+  return {h, s:Math.round(sat*100)};
+}
+function colorFor(c){
+  if (cmode==='type'){ const h=TYPE_HUE[c.type]??210; return {h, s:62, boost:1}; }
+  if (cmode==='heat'){ const t=recencyT(c); return {h: 210+(35-210)*t, s: 30+52*t, boost: .6+.6*t}; }
+  const t=recencyT(c);
+  const ov=OVERRIDES[c.name];   // user override wins in Identity mode; recency fade still applies
+  if (ov) return {h: ov.h, s: Math.max(30, Math.min(85, ov.s)) * (0.55+0.45*t), boost: .65+.55*t};
+  return {h: hashHue(c.name), s: 28+44*t, boost: .65+.55*t};
+}
+
+const cv = document.getElementById('cv'), wrap = document.getElementById('wrap'), tip = document.getElementById('tip');
+let range = '90', query = '', archiveOpen = false, whaleOn = false, cmode = 'identity', bubbles = [], archiveNode = null;
+
+function hoursFor(c){ return range==='30'?c.h30:range==='90'?c.h90:c.hall; }
+
+// ── Greedy spiral circle packing (largest first, center-out) ────────────────
+function pack(items, cx, cy, W, H){
+  const placed = [];
+  for (const it of items){
+    if (placed.length===0){ placed.push({...it, x:cx, y:cy}); continue; }
+    let best=null;
+    for (let a=0; a<Math.PI*40; a+=0.22){
+      const d=8+a*7.2;
+      const x=cx+Math.cos(a)*d, y=cy+Math.sin(a)*d*0.72;   // slight ellipse: use wide canvas
+      if (x-it.r<14||x+it.r>W-14||y-it.r<14||y+it.r>H-14) continue;
+      let ok=true;
+      for (const p of placed){ if (Math.hypot(x-p.x,y-p.y) < it.r+p.r+10){ ok=false; break; } }
+      if (ok){ best={x,y}; break; }
+    }
+    placed.push({...it, x:best?best.x:cx, y:best?best.y:cy});
+  }
+  return placed;
+}
+
+function layout(){
+  const W = wrap.clientWidth, H = wrap.clientHeight;
+  cv.width=W*devicePixelRatio; cv.height=H*devicePixelRatio;
+  cv.style.width=W+'px'; cv.style.height=H+'px';
+  const ctx=cv.getContext('2d'); ctx.setTransform(1,0,0,1,0,0); ctx.scale(devicePixelRatio,devicePixelRatio);
+
+  // ── HARNESSED sizing ──────────────────────────────────────────────────────
+  // 1) AREA BUDGET: all bubbles together may claim at most ~40% of the canvas,
+  //    each getting its share of hours WITHIN that budget — so any N fits.
+  // 2) FLOOR & CEILING per bubble: no company renders below a readable minimum
+  //    or above ~24% of canvas height, no matter how extreme its hours. A
+  //    5,000h whale is clamped; the ceiling's leftover area is simply not
+  //    reallocated (sizes stay ordinal-honest; tooltips carry exact numbers).
+  const hs = ACTIVE.map(c => whaleOn && c===ACTIVE[2] ? 5000 : hoursFor(c));
+  const total = hs.reduce((s,v)=>s+v,0) || 1;
+  const budget = W*H*0.40;
+  const Rmin = 24, Rmax = H*0.24;
+  const items = ACTIVE.map((c,i)=>{
+    const area = budget * (hs[i]/total);
+    const r = Math.max(Rmin, Math.min(Rmax, Math.sqrt(area/Math.PI)));
+    return { co:c, r, hours: hs[i] };
+  }).sort((a,b)=>b.r-a.r);
+
+  // Archive cluster bubble: fixed modest size, bottom-right anchor via packing order (last).
+  const archTotal = ARCHIVED.reduce((s,c)=>s+c.hall,0);
+  items.push({ co:{name:'Archive', type:'', archived:ARCHIVED.length, archTotal}, r: archiveOpen? 118: 56, isArchive:true });
+
+  bubbles = pack(items, W/2, H/2, W, H);
+  archiveNode = bubbles.find(b=>b.isArchive);
+
+  // Packed mini-bubbles inside the archive when open.
+  if (archiveOpen && archiveNode){
+    const inner=[];
+    const maxA=Math.max(...ARCHIVED.map(c=>c.hall));
+    const its=ARCHIVED.map(c=>({co:c, r: Math.max(6, 26*Math.sqrt(c.hall/maxA))})).sort((a,b)=>b.r-a.r);
+    for (const it of its){
+      let done=false;
+      for(let a=0;a<Math.PI*30&&!done;a+=0.3){
+        const d=a*3.4, x=archiveNode.x+Math.cos(a)*d, y=archiveNode.y+Math.sin(a)*d;
+        if (Math.hypot(x-archiveNode.x,y-archiveNode.y)+it.r>archiveNode.r-6) continue;
+        if (inner.every(p=>Math.hypot(x-p.x,y-p.y)>=it.r+p.r+2)){ inner.push({...it,x,y}); done=true; }
+      }
+    }
+    archiveNode.inner=inner;
+  }
+  draw();
+}
+
+function matches(name){ return !query || name.toLowerCase().includes(query); }
+
+function sphere(ctx,x,y,r,dim,archive,col){
+  const g=ctx.createRadialGradient(x-r*0.3,y-r*0.3,r*0.1,x,y,r);
+  if (archive || !col){ g.addColorStop(0,'rgba(126,156,192,0.30)'); g.addColorStop(0.65,'rgba(84,113,154,0.18)'); g.addColorStop(1,'rgba(0,0,0,0.35)'); }
+  else {
+    const {h,s,boost}=col;
+    g.addColorStop(0,`hsla(${h},${s}%,64%,${0.34*boost})`);
+    g.addColorStop(0.6,`hsla(${h},${s}%,42%,${0.26*boost})`);
+    g.addColorStop(1,'rgba(0,0,0,0.40)');
+  }
+  ctx.globalAlpha = dim?0.15:1;
+  ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fillStyle=g; ctx.fill();
+  ctx.strokeStyle=archive?'#54719a':(col?`hsla(${col.h},${Math.min(80,col.s+15)}%,62%,${0.55+0.45*(col.boost??1)})`:'#6366f1');
+  ctx.lineWidth=1.5; ctx.stroke();
+  const hl=ctx.createRadialGradient(x-r*0.35,y-r*0.35,0,x-r*0.35,y-r*0.35,r*0.6);
+  hl.addColorStop(0,'rgba(255,255,255,0.14)'); hl.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fillStyle=hl; ctx.fill();
+  ctx.globalAlpha=1;
+}
+
+function ellipsize(ctx,s,w){ if(ctx.measureText(s).width<=w) return s;
+  while(s.length>1&&ctx.measureText(s+'…').width>w) s=s.slice(0,-1); return s+'…'; }
+
+function draw(){
+  const ctx=cv.getContext('2d'); const W=wrap.clientWidth,H=wrap.clientHeight;
+  ctx.clearRect(0,0,W,H);
+  ctx.strokeStyle='rgba(255,255,255,0.025)'; ctx.lineWidth=0.5;
+  for(let g=0;g<W;g+=40){ctx.beginPath();ctx.moveTo(g,0);ctx.lineTo(g,H);ctx.stroke();}
+  for(let g=0;g<H;g+=40){ctx.beginPath();ctx.moveTo(0,g);ctx.lineTo(W,g);ctx.stroke();}
+
+  for (const b of bubbles){
+    if (b.isArchive){
+      sphere(ctx,b.x,b.y,b.r,false,true);
+      ctx.fillStyle='#a8c2e0'; ctx.textAlign='center';
+      if (archiveOpen && b.inner){
+        for (const m of b.inner){ sphere(ctx,m.x,m.y,m.r,!matches(m.co.name),true); }
+        ctx.font='600 11px "DM Sans",sans-serif';
+        ctx.fillText('Archive — click to collapse', b.x, b.y-b.r-10);
+      } else {
+        ctx.font='600 12px "DM Sans",sans-serif';
+        ctx.fillText('⊕ Archive', b.x, b.y-4);
+        ctx.font='500 10px "JetBrains Mono",monospace'; ctx.fillStyle='#7e9cc0';
+        ctx.fillText(b.co.archived+' inactive', b.x, b.y+11);
+      }
+      continue;
+    }
+    const dim=!matches(b.co.name);
+    sphere(ctx,b.x,b.y,b.r,dim,false,colorFor(b.co));
+    ctx.globalAlpha=dim?0.15:1;
+    ctx.textAlign='center'; ctx.fillStyle='#e0e7ff';
+    const nameSize=Math.max(10,Math.min(15,b.r/4.2));
+    ctx.font=`600 ${nameSize}px "DM Sans",sans-serif`;
+    ctx.fillText(ellipsize(ctx,b.co.name,b.r*1.7), b.x, b.y-2);
+    ctx.font=`500 ${Math.max(9,nameSize-3)}px "JetBrains Mono",monospace`;
+    ctx.fillStyle='#e6b84e';
+    ctx.fillText((b.hours??hoursFor(b.co)).toFixed(0)+'h', b.x, b.y+nameSize);
+    if (b.r>46){ ctx.fillStyle='rgba(214,236,248,0.5)';
+      ctx.font=`500 ${Math.max(8,nameSize-4)}px "DM Sans",sans-serif`;
+      ctx.fillText(b.co.type, b.x, b.y+nameSize*2); }
+    ctx.globalAlpha=1;
+  }
+}
+
+// ── Interaction ──────────────────────────────────────────────────────────────
+cv.addEventListener('mousemove',e=>{
+  const r=cv.getBoundingClientRect(), mx=e.clientX-r.left, my=e.clientY-r.top;
+  let hit=null;
+  for (const b of bubbles){ if (Math.hypot(mx-b.x,my-b.y)<b.r) hit=b; }
+  if (hit){
+    tip.style.display='block';
+    tip.style.left=(mx+18)+'px'; tip.style.top=(my-10)+'px';
+    if (hit.isArchive){ tip.querySelector('.n').textContent='Archive';
+      tip.querySelector('.d').textContent=hit.co.archived+' inactive companies · '+hit.co.archTotal+'h lifetime · click to '+(archiveOpen?'collapse':'expand'); }
+    else { tip.querySelector('.n').textContent=hit.co.name;
+      tip.querySelector('.d').textContent=hit.co.type+' · '+(hit.hours??hoursFor(hit.co)).toFixed(0)+'h in window · last worked '+(hit.co.last??'?')+'d ago · click → tracker'; }
+    cv.style.cursor='pointer';
+  } else { tip.style.display='none'; cv.style.cursor='default'; }
+});
+cv.addEventListener('click',e=>{
+  const r=cv.getBoundingClientRect(), mx=e.clientX-r.left, my=e.clientY-r.top;
+  if (archiveNode && Math.hypot(mx-archiveNode.x,my-archiveNode.y)<archiveNode.r){ archiveOpen=!archiveOpen; layout(); }
+});
+document.querySelectorAll('.rbtn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.rbtn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active'); range=b.dataset.r; layout();
+}));
+// ── Right-click context menu (Edit Color demo) ──────────────────────────────
+const ctxEl=document.getElementById('ctx'), pick=document.getElementById('pick');
+let ctxTarget=null;
+cv.addEventListener('contextmenu',e=>{
+  e.preventDefault();
+  const r=cv.getBoundingClientRect(), mx=e.clientX-r.left, my=e.clientY-r.top;
+  ctxTarget=null;
+  for (const b of bubbles){ if (!b.isArchive && Math.hypot(mx-b.x,my-b.y)<b.r) ctxTarget=b; }
+  if (!ctxTarget){ ctxEl.style.display='none'; return; }
+  ctxEl.style.left=Math.min(mx, wrap.clientWidth-190)+'px';
+  ctxEl.style.top=Math.min(my, wrap.clientHeight-120)+'px';
+  ctxEl.style.display='block';
+});
+document.addEventListener('click',e=>{ if(!e.target.closest('#ctx')) ctxEl.style.display='none'; });
+ctxEl.addEventListener('click',e=>{
+  const it=e.target.closest('.ctx-i'); if(!it||!ctxTarget) return;
+  const target=ctxTarget;
+  ctxEl.style.display='none';
+  if (it.dataset.a==='color'){
+    pick.style.left=ctxEl.style.left; pick.style.top=ctxEl.style.top;
+    pick.onchange=()=>{ OVERRIDES[target.co.name]=hexToHS(pick.value);
+      const idBtn=document.querySelector('.cbtn[data-c="identity"]');
+      if (cmode!=='identity') idBtn.click(); else draw(); };
+    pick.click();
+  }
+  if (it.dataset.a==='reset'){ delete OVERRIDES[target.co.name]; draw(); }
+});
+
+document.querySelectorAll('.cbtn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.cbtn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active'); cmode=b.dataset.c; draw();
+}));
+document.getElementById('whale').addEventListener('click',()=>{ whaleOn=!whaleOn; document.getElementById('whale').classList.toggle('active',whaleOn); layout(); });
+document.getElementById('search').addEventListener('input',e=>{ query=e.target.value.trim().toLowerCase(); draw(); });
+new ResizeObserver(()=>layout()).observe(wrap);
+layout();
+</script>
