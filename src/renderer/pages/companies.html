@@ -65,6 +65,57 @@
     flex: 0 0 auto;
     max-height: 38%;
   }
+  /* Search + filter bar */
+  .company-filter-bar {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .company-search-wrap { position: relative; display: flex; }
+  .company-search-input {
+    width: 100%;
+    padding: 7px 28px 7px 10px;
+    font-size: 12px;
+    font-family: var(--sans);
+    color: var(--text-bright);
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    transition: border-color var(--transition);
+  }
+  .company-search-input:focus { outline: none; border-color: var(--accent); }
+  .company-search-input::placeholder { color: var(--text-dim); }
+  .company-search-clear {
+    position: absolute;
+    right: 4px; top: 50%;
+    transform: translateY(-50%);
+    background: none; border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 12px;
+    padding: 2px 5px;
+    line-height: 1;
+    border-radius: var(--radius);
+  }
+  .company-search-clear:hover { color: var(--text-bright); }
+  .company-filter-row { display: flex; gap: 6px; }
+  .company-filter-select {
+    flex: 1;
+    min-width: 0;
+    padding: 5px 8px;
+    font-size: 11px;
+    font-family: var(--sans);
+    color: var(--text-bright);
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+  }
+  .company-filter-select:focus { outline: none; border-color: var(--accent); }
+
   .company-list-scroll {
     flex: 1;
     overflow-y: auto;
@@ -72,6 +123,14 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
+  }
+  /* Empty state for an active filter that matches nothing */
+  .company-list-empty {
+    font-size: 12px;
+    color: var(--text-dim);
+    text-align: center;
+    padding: 24px 12px;
+    line-height: 1.6;
   }
 
   /* List items — 2-line cards */
@@ -330,6 +389,22 @@
       <div class="hud-panel-header">
         <div class="hud-panel-title">Companies</div>
         <span style="font-family:var(--mono);font-size:12px;color:var(--text-dim);" id="company-count">0</span>
+      </div>
+      <div class="company-filter-bar">
+        <div class="company-search-wrap">
+          <input type="text" id="company-search" class="company-search-input" placeholder="Search name, project, role…" autocomplete="off" spellcheck="false" data-tip="Filter the list and web by name, alias, hierarchy, job title, work type, location or Navigator ID">
+          <button class="company-search-clear" id="company-search-clear" title="Clear search" style="display:none;">✕</button>
+        </div>
+        <div class="company-filter-row">
+          <select id="company-status-filter" class="company-filter-select" aria-label="Status filter">
+            <option value="all">All statuses</option>
+            <option value="active">Active</option>
+            <option value="ended">Ended</option>
+          </select>
+          <select id="company-type-filter" class="company-filter-select" aria-label="Work-type filter">
+            <option value="">All types</option>
+          </select>
+        </div>
       </div>
       <div class="company-list-scroll" id="company-list">
         <div style="font-size:12px;color:var(--text-dim);text-align:center;padding:24px 0;">
