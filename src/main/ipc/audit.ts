@@ -122,7 +122,12 @@ ipcMain.handle('audit:apply-fix', (_: unknown, { entry_id, row_idx, fix_type, up
       [enc.data, enc.iv, enc.tag, '', newTotal, Number(entry_id), session.user.id]
     );
     persistDB(); performBackup();
-    return { ok: true };
+    // Return the fresh updated_at so a caller applying SEVERAL fixes to the
+    // same entry (the wizard) can keep its concurrency token current — without
+    // this, fix #2 on the same entry would be stale-rejected by fix #1's bump.
+    const after = dbGet('SELECT updated_at FROM time_entries WHERE rowid=? AND user_id=?',
+      [Number(entry_id), session.user.id]);
+    return { ok: true, updated_at: after ? Number(after.updated_at) : null };
   } catch (e) { return { ok: false, error: e.message }; }
 });
 

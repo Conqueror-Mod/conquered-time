@@ -106,6 +106,11 @@ test('audit:apply-fix with the current token applies the fix', async () => {
   const res = applyFix(null, { entry_id: id, row_idx: 0, fix_type: 'set_clock_out', updated_at: token });
   assert.strictEqual(res.ok, true, 'matching token is accepted');
   assert.strictEqual(res.stale, undefined, 'not flagged stale');
+  // Fresh token returned so multi-fix callers (the wizard) can re-arm — a
+  // second fix on the SAME entry must succeed with it, not stale-reject.
+  assert.strictEqual(typeof res.updated_at, 'number', 'returns the fresh updated_at');
+  const res2 = applyFix(null, { entry_id: id, row_idx: 0, fix_type: 'recalc_duration', updated_at: res.updated_at });
+  assert.strictEqual(res2.ok, true, 'second fix with the refreshed token succeeds');
 
   // set_clock_out = clock_in + 8h → 17:00, total 480.
   const row = db.dbGet('SELECT total_mins FROM time_entries WHERE rowid=?', [id]);

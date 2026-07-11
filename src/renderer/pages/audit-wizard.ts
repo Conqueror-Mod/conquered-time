@@ -251,6 +251,12 @@ async function applyFix(): Promise<void> {
   if (res?.ok) {
     // Auto-acknowledge after successful fix
     await api.invoke('audit:dismiss', { entry_id: issue.entryId, row_idx: issue.rowIdx, type: issue.type });
+    // The fix bumped the entry's updated_at — refresh the token on every other
+    // issue of the SAME entry, or their applies would be stale-rejected.
+    const freshTs = res.updated_at;
+    if (freshTs != null) {
+      issues.forEach(i => { if (i.entryId === issue.entryId) i.updatedAt = freshTs; });
+    }
     acted++;
   }
   advance();
