@@ -167,7 +167,13 @@ const Onboarding = (() => {
     sessionStorage.setItem(KEY, String(idx));
     if (currentPage() !== step.page) {
       renderedIdx = null;
-      teardown();
+      // Deliberately NO teardown() here: removing the dim before loadFile()
+      // swaps the page let the old page paint fully lit for a beat — a visible
+      // "flash" between tour steps. The navigation wipes the DOM (overlay
+      // included) anyway; the incoming page rebuilds the dim inside Shell.init
+      // while it is still visibility:hidden, so the dim now carries across.
+      // Freeze the outgoing card's buttons so a double-click can't re-fire.
+      document.querySelectorAll('#ct-tour-card button').forEach(b => { /** @type {HTMLButtonElement} */ (b).disabled = true; });
       api.send('navigate', step.page);
       return;
     }
