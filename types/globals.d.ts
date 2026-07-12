@@ -536,6 +536,10 @@ interface BubbleWebController {
   zoomTo(key: string): void;
   destroy(): void;
 }
+/** Minimal shape for identity-color computation — a galaxy row group plus its
+ *  recency. Consumers outside the web (Dashboard week band) build one from a
+ *  plain row group. */
+interface BubbleIdentityGroup { rows: Array<{ id: number; color?: string }>; lastDays: number; }
 interface BubbleWebApi {
   attach(opts: {
     canvas: HTMLCanvasElement;
@@ -548,6 +552,14 @@ interface BubbleWebApi {
     onGalaxyContext?: (galaxy: BubbleGalaxy, ev: MouseEvent) => void;
     onSystemContext?: (co: Company, ev: MouseEvent) => void;
   }): BubbleWebController;
+  /** The galaxy grouping key (hier_company fallback name) — the identity family. */
+  groupKey(co: Company): string;
+  /** Identity hue spec (hue/saturation/boost) — override color wins over the
+   *  rowid-hash palette; saturation eased by recency. Same fn the web uses. */
+  identityHue(group: BubbleIdentityGroup): { h: number; s: number; boost: number };
+  /** Solid-fill CSS rendition of the identity (week-band blocks, list dots):
+   *  same hue, saturation floored for legibility, lightness per theme ground. */
+  identityCss(group: BubbleIdentityGroup): string;
 }
 
 /** hhmm is present exactly when ok is true. */

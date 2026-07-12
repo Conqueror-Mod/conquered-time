@@ -127,14 +127,37 @@ function recencyT(lastDays: number): number {
   return Math.max(0, Math.min(1, 1 - lastDays / 60));
 }
 
+// Minimal structural shape for identity-color computation — GalaxyModel
+// satisfies it, and outside consumers (the Dashboard week band) can build one
+// from a plain row group without the full model. Exposed via the BubbleWeb
+// export so the band and the web can never drift on what a company's color is.
+interface IdentityGroup { rows: Array<{ id: number; color?: string }>; lastDays: number; }
+
 interface HueSpec { h: number; s: number; boost: number; }
-function galaxyHue(g: GalaxyModel): HueSpec {
+function galaxyHue(g: IdentityGroup): HueSpec {
   const t = recencyT(g.lastDays);
   const ovRow = g.rows.find(r => r.color);
   const ov = ovRow?.color ? hexToHS(ovRow.color) : null;
   if (ov) return { h: ov.h, s: Math.max(30, Math.min(85, ov.s)) * (0.55 + 0.45 * t), boost: 0.65 + 0.55 * t };
   const minId = Math.min(...g.rows.map(r => r.id));
   return { h: paletteHue(minId), s: 28 + 44 * t, boost: 0.65 + 0.55 * t };
+}
+
+// The galaxy grouping key — rows sharing it form one identity family. Module
+// scope (not attach-local) so identity consumers group exactly like the web.
+const groupKey = (co: Company): string => (co.hier_company || co.name || '—').trim() || '—';
+
+// Ready-to-use CSS color for flat UI surfaces (week-band blocks, list dots)
+// carrying the same identity as the web's bubbles. The web itself keeps its
+// gradient recipes (themeColors) — this is the solid-fill rendition: same hue,
+// a legibility floor on saturation (a long-idle company still needs a readable
+// block even though its bubble fades toward grey), lightness tuned per ground
+// so white block labels pass on light themes too.
+function identityCss(g: IdentityGroup): string {
+  const spec = galaxyHue(g);
+  const s = Math.max(38, Math.round(spec.s));
+  const l = isLightTheme() ? 44 : 52;
+  return `hsl(${spec.h}, ${s}%, ${l}%)`;
 }
 // Identity path: systems keep the parent hue, stepped saturation/boost.
 function systemHue(g: GalaxyModel, idx: number): HueSpec {
@@ -241,7 +264,7 @@ function attach(opts: BubbleWebOpts): BubbleWebController {
   let hoverKey: string | null = null;
 
   // ── Model ──────────────────────────────────────────────────────────────────
-  const groupKey = (co: Company): string => (co.hier_company || co.name || '—').trim() || '—';
+  // (groupKey lives at module scope beside the identity-color helpers.)
 
   function buildModel(): void {
     const cutoff = range === 'all' ? '' : RowUtils.localDateStr(new Date(Date.now() - Number(range) * 86400000));
@@ -766,6 +789,6 @@ function attach(opts: BubbleWebOpts): BubbleWebController {
   };
 }
 
-(window as any).BubbleWeb = { attach };
+(window as any).BubbleWeb = { attach, groupKey, identityHue: galaxyHue, identityCss };
 
 })();
