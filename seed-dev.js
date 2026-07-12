@@ -11,7 +11,7 @@
  *  WHAT THIS SEEDS
  *  ───────────────
  *  • 1 dev user (TOTP bypassed, profile pre-filled, work_state TX → default policy)
- *  • 10 companies:
+ *  • 13 companies:
  *      1 Zenith Analytics    canonical clean baseline (all fields)
  *      2 Apex Digital        canonical clean baseline (all fields)
  *      3 Café Müller 東京 🚀  unicode/emoji/accents in every text sink
@@ -22,9 +22,14 @@
  *      7 "  Padded Name  "   leading/trailing whitespace
  *      8 O'Brien & Sons "Quality"  quote handling (SQL/JSON/CSV/HTML)
  *      9 Meridian Ops        HIGH VOLUME — 92 clean entries over ~4 months
+ *    9b-d Vertex Alpha/Beta/Gamma — GALAXY TRIO: three rows sharing
+ *                            hier_company 'Vertex Group' so the Company
+ *                            Galaxy (multi-project grouping, drill-in, the
+ *                            grouped list accordion) is exercised out of
+ *                            the box (docs/PLAN-company-galaxy.md)
  *     10 Pristine Control Co ZERO entries/tasks — control baseline; inserted
  *                            LAST so run-app verify-cursed-path targets it
- *  • 103 time entries:
+ *  • 106 time entries:
  *      – 6 canonical (5 clean + the 6-issue discrepancy session — unchanged)
  *      – 1 edge-probe session (see PROBES below)
  *      – 1 LEGACY PLAINTEXT entry (rows_json set, rows_enc NULL → exercises
@@ -32,6 +37,8 @@
  *      – 1 future-dated entry (tomorrow)
  *      – 2 same-date entries (one company, one day — ambiguity probe)
  *      – 92 volume entries (company 9; all clean, <210m → no compliance flags)
+ *      – 3 galaxy entries (one per Vertex row; clean, <210m, staggered
+ *        recency so the galaxy's systems get distinct sizes + fades)
  *  • 12 task_items: entry-1 compliance set (2 break/1 lunch) + Dispatch tasks,
  *    an in-progress BREAK on an old entry, a zero-duration task, a 25-hour
  *    task, an emoji/HTML-label task, and 2 ORPHANS (entry_id → nonexistent).
@@ -84,8 +91,8 @@ const SEED_THEME   = 'zanarkand';
 
 // ── Designed totals (the self-check asserts these EXACTLY) ─────────────────
 const EXPECT = {
-  companies:      10,
-  entries:        103,   // 6 canonical + 1 edge + 1 legacy + 1 future + 2 same-date + 92 volume
+  companies:      13,    // 10 v4 probes + the 3-row Vertex Group galaxy trio
+  entries:        106,   // 6 canonical + 1 edge + 1 legacy + 1 future + 2 same-date + 92 volume + 3 galaxy
   volumeEntries:  92,
   taskItems:      12,
   breaks:         3,     // 2 on entry 1 + 1 in-progress on the edge entry
@@ -289,6 +296,24 @@ async function seed() {
   }));
   console.log(`✓ Co 9: Meridian Ops (id ${companyIdV}) — volume probe (92 entries)`);
 
+  // ── 9b–9d. Vertex Group — GALAXY TRIO (Company Galaxy probe) ──────────────
+  // Three rows sharing hier_company 'Vertex Group': the only multi-project
+  // galaxy in the seed. Exercises grouping, L0 in-place expand, zoom, the
+  // grouped list accordion, and the dashboard pre-zoom handoff.
+  const galaxyDefs = [
+    { proj: 'Alpha', plat: 'HubA', nav: 'V111111', login: 'vx_alpha' },
+    { proj: 'Beta',  plat: 'HubB', nav: 'V222222', login: 'vx_beta'  },
+    { proj: 'Gamma', plat: 'HubC', nav: 'V333333', login: 'vx_gamma' },
+  ];
+  const galaxyIds = galaxyDefs.map(d => insertCompany(co('Vertex ' + d.proj, {
+    job_title: 'Multi-Project Contractor', work_type: 'QA',
+    location: 'Remote — USA', pay_rate: 21.00, date_start: '2025-10-01',
+    hier_company: 'Vertex Group', hier_project: d.proj, hier_platform: d.plat,
+    nav_id: d.nav, platform_login: d.login,
+    notes: `Galaxy probe — one of three rows under the 'Vertex Group' umbrella.`
+  })));
+  console.log(`✓ Co 9b–9d: Vertex Group galaxy trio (ids ${galaxyIds.join(', ')}) — multi-project grouping probe`);
+
   // ── 10. Pristine Control Co — MUST BE LAST (verify-cursed-path target) ─────
   const companyIdP = insertCompany(co('Pristine Control Co', {
     job_title: 'Control Group', work_type: 'Baseline', location: 'Remote',
@@ -444,6 +469,26 @@ async function seed() {
     insertEntry(companyIdV, 15 + i, `Meridian Day ${i + 1}`, rows, mins);
   }
   console.log(`✓ Volume: ${EXPECT.volumeEntries} clean entries — Meridian Ops — days 15..${14 + EXPECT.volumeEntries}`);
+
+  // ── Galaxy: 3 CLEAN entries — one per Vertex row, staggered recency ────────
+  // Distinct hours → distinct system sizes; staggered last-worked days → the
+  // identity-hue recency fade is visible inside the galaxy. All <210m so the
+  // audit expectation is untouched.
+  const galaxyEntryDefs = [
+    { day: 1, mins: 180, name: 'Alpha sprint QA' },   // vivid
+    { day: 4, mins: 120, name: 'Beta regression'  },
+    { day: 8, mins: 60,  name: 'Gamma triage'     },  // most faded
+  ];
+  galaxyEntryDefs.forEach((d, i) => {
+    const rows = [
+      { label: 'QA', name: d.name, desc: `Vertex Group galaxy fixture ${i + 1} of 3.`,
+        total_mins: d.mins, clock_in: timeStr(9, 0),
+        clock_out: timeStr(9 + Math.floor(d.mins / 60), d.mins % 60) },
+      ...blank(4)
+    ];
+    insertEntry(galaxyIds[i], d.day, `Vertex ${galaxyDefs[i].proj} Session`, rows, d.mins);
+  });
+  console.log('✓ Galaxy: 3 clean entries — Vertex Alpha/Beta/Gamma — days 1/4/8');
 
   // ═══════════════════════════════════════════════════════════════════════════
   //  TASK ITEMS
@@ -665,7 +710,7 @@ function printPacket() {
   B  dash.quick_actions ....... buttons navigate correctly
 
 ── 3. COMPANIES ──────────────────────────────────────────────────
-  A  comp.count ............... all 10 companies present
+  A  comp.count ............... all 13 companies present
   B  comp.spiderweb ........... 10-node force graph stays stable/readable
   A  comp.fields_zenith ....... Zenith detail: ALL fields populated
   B  comp.unicode ............. Café Müller 東京 🚀 renders everywhere it appears
@@ -701,8 +746,8 @@ function printPacket() {
   B  disp.emoji_label ......... 🚀 <b>Deploy</b> & "review" task renders escaped
 
 ── 6. GLOBAL LOG ─────────────────────────────────────────────────
-  A  log.all_entries .......... 103 entries appear (perf: page stays responsive)
-  A  log.filter_company ....... Zenith → 4, Apex → 6, Meridian → 92, Pristine → 0
+  A  log.all_entries .......... 106 entries appear (perf: page stays responsive)
+  A  log.filter_company ....... Zenith → 4, Apex → 6, Meridian → 92, Vertex → 1 each, Pristine → 0
   A  log.filter_dates ......... last-7-days filter correct (note: future entry!)
   B  log.future_entry ......... tomorrow-dated session — where does it sort?
   B  log.expand_detail ........ expand edge session → all 5 probe rows visible
@@ -722,7 +767,7 @@ function printPacket() {
   A  aud.dismiss .............. Dismiss an issue → count drops to 5
   A  aud.apply_fix ............ Apply Fix on no_clock_out updates the row
   B  aud.wizard ............... Suggest/Acknowledge wizard steps each issue
-  B  rep.volume ............... Period Summary / Company Breakdown handle 103
+  B  rep.volume ............... Period Summary / Company Breakdown handle 106
         entries without lag or layout breakage
 
 ── 8. SETTINGS  (sidebar gear or Ctrl+,) ─────────────────────────
@@ -758,9 +803,13 @@ function printPacket() {
   P11 future date .......... sort/filter/aggregation placement
   P12 same-date pair ....... session picker (C6/D-005): picker on load,
         Global Log Open targets the exact session, Switch button
+  P13 galaxy trio .......... 3 rows share hier_company 'Vertex Group':
+        web shows ONE galaxy (13.5h · 3 projects) that expands, zooms,
+        and shows planets; list shows the grouped accordion; dashboard
+        click pre-zooms into it
 
 ══════════════════════════════════════════════════════════════════
-  ⚡ \`npm run seed\` resets to this exact state (expected audit count = 6).
+  ⚡ \`npm run seed\` resets to this exact state (expected audit count = 7).
 ══════════════════════════════════════════════════════════════════
 `);
 }
