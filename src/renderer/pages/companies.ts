@@ -94,9 +94,17 @@ window.addEventListener('DOMContentLoaded', async () => {
   $id('gctx-reset-color').addEventListener('click', gctxResetColor);
 
   // Company list — delegated so dynamically-rendered rows need no re-wiring.
+  // Galaxy headers toggle their accordion; project rows select as before.
   $id('company-list').addEventListener('click', e => {
+    const head = (e.target as HTMLElement).closest<HTMLElement>('.galaxy-head');
+    if (head) {
+      const key = head.dataset.gkey || '';
+      if (openGroups.has(key)) openGroups.delete(key); else openGroups.add(key);
+      renderList();
+      return;
+    }
     const item = (e.target as HTMLElement).closest<HTMLElement>('.company-list-item');
-    if (item) selectCompany(Number(item.dataset.id));
+    if (item && item.dataset.id) selectCompany(Number(item.dataset.id));
   });
 
   // ── Search / filter controls ───────────────────────────────────────────
@@ -201,6 +209,11 @@ function compMinsMap(): Record<number, number> {
   return m;
 }
 
+// Galaxy grouping key — must mirror the engine's rule (bubble-web.ts).
+const listGroupKey = (co: Company): string => (co.hier_company || co.name || '—').trim() || '—';
+// Expanded galaxy headers (persists across re-renders within the page).
+const openGroups = new Set<string>();
+
 function renderList(): void {
   const el = $id('company-list');
   if (companies.length === 0) {
@@ -213,7 +226,7 @@ function renderList(): void {
     return;
   }
   const mins = compMinsMap();
-  el.innerHTML = list.map(co => {
+  const rowHtml = (co: Company): string => {
     const hier = [co.hier_project, co.hier_platform].filter(Boolean).join(' › ');
     const sub  = hier || co.job_title || co.work_type || '';
     const sel  = co.id === selectedId ? ' selected' : '';
@@ -225,6 +238,34 @@ function renderList(): void {
           ${sub ? `<div class="company-sub">${escapeHtml(sub)}</div>` : ''}
         </div>
         <div class="company-hours">${fmtH(mins[co.id] || 0)}</div>
+      </div>`;
+  };
+  // Two-level accordion mirroring the web's galaxies: rows sharing a
+  // hier_company group under one header (rolled-up hours); single-row
+  // companies render flat, exactly as before. A search/filter auto-expands
+  // the groups that still have matching rows.
+  const groups = new Map<string, Company[]>();
+  for (const co of list) {
+    const key = listGroupKey(co);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(co);
+  }
+  const filtering = isFiltering();
+  el.innerHTML = [...groups.entries()].map(([key, rows]) => {
+    if (rows.length === 1) return rowHtml(rows[0]);
+    const total = rows.reduce((t, c) => t + (mins[c.id] || 0), 0);
+    const open = filtering || openGroups.has(key) || rows.some(c => c.id === selectedId);
+    return `
+      <div class="galaxy-group${open ? ' open' : ''}" data-gkey="${escapeHtml(key)}">
+        <div class="company-list-item galaxy-head" data-gkey="${escapeHtml(key)}">
+          <div class="galaxy-caret">▶</div>
+          <div class="company-info">
+            <div class="company-name">${escapeHtml(key)}</div>
+            <div class="company-sub">${rows.length} projects</div>
+          </div>
+          <div class="company-hours">${fmtH(total)}</div>
+        </div>
+        <div class="galaxy-kids">${rows.map(rowHtml).join('')}</div>
       </div>`;
   }).join('');
 }

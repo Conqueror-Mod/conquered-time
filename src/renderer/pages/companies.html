@@ -184,6 +184,30 @@
     margin-top: 2px;
   }
 
+  /* Galaxy grouping — multi-project companies render as a two-level accordion:
+     a galaxy header row (rolled-up hours) expanding to its project rows. */
+  .galaxy-group { flex-shrink: 0; display: flex; flex-direction: column; gap: 6px; }
+  .galaxy-head .company-name { font-weight: 600; }
+  .galaxy-caret {
+    flex-shrink: 0;
+    width: 14px;
+    font-size: 10px;
+    color: var(--text-dim);
+    transition: transform var(--transition);
+    align-self: flex-start;
+    margin-top: 3px;
+  }
+  .galaxy-group.open .galaxy-caret { transform: rotate(90deg); color: var(--accent); }
+  .galaxy-kids {
+    display: none;
+    flex-direction: column;
+    gap: 6px;
+    padding-left: 18px;
+  }
+  .galaxy-group.open .galaxy-kids { display: flex; }
+  .galaxy-kids .company-list-item { flex-shrink: 0; padding: 8px 12px; }
+  .galaxy-kids .company-dot { width: 7px; height: 7px; }
+
   /* Detail pane */
   .company-detail-panel {
     display: none;
