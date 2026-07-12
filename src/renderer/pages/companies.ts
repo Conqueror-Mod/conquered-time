@@ -416,14 +416,38 @@ document.addEventListener('click', hideCtx);
 function ctxOpenTracker(): void { if (!ctxTarget) return; sessionStorage.setItem('active_company', JSON.stringify(ctxTarget)); api.send('navigate', 'tracker'); }
 function ctxEditCompany(): void { if (ctxTarget) openModal(ctxTarget); }
 
-// 🎨 Edit Color — hidden <input type="color"> so the OS picker opens at the
-// menu position; the pick persists into the company's encrypted blob.
+// 🎨 Edit Color — hidden <input type="color">. Chromium anchors the native
+// picker popup to the input's position, so the input is moved to where the
+// context menu was opened before click(). While the picker is open, `input`
+// events live-preview the pick on the bubble (mutate co.color + redraw);
+// `change` (picker confirmed/closed) persists it. Esc/cancel reverts.
 function ctxEditColor(): void {
   if (!ctxTarget) return;
   const target = ctxTarget;
+  const original = target.color;
   const pick = $field('ctx-color-pick') as HTMLInputElement;
+  const menu = $id('ctx-menu');
+  pick.style.left = menu.style.left;
+  pick.style.top = menu.style.top;
   pick.value = target.color || '#4aa8c0';
-  pick.onchange = () => { void saveColor(target, pick.value); };
+  let committed = false;
+  pick.oninput = () => {            // live preview while dragging in the picker
+    target.color = pick.value;
+    web?.redraw();
+  };
+  pick.onchange = () => {           // picker confirmed — persist
+    committed = true;
+    target.color = pick.value;
+    web?.redraw();
+    void saveColor(target, pick.value);
+  };
+  // Cancelled (Esc / close without confirm) — put the original color back.
+  const onDone = (): void => {
+    if (!committed) { target.color = original; web?.redraw(); }
+    pick.oninput = null;
+    pick.removeEventListener('focusout', onDone);
+  };
+  pick.addEventListener('focusout', onDone);
   pick.click();
 }
 function ctxResetColor(): void {

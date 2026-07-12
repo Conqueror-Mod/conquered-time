@@ -524,6 +524,8 @@ interface CanvasTextApi {
 interface BubbleWebController {
   update(companies: Company[], entries: EntrySummary[], range: '30' | '90' | 'all'): void;
   setMatcher(fn: ((co: Company) => boolean) | null): void;
+  /** Repaint with the current layout (live color preview). */
+  redraw(): void;
   destroy(): void;
 }
 interface BubbleWebApi {
