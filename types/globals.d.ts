@@ -520,12 +520,16 @@ interface CanvasTextApi {
                  baseR: number, maxR: number, padding?: number | null): number;
 }
 
-/** Company Web v2 packed-bubble engine (src/renderer/bubble-web.ts). */
+/** Company Galaxy packed-bubble engine, Web 3.0 (src/renderer/bubble-web.ts,
+ *  docs/PLAN-company-galaxy.md). Galaxy = rows grouped by hier_company. */
+interface BubbleGalaxy { key: string; name: string; rows: Company[]; }
 interface BubbleWebController {
   update(companies: Company[], entries: EntrySummary[], range: '30' | '90' | 'all'): void;
   setMatcher(fn: ((co: Company) => boolean) | null): void;
   /** Repaint with the current layout (live color preview). */
   redraw(): void;
+  /** Jump straight into a galaxy's systems (dashboard pre-zoom handoff). */
+  zoomTo(key: string): void;
   destroy(): void;
 }
 interface BubbleWebApi {
@@ -533,9 +537,12 @@ interface BubbleWebApi {
     canvas: HTMLCanvasElement;
     wrap: HTMLElement;
     tooltip: { root: HTMLElement; name: HTMLElement; hier: HTMLElement; detail: HTMLElement };
-    onCompanyClick?: (co: Company, ev: MouseEvent) => void;
-    onCompanyContext?: (co: Company, ev: MouseEvent) => void;
+    breadcrumb?: { root: HTMLElement; name: HTMLElement };
     mini?: boolean;
+    onOpenTracker?: (co: Company) => void;
+    onGalaxyNavigate?: (galaxy: BubbleGalaxy) => void;
+    onGalaxyContext?: (galaxy: BubbleGalaxy, ev: MouseEvent) => void;
+    onSystemContext?: (co: Company, ev: MouseEvent) => void;
   }): BubbleWebController;
 }
 

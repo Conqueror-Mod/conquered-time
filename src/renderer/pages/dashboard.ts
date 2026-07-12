@@ -70,10 +70,11 @@ function fmtH(mins: number): string {
   return (mins / 60).toFixed(1) + 'h';
 }
 
-// Mini packed-bubble web — same BubbleWeb engine as the Companies page so the
-// two webs read identically. Follows the shared per-profile window preset
-// (ui_webRange, set from the Companies page toggles); click → that company's
-// tracker instead of the Companies context menu.
+// Mini galaxy web — same BubbleWeb engine as the Companies page, galaxies
+// only (no drill on the small canvas). Follows the shared per-profile window
+// preset (ui_webRange, set from the Companies page toggles). Single-project
+// galaxy click → tracker, as always; multi-project click → Companies page
+// PRE-ZOOMED into that galaxy (approved decision #6).
 async function drawMiniWeb(): Promise<void> {
   const canvas = document.getElementById('web-canvas') as HTMLCanvasElement | null;
   const wrap   = document.getElementById('web-canvas-wrap');
@@ -90,9 +91,13 @@ async function drawMiniWeb(): Promise<void> {
       hier: document.getElementById('tt-hier')!,
       detail: document.getElementById('tt-detail')!,
     },
-    onCompanyClick: (co) => {
+    onOpenTracker: (co) => {
       sessionStorage.setItem('active_company', JSON.stringify(co));
       api.send('navigate', 'tracker');
+    },
+    onGalaxyNavigate: (galaxy) => {
+      sessionStorage.setItem('web_zoom_galaxy', galaxy.key);
+      api.send('navigate', 'companies');
     },
   });
   web.update(companies, allEntries, range);
