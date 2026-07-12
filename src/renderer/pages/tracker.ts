@@ -104,6 +104,27 @@ window.addEventListener('DOMContentLoaded', async () => {
     if ((e as CustomEvent).detail?.key === 'timeFormat') { renderTable(); updateTotals(); }
   });
 
+  // External punch (tray menu / global hotkey) — main wrote the entry behind
+  // our back, so our in-memory rows AND concurrency token are stale (the next
+  // autosave would be rejected). Reload the affected session in place.
+  api.on('punch:changed', async (payload: any) => {
+    const entryId   = Number(payload?.entry_id || 0);
+    const companyId = Number(payload?.company_id || 0);
+    if (!currentCompany) return;
+    const sameEntry   = entryId && entryId === currentEntryId;
+    const sameCompany = companyId && Number(currentCompany.id) === companyId
+      && $input('log-date').value === RowUtils.localDateStr();
+    if (!sameEntry && !sameCompany) return;
+    if (sameEntry) {
+      const fresh = await api.invoke('entries:get', entryId);
+      if (fresh) await loadEntryIntoTracker(fresh as TimeEntry);
+    } else {
+      sessionStorage.setItem('tracker_entry', String(entryId)); // land on the punched session
+      await loadTodayEntry();
+    }
+    Shell.toast('Session updated by a tray/hotkey punch.', 'info');
+  });
+
   await initColResize();
 
   window.addEventListener('beforeunload', clearAutoSaveTimer);

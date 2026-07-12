@@ -27,6 +27,7 @@ const ALLOWED_INVOKE = new Set([
   'win:set-launch-at-startup', 'win:get-launch-at-startup',
   'win:get-close-to-tray', 'win:set-close-to-tray',
   'win:get-start-minimized', 'win:set-start-minimized',
+  'win:get-punch-hotkey', 'win:set-punch-hotkey',
   'win:set-zoom',
   'beta:status', 'beta:redeem'
 ]);
@@ -39,7 +40,7 @@ const ALLOWED_SEND = new Set([
 
 const ALLOWED_RECEIVE = new Set([
   'menu:export-pdf', 'menu:export-csv', 'toast', 'modal:security-info',
-  'audit:close-warning', 'audit:wizard-done', 'update:status'
+  'audit:close-warning', 'audit:wizard-done', 'update:status', 'punch:changed'
 ]);
 
 // The exposed surface is typed as PreloadApi in types/globals.d.ts — the

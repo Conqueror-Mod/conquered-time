@@ -361,6 +361,8 @@ interface IpcInvokeMap {
   'win:set-close-to-tray': (on: boolean) => MutResult;
   'win:get-start-minimized': () => boolean;
   'win:set-start-minimized': (on: boolean) => MutResult;
+  'win:get-punch-hotkey': () => string;
+  'win:set-punch-hotkey': (accel: string) => MutResult;
   'win:set-zoom': (factor: number) => MutResult;
   // beta gate
   'beta:status': () => { required: boolean };
@@ -374,7 +376,7 @@ type IpcSendChannel =
 
 type IpcReceiveChannel =
   | 'menu:export-pdf' | 'menu:export-csv' | 'toast' | 'modal:security-info'
-  | 'audit:close-warning' | 'audit:wizard-done' | 'update:status';
+  | 'audit:close-warning' | 'audit:wizard-done' | 'update:status' | 'punch:changed';
 
 /** Auto-updater status pushed from main (src/main/updater.ts). */
 interface UpdateStatus {
