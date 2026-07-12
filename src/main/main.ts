@@ -1,6 +1,6 @@
 'use strict';
 
-const { app, BrowserWindow, ipcMain, Menu, Tray, nativeImage, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, Tray, nativeImage, screen, globalShortcut } = require('electron');
 const path       = require('path');
 const fs         = require('fs');
 const { loadSqlJs, newDatabase, openDb, hasDb, setDbFile, getDbFile, persistDB, dbGet, dbRun } = require('./db');
@@ -12,6 +12,7 @@ const {
 const { countAuditDiscrepancies } = require('./audit');
 const { setBackupDir, getBackupDir, performBackup } = require('./backups');
 const { initEmail, runScheduledEmailCheck } = require('./email');
+const { initPunch, getPunchState, punchIn, punchOut, togglePunch } = require('./punch');
 
 // Beta-key signing secret — private, gitignored, bundled into builds. If the
 // file is absent (e.g. a fresh clone), the gate fails OPEN (disabled) so the
@@ -105,6 +106,11 @@ initSession({
   rendererDir: RENDERER_DIR,
 });
 initEmail({ getMainWindow: () => mainWindow });
+initPunch({
+  getMainWindow: () => mainWindow,
+  showMainWindow: () => showMainWindow(),
+  refreshTray: () => refreshTrayMenu(),
+});
 
 // ── IPC handler modules ─────────────────────────────────────────────────────
 // Each ipc/* module registers its own handlers at require time; main-owned
@@ -118,6 +124,17 @@ require('./ipc/invoices').register();
 require('./ipc/settings').register({
   getMainWindow: () => mainWindow,
   applyLaunchAtStartup, loginItemOpts, getAppPref, setAppPref,
+  getPunchHotkey: () => getPunchHotkey(),
+  // Try the new binding before committing it: if the OS rejects it (taken by
+  // another app), roll back to the previous one so a bad save can't strand the
+  // user with no working hotkey.
+  setPunchHotkey: (accel: string) => {
+    const prev = getPunchHotkey();
+    setAppPref('punchHotkey', accel);
+    const res = registerPunchHotkey();
+    if (!res.ok) { setAppPref('punchHotkey', prev); registerPunchHotkey(); }
+    return res;
+  },
   rendererDir: RENDERER_DIR, IS_DEV,
 });
 require('./ipc/auth').register({
@@ -480,13 +497,37 @@ function showMainWindow() {
   mainWindow.focus();
 }
 
-function createTray() {
-  if (tray) return;
-  const icon = nativeImage.createFromPath(path.join(__dirname, '../../assets/icon.ico'));
-  tray = new Tray(icon.isEmpty() ? nativeImage.createEmpty() : icon);
-  tray.setToolTip('Conquered Time');
+// The Clock In / Clock Out items are dynamic (label follows the punch state),
+// and Windows requires the context menu to be rebuilt with setContextMenu —
+// there's no reliable "about to open" hook. So the menu is rebuilt on every
+// punch/session change (punch.ts calls refreshTrayMenu) plus a slow interval
+// as a catch-all for state changes with no explicit hook (login, idle lock).
+function buildPunchMenuItems() {
+  const st = getPunchState();
+  if (st.state === 'locked') {
+    return [{ label: 'Clock In / Out…  (sign in first)', click: showMainWindow }];
+  }
+  if (st.state === 'in') {
+    return [{
+      label: `Clock Out${st.since ? `  (in since ${st.since}${st.company ? ' — ' + st.company : ''})` : ''}`,
+      click: () => punchOut(),
+    }];
+  }
+  if (st.lastTask) {
+    return [{
+      label: `Clock In — ${st.lastTask.name}${st.lastTask.company ? ' @ ' + st.lastTask.company : ''}`,
+      click: () => punchIn(),
+    }];
+  }
+  return [{ label: 'Clock In…  (no task to repeat — open app)', click: showMainWindow }];
+}
+
+function refreshTrayMenu() {
+  if (!tray) return;
   const menu = Menu.buildFromTemplate([
     { label: 'Open Conquered Time', click: showMainWindow },
+    { type: 'separator' },
+    ...buildPunchMenuItems(),
     { type: 'separator' },
     { label: 'Lock Session', click: () => { showMainWindow(); lockSession(); } },
     { label: 'Backup Now',   click: () => { persistDB(); performBackup(); if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('toast', { msg: 'Backup saved.', type: 'success' }); } },
@@ -494,8 +535,45 @@ function createTray() {
     { label: 'Quit', click: () => { isQuitting = true; app.quit(); } }
   ]);
   tray.setContextMenu(menu);
+}
+
+function createTray() {
+  if (tray) return;
+  const icon = nativeImage.createFromPath(path.join(__dirname, '../../assets/icon.ico'));
+  tray = new Tray(icon.isEmpty() ? nativeImage.createEmpty() : icon);
+  tray.setToolTip('Conquered Time');
+  refreshTrayMenu();
   tray.on('click', showMainWindow);
   tray.on('double-click', showMainWindow);
+  // Catch-all refresh (see buildPunchMenuItems). Cheap: locked/fast-path reads.
+  setInterval(refreshTrayMenu, 20 * 1000);
+}
+
+// ── Global punch hotkey ─────────────────────────────────────────────────────
+// App-global pref (app-prefs.json, like close-to-tray): the hotkey is an OS
+// registration, not a profile's data. '' disables. Toggle semantics: clock in
+// when no punch is open, clock out when one is (see punch.ts togglePunch).
+const DEFAULT_PUNCH_HOTKEY = 'Control+Alt+P';
+let registeredPunchHotkey: string | null = null;
+function getPunchHotkey(): string {
+  const v = getAppPref('punchHotkey', DEFAULT_PUNCH_HOTKEY);
+  return typeof v === 'string' ? v : DEFAULT_PUNCH_HOTKEY;
+}
+function registerPunchHotkey(): { ok: boolean; error?: string } {
+  if (registeredPunchHotkey) {
+    try { globalShortcut.unregister(registeredPunchHotkey); } catch {}
+    registeredPunchHotkey = null;
+  }
+  const accel = getPunchHotkey();
+  if (!accel) return { ok: true }; // disabled
+  try {
+    const ok = globalShortcut.register(accel, () => togglePunch());
+    if (!ok) return { ok: false, error: 'That shortcut is in use by another app.' };
+    registeredPunchHotkey = accel;
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
 }
 
 // ── Launch at startup ───────────────────────────────────────────────────────
@@ -655,6 +733,8 @@ app.whenReady().then(async () => {
   const splash = startHidden ? null : createSplashWindow('zanarkand', splashDisplay);
   createWindow(); // creates hidden (show: false)
   createTray();
+  const hk = registerPunchHotkey();
+  if (!hk.ok) console.warn('[hotkey] punch hotkey registration failed:', hk.error);
   // No launch-at-startup re-sync needed here: the OS login item is its own
   // persistent source of truth (toggled via win:set-launch-at-startup).
 
@@ -743,6 +823,8 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => { isQuitting = true; });
+
+app.on('will-quit', () => { try { globalShortcut.unregisterAll(); } catch {} });
 
 app.on('second-instance', () => {
   if (mainWindow) { mainWindow.show(); mainWindow.focus(); }

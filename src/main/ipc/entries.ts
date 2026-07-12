@@ -6,7 +6,6 @@ const { dbAll, dbGet, dbRun, persistDB } = require('../db');
 const { readCache, cacheOwner, invalidateEntriesCache } = require('../cache');
 const { performBackup } = require('../backups');
 const { encrypt, decrypt } = require('../vault-crypto');
-const { localDateStr } = require('../../renderer/row-utils');
 
 function register() {
 // ── IPC: Time entries ──────────────────────────────────────────────────────
@@ -88,47 +87,10 @@ ipcMain.handle('entries:summary', () => {
 ipcMain.handle('entries:get-active', () => {
   if (!session.key || !session.user) return null;
 
-  let row = null;
-
-  // Fast path: use in-memory session.activeEntryId if set
-  if (session.activeEntryId) {
-    row = dbGet('SELECT rowid as rid, * FROM time_entries WHERE rowid=? AND user_id=?',
-      [session.activeEntryId, session.user.id]);
-  }
-
-  // Fallback: find today's entry that has a clocked-in but not clocked-out row
-  if (!row) {
-    // LOCAL date — toISOString here is UTC and pointed at tomorrow all evening.
-    const today = localDateStr();
-    const candidates = dbAll(
-      'SELECT rowid as rid, * FROM time_entries WHERE user_id=? AND log_date=? ORDER BY updated_at DESC',
-      [session.user.id, today]
-    );
-    for (const c of candidates) {
-      try {
-        decryptEntry(c);
-        const rows = JSON.parse(c.rows_json || '[]');
-        if (rows.some((r: any) => r.clock_in && !r.clock_out)) { row = c; break; }
-      } catch {}
-    }
-    // Also check entries from yesterday in case of overnight sessions
-    if (!row) {
-      const yesterday = localDateStr(new Date(Date.now() - 86400000));
-      const prev = dbAll(
-        'SELECT rowid as rid, * FROM time_entries WHERE user_id=? AND log_date=? ORDER BY updated_at DESC',
-        [session.user.id, yesterday]
-      );
-      for (const c of prev) {
-        try {
-          decryptEntry(c);
-          const rows = JSON.parse(c.rows_json || '[]');
-          if (rows.some((r: any) => r.clock_in && !r.clock_out)) { row = c; break; }
-        } catch {}
-      }
-    }
-    if (row) session.activeEntryId = Number(row.rid);
-  }
-
+  // Active-punch lookup (fast path activeEntryId + today/yesterday fallback)
+  // lives in ../punch so the tray/hotkey punch engine and this handler can
+  // never disagree about what "the active entry" is.
+  const row = require('../punch').findActiveEntry();
   if (!row) return null;
 
   decryptEntry(row);
