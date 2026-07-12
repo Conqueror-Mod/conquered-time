@@ -317,12 +317,14 @@ interface IpcInvokeMap {
   // backup
   'backup:list': () => Array<{
     filename: string; timestamp?: string; sizeKB?: number;
+    kind?: 'auto' | 'safety'; reason?: string | null;
   }>;
   'backup:preview': (file: string) => {
     error?: string; username?: string; companyCount?: number;
     entryCount?: number; dateFrom?: string; dateTo?: string;
   };
   'backup:restore': (file: string) => MutResult;
+  'backup:export-portable': () => { ok: boolean; path?: string; canceled?: boolean; error?: string };
   // email
   'email:save-config': (payload: object) => MutResult;
   'email:get-config': () => {

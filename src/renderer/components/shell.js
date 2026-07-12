@@ -410,8 +410,17 @@ const Shell = (() => {
               </div>
 
               <div class="settings-group">
+                <div class="settings-group-title">Export Vault</div>
+                <div class="settings-row-label">Save a portable copy of your entire vault to a location of your choice. The exported file stays encrypted and still needs your account password to open — safe to store on a USB drive or cloud folder.</div>
+                <div style="margin-top:10px;">
+                  <button class="s-btn" id="export-vault-btn" data-action="exportVault">Export Vault…</button>
+                  <span id="export-vault-status" class="settings-row-label" style="margin-left:10px;"></span>
+                </div>
+              </div>
+
+              <div class="settings-group">
                 <div class="settings-group-title">Backup Library</div>
-                <div class="settings-row-label">Restore from a previous automatic backup. Your current data is saved first as a safety checkpoint before any restore.</div>
+                <div class="settings-row-label">Restore from an automatic backup, or from a protected <strong>safety snapshot</strong> taken automatically just before a destructive action (a clear or a restore). Your current data is saved first as a safety checkpoint before any restore.</div>
                 <div id="backup-list-area" style="margin-top:10px;">
                   <button class="s-btn" data-action="loadBackupList">Load Backups</button>
                 </div>
@@ -1041,6 +1050,46 @@ function hideDbaConfirm(type) {
   if (inp) inp.value = '';
 }
 
+// Full-clear safety nudge. Resolves 'export' | 'continue' | 'cancel'. Built
+// dynamically (CSP-safe: buttons wired via addEventListener, no inline
+// handlers). Theme-aware through CSS variables; Escape cancels.
+function showFullClearNudge() {
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.className = 'fullclear-nudge-overlay';
+    overlay.setAttribute('style',
+      'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;' +
+      'background:rgba(0,0,0,0.55);backdrop-filter:blur(2px);');
+    overlay.innerHTML = `
+      <div class="fullclear-nudge-card" style="max-width:440px;width:90%;background:var(--surface-1,#1a1d24);
+           border:1px solid var(--border,#333);border-radius:12px;padding:22px 24px;box-shadow:var(--shadow-3,0 20px 60px rgba(0,0,0,.5));font-family:var(--sans);">
+        <div style="font-size:16px;font-weight:700;color:var(--text,#eee);margin-bottom:10px;">⚠ Full Database Clear</div>
+        <div style="font-size:13px;line-height:1.5;color:var(--text-muted,#aaa);margin-bottom:8px;">
+          This permanently removes this profile and <strong>all of its backups</strong>, including the automatic safety snapshots. This cannot be undone.</div>
+        <div style="font-size:13px;line-height:1.5;color:var(--text-muted,#aaa);margin-bottom:18px;">
+          Export a portable, encrypted copy of your vault first?</div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">
+          <button class="dba-confirm-btn" data-nudge="cancel">Cancel</button>
+          <button class="dba-confirm-btn" data-nudge="continue">Continue Anyway</button>
+          <button class="dba-confirm-btn danger" data-nudge="export" style="background:var(--accent,#3a7);">Export &amp; Continue</button>
+        </div>
+      </div>`;
+    const done = choice => {
+      document.removeEventListener('keydown', onKey, true);
+      overlay.remove();
+      resolve(choice);
+    };
+    const onKey = e => { if (e.key === 'Escape') { e.stopPropagation(); done('cancel'); } };
+    overlay.addEventListener('click', e => {
+      const b = e.target.closest('[data-nudge]');
+      if (b) { done(b.dataset.nudge); return; }
+      if (e.target === overlay) done('cancel'); // click backdrop = cancel
+    });
+    document.addEventListener('keydown', onKey, true);
+    document.body.appendChild(overlay);
+  });
+}
+
 async function executeDbaClear(type) {
   const inp = document.getElementById(`dba-input-${type}`);
   if (!inp || inp.value.trim() !== 'CONFIRM') {
@@ -1048,6 +1097,20 @@ async function executeDbaClear(type) {
     setTimeout(() => inp?.classList.remove('dba-input-shake'), 600);
     Shell.toast('Type CONFIRM exactly to proceed.', 'error', 3000);
     return;
+  }
+  // Full Database Clear deletes the whole profile, its backups/ folder
+  // included — so the automatic pre-action safety snapshots can't help here.
+  // Nudge a portable export (to a location outside the app) before the wipe.
+  if (type === 'full') {
+    const choice = await showFullClearNudge();
+    if (choice === 'cancel') return;
+    if (choice === 'export') {
+      const exp = await exportVault();
+      // If the export didn't complete (cancelled the save dialog or errored),
+      // don't proceed to the irreversible wipe — the user asked to save first.
+      if (!exp || !exp.ok) { Shell.toast('Export not completed — wipe cancelled.', 'info', 3500); return; }
+    }
+    // choice === 'continue' falls through to the wipe with no export.
   }
   try {
     let res;
@@ -1096,6 +1159,36 @@ Shell._openUpdateUrl = function(url) {
   api.send('shell:open-external', url);
 };
 
+// ── Portable vault export ──────────────────────────────────────────────────
+// Copies the encrypted vault to a user-chosen location (save dialog in main).
+// Returns the MutResult so callers (e.g. the full-clear nudge) can branch on
+// whether the export actually completed vs. was cancelled.
+async function exportVault() {
+  const btn = document.getElementById('export-vault-btn');
+  const status = document.getElementById('export-vault-status');
+  if (btn) btn.disabled = true;
+  if (status) { status.textContent = 'Choose where to save…'; status.style.color = ''; }
+  try {
+    const res = await api.invoke('backup:export-portable');
+    if (res && res.ok) {
+      if (status) status.textContent = 'Exported ✓';
+      Shell.toast('Vault exported (encrypted).', 'success', 3000);
+    } else if (res && res.canceled) {
+      if (status) status.textContent = '';
+    } else {
+      if (status) { status.textContent = 'Export failed.'; status.style.color = 'var(--red)'; }
+      Shell.toast('Export failed: ' + ((res && res.error) || 'unknown error'), 'error');
+    }
+    return res || { ok: false };
+  } catch (e) {
+    if (status) { status.textContent = 'Export failed.'; status.style.color = 'var(--red)'; }
+    Shell.toast('Export error: ' + e.message, 'error');
+    return { ok: false, error: e.message };
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
 // ── Backup Library ────────────────────────────────────────────────────────────
 let _backupFiles = []; // cache so indices stay stable
 let _backupPreviewOpen = null; // index of currently expanded preview
@@ -1112,11 +1205,16 @@ async function loadBackupList() {
     }
     const rows = _backupFiles.map((b, i) => {
       const dt = (b.timestamp || '').replace('T', ' ');
+      // Safety snapshots (taken just before a destructive action) get a badge
+      // and their reason so they stand out from routine autosave copies.
+      const badge = b.kind === 'safety'
+        ? `<span class="backup-badge-safety" title="Protected snapshot taken before a destructive action">🛡 ${escapeHtml(b.reason || 'Safety Snapshot')}</span>`
+        : '';
       return `
-        <div class="backup-row" id="brow-${i}" style="flex-shrink:0;">
+        <div class="backup-row${b.kind === 'safety' ? ' backup-row-safety' : ''}" id="brow-${i}" style="flex-shrink:0;">
           <div class="backup-row-main">
             <div>
-              <div class="backup-row-ts">${dt}</div>
+              <div class="backup-row-ts">${dt}${badge}</div>
               <div class="backup-row-size">${b.sizeKB} KB</div>
             </div>
             <button class="backup-preview-btn" data-idx="${i}">Preview</button>
@@ -1771,6 +1869,7 @@ function installShellDelegation() {
     hideDbaConfirm:        a       => hideDbaConfirm(a),
     executeDbaClear:       a       => executeDbaClear(a),
     loadBackupList:        ()      => loadBackupList(),
+    exportVault:           ()      => exportVault(),
     showBackupConfirm:     a       => showBackupConfirm(Number(a)),
     hideBackupConfirm:     a       => hideBackupConfirm(Number(a)),
     executeBackupRestore:  a       => executeBackupRestore(Number(a)),

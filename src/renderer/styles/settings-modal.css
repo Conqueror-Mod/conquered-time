@@ -444,6 +444,22 @@
 .backup-row-ts   { font-family: var(--mono); font-size: 12px; color: var(--text-bright); }
 .backup-row-size { font-family: var(--sans); font-size: 10px; color: var(--text-muted); margin-top: 2px; }
 
+/* Protected pre-destructive-action snapshots stand out from routine autosaves. */
+.backup-row-safety { border-color: var(--accent); }
+.backup-row-safety:hover { border-color: var(--accent); }
+.backup-badge-safety {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-family: var(--sans);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  vertical-align: middle;
+}
+
 .backup-preview-btn {
   flex-shrink: 0;
   padding: 5px 12px;

@@ -6,7 +6,29 @@ const { app, ipcMain, screen, dialog, Notification } = require('electron');
 const { session, clearIdleTimer } = require('../session');
 const { dbGet, dbRun, persistDB, hasDb, getDbFile, setDbFile, replaceDb, newDatabase } = require('../db');
 const { readCache, invalidateEntriesCache } = require('../cache');
-const { setBackupDir, getBackupDir, performBackup } = require('../backups');
+const { setBackupDir, getBackupDir, performBackup, performSafetySnapshot } = require('../backups');
+
+// Backup filename shapes. Routine autosave copies are vault-<stamp>.db; pre-
+// destructive-action safety snapshots are safety-<stamp>__<slug>.db (see
+// backups.ts). Both are validated before any fs use so a crafted filename from
+// the renderer can't escape the backups/ dir.
+const VAULT_RE  = /^vault-[\d\-T]+\.db$/;
+const SAFETY_RE = /^safety-[\d\-T]+__[a-z0-9-]+\.db$/;
+const isBackupName = (f: any) => typeof f === 'string' && (VAULT_RE.test(f) || SAFETY_RE.test(f));
+
+// safety-<stamp>__<slug>.db → { timestamp, reason }. Humanizes the slug
+// ("companies-clear" → "Companies Clear") for the Backup Library.
+function parseBackupName(f: string): { kind: 'safety' | 'auto'; timestamp: string; reason: string | null } {
+  if (SAFETY_RE.test(f)) {
+    const body = f.replace(/^safety-/, '').replace(/\.db$/, '');
+    const [stamp, slug] = body.split('__');
+    const ts = stamp.replace(/T(\d{2})-(\d{2})-(\d{2})/, 'T$1:$2:$3');
+    const reason = (slug || '').split('-').map(w => w ? w[0].toUpperCase() + w.slice(1) : w).join(' ');
+    return { kind: 'safety', timestamp: ts, reason: reason || 'Safety Snapshot' };
+  }
+  const ts = f.replace('vault-', '').replace('.db', '').replace(/T(\d{2})-(\d{2})-(\d{2})/, 'T$1:$2:$3');
+  return { kind: 'auto', timestamp: ts, reason: null };
+}
 
 // ctx: main-owned window/prefs helpers.
 function register(ctx: Record<string, any>) {
@@ -78,19 +100,23 @@ ipcMain.handle('win:set-start-minimized', (_: unknown, enabled: any) => {
 ipcMain.handle('backup:list', () => {
   if (!session.user) return [];
   if (!fs.existsSync(getBackupDir())) return [];
+  // Both classes listed together, newest-first. Sorting by the ISO-derived
+  // stamp embedded in each name interleaves auto + safety copies correctly
+  // regardless of prefix (a plain filename sort would group by prefix).
   const files = fs.readdirSync(getBackupDir())
-    .filter((f: any) => f.startsWith('vault-') && f.endsWith('.db'))
-    .sort().reverse();
+    .filter(isBackupName)
+    .sort((a: string, b: string) => parseBackupName(a).timestamp.localeCompare(parseBackupName(b).timestamp))
+    .reverse();
   return files.map((f: any) => {
     const stat = fs.statSync(path.join(getBackupDir(), f));
-    const ts = f.replace('vault-', '').replace('.db', '').replace(/T(\d{2})-(\d{2})-(\d{2})/, 'T$1:$2:$3');
-    return { filename: f, timestamp: ts, sizeKB: Math.round(stat.size / 1024) };
+    const meta = parseBackupName(f);
+    return { filename: f, timestamp: meta.timestamp, kind: meta.kind, reason: meta.reason, sizeKB: Math.round(stat.size / 1024) };
   });
 });
 
 ipcMain.handle('backup:preview', (_: unknown, filename: any) => {
   if (!session.user) return { error: 'No session' };
-  if (!/^vault-[\d\-T]+\.db$/.test(filename)) return { error: 'Invalid filename' };
+  if (!isBackupName(filename)) return { error: 'Invalid filename' };
   const filepath = path.join(getBackupDir(), filename);
   if (!fs.existsSync(filepath)) return { error: 'File not found' };
   try {
@@ -109,11 +135,13 @@ ipcMain.handle('backup:preview', (_: unknown, filename: any) => {
 
 ipcMain.handle('backup:restore', (_: unknown, filename: any) => {
   if (!session.user) return { ok: false, error: 'No session' };
-  if (!/^vault-[\d\-T]+\.db$/.test(filename)) return { ok: false, error: 'Invalid filename' };
+  if (!isBackupName(filename)) return { ok: false, error: 'Invalid filename' };
   const filepath = path.join(getBackupDir(), filename);
   if (!fs.existsSync(filepath)) return { ok: false, error: 'File not found' };
   try {
-    performBackup(); // safety-save current state before overwriting
+    // Protected snapshot of the live vault before it's overwritten — restoring
+    // the "wrong" backup is itself recoverable from this.
+    persistDB(); performSafetySnapshot('before-restore');
     fs.copyFileSync(filepath, getDbFile());
     // Reload the DB in memory
     const buf = fs.readFileSync(getDbFile());
@@ -161,6 +189,7 @@ ipcMain.handle('auth:browse-backup', async () => {
 ipcMain.handle('db:clear-timeclock', () => {
   if (!session.key || !session.user) return { ok: false };
   const uid = session.user.id;
+  persistDB(); performSafetySnapshot('timeclock-clear'); // protected pre-action snapshot
   dbRun('DELETE FROM task_items   WHERE user_id=?', [uid]);
   dbRun('DELETE FROM time_entries WHERE user_id=?', [uid]);
   session.activeEntryId = null;
@@ -178,6 +207,7 @@ ipcMain.handle('db:clear-timeclock-company', (_: unknown, arg: any) => {
   const companyId = Number(arg && arg.companyId);
   if (!companyId) return { ok: false, error: 'No company specified' };
   const uid = session.user.id;
+  persistDB(); performSafetySnapshot('company-timeclock-clear'); // protected pre-action snapshot
   dbRun(
     'DELETE FROM task_items WHERE user_id=? AND entry_id IN (SELECT rowid FROM time_entries WHERE user_id=? AND company_id=?)',
     [uid, uid, companyId]
@@ -192,6 +222,7 @@ ipcMain.handle('db:clear-timeclock-company', (_: unknown, arg: any) => {
 ipcMain.handle('db:clear-companies', () => {
   if (!session.key || !session.user) return { ok: false };
   const uid = session.user.id;
+  persistDB(); performSafetySnapshot('companies-clear'); // protected pre-action snapshot
   dbRun('DELETE FROM task_items   WHERE user_id=?', [uid]);
   dbRun('DELETE FROM time_entries WHERE user_id=?', [uid]);
   dbRun('DELETE FROM companies    WHERE user_id=?', [uid]);
@@ -234,6 +265,32 @@ ipcMain.handle('db:clear-full', () => {
   }
 
   return { ok: true }; // no persistDB() — directory is gone
+});
+
+// Portable vault export — copies the ENCRYPTED vault.db to a user-chosen
+// location via a save dialog. The exported file still requires the account
+// password to open (AES-GCM key derived from it), so it's safe to store
+// anywhere — consistent with the on-disk backups and the encryption-at-rest
+// design. This is the safety net for the full-clear "nuke the profile" path,
+// whose in-profile backups die with it. No decryption / plaintext bundle:
+// that would leak PPI and contradict the whole vault model.
+ipcMain.handle('backup:export-portable', async () => {
+  if (!session.key || !session.user) return { ok: false, error: 'No session' };
+  persistDB(); // flush any pending in-memory changes into the file first
+  const dbFile = getDbFile();
+  if (!dbFile || !fs.existsSync(dbFile)) return { ok: false, error: 'No vault file to export' };
+  const stamp = new Date().toISOString().slice(0, 10);
+  const uname = String(session.user.username || 'vault').replace(/[^a-z0-9_-]+/gi, '') || 'vault';
+  const result = await dialog.showSaveDialog(getMainWindow(), {
+    title: 'Export Vault (encrypted)',
+    defaultPath: `conquered-time-${uname}-${stamp}.db`,
+    filters: [{ name: 'Encrypted vault', extensions: ['db'] }],
+  });
+  if (result.canceled || !result.filePath) return { ok: false, canceled: true };
+  try {
+    fs.copyFileSync(dbFile, result.filePath);
+    return { ok: true, path: result.filePath };
+  } catch (e) { return { ok: false, error: e.message }; }
 });
 
 // Native OS notification (used by the Pomodoro engine when the window is
