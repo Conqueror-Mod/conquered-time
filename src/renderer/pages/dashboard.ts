@@ -161,7 +161,16 @@ function renderWeekBand(): void {
   weekBlocks = [];
   const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   if (weekTotal === 0) {
-    cols.innerHTML = '<div class="week-empty-msg" style="flex:1;">No sessions this week</div>';
+    // Branded empty state — an invitation, not an apology. The CTA differs by
+    // tense: past weeks are history (no CTA), the current/future week can
+    // still be conquered.
+    const isPastWeek = weekOffset < 0;
+    cols.innerHTML = `
+      <div class="week-empty-state" style="flex:1;">
+        <div class="week-empty-glyph">⧗</div>
+        <div class="week-empty-title">${isPastWeek ? 'A quiet week' : 'Nothing on the board yet'}</div>
+        ${isPastWeek ? '' : '<button class="btn-neutral week-empty-cta" data-action="navigate" data-arg="tracker">⏱ Start the clock</button>'}
+      </div>`;
   } else {
     cols.innerHTML = dayDates.map(d => {
       const sessions = byDay.get(d) || [];
