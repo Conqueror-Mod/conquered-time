@@ -295,6 +295,17 @@ const Shell = (() => {
                   <button class="toggle-switch" id="toggle-start-minimized" data-action="applyStartMinimized"></button>
                 </div>
               </div>
+
+              <div class="settings-group">
+                <div class="settings-group-title">Punch Hotkey</div>
+                <div class="settings-row-label">System-wide shortcut that clocks in (repeating your last task) or clocks out — even while the app is hidden in the tray. Click the box, then press the keys you want.</div>
+                <div style="display:flex; gap:8px; align-items:center; margin-top:8px;">
+                  <input type="text" id="punch-hotkey-input" readonly placeholder="Press a shortcut…"
+                         style="width:200px; cursor:pointer;" data-tip="Click, then press e.g. Ctrl+Alt+P" />
+                  <button class="s-btn" id="punch-hotkey-clear" data-action="clearPunchHotkey">Disable</button>
+                </div>
+                <div class="settings-row-label" id="punch-hotkey-status" style="margin-top:6px;"></div>
+              </div>
             </div><!-- /settings-cat-window -->
 
             <!-- ── DATA ─────────────────────────────────────── -->
@@ -1535,6 +1546,52 @@ async function loadDisplayPicker() {
   if (tct) tct.classList.toggle('on', savedCloseTray === true);
   const tsmin = document.getElementById('toggle-start-minimized');
   if (tsmin) tsmin.classList.toggle('on', savedStartMin === true);
+  await loadPunchHotkey();
+}
+
+// ── Punch hotkey (app-global, like close-to-tray) ───────────────────────────
+// A readonly capture box: focus it, press a combo, it's saved immediately.
+// Main tries the OS registration before committing — a collision rolls back
+// to the previous binding and surfaces the error here.
+async function loadPunchHotkey() {
+  const input = /** @type {HTMLInputElement & { __hotkeyWired?: boolean }} */ (document.getElementById('punch-hotkey-input'));
+  if (!input) return;
+  const current = await api.invoke('win:get-punch-hotkey').catch(() => '');
+  input.value = current || '';
+  input.placeholder = current ? '' : 'Disabled — click and press a shortcut';
+  if (!input.__hotkeyWired) {
+    input.__hotkeyWired = true; // wired once; loadDisplayPicker re-runs on each tab open
+    input.addEventListener('keydown', async e => {
+      e.preventDefault();
+      if (e.key === 'Escape' || e.key === 'Tab') { input.blur(); return; }
+      // Modifier alone isn't a binding — wait for the full chord.
+      if (['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) return;
+      const mods = [];
+      if (e.ctrlKey)  mods.push('Control');
+      if (e.altKey)   mods.push('Alt');
+      if (e.shiftKey) mods.push('Shift');
+      if (e.metaKey)  mods.push('Super');
+      // Require at least one modifier so a bare letter can't eat all typing OS-wide.
+      if (!mods.length) { setPunchHotkeyStatus('Include Ctrl, Alt or Shift in the shortcut.', true); return; }
+      const key = e.key.length === 1 ? e.key.toUpperCase() : e.key;
+      if (!/^[A-Za-z0-9]+$/.test(key)) return; // F-keys ok; skip Dead/Arrow-with-symbol etc.
+      await savePunchHotkey([...mods, key].join('+'));
+      input.blur();
+    });
+  }
+}
+function setPunchHotkeyStatus(msg, isError) {
+  const el = document.getElementById('punch-hotkey-status');
+  if (el) { el.textContent = msg || ''; el.style.color = isError ? 'var(--danger, #e5484d)' : ''; }
+}
+async function savePunchHotkey(accel) {
+  const res = await api.invoke('win:set-punch-hotkey', accel);
+  if (res && res.ok) {
+    setPunchHotkeyStatus(accel ? `Saved — ${accel} now punches from anywhere.` : 'Punch hotkey disabled.');
+  } else {
+    setPunchHotkeyStatus((res && res.error) || 'Could not register that shortcut.', true);
+  }
+  await loadPunchHotkey();
 }
 
 async function applyPreferredDisplay(displayId) {
@@ -1806,6 +1863,7 @@ function installShellDelegation() {
     applyLaunchStartup:    (a, el) => applyLaunchStartup(el),
     applyCloseToTray:      (a, el) => applyCloseToTray(el),
     applyStartMinimized:   (a, el) => applyStartMinimized(el),
+    clearPunchHotkey:      ()      => savePunchHotkey(''),
     applyPreferredDisplay: a       => applyPreferredDisplay(a),
     showDbaConfirm:        a       => showDbaConfirm(a),
     hideDbaConfirm:        a       => hideDbaConfirm(a),

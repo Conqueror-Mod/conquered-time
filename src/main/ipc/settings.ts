@@ -32,7 +32,7 @@ function parseBackupName(f: string): { kind: 'safety' | 'auto'; timestamp: strin
 
 // ctx: main-owned window/prefs helpers.
 function register(ctx: Record<string, any>) {
-  const { getMainWindow, applyLaunchAtStartup, loginItemOpts, getAppPref, setAppPref, rendererDir, IS_DEV } = ctx;
+  const { getMainWindow, applyLaunchAtStartup, loginItemOpts, getAppPref, setAppPref, getPunchHotkey, setPunchHotkey, rendererDir, IS_DEV } = ctx;
 ipcMain.handle('win:get-displays', () => {
   const primary = screen.getPrimaryDisplay();
   return screen.getAllDisplays().map((d: any, i: any) => ({
@@ -79,6 +79,17 @@ ipcMain.handle('win:get-close-to-tray', () => getAppPref('closeToTray', false) =
 ipcMain.handle('win:set-close-to-tray', (_: unknown, enabled: any) => {
   setAppPref('closeToTray', !!enabled);
   return { ok: true };
+});
+// Punch hotkey — app-global (an OS-level registration, not profile data).
+// '' = disabled. set re-registers immediately and reports a collision error
+// without committing it (main.ts rolls back to the previous binding).
+ipcMain.handle('win:get-punch-hotkey', () => getPunchHotkey());
+ipcMain.handle('win:set-punch-hotkey', (_: unknown, accel: any) => {
+  const a = String(accel ?? '').trim();
+  // Loose accelerator shape check: empty (disable) or modifier+key tokens.
+  if (a && !/^([A-Za-z0-9]+\+)+[A-Za-z0-9]+$/.test(a) )
+    return { ok: false, error: 'Invalid shortcut.' };
+  return setPunchHotkey(a);
 });
 ipcMain.handle('win:get-start-minimized', () => getAppPref('startMinimized', false) === true);
 ipcMain.handle('win:set-start-minimized', (_: unknown, enabled: any) => {
