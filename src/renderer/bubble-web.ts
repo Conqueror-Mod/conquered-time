@@ -60,6 +60,8 @@ interface BubbleWebController {
   update(companies: Company[], entries: EntrySummary[], range: '30' | '90' | 'all'): void;
   /** null clears dimming; otherwise non-matching bubbles fade. */
   setMatcher(fn: ((co: Company) => boolean) | null): void;
+  /** Repaint with the current layout (live color preview). */
+  redraw(): void;
   destroy(): void;
 }
 
@@ -241,6 +243,7 @@ function attach(opts: BubbleWebOpts): BubbleWebController {
       }
       archive.inner = placed;
     }
+    hoverKey = null;   // bubbles moved — let the next mousemove re-anchor the tooltip
     applyDim();
     draw();
   }
@@ -372,21 +375,23 @@ function attach(opts: BubbleWebOpts): BubbleWebController {
   }
 
   // ── Hit testing & interaction ──────────────────────────────────────────────
-  type Hit = { kind: 'company'; co: Company; hours: number; lastDays: number }
-           | { kind: 'archive' };
+  type Hit = { kind: 'company'; co: Company; hours: number; lastDays: number; x: number; y: number; r: number }
+           | { kind: 'archive'; x: number; y: number; r: number };
   function hitTest(mx: number, my: number): Hit | null {
     // Expanded-archive minis take priority (they sit inside the archive circle).
     if (archive && archiveOpen) {
       for (const m of archive.inner) {
         if (Math.hypot(mx - m.x, my - m.y) < Math.max(m.r, 8)) {
-          return { kind: 'company', co: m.co, hours: m.hours, lastDays: m.lastDays };
+          return { kind: 'company', co: m.co, hours: m.hours, lastDays: m.lastDays, x: m.x, y: m.y, r: m.r };
         }
       }
     }
-    if (archive && Math.hypot(mx - archive.x, my - archive.y) < archive.r) return { kind: 'archive' };
+    if (archive && Math.hypot(mx - archive.x, my - archive.y) < archive.r) {
+      return { kind: 'archive', x: archive.x, y: archive.y, r: archive.r };
+    }
     for (const b of bubbles) {
       if (Math.hypot(mx - b.x, my - b.y) < b.r) {
-        return { kind: 'company', co: b.co, hours: b.hours, lastDays: b.lastDays };
+        return { kind: 'company', co: b.co, hours: b.hours, lastDays: b.lastDays, x: b.x, y: b.y, r: b.r };
       }
     }
     return null;
@@ -397,39 +402,54 @@ function attach(opts: BubbleWebOpts): BubbleWebController {
     return { mx: e.clientX - rect.left, my: e.clientY - rect.top };
   }
 
+  // Tooltip is anchored to the BUBBLE, not the cursor — it appears once beside
+  // the hovered bubble and stays put until the hover target changes (a
+  // cursor-following tooltip read as jittery in beta feedback, 2026-07-11).
+  let hoverKey: string | null = null;
   const onMove = (e: MouseEvent): void => {
     const { mx, my } = mousePos(e);
     const hit = hitTest(mx, my);
     if (!hit) {
+      hoverKey = null;
       tooltip.root.style.display = 'none';
       canvas.style.cursor = 'default';
       return;
     }
-    const wr = wrap.getBoundingClientRect();
-    tooltip.root.style.left = (e.clientX - wr.left + 16) + 'px';
-    tooltip.root.style.top = (e.clientY - wr.top - 12) + 'px';
-    tooltip.root.style.display = 'block';
     canvas.style.cursor = 'pointer';
+    const key = hit.kind === 'archive' ? 'archive:' + archiveOpen : 'co:' + hit.co.id;
+    if (key === hoverKey) return;   // same bubble — leave the tooltip where it is
+    hoverKey = key;
+    // Fill content first so the measured size matches what will show.
     if (hit.kind === 'archive') {
       tooltip.name.textContent = 'Archive';
       tooltip.hier.textContent = '';
       tooltip.detail.textContent = archive!.count + ' inactive ' + (archive!.count === 1 ? 'company' : 'companies')
         + ' · ' + fmtHours(archive!.totalHours) + ' lifetime · click to ' + (archiveOpen ? 'collapse' : 'expand');
-      return;
+    } else {
+      const co = hit.co;
+      tooltip.name.textContent = co.name || '—';
+      const hierParts = [co.hier_company, co.hier_project, co.hier_platform].filter(Boolean);
+      tooltip.hier.textContent = hierParts.length > 1 ? hierParts.join(' › ') : '';
+      const lastTxt = !isFinite(hit.lastDays) ? 'never worked'
+        : hit.lastDays === 0 ? 'worked today'
+        : `last worked ${hit.lastDays}d ago`;
+      tooltip.detail.textContent = [
+        co.work_type,
+        fmtHours(hit.hours) + (range === 'all' ? ' all-time' : ` in ${range}d`),
+        lastTxt,
+        co.date_end ? 'ended' : '',
+      ].filter(Boolean).join(' · ');
     }
-    const co = hit.co;
-    tooltip.name.textContent = co.name || '—';
-    const hierParts = [co.hier_company, co.hier_project, co.hier_platform].filter(Boolean);
-    tooltip.hier.textContent = hierParts.length > 1 ? hierParts.join(' › ') : '';
-    const lastTxt = !isFinite(hit.lastDays) ? 'never worked'
-      : hit.lastDays === 0 ? 'worked today'
-      : `last worked ${hit.lastDays}d ago`;
-    tooltip.detail.textContent = [
-      co.work_type,
-      fmtHours(hit.hours) + (range === 'all' ? ' all-time' : ` in ${range}d`),
-      lastTxt,
-      co.date_end ? 'ended' : '',
-    ].filter(Boolean).join(' · ');
+    // Anchor at the bubble's upper-right shoulder, clamped inside the wrap.
+    tooltip.root.style.display = 'block';
+    const pad = 8;
+    const tw = tooltip.root.offsetWidth || 200, th = tooltip.root.offsetHeight || 60;
+    let tx = hit.x + hit.r * 0.72;
+    let ty = hit.y - hit.r * 0.72 - th;
+    tx = Math.max(pad, Math.min(tx, wrap.clientWidth - tw - pad));
+    ty = Math.max(pad, Math.min(ty, wrap.clientHeight - th - pad));
+    tooltip.root.style.left = tx + 'px';
+    tooltip.root.style.top = ty + 'px';
   };
 
   const onClick = (e: MouseEvent): void => {
@@ -476,6 +496,10 @@ function attach(opts: BubbleWebOpts): BubbleWebController {
       applyDim();
       draw();
     },
+    // Repaint with current layout — used for live color preview while the
+    // Edit Color picker is open (the co objects are shared with the caller,
+    // so mutating co.color + redraw() shows the pick immediately).
+    redraw(): void { draw(); },
     destroy(): void {
       ro.disconnect();
       canvas.removeEventListener('mousemove', onMove);
