@@ -4,7 +4,7 @@ const { ipcMain } = require('electron');
 const { session } = require('../session');
 const { dbAll, dbRun, persistDB } = require('../db');
 const { readCache, cacheOwner, invalidateEntriesCache } = require('../cache');
-const { performBackup } = require('../backups');
+const { performBackup, performSafetySnapshot } = require('../backups');
 const { encrypt, decrypt } = require('../vault-crypto');
 
 function register() {
@@ -46,6 +46,7 @@ ipcMain.handle('companies:save', (_: unknown, data: any) => {
 ipcMain.handle('companies:delete', (_: unknown, id: any) => {
   if (!session.key || !session.user) return { ok: false };
   const numId = Number(id);
+  persistDB(); performSafetySnapshot('company-delete'); // protected pre-action snapshot
   // task_items are entry_id-scoped — delete them via subquery BEFORE the
   // entries are removed, otherwise the company's break/lunch/Dispatch tasks
   // are orphaned in the DB.

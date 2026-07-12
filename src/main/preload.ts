@@ -18,7 +18,7 @@ const ALLOWED_INVOKE = new Set([
   'db:clear-timeclock', 'db:clear-timeclock-company', 'db:clear-companies', 'db:clear-full',
   'profile:get', 'profile:save', 'auth:change-password',
   'audit:get-policy', 'audit:get-dismissed', 'audit:dismiss', 'audit:undismiss', 'audit:clear-dismissed', 'audit:apply-fix', 'audit:open-wizard', 'audit:count', 'audit:email-notify',
-  'backup:list', 'backup:preview', 'backup:restore',
+  'backup:list', 'backup:preview', 'backup:restore', 'backup:export-portable',
   'email:save-config', 'email:get-config', 'email:test-smtp', 'email:send-report',
   'email:send-scheduled-now', 'email:get-schedule-status', 'email:trigger-schedule-check',
   'invoices:context', 'invoices:preview', 'invoices:issue', 'invoices:list', 'invoices:get',

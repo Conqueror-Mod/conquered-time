@@ -19,9 +19,6 @@ _Last curated: 2026-07-12 (v3.20.0 — Company Galaxy — released)_
 - **Week view** — see your week spatially: a 7-day grid of session blocks
   (colored per company) alongside the day-based tracker and the aggregate
   Insights — the "Tuesday was heavy, Thursday was empty" view.
-- **Data safety net** — an automatic backup snapshot before every destructive
-  action (deletes, clears), plus a full portable vault export so your history
-  is never one misclick from gone.
 
 ### Polish pass (smaller items, mixed in between features)
 
@@ -54,6 +51,15 @@ _Last curated: 2026-07-12 (v3.20.0 — Company Galaxy — released)_
 
 ## ✅ Recently shipped
 
+- **Data safety net** — your history is no longer one misclick from gone.
+  Before any destructive action (deleting a company, clearing time data or
+  companies, restoring a backup), Conquered Time now automatically saves a
+  **protected safety snapshot** — kept separately from the routine autosave
+  backups so a busy day can't prune it away, and marked with what it was taken
+  before (🛡 "Company Delete", "Companies Clear", …) in the Backup Library. Plus
+  a new **Export Vault** button saves a portable, still-encrypted copy of your
+  whole vault anywhere you like — a USB stick, a cloud folder — and Full
+  Database Clear now offers to export first before it wipes everything.
 - **Company Galaxy** (v3.20.0) — the company web reimagined, twice over: it
   first became packed bubbles (sized by hours in a 30d / 90d / all-time window,
   harnessed so no client can drown the rest, idle and ended companies folding
