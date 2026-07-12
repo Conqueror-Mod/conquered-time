@@ -154,6 +154,13 @@ function readStartupSetting(key: string) {
     (n: string) => fs.existsSync(path.join(PROFILES_DIR, n, 'vault.db'))
   );
   if (!dirs.length) return null;
+  // Read from the most recently USED profile (newest vault.db mtime), not the
+  // first alphabetically — window/display prefs should follow whichever
+  // profile actually ran last, or a stale sibling profile's prefs decide
+  // which monitor the app opens on.
+  dirs.sort((a: string, b: string) =>
+    fs.statSync(path.join(PROFILES_DIR, b, 'vault.db')).mtimeMs -
+    fs.statSync(path.join(PROFILES_DIR, a, 'vault.db')).mtimeMs);
   try {
     const buf  = fs.readFileSync(path.join(PROFILES_DIR, dirs[0], 'vault.db'));
     const tmpDb = newDatabase(buf);
@@ -683,6 +690,18 @@ app.whenReady().then(async () => {
   }
   mainWindow.on('moved',   () => { saveWindowBounds(); syncPreferredDisplay(); });
   mainWindow.on('resized', saveWindowBounds);
+  // Where the user CLOSED the app is where it should reopen. The moved/resized
+  // handlers alone can't guarantee that: a drag on the pre-auth login screen
+  // happens before any vault is loaded (hasDb() false → the write is dropped),
+  // so a stale display pref kept reopening the app on the wrong monitor even
+  // though it was last closed on the primary. Saving at close (with a session
+  // active) captures the final resting place. Also fires on the close-to-tray
+  // hide path, which is fine — same intent.
+  mainWindow.on('close', () => {
+    if (!mainWindow || mainWindow.isDestroyed() || mainWindow.isMinimized()) return;
+    saveWindowBounds();
+    syncPreferredDisplay();
+  });
   // 'moved' only fires at the end of a REAL drag (WM_EXITSIZEMOVE) — programmatic
   // setPosition/maximize emit only 'move'. Debounced so a drag doesn't write on
   // every pixel.
