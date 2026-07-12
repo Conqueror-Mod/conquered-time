@@ -6,20 +6,25 @@ Discord's **#roadmap** channel mirrors this file automatically.
 
 **Status legend:** ✅ Shipped · 🔨 In progress · 🗓️ Planned · 💡 Under consideration
 
-_Last curated: 2026-07-11 (v3.19.1 + full next-cycle queue)_
+_Last curated: 2026-07-12 (Company Galaxy queued as the v3.20.0 headline)_
+
+## 🔨 In progress
+
+- **Company Galaxy (Company Web 3.0)** — the company web goes hierarchical:
+  each company is a **galaxy** you can open into its **solar systems**
+  (projects/platforms), which break down into their IDs and logins. Click to
+  expand in place, click deeper to zoom in (with a breadcrumb back out), and
+  the whole thing keeps the harnessed sizing, Archive cluster, and identity
+  colors from the bubble redesign. The company list gains matching
+  company › project grouping, and the dashboard mini-web jumps you straight
+  into a company's galaxy. _(Ships as v3.20.0 — design approved 2026-07-12,
+  plan in docs/PLAN-company-galaxy.md.)_
 
 ## 🗓️ Planned (next up)
 
-- **Company Web v2 — packed bubbles** — the company web redesigned to stay
-  readable at 25+ companies: bubbles sized by hours in a selectable window
-  (30d / 90d / all-time) with harnessed sizing so no client can drown the rest,
-  dormant and ended companies folded into an expandable **Archive** cluster,
-  and per-company colors — auto-assigned identity hues that fade as a client
-  goes idle, with a right-click **Edit Color** picker to set your own.
-  _(Driven by beta feedback on large company counts.)_
 - **Richer right-click menus** — grow the context menus across the app
-  (starting with the company web: Edit Color, and more quick actions where
-  you'd expect them).
+  (the Galaxy ships the first wave: galaxy- and project-level menus with
+  Edit Color and quick actions where you'd expect them).
 - **Punch from the tray + global hotkey** — Clock In / Clock Out without
   opening the app: tray-menu punch actions and a system-wide keyboard shortcut,
   so starting the clock is instant instead of launch-login-navigate-click.
@@ -54,7 +59,8 @@ _Last curated: 2026-07-11 (v3.19.1 + full next-cycle queue)_
 - **Global search** — a shell-wide omnibox (⌘/Ctrl+K) that jumps to companies
   and entries across pages, beyond the per-tab Companies filter above.
 - **Multi-account (DBA) handling** — one person working several Navigator IDs /
-  accounts; needs a data-model and UI decision before any build.
+  accounts. _(The Company Galaxy's company › project › ID grouping covers the
+  visual side of this; anything beyond that still needs a data-model decision.)_
 - **Language / internationalization** — lowest priority, highest complexity;
   slated for last.
 

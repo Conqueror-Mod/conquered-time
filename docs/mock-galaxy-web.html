@@ -1,0 +1,431 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Company Galaxy — Web 3.0 concept</title>
+<style>
+  :root{
+    --bg:#0d1526; --surface-1:#14203a; --surface-3:#1b2b46; --border:#22375c;
+    --border-light:#33568c; --accent:#10d6e8; --accent-dim:rgba(16,214,232,0.12);
+    --yellow:#e6b84e; --text-bright:#d6ecf8; --text-muted:#7e9cc0; --text-dim:#54719a;
+    --sans:'DM Sans','Segoe UI',system-ui,sans-serif;
+    --mono:'JetBrains Mono',Consolas,monospace;
+  }
+  body{margin:0;background:var(--bg);color:var(--text-bright);font-family:var(--sans);padding:22px;}
+  .hdr{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;}
+  .eyebrow{font-size:11px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase;}
+  h1{font-size:22px;font-weight:600;margin:0;letter-spacing:-0.02em;}
+  .controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+  .rbtn{padding:6px 14px;font-size:12px;font-family:var(--sans);font-weight:500;color:var(--text-muted);
+    background:var(--surface-1);border:1px solid var(--border);border-radius:6px;cursor:pointer;}
+  .rbtn.active{border-color:var(--accent);color:var(--accent);background:var(--accent-dim);}
+  #wrap{position:relative;background:var(--surface-1);border:1px solid var(--border);border-radius:12px;
+    overflow:hidden;height:640px;box-shadow:inset 0 1px 8px rgba(0,0,0,.3);}
+  #wrap::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--accent);opacity:.6;z-index:3;pointer-events:none;}
+  canvas{position:absolute;inset:0;width:100%;height:100%;cursor:default;}
+  #tip{position:absolute;background:var(--surface-3);border:1px solid var(--border-light);border-radius:8px;
+    padding:9px 13px;font-size:12px;pointer-events:none;display:none;box-shadow:0 10px 28px rgba(0,0,0,.5);max-width:250px;z-index:5;}
+  #tip .n{font-weight:600;margin-bottom:2px;}
+  #tip .h{font-size:11px;color:var(--accent);font-family:var(--mono);margin-bottom:2px;}
+  #tip .d{font-size:11px;color:var(--text-muted);}
+  #crumb{position:absolute;top:12px;left:12px;z-index:4;display:none;align-items:center;gap:8px;
+    background:var(--surface-3);border:1px solid var(--border-light);border-radius:8px;padding:7px 12px;
+    font-size:12.5px;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.4);}
+  #crumb:hover{border-color:var(--accent);color:var(--accent);}
+  #crumb .sep{color:var(--text-dim);}
+  #crumb b{font-weight:600;}
+  #toast{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);z-index:6;background:var(--surface-3);
+    border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:8px 16px;font-size:12.5px;
+    display:none;box-shadow:0 8px 24px rgba(0,0,0,.5);}
+  .legend{margin-top:10px;font-size:11px;color:var(--text-dim);line-height:1.7;max-width:1100px;}
+  .legend b{color:var(--text-muted);font-weight:600;}
+</style>
+<div class="hdr">
+  <div><div class="eyebrow">Network — Concept mock · Web 3.0</div><h1>Company Galaxy</h1></div>
+  <div class="controls">
+    <button class="rbtn" data-r="30">30d</button>
+    <button class="rbtn active" data-r="90">90d</button>
+    <button class="rbtn" data-r="all">All</button>
+    <button class="rbtn" id="whale" title="Give one project 5,000h to prove sizing stays harnessed at every level">🐋 Whale test</button>
+  </div>
+</div>
+<div id="wrap">
+  <canvas id="cv"></canvas>
+  <div id="crumb"><span>← All Galaxies</span><span class="sep">›</span><b id="crumb-name"></b></div>
+  <div id="tip"><div class="n"></div><div class="h"></div><div class="d"></div></div>
+  <div id="toast"></div>
+</div>
+<div class="legend">
+  <b>Level 0 — Galaxies:</b> one bubble per umbrella company (rows grouped by <b>Company</b> in the hierarchy), sized by
+  rolled-up hours under the same v2 harness (40% canvas budget, floor, whale ceiling). Identity hue lives at galaxy level;
+  recency fades it; idle/ended galaxies fold into the Archive.<br>
+  <b>Click a multi-project galaxy</b> → it expands in place into its <b>solar systems</b> (Project › Platform rows) as
+  hue-inherited shades — the Identity path. <b>Click a system inside</b> → the view zooms: that galaxy becomes the canvas
+  (breadcrumb top-left backs out). <b>Click a system at full zoom</b> → its <b>planets</b> (Platform · Navigator ID · login)
+  fan out inside. A single-project galaxy skips all of this — click goes straight to the Time Tracker, like today.<br>
+  Hues here follow the v2 palette; the colorblind-safe variant applies exactly as in v2.
+</div>
+<script>
+'use strict';
+// ── Fake vault: rows grouped by hier_company (all clearly-fake data) ─────────
+// Each system = one company row (Project › Platform). Planets = row detail.
+const GALAXIES = [
+  { name:'RWS', last:2, systems:[
+    { proj:'Diamond',  plat:'MultiMango', h30:9,  h90:12.3, hall:38,  last:2,  nav:'A123456', login:'rws_dia_01' },
+    { proj:'Diamond',  plat:'Kiwi',       h30:2,  h90:4.1,  hall:19,  last:9,  nav:'A123457', login:'rws_dia_02' },
+    { proj:'Emerald',  plat:'Atlas',      h30:11, h90:22,   hall:60,  last:4,  nav:'B778001', login:'rws_emr'    },
+  ]},
+  { name:'Meridian Ops', last:1, systems:[
+    { proj:'Operations', plat:'MeridianHub', h30:40, h90:151, hall:600, last:1,  nav:'C550100', login:'mer_ops'   },
+    { proj:'QA',         plat:'MeridianHub', h30:6,  h90:19,  hall:88,  last:6,  nav:'C550101', login:'mer_qa'    },
+    { proj:'Training',   plat:'Onboard',     h30:3,  h90:8,   hall:31,  last:15, nav:'C550102', login:'mer_train' },
+    { proj:'Research',   plat:'LabKit',      h30:1,  h90:5,   hall:12,  last:22, nav:'C550103', login:'mer_lab'   },
+    { proj:'Evaluation', plat:'Scorecard',   h30:2,  h90:6,   hall:24,  last:11, nav:'C550104', login:'mer_eval'  },
+  ]},
+  // Single-project galaxy — click goes straight to the tracker (no drill).
+  { name:'Zenith Analytics', last:3, systems:[
+    { proj:'Phoenix', plat:'ZenDesk Pro', h30:8, h90:18.3, hall:74, last:3, nav:'X192847', login:'zen_phx' },
+  ]},
+  { name:'Café Müller 東京', last:12, systems:[
+    { proj:'Proyecto Ñandú', plat:'Πλατφόρμα', h30:2, h90:6.5, hall:21, last:12, nav:'K001122', login:'cafe_a' },
+    { proj:'Sakura',         plat:'花見',       h30:1, h90:3,   hall:9,  last:30, nav:'K001123', login:'cafe_b' },
+  ]},
+];
+const ARCHIVED = ['Northwind','Solstice Labs',"O'Brien & Sons",'Padded Name','Ended Co'].map((n,i)=>({name:n, hall:8+i*22}));
+
+// ── Identity color (v2 rules) — hue per GALAXY, systems inherit shades ──────
+const PALETTE = [187, 262, 43, 12, 152, 210, 322, 88, 280, 335];
+function hashHue(name){ let h=0; for (const ch of name) h=(h*31+ch.codePointAt(0))>>>0; return PALETTE[h%PALETTE.length]; }
+function recencyT(last){ return Math.max(0, Math.min(1, 1-(last||0)/60)); }
+function galaxyColor(g){ const t=recencyT(g.last); return {h:hashHue(g.name), s:28+44*t, boost:.65+.55*t}; }
+// Identity path: same hue as the parent galaxy, stepped lightness/sat per system.
+function systemColor(g, idx, n){ const c=galaxyColor(g); const step=n>1? idx/(n-1) : 0;
+  return {h:c.h, s:Math.max(22, c.s-8+step*16), boost:c.boost*(1.05-step*0.35)}; }
+
+const cv=document.getElementById('cv'), wrap=document.getElementById('wrap'),
+      tip=document.getElementById('tip'), crumb=document.getElementById('crumb'),
+      toast=document.getElementById('toast');
+let range='90', whaleOn=false;
+let view={level:0, galaxy:null};   // level 0 = all galaxies; level 1 = inside one
+let openGalaxy=null;               // level-0 in-place expanded galaxy (name)
+let openSystem=null;               // level-1 in-place expanded system (index)
+let archiveOpen=false;
+let nodes=[], hoverKey=null;
+
+const sysH = s => whaleOn && s.proj==='Operations' ? 5000 : (range==='30'?s.h30:range==='90'?s.h90:s.hall);
+const galH = g => g.systems.reduce((t,s)=>t+sysH(s),0);
+const fmtH = h => (h>=100?Math.round(h):Math.round(h*10)/10)+'h';
+
+// ── Greedy spiral packing (v2) — with a hard no-overlap guarantee ────────────
+// The spiral is the fast path; if it can't place a bubble (small/crowded
+// canvas), a grid scan hunts for any free spot, and as a last resort the
+// bubble SHRINKS and retries. Bubbles never silently stack at the center.
+function findSpot(it, placed, cx, cy, W, H, elliptic){
+  for(let a=0;a<Math.PI*40;a+=0.22){
+    const d=8+a*7.2, x=cx+Math.cos(a)*d, y=cy+Math.sin(a)*d*(elliptic?0.72:1);
+    if(x-it.r<14||x+it.r>W-14||y-it.r<14||y+it.r>H-14) continue;
+    if(placed.every(p=>Math.hypot(x-p.x,y-p.y)>=it.r+p.r+10)) return {x,y};
+  }
+  // Grid fallback — coarse sweep of the whole canvas, nearest-to-center first.
+  const cells=[];
+  for(let x=14+it.r; x<=W-14-it.r; x+=18) for(let y=14+it.r; y<=H-14-it.r; y+=18)
+    cells.push({x,y,d:Math.hypot(x-cx,y-cy)});
+  cells.sort((a,b)=>a.d-b.d);
+  for(const c of cells)
+    if(placed.every(p=>Math.hypot(c.x-p.x,c.y-p.y)>=it.r+p.r+8)) return {x:c.x,y:c.y};
+  return null;
+}
+function pack(items,cx,cy,W,H,elliptic=true){
+  const placed=[];
+  for(const it of items){
+    if(placed.length===0){ it.x=cx; it.y=cy; placed.push(it); continue; }
+    let spot=findSpot(it, placed, cx, cy, W, H, elliptic);
+    while(!spot && it.r>10){ it.r*=0.85; spot=findSpot(it, placed, cx, cy, W, H, elliptic); }
+    if(spot){ it.x=spot.x; it.y=spot.y; } else { it.x=cx; it.y=cy; }
+    placed.push(it);
+  }
+}
+// Pack children INSIDE a parent circle (archive-expand mechanic). Same
+// guarantee as pack(): a child that doesn't fit SHRINKS until it does —
+// children never stack at the parent's center.
+function packInside(items, px, py, pr){
+  const placed=[];
+  const tryFit=(it)=>{
+    for(let a=0;a<Math.PI*30;a+=0.25){
+      const d=a*3.0, x=px+Math.cos(a)*d, y=py+Math.sin(a)*d;
+      if(Math.hypot(x-px,y-py)+it.r>pr-8) continue;
+      if(placed.every(p=>Math.hypot(x-p.x,y-p.y)>=it.r+p.r+4)) return {x,y};
+    }
+    return null;
+  };
+  for(const it of items){
+    let spot=tryFit(it);
+    while(!spot && it.r>6){ it.r*=0.85; spot=tryFit(it); }
+    if(spot){ it.x=spot.x; it.y=spot.y; } else { it.x=px; it.y=py; }
+    placed.push(it);
+  }
+}
+// Pairwise separation relaxation — used after an in-place expansion so the
+// enlarged bubble pushes its neighbours aside instead of triggering a full
+// repack (which made bubbles trade places on every click).
+function separate(items, W, H, passes=140){
+  for(let p=0;p<passes;p++){
+    for(let i=0;i<items.length;i++) for(let j=i+1;j<items.length;j++){
+      const a=items[i], b=items[j];
+      let dx=b.x-a.x, dy=b.y-a.y, d=Math.hypot(dx,dy);
+      const minD=a.r+b.r+10;
+      if(d<minD){
+        if(d<0.01){ dx=Math.random()-0.5; dy=Math.random()-0.5; d=0.01; }
+        const ux=dx/d, uy=dy/d, ov=(minD-d);
+        const wa=a.pinned?0:(b.pinned?1:0.5), wb=a.pinned?1:(b.pinned?0:0.5);
+        a.x-=ux*ov*wa; a.y-=uy*ov*wa;
+        b.x+=ux*ov*wb; b.y+=uy*ov*wb;
+      }
+    }
+    for(const n of items){
+      n.x=Math.max(n.r+14, Math.min(W-n.r-14, n.x));
+      n.y=Math.max(n.r+14, Math.min(H-n.r-14, n.y));
+    }
+  }
+}
+// Harnessed radii: share of hours within a budget, clamped floor/ceiling.
+function harness(items, budget, Rmin, Rmax){
+  const total=items.reduce((t,i)=>t+i.hours,0)||1;
+  for(const i of items) i.r=Math.max(Rmin, Math.min(Rmax, Math.sqrt(budget*(i.hours/total)/Math.PI)));
+  items.sort((a,b)=>b.r-a.r);
+}
+
+// ── Layout ───────────────────────────────────────────────────────────────────
+function layout(){
+  const W=wrap.clientWidth, H=wrap.clientHeight;
+  cv.width=W*devicePixelRatio; cv.height=H*devicePixelRatio;
+  cv.style.width=W+'px'; cv.style.height=H+'px';
+  const ctx=cv.getContext('2d'); ctx.setTransform(1,0,0,1,0,0); ctx.scale(devicePixelRatio,devicePixelRatio);
+  nodes=[]; hoverKey=null;
+
+  if(view.level===0){
+    crumb.style.display='none';
+    const items=GALAXIES.map(g=>({kind:'galaxy', g, hours:galH(g)}));
+    harness(items, W*H*0.40, 30, H*0.26);
+    items.push({kind:'archive', r:52, hours:0});
+    // Base layout is deterministic for a given window — bubbles keep their
+    // homes across clicks. Expansion enlarges IN PLACE (pinned) and the
+    // relaxation pass nudges neighbours aside instead of repacking.
+    pack(items, W/2, H/2, W, H);
+    let expanded=false;
+    for(const it of items){
+      if(it.kind==='galaxy' && openGalaxy===it.g.name && it.g.systems.length>1){
+        it.r=Math.max(it.r, Math.min(150, H*0.30, W*0.20)); it.pinned=true; expanded=true;
+      }
+      if(it.kind==='archive' && archiveOpen){
+        it.r=Math.min(110, H*0.30); it.pinned=true; expanded=true;
+      }
+    }
+    if(expanded) separate(items, W, H);
+    nodes=items;
+    for(const it of items){
+      if(it.kind==='galaxy' && openGalaxy===it.g.name && it.g.systems.length>1){
+        const kids=it.g.systems.map((s,i)=>({kind:'system', g:it.g, s, idx:i, hours:sysH(s)}));
+        harness(kids, Math.PI*it.r*it.r*0.52, 13, it.r*0.46);
+        packInside(kids, it.x, it.y, it.r);
+        it.kids=kids;
+      }
+      if(it.kind==='archive' && archiveOpen){
+        const maxA=Math.max(...ARCHIVED.map(a=>a.hall));
+        const kids=ARCHIVED.map(a=>({kind:'arch-co', a, r:Math.max(6, it.r*0.24*Math.sqrt(a.hall/maxA))}))
+          .sort((x,y)=>y.r-x.r);
+        packInside(kids, it.x, it.y, it.r);
+        it.kids=kids;
+      }
+    }
+  } else {
+    // Level 1 — inside one galaxy: its systems ARE the canvas.
+    const g=view.galaxy;
+    crumb.style.display='flex';
+    document.getElementById('crumb-name').textContent=g.name;
+    const items=g.systems.map((s,i)=>({kind:'system', g, s, idx:i, hours:sysH(s)}));
+    harness(items, W*H*0.40, 34, H*0.26);
+    pack(items, W/2, H/2, W, H);
+    let expanded=false;
+    for(const it of items) if(openSystem===it.idx){
+      it.r=Math.max(it.r, Math.min(130, H*0.26, W*0.20)); it.pinned=true; expanded=true;
+    }
+    if(expanded) separate(items, W, H);
+    nodes=items;
+    for(const it of items){
+      if(openSystem===it.idx){
+        const planets=[
+          {label:it.s.plat,  cls:'Platform'},
+          {label:it.s.nav,   cls:'Navigator ID'},
+          {label:it.s.login, cls:'Login'},
+        ].map(p=>({kind:'planet', ...p, r:Math.max(16, it.r*0.26)}));
+        packInside(planets, it.x, it.y, it.r);
+        it.kids=planets;
+      }
+    }
+  }
+  draw();
+}
+
+// ── Draw ─────────────────────────────────────────────────────────────────────
+function sphere(ctx,x,y,r,col,grey){
+  const g=ctx.createRadialGradient(x-r*0.3,y-r*0.3,r*0.1,x,y,r);
+  if(grey||!col){ g.addColorStop(0,'rgba(126,156,192,0.30)'); g.addColorStop(0.65,'rgba(84,113,154,0.18)'); g.addColorStop(1,'rgba(0,0,0,0.35)'); }
+  else{ g.addColorStop(0,`hsla(${col.h},${col.s}%,64%,${0.34*col.boost})`);
+        g.addColorStop(0.6,`hsla(${col.h},${col.s}%,42%,${0.26*col.boost})`);
+        g.addColorStop(1,'rgba(0,0,0,0.40)'); }
+  ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fillStyle=g; ctx.fill();
+  ctx.strokeStyle=grey?'#54719a':(col?`hsla(${col.h},${Math.min(80,col.s+15)}%,62%,${0.55+0.45*(col.boost??1)})`:'#6366f1');
+  ctx.lineWidth=1.5; ctx.stroke();
+  const hl=ctx.createRadialGradient(x-r*0.35,y-r*0.35,0,x-r*0.35,y-r*0.35,r*0.6);
+  hl.addColorStop(0,'rgba(255,255,255,0.13)'); hl.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fillStyle=hl; ctx.fill();
+}
+// Caption above the bubble, or below it when clamped against the top edge.
+function capY(n){ const above=n.y-n.r-12; return above>=14 ? above : n.y+n.r+14; }
+function ellip(ctx,s,w){ if(ctx.measureText(s).width<=w) return s;
+  while(s.length>1&&ctx.measureText(s+'…').width>w) s=s.slice(0,-1); return s+'…'; }
+
+function draw(){
+  const ctx=cv.getContext('2d'), W=wrap.clientWidth, H=wrap.clientHeight;
+  ctx.clearRect(0,0,W,H);
+  ctx.strokeStyle='rgba(255,255,255,0.025)'; ctx.lineWidth=0.5;
+  for(let g=0;g<W;g+=40){ctx.beginPath();ctx.moveTo(g,0);ctx.lineTo(g,H);ctx.stroke();}
+  for(let g=0;g<H;g+=40){ctx.beginPath();ctx.moveTo(0,g);ctx.lineTo(W,g);ctx.stroke();}
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+
+  for(const n of nodes){
+    if(n.kind==='archive'){
+      sphere(ctx,n.x,n.y,n.r,null,true);
+      ctx.fillStyle='#a8c2e0';
+      if(archiveOpen&&n.kids){
+        for(const k of n.kids) sphere(ctx,k.x,k.y,k.r,null,true);
+        ctx.font='600 11px '+'"DM Sans",sans-serif';
+        ctx.fillText('Archive — click to collapse', n.x, capY(n));
+      } else {
+        ctx.font='600 12px "DM Sans",sans-serif'; ctx.fillText('⊕ Archive', n.x, n.y-4);
+        ctx.font='500 10px "JetBrains Mono",monospace'; ctx.fillStyle='#7e9cc0';
+        ctx.fillText(ARCHIVED.length+' inactive', n.x, n.y+11);
+      }
+      continue;
+    }
+    if(n.kind==='galaxy'){
+      const col=galaxyColor(n.g), open=openGalaxy===n.g.name&&n.kids;
+      sphere(ctx,n.x,n.y,n.r,col,false);
+      if(open){
+        for(const k of n.kids){
+          sphere(ctx,k.x,k.y,k.r,systemColor(k.g,k.idx,k.g.systems.length),false);
+          if(k.r>18){ ctx.fillStyle='#e0e7ff'; ctx.font=`600 ${Math.max(9,Math.min(12,k.r/3.4))}px "DM Sans",sans-serif`;
+            ctx.fillText(ellip(ctx,k.s.proj,k.r*1.7), k.x, k.y); }
+        }
+        ctx.fillStyle='#a8c2e0'; ctx.font='600 12px "DM Sans",sans-serif';
+        ctx.fillText(n.g.name+' — click a system to zoom in', n.x, capY(n));
+      } else {
+        const nameSize=Math.max(10,Math.min(15,n.r/4.2));
+        ctx.fillStyle='#e0e7ff'; ctx.font=`600 ${nameSize}px "DM Sans",sans-serif`;
+        ctx.fillText(ellip(ctx,n.g.name,n.r*1.7), n.x, n.y-2);
+        ctx.fillStyle='#e6b84e'; ctx.font=`500 ${Math.max(9,nameSize-3)}px "JetBrains Mono",monospace`;
+        ctx.fillText(fmtH(n.hours), n.x, n.y+nameSize);
+        if(n.r>44){ ctx.fillStyle='rgba(214,236,248,0.55)';
+          ctx.font=`500 ${Math.max(8,nameSize-4)}px "DM Sans",sans-serif`;
+          const np=n.g.systems.length;
+          ctx.fillText(np===1?'1 project':np+' projects', n.x, n.y+nameSize*2); }
+      }
+      continue;
+    }
+    if(n.kind==='system'){   // level-1 full-canvas systems
+      const col=systemColor(n.g,n.idx,n.g.systems.length), open=openSystem===n.idx&&n.kids;
+      sphere(ctx,n.x,n.y,n.r,col,false);
+      if(open){
+        for(const k of n.kids){
+          sphere(ctx,k.x,k.y,k.r,{h:col.h,s:col.s*0.7,boost:col.boost*0.9},false);
+          ctx.fillStyle='#e0e7ff'; ctx.font=`600 ${Math.max(8,Math.min(11,k.r/2.6))}px "JetBrains Mono",monospace`;
+          ctx.fillText(ellip(ctx,k.label,k.r*1.8), k.x, k.y);
+        }
+        ctx.fillStyle='#a8c2e0'; ctx.font='600 11px "DM Sans",sans-serif';
+        ctx.fillText(n.s.proj+' › '+n.s.plat+' — click again to collapse', n.x, capY(n));
+      } else {
+        const nameSize=Math.max(10,Math.min(15,n.r/4.2));
+        ctx.fillStyle='#e0e7ff'; ctx.font=`600 ${nameSize}px "DM Sans",sans-serif`;
+        ctx.fillText(ellip(ctx,n.s.proj,n.r*1.7), n.x, n.y-2);
+        ctx.fillStyle='#e6b84e'; ctx.font=`500 ${Math.max(9,nameSize-3)}px "JetBrains Mono",monospace`;
+        ctx.fillText(fmtH(n.hours), n.x, n.y+nameSize);
+        if(n.r>44){ ctx.fillStyle='rgba(214,236,248,0.55)';
+          ctx.font=`500 ${Math.max(8,nameSize-4)}px "DM Sans",sans-serif`;
+          ctx.fillText(ellip(ctx,n.s.plat,n.r*1.6), n.x, n.y+nameSize*2); }
+      }
+    }
+  }
+}
+
+// ── Hit testing ──────────────────────────────────────────────────────────────
+function hitTest(mx,my){
+  // Children first (they sit inside parents).
+  for(const n of nodes){
+    if(!n.kids) continue;
+    for(const k of n.kids) if(Math.hypot(mx-k.x,my-k.y)<Math.max(k.r,8)) return {node:k, parent:n};
+  }
+  for(const n of nodes) if(Math.hypot(mx-n.x,my-n.y)<n.r) return {node:n, parent:null};
+  return null;
+}
+const pos=e=>{ const r=cv.getBoundingClientRect(); return {mx:e.clientX-r.left, my:e.clientY-r.top}; };
+
+// Tooltip — anchored to the bubble (v2 fix), repositions only on target change.
+cv.addEventListener('mousemove',e=>{
+  const {mx,my}=pos(e), hit=hitTest(mx,my);
+  if(!hit){ hoverKey=null; tip.style.display='none'; cv.style.cursor='default'; return; }
+  cv.style.cursor='pointer';
+  const n=hit.node;
+  const key=n.kind+':'+(n.g?.name??'')+':'+(n.s?.proj??n.a?.name??n.label??'')+':'+archiveOpen+':'+openGalaxy+':'+openSystem;
+  if(key===hoverKey) return;
+  hoverKey=key;
+  const N=tip.querySelector('.n'), Hh=tip.querySelector('.h'), D=tip.querySelector('.d');
+  if(n.kind==='galaxy'){ N.textContent=n.g.name; Hh.textContent='';
+    D.textContent=n.g.systems.length+(n.g.systems.length===1?' project · ':' projects · ')+fmtH(galH(n.g))+' in window · '
+      +(n.g.systems.length>1?'click to open':'click → tracker'); }
+  else if(n.kind==='system'){ N.textContent=n.s.proj; Hh.textContent=n.g.name+' › '+n.s.proj+' › '+n.s.plat;
+    D.textContent=fmtH(sysH(n.s))+' in window · last worked '+n.s.last+'d ago · '
+      +(view.level===0?'click to zoom in':'click for detail'); }
+  else if(n.kind==='planet'){ N.textContent=n.cls; Hh.textContent=''; D.textContent=n.label+' (in-session only — never exported)'; }
+  else if(n.kind==='archive'){ N.textContent='Archive'; Hh.textContent='';
+    D.textContent=ARCHIVED.length+' inactive companies · click to '+(archiveOpen?'collapse':'expand'); }
+  else if(n.kind==='arch-co'){ N.textContent=n.a.name; Hh.textContent=''; D.textContent=n.a.hall+'h lifetime · inactive'; }
+  tip.style.display='block';
+  const pad=8, tw=tip.offsetWidth||200, th=tip.offsetHeight||60;
+  let tx=n.x+n.r*0.72, ty=n.y-n.r*0.72-th;
+  tx=Math.max(pad,Math.min(tx,wrap.clientWidth-tw-pad));
+  ty=Math.max(pad,Math.min(ty,wrap.clientHeight-th-pad));
+  tip.style.left=tx+'px'; tip.style.top=ty+'px';
+});
+
+let toastTimer=null;
+function showToast(msg){ toast.textContent=msg; toast.style.display='block';
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>toast.style.display='none', 2200); }
+
+cv.addEventListener('click',e=>{
+  const {mx,my}=pos(e), hit=hitTest(mx,my);
+  if(!hit) return;
+  const n=hit.node;
+  tip.style.display='none';
+  if(n.kind==='archive'){ archiveOpen=!archiveOpen; layout(); return; }
+  if(n.kind==='arch-co'){ showToast('→ would open '+n.a.name+' (read-only, inactive)'); return; }
+  if(n.kind==='galaxy'){
+    if(n.g.systems.length===1){ showToast('→ opens Time Tracker · '+n.g.name+' › '+n.g.systems[0].proj); return; }
+    openGalaxy = openGalaxy===n.g.name ? null : n.g.name;
+    layout(); return;
+  }
+  if(n.kind==='system'){
+    if(view.level===0){ view={level:1, galaxy:n.g}; openGalaxy=null; openSystem=null; layout(); return; }
+    openSystem = openSystem===n.idx ? null : n.idx; layout(); return;
+  }
+  if(n.kind==='planet'){ showToast(n.cls+': '+n.label); }
+});
+crumb.addEventListener('click',()=>{ view={level:0,galaxy:null}; openSystem=null; layout(); });
+document.querySelectorAll('.rbtn[data-r]').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.rbtn[data-r]').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active'); range=b.dataset.r; layout();
+}));
+document.getElementById('whale').addEventListener('click',()=>{
+  whaleOn=!whaleOn; document.getElementById('whale').classList.toggle('active',whaleOn); layout();
+});
+new ResizeObserver(()=>layout()).observe(wrap);
+layout();
+</script>
