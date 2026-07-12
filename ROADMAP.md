@@ -6,19 +6,7 @@ Discord's **#roadmap** channel mirrors this file automatically.
 
 **Status legend:** ✅ Shipped · 🔨 In progress · 🗓️ Planned · 💡 Under consideration
 
-_Last curated: 2026-07-12 (Company Galaxy queued as the v3.20.0 headline)_
-
-## 🔨 In progress
-
-- **Company Galaxy (Company Web 3.0)** — the company web goes hierarchical:
-  each company is a **galaxy** you can open into its **solar systems**
-  (projects/platforms), which break down into their IDs and logins. Click to
-  expand in place, click deeper to zoom in (with a breadcrumb back out), and
-  the whole thing keeps the harnessed sizing, Archive cluster, and identity
-  colors from the bubble redesign. The company list gains matching
-  company › project grouping, and the dashboard mini-web jumps you straight
-  into a company's galaxy. _(Ships as v3.20.0 — design approved 2026-07-12,
-  plan in docs/PLAN-company-galaxy.md.)_
+_Last curated: 2026-07-12 (v3.20.0 — Company Galaxy — released)_
 
 ## 🗓️ Planned (next up)
 
@@ -66,6 +54,17 @@ _Last curated: 2026-07-12 (Company Galaxy queued as the v3.20.0 headline)_
 
 ## ✅ Recently shipped
 
+- **Company Galaxy** (v3.20.0) — the company web reimagined, twice over: it
+  first became packed bubbles (sized by hours in a 30d / 90d / all-time window,
+  harnessed so no client can drown the rest, idle and ended companies folding
+  into an expandable **Archive** cluster, and per-company **identity colors**
+  that fade as a client goes idle — with a colorblind-safe palette and a
+  right-click color picker), and then went **hierarchical**: each company is a
+  **galaxy** that opens into its **solar systems** (projects/platforms), which
+  break down into their IDs and logins. Click to expand in place, click deeper
+  to zoom (breadcrumb backs out), right-click for galaxy- and project-level
+  menus. The company list gains matching company › project grouping, and the
+  dashboard mini-web jumps you straight into a company's galaxy.
 - **Profile placement** (v3.19.1) — Profile left the navigation bar and now
   lives behind your avatar (bottom-left; click → Edit Profile) and under
   Settings → Profile. _(Community suggestion — thank you!)_ Shipped with setup-guide
