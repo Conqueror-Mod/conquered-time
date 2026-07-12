@@ -327,7 +327,53 @@
   .tooltip-hier   { font-size: 11px; color: var(--accent); margin-bottom: 2px; font-family: var(--mono); }
   .tooltip-detail { font-size: 11px; color: var(--text-muted); }
 
-  /* Context menu */
+  /* Breadcrumb — shown when zoomed into a galaxy (level 1) */
+  #web-crumb {
+    position: absolute;
+    top: 12px; left: 12px;
+    z-index: 4;
+    display: none;
+    align-items: center;
+    gap: 8px;
+    background: var(--surface-3);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-lg);
+    padding: 7px 12px;
+    font-size: 12.5px;
+    cursor: pointer;
+    box-shadow: var(--shadow-2);
+    transition: all var(--transition);
+  }
+  #web-crumb:hover { border-color: var(--accent); color: var(--accent); }
+  #web-crumb .crumb-sep { color: var(--text-dim); }
+  #web-crumb b { font-weight: 600; }
+
+  /* Context menus (system + galaxy variants share the styling) */
+  #galaxy-ctx-menu {
+    position: absolute;
+    background: var(--surface-3);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-lg);
+    padding: 4px;
+    z-index: 20;
+    display: none;
+    min-width: 190px;
+    box-shadow: var(--shadow-3);
+  }
+  .ctx-title {
+    padding: 7px 12px 5px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-dim);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 4px;
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   #ctx-menu {
     position: absolute;
     background: var(--surface-3);
@@ -396,6 +442,9 @@
       <div class="tooltip-hier"   id="tt-hier"></div>
       <div class="tooltip-detail" id="tt-detail"></div>
     </div>
+    <div id="web-crumb">
+      <span>← All Galaxies</span><span class="crumb-sep">›</span><b id="web-crumb-name"></b>
+    </div>
     <div id="ctx-menu">
       <div class="ctx-item" id="ctx-open-tracker">⏱ Open Time Tracker</div>
       <div class="ctx-item" id="ctx-edit">✎ Edit Company</div>
@@ -403,6 +452,12 @@
       <div class="ctx-item" id="ctx-reset-color">↺ Reset to auto color</div>
       <div class="ctx-divider"></div>
       <div class="ctx-item danger" id="ctx-delete">⊗ Delete</div>
+    </div>
+    <div id="galaxy-ctx-menu">
+      <div class="ctx-title" id="gctx-title"></div>
+      <div class="ctx-item" id="gctx-open">⤢ Open Galaxy</div>
+      <div class="ctx-item" id="gctx-edit-color">🎨 Edit Galaxy Color…</div>
+      <div class="ctx-item" id="gctx-reset-color">↺ Reset to auto color</div>
     </div>
     <!-- Hidden picker for 🎨 Edit Color — opens the OS color dialog. -->
     <input type="color" id="ctx-color-pick" style="position:absolute;width:0;height:0;opacity:0;border:0;padding:0;pointer-events:none;">

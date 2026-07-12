@@ -40,14 +40,20 @@ window.addEventListener('DOMContentLoaded', async () => {
       root: $id('node-tooltip'), name: $id('tt-name'),
       hier: $id('tt-hier'), detail: $id('tt-detail'),
     },
-    // Left-click opens the context menu at the cursor (same behavior the old
-    // web had); right-click does too, so both gestures work.
-    onCompanyClick: (co, ev) => showCtxAt(co, ev),
-    onCompanyContext: (co, ev) => showCtxAt(co, ev),
+    breadcrumb: { root: $id('web-crumb'), name: $id('web-crumb-name') },
+    // Galaxy rules: left-click is navigation (expand / zoom / tracker);
+    // actions live on the right-click menus — galaxy menu vs system menu.
+    onOpenTracker: (co) => { sessionStorage.setItem('active_company', JSON.stringify(co)); api.send('navigate', 'tracker'); },
+    onGalaxyContext: (galaxy, ev) => showGalaxyCtx(galaxy, ev),
+    onSystemContext: (co, ev) => showCtxAt(co, ev),
   });
 
   await loadCompanies();
   refreshWeb();
+
+  // Dashboard → Companies pre-zoom handoff: land inside the clicked galaxy.
+  const zoomKey = sessionStorage.getItem('web_zoom_galaxy');
+  if (zoomKey) { sessionStorage.removeItem('web_zoom_galaxy'); web.zoomTo(zoomKey); }
 
   // 30d / 90d / All window presets for bubble sizing + the archive idle rule.
   $id('web-range').addEventListener('click', e => {
@@ -83,6 +89,9 @@ window.addEventListener('DOMContentLoaded', async () => {
   $id('ctx-edit-color').addEventListener('click', ctxEditColor);
   $id('ctx-reset-color').addEventListener('click', ctxResetColor);
   $id('ctx-delete').addEventListener('click', ctxDeleteCompany);
+  $id('gctx-open').addEventListener('click', gctxOpen);
+  $id('gctx-edit-color').addEventListener('click', gctxEditColor);
+  $id('gctx-reset-color').addEventListener('click', gctxResetColor);
 
   // Company list — delegated so dynamically-rendered rows need no re-wiring.
   $id('company-list').addEventListener('click', e => {
@@ -411,8 +420,72 @@ function showCtxAt(co: Company, ev: MouseEvent): void {
   m.style.left = Math.min(ev.clientX - wr.left, wrap.clientWidth - m.offsetWidth - 8) + 'px';
   m.style.top  = Math.min(ev.clientY - wr.top,  wrap.clientHeight - m.offsetHeight - 8) + 'px';
 }
-function hideCtx(): void { $id('ctx-menu').style.display = 'none'; }
+function hideCtx(): void {
+  $id('ctx-menu').style.display = 'none';
+  $id('galaxy-ctx-menu').style.display = 'none';
+}
 document.addEventListener('click', hideCtx);
+
+// ── Galaxy context menu (right-click a galaxy bubble) ─────────────────────
+let gctxTarget: BubbleGalaxy | null = null;
+function showGalaxyCtx(galaxy: BubbleGalaxy, ev: MouseEvent): void {
+  gctxTarget = galaxy;
+  const wrap = $id('spiderweb-wrap');
+  const wr = wrap.getBoundingClientRect();
+  const m = $id('galaxy-ctx-menu');
+  $id('gctx-title').textContent = galaxy.name;
+  $id('gctx-open').style.display = galaxy.rows.length > 1 ? '' : 'none';
+  $id('gctx-reset-color').style.display = galaxy.rows.some(r => r.color) ? '' : 'none';
+  m.style.display = 'block';
+  m.style.left = Math.min(ev.clientX - wr.left, wrap.clientWidth - m.offsetWidth - 8) + 'px';
+  m.style.top  = Math.min(ev.clientY - wr.top,  wrap.clientHeight - m.offsetHeight - 8) + 'px';
+}
+function gctxOpen(): void {
+  if (gctxTarget) web?.zoomTo(gctxTarget.key);
+}
+// Galaxy Edit Color writes the same color to EVERY row of the group (approved
+// decision #2 — no schema change; system shades derive from it). Live preview
+// while picking; `change` persists; cancel reverts.
+function gctxEditColor(): void {
+  if (!gctxTarget) return;
+  const rows = gctxTarget.rows;
+  const originals = rows.map(r => r.color);
+  const pick = $field('ctx-color-pick') as HTMLInputElement;
+  const menu = $id('galaxy-ctx-menu');
+  pick.style.left = menu.style.left;
+  pick.style.top = menu.style.top;
+  pick.value = rows.find(r => r.color)?.color || '#4aa8c0';
+  let committed = false;
+  pick.oninput = () => { rows.forEach(r => { r.color = pick.value; }); web?.redraw(); };
+  pick.onchange = () => {
+    committed = true;
+    rows.forEach(r => { r.color = pick.value; });
+    web?.redraw();
+    void saveGalaxyColor(rows, pick.value);
+  };
+  const onDone = (): void => {
+    if (!committed) { rows.forEach((r, i) => { r.color = originals[i]; }); web?.redraw(); }
+    pick.oninput = null;
+    pick.removeEventListener('focusout', onDone);
+  };
+  pick.addEventListener('focusout', onDone);
+  pick.click();
+}
+function gctxResetColor(): void {
+  if (gctxTarget) void saveGalaxyColor(gctxTarget.rows, null);
+}
+async function saveGalaxyColor(rows: Company[], hex: string | null): Promise<void> {
+  for (const co of rows) {
+    const data: Company = { ...co, color: hex || undefined };
+    if (!hex) delete data.color;
+    const res = await IPC.companies.save(data);
+    if (!res.ok) { Shell.toast(res.error || 'Color save failed.', 'error'); return; }
+  }
+  Shell.toast(hex ? 'Galaxy color updated.' : 'Galaxy color reset to auto.', 'success');
+  Store.invalidate('companies');
+  await loadCompanies();
+  refreshWeb();
+}
 function ctxOpenTracker(): void { if (!ctxTarget) return; sessionStorage.setItem('active_company', JSON.stringify(ctxTarget)); api.send('navigate', 'tracker'); }
 function ctxEditCompany(): void { if (ctxTarget) openModal(ctxTarget); }
 
