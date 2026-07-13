@@ -25,8 +25,10 @@ function escapeHtml(v: unknown): string {
   return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 const params   = new URLSearchParams(window.location.search);
-const mode     = params.get('mode') || 'fix';
-const isFix    = mode === 'fix';
+// Unified review wizard: one window that both suggests the auto-fix (when the
+// issue is fixable) AND lets you acknowledge. The old ?mode=fix|acknowledge
+// split is gone — every issue shows Apply Fix (if available) + Acknowledge.
+const WIZARD_TITLE = 'Review Discrepancies';
 
 let issues: WizardIssue[] = [];
 let current = 0;
@@ -82,7 +84,7 @@ function auditMeta(type: string, r: AuditRow): AuditMeta {
 
 // ── Load data and build issue list ──────────────────────────────────────
 window.addEventListener('DOMContentLoaded', async () => {
-  $id('titlebar-label').textContent = isFix ? 'Suggest Discrepancy Fix' : 'Acknowledge Discrepancies';
+  $id('titlebar-label').textContent = WIZARD_TITLE;
   $id('btn-titlebar-close').addEventListener('click', () => window.close());
 
   // Apply settings (scale only — theme already set via query param).
@@ -170,12 +172,13 @@ function renderStep(): void {
   const { flag, cls, suggestion, fix } = auditMeta(type, r);
   const total = issues.length;
 
-  const showFix    = isFix && fix !== null;
+  // Apply Fix appears whenever the issue is auto-fixable — no mode gating.
+  const showFix    = fix !== null;
   const pct        = Math.round((current / total) * 100);
 
   body.innerHTML = `
     <div class="wizard-header">
-      <div class="wizard-mode-title">${isFix ? 'Suggest Discrepancy Fix' : 'Acknowledge Discrepancies'}</div>
+      <div class="wizard-mode-title">${WIZARD_TITLE}</div>
       <div class="wizard-counter">Issue ${current + 1} of ${total}</div>
     </div>
 
@@ -218,7 +221,7 @@ function renderStep(): void {
 
     <div class="wizard-footer">
       ${showFix ? `<button class="btn-wiz-primary" id="btn-apply-fix">Apply Fix</button>` : ''}
-      <button class="btn-wiz-${isFix && !showFix ? 'primary' : 'secondary'}" id="btn-acknowledge">Acknowledge</button>
+      <button class="btn-wiz-${showFix ? 'secondary' : 'primary'}" id="btn-acknowledge">Acknowledge</button>
       <button class="btn-wiz-secondary" id="btn-skip">Skip</button>
       <div class="spacer"></div>
       <button class="btn-wiz-done" id="btn-done">Done</button>

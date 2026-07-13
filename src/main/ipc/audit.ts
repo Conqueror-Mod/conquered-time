@@ -131,8 +131,8 @@ ipcMain.handle('audit:apply-fix', (_: unknown, { entry_id, row_idx, fix_type, up
   } catch (e) { return { ok: false, error: e.message }; }
 });
 
-ipcMain.handle('audit:open-wizard', (_: unknown, { mode, theme }: { mode?: string; theme?: string } = {}) => {
-  createAuditWizardWindow(mode, theme);
+ipcMain.handle('audit:open-wizard', (_: unknown, { theme }: { theme?: string } = {}) => {
+  createAuditWizardWindow(theme);
   return { ok: true };
 });
 
