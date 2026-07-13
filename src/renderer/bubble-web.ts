@@ -86,6 +86,10 @@ interface BubbleWebOpts {
   onGalaxyContext?: (galaxy: { key: string; name: string; rows: Company[] }, ev: MouseEvent) => void;
   /** Right-click a system bubble (expanded L0 kid or L1). */
   onSystemContext?: (co: Company, ev: MouseEvent) => void;
+  /** Left-click a system bubble — ties the clicked planet to its list row. */
+  onSelect?: (co: Company) => void;
+  /** Hover a bubble that maps to one company (or null on leave) — glows its list row. */
+  onHover?: (co: Company | null) => void;
 }
 
 // Identity palettes (v2) — hues tuned for both grounds; the CB variant avoids
@@ -262,6 +266,27 @@ function attach(opts: BubbleWebOpts): BubbleWebController {
   let archiveOpen = false;
   let nodes: Node[] = [];
   let hoverKey: string | null = null;
+  let lastHoverCoId: number | null = null;   // last company emitted to opts.onHover
+
+  // A hovered bubble maps to one company row (system, planet, or single-project
+  // galaxy); multi-project galaxies have no single row so they emit null. Fired
+  // to the page so it can glow the matching list entry — hover-tracking that
+  // works even for single-project / single-entry companies.
+  function hoverCompany(hit: { node: Node; parent: Node | null } | null): Company | null {
+    if (!hit) return null;
+    const n = hit.node;
+    if (n.kind === 'system') return n.sys!.co;
+    if (n.kind === 'planet') return hit.parent?.sys?.co ?? null;
+    if ((n.kind === 'galaxy' || n.kind === 'arch-galaxy') && n.gal!.systems.length === 1) return n.gal!.rows[0];
+    return null;
+  }
+  function emitHover(hit: { node: Node; parent: Node | null } | null): void {
+    const co = hoverCompany(hit);
+    const id = co ? co.id : null;
+    if (id === lastHoverCoId) return;
+    lastHoverCoId = id;
+    opts.onHover?.(co);
+  }
 
   // ── Model ──────────────────────────────────────────────────────────────────
   // (groupKey lives at module scope beside the identity-color helpers.)
@@ -367,13 +392,12 @@ function attach(opts: BubbleWebOpts): BubbleWebController {
           it.kids = kids;
         }
         if (it.kind === 'archive' && archiveOpen && archived.length > 0) {
-          const maxH = Math.max(...archived.map(g => g.hours), ...archived.map(() => 0.001), 0.001);
-          const totals = archived.map(g => allTimeHours(g));
-          const maxT = Math.max(...totals, 0.001);
-          const kids: Node[] = archived
-            .map((g, i) => ({ kind: 'arch-galaxy' as const, gal: g, x: 0, y: 0, r: Math.max(6, it.r * 0.24 * Math.sqrt(totals[i] / maxT)) }))
-            .sort((a, b) => b.r - a.r);
-          void maxH;
+          // Same area-budget sizer the active-galaxy systems use, so archived
+          // bubbles read at a comparable, legible size instead of shrinking to
+          // near-dots. hours carries the all-time total (archived = 0 in-window).
+          const kids: Array<Node & { hours: number }> = archived
+            .map((g) => ({ kind: 'arch-galaxy' as const, gal: g, hours: allTimeHours(g), x: 0, y: 0, r: 0 }));
+          harness(kids as any, Math.PI * it.r * it.r * 0.52, 15, it.r * 0.5);
           packInside(kids, it.x, it.y, it.r);
           it.kids = kids;
         }
@@ -603,22 +627,52 @@ function attach(opts: BubbleWebOpts): BubbleWebController {
     }
   }
 
-  // ── Zoom tween (reduced-motion gated) ──────────────────────────────────────
-  function withZoom(zoomIn: boolean, apply: () => void): void {
+  // ── Fly-through zoom (reduced-motion gated) ────────────────────────────────
+  // Snappy directional push (~300ms): the outgoing frame scales INTO the
+  // clicked node (transform-origin = its center) and fades — reads as rushing
+  // toward the thing you picked — then the new level arrives with a slight
+  // overshoot that settles to rest, like decelerating into the destination.
+  // `animating` blocks clicks mid-flight so a double-click can't desync layout.
+  let animating = false;
+  function withZoom(zoomIn: boolean, apply: () => void, focus?: { x: number; y: number }): void {
     if (reducedMotion()) { apply(); return; }
-    canvas.style.transition = 'transform 120ms ease-in, opacity 120ms ease-in';
-    canvas.style.transform = zoomIn ? 'scale(1.12)' : 'scale(0.9)';
+    const W = wrap.clientWidth, H = wrap.clientHeight;
+    const ox = zoomIn && focus ? focus.x : W / 2;
+    const oy = zoomIn && focus ? focus.y : H / 2;
+    const outScale = zoomIn ? 2.5 : 0.6;    // where the departing frame ends up
+    const inStart = zoomIn ? 0.72 : 1.5;    // where the arriving frame begins (overshoot)
+    animating = true;
+    canvas.style.transformOrigin = `${ox}px ${oy}px`;
+    canvas.style.transition = 'transform 150ms ease-in, opacity 150ms ease-in';
+    canvas.style.transform = `scale(${outScale})`;
     canvas.style.opacity = '0';
     setTimeout(() => {
       apply();
       canvas.style.transition = 'none';
-      canvas.style.transform = zoomIn ? 'scale(0.9)' : 'scale(1.12)';
+      canvas.style.transformOrigin = `${W / 2}px ${H / 2}px`;
+      canvas.style.transform = `scale(${inStart})`;
+      canvas.style.opacity = '0';
       // Force style flush so the next transition animates from the reset state.
       void canvas.offsetWidth;
-      canvas.style.transition = 'transform 120ms ease-out, opacity 120ms ease-out';
+      canvas.style.transition = 'transform 160ms ease-out, opacity 160ms ease-out';
       canvas.style.transform = 'scale(1)';
       canvas.style.opacity = '1';
-    }, 125);
+      setTimeout(() => { animating = false; }, 170);
+    }, 150);
+  }
+
+  // One-way "warp out": clicking a single-project galaxy dives INTO its bubble
+  // (~4×) and fades, then hands off to the tracker — turns the hard page swap
+  // into a deliberate "fly into the system" beat. The page navigates away
+  // (loadFile destroys this canvas), so there's no arrival frame to restore.
+  function warpOut(focus: { x: number; y: number }, done: () => void): void {
+    if (reducedMotion()) { done(); return; }
+    animating = true;
+    canvas.style.transformOrigin = `${focus.x}px ${focus.y}px`;
+    canvas.style.transition = 'transform 220ms cubic-bezier(0.5,0,0.75,0), opacity 220ms ease-in';
+    canvas.style.transform = 'scale(4)';
+    canvas.style.opacity = '0';
+    setTimeout(done, 210);
   }
 
   // ── Hit testing & interaction ──────────────────────────────────────────────
@@ -640,6 +694,7 @@ function attach(opts: BubbleWebOpts): BubbleWebController {
   const onMove = (e: MouseEvent): void => {
     const { mx, my } = mousePos(e);
     const hit = hitTest(mx, my);
+    emitHover(hit);
     if (!hit) {
       hoverKey = null;
       tooltip.root.style.display = 'none';
@@ -695,6 +750,7 @@ function attach(opts: BubbleWebOpts): BubbleWebController {
   };
 
   const onClick = (e: MouseEvent): void => {
+    if (animating) return;
     const { mx, my } = mousePos(e);
     const hit = hitTest(mx, my);
     if (!hit) return;
@@ -703,24 +759,25 @@ function attach(opts: BubbleWebOpts): BubbleWebController {
     if (n.kind === 'archive') { archiveOpen = !archiveOpen; layout(); return; }
     if (n.kind === 'arch-galaxy') {
       // Inactive galaxy: single row → tracker; multi → zoom in read-only.
-      if (n.gal!.systems.length === 1) opts.onOpenTracker?.(n.gal!.rows[0]);
-      else if (!opts.mini) { currentKey = n.gal!.key; openSystemIdx = null; withZoom(true, () => { level = 1; layout(); }); }
+      if (n.gal!.systems.length === 1) warpOut({ x: n.x, y: n.y }, () => opts.onOpenTracker?.(n.gal!.rows[0]));
+      else if (!opts.mini) { currentKey = n.gal!.key; openSystemIdx = null; withZoom(true, () => { level = 1; layout(); }, { x: n.x, y: n.y }); }
       return;
     }
     if (n.kind === 'galaxy') {
       const g = n.gal!;
-      if (g.systems.length === 1) { opts.onOpenTracker?.(g.rows[0]); return; }
+      if (g.systems.length === 1) { warpOut({ x: n.x, y: n.y }, () => opts.onOpenTracker?.(g.rows[0])); return; }
       if (opts.mini) { opts.onGalaxyNavigate?.({ key: g.key, name: g.name, rows: g.rows }); return; }
       openGalaxyKey = openGalaxyKey === g.key ? null : g.key;
       layout();
       return;
     }
     if (n.kind === 'system') {
+      opts.onSelect?.(n.sys!.co);   // tie the clicked planet to its list row
       if (level === 0) {   // system inside an expanded L0 galaxy → zoom
         currentKey = n.gal!.key;
         openGalaxyKey = null;
         openSystemIdx = null;
-        withZoom(true, () => { level = 1; layout(); });
+        withZoom(true, () => { level = 1; layout(); }, { x: n.x, y: n.y });
         return;
       }
       openSystemIdx = openSystemIdx === n.sysIdx ? null : (planetsOf(n.sys!).length ? n.sysIdx! : null);
@@ -744,7 +801,9 @@ function attach(opts: BubbleWebOpts): BubbleWebController {
     }
   };
 
+  const onLeave = (): void => { emitHover(null); };
   canvas.addEventListener('mousemove', onMove);
+  canvas.addEventListener('mouseleave', onLeave);
   canvas.addEventListener('click', onClick);
   canvas.addEventListener('contextmenu', onContext);
   const crumbClick = (): void => {
@@ -781,6 +840,7 @@ function attach(opts: BubbleWebOpts): BubbleWebController {
     destroy(): void {
       ro.disconnect();
       canvas.removeEventListener('mousemove', onMove);
+      canvas.removeEventListener('mouseleave', onLeave);
       canvas.removeEventListener('click', onClick);
       canvas.removeEventListener('contextmenu', onContext);
       opts.breadcrumb?.root.removeEventListener('click', crumbClick);

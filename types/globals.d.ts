@@ -551,6 +551,8 @@ interface BubbleWebApi {
     onGalaxyNavigate?: (galaxy: BubbleGalaxy) => void;
     onGalaxyContext?: (galaxy: BubbleGalaxy, ev: MouseEvent) => void;
     onSystemContext?: (co: Company, ev: MouseEvent) => void;
+    onSelect?: (co: Company) => void;
+    onHover?: (co: Company | null) => void;
   }): BubbleWebController;
   /** The galaxy grouping key (hier_company fallback name) — the identity family. */
   groupKey(co: Company): string;
