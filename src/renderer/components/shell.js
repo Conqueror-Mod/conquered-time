@@ -148,6 +148,7 @@ const Shell = (() => {
       { id: 'profile',      label: 'Profile',        icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="7" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg>' },
       { id: 'appearance',   label: 'Appearance',    icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>' },
       { id: 'window',       label: 'Window',         icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 9h20"/><path d="M7 4v5"/></svg>' },
+      { id: 'shortcuts',    label: 'Shortcuts',      icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8"/></svg>' },
       { id: 'security',     label: 'Security',       icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>' },
       { id: 'data',         label: 'Data',           icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>' },
       { id: 'reports',      label: 'Reports',        icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>' },
@@ -295,18 +296,41 @@ const Shell = (() => {
                   <button class="toggle-switch" id="toggle-start-minimized" data-action="applyStartMinimized"></button>
                 </div>
               </div>
+            </div><!-- /settings-cat-window -->
+
+            <!-- ── SHORTCUTS ─────────────────────────────────── -->
+            <div id="settings-cat-shortcuts" class="settings-cat-panel" style="display:none;">
+              <div class="sc-title">Shortcuts</div>
 
               <div class="settings-group">
-                <div class="settings-group-title">Punch Hotkey</div>
-                <div class="settings-row-label">System-wide shortcut that clocks in (repeating your last task) or clocks out — even while the app is hidden in the tray. Click the box, then press the keys you want.</div>
-                <div style="display:flex; gap:8px; align-items:center; margin-top:8px;">
-                  <input type="text" id="punch-hotkey-input" readonly placeholder="Press a shortcut…"
-                         style="width:200px; cursor:pointer;" data-tip="Click, then press e.g. Ctrl+Alt+P" />
-                  <button class="s-btn" id="punch-hotkey-clear" data-action="clearPunchHotkey">Disable</button>
+                <div class="settings-group-title">Global Hotkey</div>
+                <div class="settings-row-label">Works anywhere in Windows, even while Conquered Time is hidden in the tray. Click the box, then press the keys you want.</div>
+                <div class="sc-key-row" style="margin-top:10px;">
+                  <div class="sc-key-info">
+                    <div class="sc-key-name">Clock In / Out</div>
+                    <div class="sc-key-desc">Clocks in on your last task if you're out, or clocks out if you're in.</div>
+                  </div>
+                  <div style="display:flex; gap:8px; align-items:center;">
+                    <input type="text" id="punch-hotkey-input" readonly placeholder="Press a shortcut…"
+                           style="width:190px; cursor:pointer;" data-tip="Click, then press e.g. Ctrl+Alt+P" />
+                    <button class="s-btn" id="punch-hotkey-clear" data-action="clearPunchHotkey">Disable</button>
+                  </div>
                 </div>
                 <div class="settings-row-label" id="punch-hotkey-status" style="margin-top:6px;"></div>
               </div>
-            </div><!-- /settings-cat-window -->
+
+              <div class="settings-group">
+                <div class="settings-group-title">Navigation</div>
+                <div class="settings-row-label">Jump between pages from anywhere in the app.</div>
+                <div id="sc-nav-list" class="sc-key-list" style="margin-top:10px;"></div>
+              </div>
+
+              <div class="settings-group">
+                <div class="settings-group-title">Actions</div>
+                <div class="settings-row-label">Common commands. These are fixed for now — the global hotkey above is the customizable one.</div>
+                <div id="sc-action-list" class="sc-key-list" style="margin-top:10px;"></div>
+              </div>
+            </div><!-- /settings-cat-shortcuts -->
 
             <!-- ── DATA ─────────────────────────────────────── -->
             <div id="settings-cat-data" class="settings-cat-panel" style="display:none;">
@@ -985,6 +1009,8 @@ async function switchSettingsCategory(cat) {
     loadDisplayPicker();
   }
 
+  if (cat === 'shortcuts') renderShortcutsTab();
+
   if (cat === 'security' && !_safeStorageLoaded) {
     _safeStorageLoaded = true;
     loadSafeStorageStatus();
@@ -1547,7 +1573,37 @@ async function loadDisplayPicker() {
   if (tct) tct.classList.toggle('on', savedCloseTray === true);
   const tsmin = document.getElementById('toggle-start-minimized');
   if (tsmin) tsmin.classList.toggle('on', savedStartMin === true);
-  await loadPunchHotkey();
+}
+
+// ── Shortcuts tab ───────────────────────────────────────────────────────────
+// Reference list of every app shortcut (grouped) + the one editable control,
+// the global punch hotkey. The lists are the single source of truth for what
+// the app's key bindings ARE — keep them in sync with the real handlers:
+//   navigation Ctrl+1–7  → shell.js keydown (Module switching)
+//   Ctrl+,               → shell.js keydown (open Settings)
+//   Ctrl+L/P/Q, F12      → main.ts buildMenu accelerators
+function renderShortcutsTab() {
+  const nav = document.getElementById('sc-nav-list');
+  const act = document.getElementById('sc-action-list');
+  const kbd = (combo) => combo.split('+').map(k => `<kbd class="sc-kbd">${escapeHtml(k)}</kbd>`).join('<span class="sc-plus">+</span>');
+  const row = ({ name, keys }) => `<div class="sc-key-row"><div class="sc-key-info"><div class="sc-key-name">${escapeHtml(name)}</div></div><div class="sc-key-combo">${kbd(keys)}</div></div>`;
+  if (nav) nav.innerHTML = [
+    { name: 'Dashboard',   keys: 'Ctrl+1' },
+    { name: 'Companies',   keys: 'Ctrl+2' },
+    { name: 'Time Tracker',keys: 'Ctrl+3' },
+    { name: 'Dispatch',    keys: 'Ctrl+4' },
+    { name: 'Reports',     keys: 'Ctrl+5' },
+    { name: 'Invoices',    keys: 'Ctrl+6' },
+    { name: 'Global Log',  keys: 'Ctrl+7' },
+    { name: 'Open Settings', keys: 'Ctrl+,' },
+  ].map(row).join('');
+  if (act) act.innerHTML = [
+    { name: 'Lock Session',   keys: 'Ctrl+L' },
+    { name: 'Export PDF',     keys: 'Ctrl+P' },
+    { name: 'Quit',           keys: 'Ctrl+Q' },
+    { name: 'Toggle Developer Tools', keys: 'F12' },
+  ].map(row).join('');
+  loadPunchHotkey();
 }
 
 // ── Punch hotkey (app-global, like close-to-tray) ───────────────────────────

@@ -444,6 +444,35 @@
 .backup-row-ts   { font-family: var(--mono); font-size: 12px; color: var(--text-bright); }
 .backup-row-size { font-family: var(--sans); font-size: 10px; color: var(--text-muted); margin-top: 2px; }
 
+/* ── Shortcuts tab ── */
+.sc-key-list { display: flex; flex-direction: column; }
+.sc-key-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 2px;
+  border-bottom: 1px solid var(--border);
+}
+.sc-key-list .sc-key-row:last-child { border-bottom: none; }
+.sc-key-name { font-family: var(--sans); font-size: 13px; font-weight: 500; color: var(--text-bright); }
+.sc-key-desc { font-family: var(--sans); font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.sc-key-combo { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+.sc-kbd {
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1;
+  color: var(--text-bright);
+  background: var(--surface-2);
+  border: 1px solid var(--border-light);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  padding: 4px 7px;
+  min-width: 10px;
+  text-align: center;
+}
+.sc-plus { color: var(--text-dim); font-size: 11px; margin: 0 1px; }
+
 /* Protected pre-destructive-action snapshots stand out from routine autosaves. */
 .backup-row-safety { border-color: var(--accent); }
 .backup-row-safety:hover { border-color: var(--accent); }
