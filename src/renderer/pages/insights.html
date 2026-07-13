@@ -116,6 +116,11 @@
   .dl-val { color: var(--text-muted); font-family: var(--mono); font-size: 11px; }
   .dl-pct { color: var(--text-dim); font-family: var(--mono); font-size: 11px; min-width: 34px; text-align: right; }
   .dl-row.dim .dl-dot, .dl-row.dim .dl-name, .dl-row.dim .dl-val, .dl-row.dim .dl-pct { opacity: 0.4; }
+  /* Click-through affordance — client slices/legend rows jump to the Global Log. */
+  .donut-svg path.clickable { cursor: pointer; }
+  .donut-svg path.clickable:hover { opacity: 0.82; }
+  .dl-row.clickable { cursor: pointer; border-radius: var(--radius); padding: 2px 4px; margin: -1px -4px; transition: background 0.12s ease; }
+  .dl-row.clickable:hover { background: var(--surface-2); }
 
   /* ── Shared hover tooltip ── */
   .ins-tooltip {
