@@ -12,6 +12,8 @@ const $ta = (id: string): HTMLTextAreaElement => document.getElementById(id) as 
 
 let companies: Company[] = [];
 let defaultCurrency = 'USD';
+/** companyId → identity color (BubbleWeb.colorMap), set when companies load. */
+let colorFor: (companyId: number) => string = () => 'var(--border-light)';
 let pendingParams: InvoicePreviewParams | null = null; // params behind the open preview
 
 // Local date string (NEVER toISOString — that's UTC; see the UTC date gotcha).
@@ -72,6 +74,7 @@ async function loadContext(): Promise<void> {
 
 async function loadCompanies(): Promise<void> {
   companies = await Store.getCompanies();
+  colorFor  = BubbleWeb.colorMap(companies, await Store.getEntriesSummary()).colorFor;
   const sel = $sel('gen-company');
   const opts = ['<option value="">— Select a company —</option>'];
   for (const co of companies) opts.push(`<option value="${co.id}">${escapeHtml(co.name)}</option>`);
@@ -176,7 +179,7 @@ async function loadLedger(): Promise<void> {
     const voidBtn = r.status === 'void' ? '' : `<button class="mini-btn danger" data-act="void" data-id="${r.id}">Void</button>`;
     return `<tr>
       <td class="mono">${escapeHtml(r.number)}</td>
-      <td>${escapeHtml(r.company_name || '—')}</td>
+      <td>${r.company_id != null ? `<span class="co-dot" style="background:${colorFor(r.company_id)}"></span>` : ''}${escapeHtml(r.company_name || '—')}</td>
       <td class="mono">${period}</td>
       <td class="num mono">${escapeHtml(money(r.total, r.currency))}</td>
       <td><span class="status-pill status-${r.status}">${r.status === 'unpaid' ? 'Unpaid' : r.status === 'paid' ? 'Paid' : 'Void'}</span></td>

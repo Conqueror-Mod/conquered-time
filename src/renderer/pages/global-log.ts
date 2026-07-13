@@ -10,6 +10,8 @@
 let allEntries: TimeEntry[] = [], filtered: TimeEntry[] = [];
 let companies: Company[] = [];
 let compMap: Record<number, Company> = {};
+/** companyId → identity color (BubbleWeb.colorMap), set on data load. */
+let colorFor: (companyId: number) => string = () => 'var(--border-light)';
 
 // Static markup lookups — a missing id is a programming error.
 const $id = (id: string): HTMLElement => document.getElementById(id)!;
@@ -68,6 +70,7 @@ async function loadData(): Promise<void> {
   allEntries = await Store.getEntries();
   compMap    = {};
   companies.forEach(c => compMap[c.id] = c);
+  colorFor   = BubbleWeb.colorMap(companies, allEntries).colorFor;
   const sel = $id('filter-company');
   companies.forEach(co => {
     const opt = document.createElement('option');
@@ -135,7 +138,7 @@ function renderTable(): void {
     return `
       <tr data-idx="${idx}" style="cursor:pointer;">
         <td><span class="expand-arrow" id="arrow-${idx}">${hasDetail?'▶':''}</span></td>
-        <td class="log-company">${escapeHtml(co?.name)||'—'}</td>
+        <td class="log-company"><span class="co-dot" style="background:${colorFor(e.company_id)}"></span>${escapeHtml(co?.name)||'—'}</td>
         <td class="log-date">${escapeHtml(e.log_date)}${e.log_date>todayStr?' <span class="future-badge" title="This session is dated in the future">FUTURE</span>':''}</td>
         <td class="log-session">${e.session_label?escapeHtml(e.session_label):'<span style="color:var(--text-dim);font-style:italic;">No label</span>'}</td>
         <td class="log-hours">${fmtHFull(e.total_mins)}</td>

@@ -874,3 +874,18 @@ hr.divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; 
   border-radius: 3px;
   vertical-align: 1px;
 }
+
+/* Company identity dot — the Galaxy hue as a small inline marker before a
+   company name, so a company reads as the same color everywhere (Recent
+   Activity, Global Log, invoice ledger). Background is set inline per-row from
+   BubbleWeb.colorMap; the faint ring keeps it legible on same-hue grounds. */
+.co-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 7px;
+  vertical-align: middle;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.18), 0 0 5px -1px rgba(0, 0, 0, 0.25);
+}

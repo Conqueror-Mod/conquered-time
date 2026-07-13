@@ -55,7 +55,7 @@ async function loadData(): Promise<void> {
   companies = cos || [];
   companyMap = {};
   companies.forEach(c => { companyMap[Number(c.id)] = c; });
-  _colorGroups = null; // identity-color groups depend on companies + entries
+  _colorFor = null; // identity-color map depends on companies + entries
   defaultCurrency = (profile && profile.default_currency) || 'USD';
   entries = (raw || []).map(e => {
     let rows: InsightEntry['rows'] = [];
@@ -174,37 +174,13 @@ function barDefs(gradId: string): string {
 }
 
 // ── Identity colors (shared galaxy hue per company — matches web + week band) ──
-// Groups companies by hier_company and derives recency from the full entry set,
-// then defers to BubbleWeb.identityCss so a client's donut slice is the exact
-// colour of its galaxy bubble. Cached; invalidated on data reload (loadData).
-let _colorGroups: Map<string, { rows: Company[]; lastDays: number }> | null = null;
-function colorGroups(): Map<string, { rows: Company[]; lastDays: number }> {
-  if (_colorGroups) return _colorGroups;
-  const today = RowUtils.localDateStr();
-  const lastByCo: Record<number, string> = {};
-  for (const e of entries) {
-    if (e.log_date <= today && (!lastByCo[e.company_id] || e.log_date > lastByCo[e.company_id]))
-      lastByCo[e.company_id] = e.log_date;
-  }
-  const dayMs = 86400000;
-  const groups = new Map<string, { rows: Company[]; lastDays: number }>();
-  for (const co of companies) {
-    const key = BubbleWeb.groupKey(co);
-    let g = groups.get(key);
-    if (!g) { g = { rows: [], lastDays: Infinity }; groups.set(key, g); }
-    g.rows.push(co);
-    const lastDays = lastByCo[co.id]
-      ? Math.max(0, Math.round((new Date(today + 'T00:00').getTime() - new Date(lastByCo[co.id] + 'T00:00').getTime()) / dayMs))
-      : Infinity;
-    g.lastDays = Math.min(g.lastDays, lastDays);
-  }
-  _colorGroups = groups;
-  return groups;
-}
+// The shared BubbleWeb.colorMap owns the grouping + recency logic so a client's
+// donut slice is the exact colour of its galaxy bubble. Cached; invalidated on
+// data reload (loadData).
+let _colorFor: ((companyId: number) => string) | null = null;
 function identityColorFor(companyId: number): string {
-  const co = companyMap[companyId];
-  const g = co ? colorGroups().get(BubbleWeb.groupKey(co)) : null;
-  return g ? BubbleWeb.identityCss(g) : 'var(--text-muted)';
+  if (!_colorFor) _colorFor = BubbleWeb.colorMap(companies, entries).colorFor;
+  return _colorFor(companyId);
 }
 
 // ── Donut (Client Mix / Earnings) ────────────────────────────────────────────
