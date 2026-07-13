@@ -11,14 +11,20 @@
   .dashboard-outer {
     display: flex;
     flex-direction: column;
-    flex: 1;
+    /* Grows to fill tall windows but never shrinks below its content —
+       #main-content scrolls on short windows instead of the grid crushing
+       the week band / network web to slivers (flex-shrink would let grid
+       tracks compress below their content). */
+    flex: 1 0 auto;
     gap: 16px;
-    min-height: 0;
   }
   .dashboard-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    grid-template-rows: 1fr auto;
+    /* Top row (network + activity) flexes but never crushes below its
+       min-height; the week band and quick actions are fixed-size rows. On
+       very short windows #main-content scrolls instead (set in dashboard.ts). */
+    grid-template-rows: minmax(200px, 1fr) auto auto;
     gap: 16px;
     flex: 1;
     min-height: 0;
@@ -122,6 +128,109 @@
   }
   .quick-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 
+  /* ── Week band (docs/PLAN-week-view.md — Direction A volume columns) ── */
+  .week-nav {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .week-nav-btn {
+    font-size: 13px;
+    padding: 3px 9px;
+    line-height: 1.2;
+  }
+  .week-range {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-bright);
+    min-width: 110px;
+    text-align: center;
+  }
+  .week-total {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent);
+    margin-left: 4px;
+  }
+  #week-cols {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+    height: 132px;
+  }
+  .week-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    height: 100%;
+    min-width: 0;
+  }
+  .week-blk {
+    flex-shrink: 0;
+    border-radius: 6px;
+    margin-top: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: filter 0.12s;
+    overflow: hidden;
+  }
+  .week-blk:hover { filter: brightness(1.18); }
+  .week-day-empty {
+    border: 1px dashed var(--border-light);
+    border-radius: 7px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-dim);
+    font-size: 12px;
+  }
+  #week-axis {
+    display: flex;
+    gap: 10px;
+    margin-top: 8px;
+  }
+  .week-ax {
+    flex: 1;
+    text-align: center;
+    cursor: pointer;
+    border-radius: 6px;
+    padding: 2px 0;
+  }
+  .week-ax:hover { background: var(--surface-2); }
+  .week-ax .wd { font-family: var(--sans); font-size: 12px; font-weight: 600; }
+  .week-ax .wh { font-family: var(--mono); font-size: 11px; color: var(--text-dim); }
+  .week-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 100%;
+  }
+  .week-empty-glyph {
+    font-size: 26px;
+    color: var(--accent);
+    opacity: 0.55;
+    line-height: 1;
+  }
+  .week-empty-title {
+    font-family: var(--sans);
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+  .week-empty-cta {
+    font-size: 11px;
+    padding: 5px 12px;
+  }
+
   /* ── Dashboard module accent colors ── */
   #chip-today::before         { background: #03ecfc; }
   #chip-week::before          { background: #030ffc; }
@@ -129,6 +238,7 @@
   #chip-companies::before     { background: #020a75; }
   #panel-network::before      { background: #2aed07; }
   #panel-activity::before     { background: #f2fa05; }
+  #panel-week::before         { background: #03fcb6; }
   #panel-quickactions::before { background: #610030; }
 </style>
 </head>
@@ -200,6 +310,23 @@
           No recent sessions
         </div>
       </div>
+    </div>
+  </div>
+
+  <div class="hud-panel span-2" id="panel-week">
+    <div class="hud-panel-header">
+      <div class="hud-panel-title">This Week</div>
+      <div class="week-nav">
+        <button class="btn-neutral week-nav-btn" id="week-prev" data-tip="Previous week" aria-label="Previous week">‹</button>
+        <span class="week-range" id="week-range">—</span>
+        <button class="btn-neutral week-nav-btn" id="week-next" data-tip="Next week" aria-label="Next week">›</button>
+        <button class="btn-neutral week-nav-btn" id="week-today" style="display:none;" data-tip="Jump back to the current week.">This week</button>
+        <span class="week-total" id="week-total"></span>
+      </div>
+    </div>
+    <div class="hud-panel-body">
+      <div id="week-cols"></div>
+      <div id="week-axis"></div>
     </div>
   </div>
 
