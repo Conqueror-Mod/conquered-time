@@ -717,6 +717,7 @@ const Shell = (() => {
       </div>
       ${buildSettingsModal()}
       ${buildAuditWarningModal()}
+      ${buildOmnibox()}
       <div id="toast-container"></div>
     `;
 
@@ -726,6 +727,7 @@ const Shell = (() => {
     installShellDelegation();
     installTooltips();
     installContextMenu();
+    installOmnibox();
     // Backdrop close is special — must fire only when the modal element itself
     // (not its box children) is clicked, so it can't use the closest() dispatcher.
     document.getElementById('settings-modal')?.addEventListener('click', handleModalBackdrop);
@@ -739,11 +741,25 @@ const Shell = (() => {
       const auditOpen    = document.getElementById('audit-warning-modal')?.style.display !== 'none';
       const settingsOpen = document.getElementById('settings-modal')?.classList.contains('open');
 
+      const searchOpen = _omniOpen;
+
+      // ── Global search: Ctrl/⌘+K (toggle) ──────────────────────────────────
+      if ((e.key === 'k' || e.key === 'K') && (e.ctrlKey || e.metaKey) && !e.altKey) {
+        e.preventDefault();
+        if (searchOpen) closeOmnibox(); else openOmnibox();
+        return;
+      }
+
       // ── Escape: close whichever modal is open ─────────────────────────────
       if (e.key === 'Escape') {
+        if (searchOpen)   { closeOmnibox(); return; }
         if (settingsOpen) { closeSettingsModal(); return; }
         if (auditOpen)    { document.getElementById('audit-warn-dismiss')?.click(); return; }
       }
+
+      // While the search palette owns the keyboard, let its own handlers run
+      // (arrows/Enter on the input) — don't fire app shortcuts underneath it.
+      if (searchOpen) return;
 
       // ── Settings modal: Ctrl+, ─────────────────────────────────────────────
       if (e.key === ',' && (e.ctrlKey || e.metaKey)) {
@@ -1012,7 +1028,226 @@ const Shell = (() => {
       + `<div class="ct-empty-title">${escapeHtml(o.title || '')}</div>${body}${cta}</div>`;
   }
 
-  return { init, toast, showSidebarTimer, hideSidebarTimer, showLiveBadge, hideLiveBadge, setSidebarAvatar, contextMenu: openContextMenu, emptyState };
+  // ── Global search omnibox (Ctrl/⌘+K) ──────────────────────────────────────
+  // A shell-wide command palette. Injected on every inner page; searches
+  // companies, time sessions and page-jumps, then navigates smart per type.
+  const OMNI_ICON = {
+    page:    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>',
+    session: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 13V9M12 2h0M9 2h6M18 6l1.5-1.5"/></svg>',
+  };
+  // Extra shell targets beyond the sidebar NAV list.
+  const OMNI_EXTRA_PAGES = [
+    { id: 'profile',  label: 'Profile' },
+    { id: 'insights', label: 'Insights' },
+    { id: 'settings', label: 'Settings' },   // opens the modal, not a nav
+  ];
+  let _omniOpen = false, _omniSel = 0, _omniItems = [];
+  let _omniData = null;                       // { companies, sessions, colorFor }
+
+  function buildOmnibox() {
+    return `
+      <div id="omnibox-modal" class="omnibox-modal">
+        <div class="omnibox-box" role="dialog" aria-label="Search">
+          <div class="omnibox-input-wrap">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+            <input id="omnibox-input" type="text" autocomplete="off" spellcheck="false"
+                   placeholder="Search companies, sessions, pages…" aria-label="Search">
+            <kbd class="omnibox-esc">Esc</kbd>
+          </div>
+          <div id="omnibox-results" class="omnibox-results"></div>
+        </div>
+      </div>`;
+  }
+
+  async function openOmnibox() {
+    const modal = document.getElementById('omnibox-modal');
+    const input = /** @type {HTMLInputElement} */ (document.getElementById('omnibox-input'));
+    if (!modal || !input) return;
+    _omniOpen = true;
+    modal.classList.add('open');
+    input.value = '';
+    // Refresh data each open — cheap (Store dedups within the page); sessions
+    // use the non-decrypting summary channel.
+    try {
+      const [companies, sessions] = await Promise.all([
+        window.Store ? Store.getCompanies() : api.invoke('companies:list'),
+        window.Store ? Store.getEntriesSummary() : api.invoke('entries:summary'),
+      ]);
+      const colorFor = (typeof BubbleWeb !== 'undefined')
+        ? BubbleWeb.colorMap(companies || [], sessions || []).colorFor
+        : () => 'var(--border-light)';
+      _omniData = { companies: companies || [], sessions: sessions || [], colorFor };
+    } catch { _omniData = { companies: [], sessions: [], colorFor: () => 'var(--border-light)' }; }
+    // Respect anything typed while Store was resolving (don't clobber with '').
+    omniSearch(input.value);
+    input.focus();
+  }
+
+  function closeOmnibox() {
+    _omniOpen = false;
+    document.getElementById('omnibox-modal')?.classList.remove('open');
+  }
+
+  // Case-insensitive score: prefix 3, word-boundary prefix 2, substring 1, else 0.
+  function omniScore(hay, q) {
+    if (!hay) return 0;
+    const h = hay.toLowerCase();
+    if (h.startsWith(q)) return 3;
+    if (h.split(/[\s›·\-_/]+/).some(w => w.startsWith(q))) return 2;
+    return h.includes(q) ? 1 : 0;
+  }
+
+  function omniSearch(rawQuery) {
+    const q = (rawQuery || '').trim().toLowerCase();
+    const d = _omniData || { companies: [], sessions: [], colorFor: () => 'var(--border-light)' };
+    const pages = [...NAV, ...OMNI_EXTRA_PAGES];
+
+    // Pages
+    let pageHits = pages
+      .map(p => ({ p, s: q ? omniScore(p.label, q) : 1 }))
+      .filter(x => x.s > 0)
+      .sort((a, b) => b.s - a.s)
+      .map(x => ({
+        type: 'page', icon: OMNI_ICON.page, name: x.p.label, sub: 'Go to page', meta: '',
+        run: () => navigateOmniPage(x.p.id),
+      }));
+
+    // Companies
+    let coHits = [];
+    if (q) {
+      coHits = d.companies
+        .map(c => {
+          const hay = [c.name, c.hier_company, c.hier_project, c.hier_platform, c.job_title, c.work_type, c.location, c.nav_id]
+            .filter(Boolean).join(' ');
+          return { c, s: Math.max(omniScore(c.name, q) * 2, omniScore(hay, q)) };
+        })
+        .filter(x => x.s > 0)
+        .sort((a, b) => b.s - a.s)
+        .slice(0, 6)
+        .map(x => ({
+          type: 'company', dot: d.colorFor(x.c.id), name: x.c.name || '—',
+          sub: [x.c.hier_project, x.c.job_title, x.c.work_type].filter(Boolean).join(' · ') || 'Company',
+          meta: '', run: () => navigateOmniCompany(x.c.id),
+        }));
+    }
+
+    // Sessions — empty query shows the most recent few.
+    const coById = {};
+    d.companies.forEach(c => coById[c.id] = c);
+    let seHits;
+    if (q) {
+      seHits = d.sessions
+        .map(e => {
+          const coName = coById[e.company_id]?.name || '';
+          const hay = [e.session_label, e.log_date, coName].filter(Boolean).join(' ');
+          return { e, coName, s: omniScore(hay, q) };
+        })
+        .filter(x => x.s > 0)
+        .sort((a, b) => b.s - a.s || b.e.log_date.localeCompare(a.e.log_date))
+        .slice(0, 8);
+    } else {
+      seHits = [...d.sessions]
+        .sort((a, b) => (b.log_date || '').localeCompare(a.log_date || ''))
+        .slice(0, 5)
+        .map(e => ({ e, coName: coById[e.company_id]?.name || '', s: 1 }));
+    }
+    const seItems = seHits.map(x => ({
+      type: 'session', dot: d.colorFor(x.e.company_id),
+      name: x.e.session_label || 'Untitled session',
+      sub: [x.coName, x.e.log_date].filter(Boolean).join(' · '),
+      meta: fmtOmniHours(x.e.total_mins),
+      run: () => navigateOmniSession(x.e.company_id, x.e.log_date, x.e.id),
+    }));
+
+    renderOmniResults([
+      { label: 'Pages',     items: pageHits },
+      { label: 'Companies', items: coHits },
+      { label: q ? 'Sessions' : 'Recent sessions', items: seItems },
+    ]);
+  }
+
+  function fmtOmniHours(mins) {
+    const m = Math.max(0, Math.round(mins || 0));
+    return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`;
+  }
+
+  function renderOmniResults(groups) {
+    const box = document.getElementById('omnibox-results');
+    if (!box) return;
+    _omniItems = [];
+    let html = '';
+    for (const g of groups) {
+      if (!g.items.length) continue;
+      html += `<div class="omnibox-group-label">${escapeHtml(g.label)}</div>`;
+      for (const it of g.items) {
+        const idx = _omniItems.length;
+        _omniItems.push(it);
+        const lead = it.icon
+          ? `<span class="oi-icon">${it.icon}</span>`
+          : `<span class="oi-dot" style="background:${it.dot || 'var(--border-light)'}"></span>`;
+        html += `<div class="omnibox-item" data-idx="${idx}">${lead}`
+          + `<span class="oi-text"><span class="oi-name">${escapeHtml(it.name)}</span>`
+          + (it.sub ? `<span class="oi-sub">${escapeHtml(it.sub)}</span>` : '')
+          + `</span>${it.meta ? `<span class="oi-meta">${escapeHtml(it.meta)}</span>` : ''}</div>`;
+      }
+    }
+    box.innerHTML = html || `<div class="omnibox-empty">No matches. Try a company name, a date (YYYY-MM-DD), or a page.</div>`;
+    _omniSel = 0;
+    highlightOmni();
+  }
+
+  function highlightOmni() {
+    const items = document.querySelectorAll('#omnibox-results .omnibox-item');
+    items.forEach((el, i) => el.classList.toggle('sel', i === _omniSel));
+    items[_omniSel]?.scrollIntoView({ block: 'nearest' });
+  }
+
+  function activateOmni(idx) {
+    const it = _omniItems[idx];
+    if (!it) return;
+    closeOmnibox();
+    it.run();
+  }
+
+  // ── Smart navigation per result type ──────────────────────────────────────
+  function navigateOmniPage(id) {
+    if (id === 'settings') { openSettingsModal(); return; }
+    api.send('navigate', id);
+  }
+  function navigateOmniCompany(id) {
+    sessionStorage.setItem('companies_focus_id', String(id));
+    api.send('navigate', 'companies');
+  }
+  function navigateOmniSession(companyId, date, entryId) {
+    const co = (_omniData?.companies || []).find(c => c.id === companyId);
+    if (co) sessionStorage.setItem('active_company', JSON.stringify(co));
+    if (date) sessionStorage.setItem('tracker_date', date);
+    if (entryId) sessionStorage.setItem('tracker_entry', String(entryId));
+    api.send('navigate', 'tracker');
+  }
+
+  // Wired from init()'s post-injection setup.
+  function installOmnibox() {
+    const input = document.getElementById('omnibox-input');
+    const modal = document.getElementById('omnibox-modal');
+    const results = document.getElementById('omnibox-results');
+    if (!input || !modal || !results) return;
+    input.addEventListener('input', () => omniSearch(input.value));
+    input.addEventListener('keydown', e => {
+      if (e.key === 'ArrowDown') { e.preventDefault(); _omniSel = Math.min(_omniItems.length - 1, _omniSel + 1); highlightOmni(); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); _omniSel = Math.max(0, _omniSel - 1); highlightOmni(); }
+      else if (e.key === 'Enter') { e.preventDefault(); activateOmni(_omniSel); }
+    });
+    // Delegated result clicks (rows are re-rendered on every keystroke).
+    results.addEventListener('click', e => {
+      const row = e.target.closest('.omnibox-item');
+      if (row) activateOmni(Number(row.dataset.idx));
+    });
+    // Backdrop click closes (only when the overlay itself, not the box, is hit).
+    modal.addEventListener('click', e => { if (e.target === modal) closeOmnibox(); });
+  }
+
+  return { init, toast, showSidebarTimer, hideSidebarTimer, showLiveBadge, hideLiveBadge, setSidebarAvatar, contextMenu: openContextMenu, emptyState, openSearch: openOmnibox, _installOmnibox: installOmnibox, _isSearchOpen: () => _omniOpen, _closeSearch: closeOmnibox };
 })();
 
 // ── Settings modal controls (global scope) ────────────────────────────────────
@@ -1620,6 +1855,7 @@ async function loadDisplayPicker() {
 // the global punch hotkey. The lists are the single source of truth for what
 // the app's key bindings ARE — keep them in sync with the real handlers:
 //   navigation Ctrl+1–7  → shell.js keydown (Module switching)
+//   Ctrl+K               → shell.js keydown (Global search omnibox)
 //   Ctrl+,               → shell.js keydown (open Settings)
 //   Ctrl+L/P/Q, F12      → main.ts buildMenu accelerators
 function renderShortcutsTab() {
@@ -1638,6 +1874,7 @@ function renderShortcutsTab() {
     { name: 'Open Settings', keys: 'Ctrl+,' },
   ].map(row).join('');
   if (act) act.innerHTML = [
+    { name: 'Global Search',  keys: 'Ctrl+K' },
     { name: 'Lock Session',   keys: 'Ctrl+L' },
     { name: 'Export PDF',     keys: 'Ctrl+P' },
     { name: 'Quit',           keys: 'Ctrl+Q' },
