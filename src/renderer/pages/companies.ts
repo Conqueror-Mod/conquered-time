@@ -60,6 +60,21 @@ window.addEventListener('DOMContentLoaded', async () => {
   const zoomKey = sessionStorage.getItem('web_zoom_galaxy');
   if (zoomKey) { sessionStorage.removeItem('web_zoom_galaxy'); web.zoomTo(zoomKey); }
 
+  // Global search → Companies focus handoff: select the picked company.
+  const focusId = sessionStorage.getItem('companies_focus_id');
+  if (focusId) {
+    sessionStorage.removeItem('companies_focus_id');
+    const co = companies.find(c => c.id === Number(focusId));
+    if (co) {
+      // Expand its galaxy group so the row is visible, then select + reveal.
+      openGroups.add(listGroupKey(co));
+      renderList();
+      selectCompany(co.id);
+      document.querySelector<HTMLElement>(`.company-list-item[data-id="${co.id}"]`)
+        ?.scrollIntoView({ block: 'nearest' });
+    }
+  }
+
   // 30d / 90d / All window presets for bubble sizing + the archive idle rule.
   $id('web-range').addEventListener('click', e => {
     const btn = (e.target as HTMLElement).closest<HTMLElement>('.range-btn');

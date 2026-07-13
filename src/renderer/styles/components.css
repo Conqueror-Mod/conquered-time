@@ -963,6 +963,78 @@ hr.divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; 
 }
 .ct-empty-cta { margin-top: 5px; }
 
+/* ── Global search omnibox (Ctrl/⌘+K) ─────────────────────────────────────
+   Shell-wide command palette injected on every inner page (shell.js). Jumps to
+   companies, time sessions and pages. Overlay + centered box, keyboard-driven. */
+.omnibox-modal {
+  position: fixed; inset: 0; z-index: 2500;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(3px);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding-top: 11vh;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+.omnibox-modal.open { opacity: 1; pointer-events: all; }
+.omnibox-box {
+  width: 620px; max-width: 92vw; max-height: 72vh;
+  display: flex; flex-direction: column;
+  background: var(--surface-2);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-3);
+  overflow: hidden;
+}
+.omnibox-input-wrap {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.omnibox-input-wrap > svg { color: var(--text-muted); flex-shrink: 0; }
+#omnibox-input {
+  flex: 1; min-width: 0;
+  background: transparent; border: none; outline: none;
+  color: var(--text-bright);
+  font-family: var(--sans); font-size: 16px;
+}
+#omnibox-input::placeholder { color: var(--text-dim); }
+.omnibox-esc {
+  font-family: var(--mono); font-size: 11px; color: var(--text-muted);
+  border: 1px solid var(--border-light); border-radius: 4px;
+  padding: 2px 6px; flex-shrink: 0;
+}
+.omnibox-results { overflow-y: auto; min-height: 0; padding: 6px 6px 8px; }
+.omnibox-group-label {
+  font-family: var(--sans); font-size: 11px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--text-muted);
+  padding: 10px 12px 4px;
+}
+.omnibox-item {
+  display: flex; align-items: center; gap: 11px;
+  padding: 9px 12px; border-radius: var(--radius);
+  cursor: pointer;
+}
+.omnibox-item .oi-icon { color: var(--accent); flex-shrink: 0; display: flex; }
+.omnibox-item .oi-dot {
+  width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.18);
+}
+.omnibox-item .oi-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.omnibox-item .oi-name {
+  font-family: var(--sans); font-size: 14px; color: var(--text-bright);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.omnibox-item .oi-sub {
+  font-family: var(--sans); font-size: 12px; color: var(--text-muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.omnibox-item .oi-meta { font-family: var(--mono); font-size: 11px; color: var(--text-dim); flex-shrink: 0; }
+.omnibox-item.sel, .omnibox-item:hover { background: var(--accent-dim); }
+.omnibox-item.sel .oi-name { color: var(--accent); }
+.omnibox-empty { padding: 30px 16px; text-align: center; color: var(--text-muted); font-size: 13px; }
+
 /* Company identity dot — the Galaxy hue as a small inline marker before a
    company name, so a company reads as the same color everywhere (Recent
    Activity, Global Log, invoice ledger). Background is set inline per-row from
