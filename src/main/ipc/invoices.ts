@@ -172,6 +172,7 @@ function register() {
         id: Number(r.rid), seq: r.seq, status: r.status, paid_at: r.paid_at || null, issued_at: r.issued_at,
         number: doc.number || fmtNumber(r.seq),
         company_name: doc.billTo ? doc.billTo.name : '',
+        company_id: typeof doc.companyId === 'number' ? doc.companyId : null,
         period_from: doc.periodFrom || '', period_to: doc.periodTo || '',
         due_date: doc.dueDate || '', total: doc.total || 0, currency: doc.currency || 'USD',
       };

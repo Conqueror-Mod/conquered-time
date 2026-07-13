@@ -8,6 +8,18 @@ Discord's **#roadmap** channel mirrors this file automatically.
 
 _Last curated: 2026-07-13 (v3.22.0 — Insights overhaul, Shortcuts tab, unified audit review — released)_
 
+## 🔨 In the next update
+
+_Built and merged — landing in the next release._
+
+- **Galaxy fly-through** — drilling into a company now flies the camera into the
+  bubble you clicked, single-project companies warp into the tracker, and
+  clicking or hovering a bubble glows its matching row in the list beside it.
+  Archived-company bubbles are legible again, too.
+- **Company colors everywhere** — the Galaxy identity hues now carry through the
+  whole app: color dots on Recent Activity, the Global Log, and the invoice
+  ledger, matching each company's bubble (Insights' client mix already did).
+
 ## 🗓️ Planned (next up)
 
 - **Richer right-click menus** — grow the context menus across the app
@@ -16,9 +28,6 @@ _Last curated: 2026-07-13 (v3.22.0 — Insights overhaul, Shortcuts tab, unified
 
 ### Polish pass (smaller items, mixed in between features)
 
-- **Company colors everywhere** — the Web v2 identity hues carried through the
-  whole app: color dots on Recent Activity, the Global Log, the invoice ledger,
-  and Insights' client mix. _(Ships with Company Web v2.)_
 - **Smarter dashboard stats** — the Today / This Week tiles gain deltas
   ("up 1.2h vs last week") and a 7-day micro-sparkline, so the numbers tell a
   story at a glance.

@@ -12,6 +12,8 @@
 let companies: Company[] = [], allEntries: EntrySummary[] = [];
 /** Week band paging: 0 = the current calendar week, -1 = last week, … */
 let weekOffset = 0;
+/** companyId → identity color, shared by Recent Activity + the week band. */
+let colorFor: (companyId: number) => string = () => 'var(--border-light)';
 
 window.addEventListener('DOMContentLoaded', async () => {
   await Shell.init('dashboard');
@@ -44,6 +46,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 async function loadData(): Promise<void> {
   companies  = await Store.getCompanies();
   allEntries = await Store.getEntriesSummary();
+  colorFor   = BubbleWeb.colorMap(companies, allEntries).colorFor;
 
   // LOCAL dates — toISOString is UTC and bucketed evening hours into tomorrow.
   const today   = RowUtils.localDateStr();
@@ -72,7 +75,7 @@ async function loadData(): Promise<void> {
 
   list.innerHTML = recent.map(e => `
     <div class="activity-row">
-      <div class="activity-company">${escapeHtml(compMap[e.company_id]) || '—'}</div>
+      <div class="activity-company"><span class="co-dot" style="background:${colorFor(e.company_id)}"></span>${escapeHtml(compMap[e.company_id]) || '—'}</div>
       <div class="activity-date">${escapeHtml(e.log_date)}${e.session_label ? ' · ' + escapeHtml(e.session_label) : ''}</div>
       <div class="activity-hours">${fmtH(e.total_mins)}</div>
     </div>
@@ -112,34 +115,12 @@ function renderWeekBand(): void {
   }
   const inWeek = new Set(dayDates);
 
-  // Identity color per company — group rows exactly like the web (groupKey),
-  // recency from the latest worked date, so band blocks and the galaxy
-  // directly above can never disagree on a company's color.
-  const today = RowUtils.localDateStr();
-  const lastByCo: Record<number, string> = {};
-  for (const e of allEntries) {
-    if (e.log_date <= today && (!lastByCo[e.company_id] || e.log_date > lastByCo[e.company_id]))
-      lastByCo[e.company_id] = e.log_date;
-  }
-  const dayMs = 86400000;
-  const groups = new Map<string, { rows: Company[]; lastDays: number }>();
+  const today = RowUtils.localDateStr();   // underlines today's column below
+  // Identity color per company is the shared module `colorFor` (BubbleWeb.colorMap,
+  // set in loadData) — so band blocks, Recent Activity, and the galaxy directly
+  // above can never disagree on a company's color.
   const coById: Record<number, Company> = {};
-  for (const co of companies) {
-    coById[co.id] = co;
-    const key = BubbleWeb.groupKey(co);
-    let g = groups.get(key);
-    if (!g) { g = { rows: [], lastDays: Infinity }; groups.set(key, g); }
-    g.rows.push(co);
-    const lastDays = lastByCo[co.id]
-      ? Math.max(0, Math.round((new Date(today + 'T00:00').getTime() - new Date(lastByCo[co.id] + 'T00:00').getTime()) / dayMs))
-      : Infinity;
-    g.lastDays = Math.min(g.lastDays, lastDays);
-  }
-  const colorFor = (companyId: number): string => {
-    const co = coById[companyId];
-    const g = co ? groups.get(BubbleWeb.groupKey(co)) : null;
-    return g ? BubbleWeb.identityCss(g) : 'var(--border-light)';
-  };
+  for (const co of companies) coById[co.id] = co;
 
   // Sessions per day, rowid-ordered within the day.
   const byDay = new Map<string, EntrySummary[]>();

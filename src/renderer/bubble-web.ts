@@ -163,6 +163,46 @@ function identityCss(g: IdentityGroup): string {
   const l = isLightTheme() ? 44 : 52;
   return `hsl(${spec.h}, ${s}%, ${l}%)`;
 }
+// Build a companyId → identity CSS color lookup for flat list surfaces
+// (Recent Activity, Global Log, invoice ledger, Insights). Groups companies by
+// groupKey and derives recency (lastDays) from the latest worked log_date,
+// exactly as the web and week band do, then defers to identityCss — so a
+// company's dot, bubble, week block and donut slice can never disagree. Unknown
+// / deleted companies fall back to a neutral border color. This is the single
+// primitive every "company colors everywhere" surface calls.
+function colorMap(
+  companies: Company[],
+  entries: Array<{ company_id: number; log_date: string }>,
+): { colorFor: (companyId: number) => string } {
+  const today = RowUtils.localDateStr();
+  const lastByCo: Record<number, string> = {};
+  for (const e of entries) {
+    if (e.log_date <= today && (!lastByCo[e.company_id] || e.log_date > lastByCo[e.company_id]))
+      lastByCo[e.company_id] = e.log_date;
+  }
+  const dayMs = 86400000;
+  const groups = new Map<string, { rows: Company[]; lastDays: number }>();
+  const coById: Record<number, Company> = {};
+  for (const co of companies) {
+    coById[co.id] = co;
+    const key = groupKey(co);
+    let g = groups.get(key);
+    if (!g) { g = { rows: [], lastDays: Infinity }; groups.set(key, g); }
+    g.rows.push(co);
+    const lastDays = lastByCo[co.id]
+      ? Math.max(0, Math.round((new Date(today + 'T00:00').getTime() - new Date(lastByCo[co.id] + 'T00:00').getTime()) / dayMs))
+      : Infinity;
+    g.lastDays = Math.min(g.lastDays, lastDays);
+  }
+  return {
+    colorFor(companyId: number): string {
+      const co = coById[companyId];
+      const g = co ? groups.get(groupKey(co)) : null;
+      return g ? identityCss(g) : 'var(--border-light)';
+    },
+  };
+}
+
 // Identity path: systems keep the parent hue, stepped saturation/boost.
 function systemHue(g: GalaxyModel, idx: number): HueSpec {
   const c = galaxyHue(g);
@@ -849,6 +889,6 @@ function attach(opts: BubbleWebOpts): BubbleWebController {
   };
 }
 
-(window as any).BubbleWeb = { attach, groupKey, identityHue: galaxyHue, identityCss };
+(window as any).BubbleWeb = { attach, groupKey, identityHue: galaxyHue, identityCss, colorMap };
 
 })();

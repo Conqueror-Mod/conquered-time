@@ -204,7 +204,7 @@ interface InvoiceDoc {
 /** One row in the ledger list. */
 interface InvoiceListRow {
   id: number; seq: number; status: 'unpaid' | 'paid' | 'void'; paid_at: number | null;
-  issued_at: number; number: string; company_name: string;
+  issued_at: number; number: string; company_name: string; company_id: number | null;
   period_from: string; period_to: string; due_date: string; total: number; currency: string;
 }
 interface InvoicePreviewParams {
@@ -562,6 +562,13 @@ interface BubbleWebApi {
   /** Solid-fill CSS rendition of the identity (week-band blocks, list dots):
    *  same hue, saturation floored for legibility, lightness per theme ground. */
   identityCss(group: BubbleIdentityGroup): string;
+  /** companyId → identity CSS color for flat list surfaces (Recent Activity,
+   *  Global Log, invoice ledger, Insights). Groups + recency computed as the web
+   *  does; unknown/deleted companies fall back to a neutral color. */
+  colorMap(
+    companies: Company[],
+    entries: Array<{ company_id: number; log_date: string }>,
+  ): { colorFor(companyId: number): string };
 }
 
 /** hhmm is present exactly when ok is true. */
