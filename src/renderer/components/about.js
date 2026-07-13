@@ -24,6 +24,12 @@ const About = (() => {
   // Changelog — newest first. Edit HERE and both About surfaces update. The two
   // most recent entries render in-panel; older notes live on GitHub Releases.
   const CHANGELOG = [
+    { version: 'v3.21.1', items: [
+      'Week view now starts on Sunday (Sun–Sat) to match the usual calendar week',
+      'Fixed: the live session timer now starts at 0:00 when you clock in from the tray or the global hotkey (it could start a few seconds in)',
+      'The Reports email password field now explains that accounts with 2-factor sign-in need an app-specific password, and where to create one',
+      'Polish: profile cards in the sign-in selector have more depth and a bolder name, the Companies web page is now titled "Companies · Galaxy View", and a redundant tooltip was removed',
+    ] },
     { version: 'v3.21.0', items: [
       'Punch from the tray or a global hotkey — Clock In / Clock Out without opening the app. Right-click the tray icon to punch, or press the hotkey (default Ctrl+Alt+P) from anywhere: it clocks in on your last task if you\'re out, clocks out if you\'re in, even while the app is hidden in the tray. Rebind or disable it under Settings → Window',
       'Week view — the Dashboard now shows your week at a glance: a seven-day band of session blocks (colored per company, sized by hours) with day totals and prev/next week paging. Click any block to jump to that session in the Tracker',

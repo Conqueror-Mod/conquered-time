@@ -6,7 +6,7 @@ Discord's **#roadmap** channel mirrors this file automatically.
 
 **Status legend:** ✅ Shipped · 🔨 In progress · 🗓️ Planned · 💡 Under consideration
 
-_Last curated: 2026-07-12 (v3.21.0 — Tray punch, data safety net, week view — released)_
+_Last curated: 2026-07-13 (v3.21.1 — week-view Sunday start, tray-punch timer fix, polish — released)_
 
 ## 🗓️ Planned (next up)
 
@@ -45,6 +45,9 @@ _Last curated: 2026-07-12 (v3.21.0 — Tray punch, data safety net, week view �
 
 ## ✅ Recently shipped
 
+- **v3.21.1 (patch)** — the week view now starts on Sunday (Sun–Sat); the live
+  session timer starts at 0:00 when you clock in from the tray or hotkey; clearer
+  guidance on the Reports email app-password; plus profile-card and labelling polish.
 - **Punch from the tray + global hotkey** (v3.21.0) — Clock In / Clock Out
   without opening the app. Right-click the tray icon to punch, or press the
   global hotkey (default Ctrl+Alt+P) from anywhere — it clocks in on your last
