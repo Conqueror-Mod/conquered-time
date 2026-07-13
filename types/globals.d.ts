@@ -250,6 +250,7 @@ interface IpcInvokeMap {
   // entries
   'entries:list': (companyId: number) => TimeEntry[];
   'entries:save': (entry: Partial<TimeEntry>) => EntrySaveResult;
+  'entries:delete': (id: number) => MutResult;
   'entries:all': () => TimeEntry[];
   'entries:summary': () => EntrySummary[];
   'entries:get-active': () => TimeEntry | null;
@@ -609,6 +610,11 @@ interface ShellApi {
   hideLiveBadge(): void;
   setSidebarAvatar(profile: { avatar?: string | null } | null,
                    displayName?: string | null, username?: string | null): void;
+  /** Shared floating context menu. Opens at the event position; items with
+   *  hidden:true are dropped, null/{separator} become dividers. */
+  contextMenu(ev: MouseEvent, items: Array<
+    { label: string; action?: () => void; danger?: boolean; disabled?: boolean; hidden?: boolean; separator?: boolean }
+    | { separator: true } | null>): void;
 }
 
 // Globals exposed on window (classic-script world). `Settings` is a top-level
@@ -652,6 +658,7 @@ interface Window {
   __shellDelegated?: boolean;
   __loginDelegated?: boolean;
   __tooltipsInstalled?: boolean;
+  __ctxMenuInstalled?: boolean;
   /** Pomodoro cycle engine (components/pomodoro.js, injected by Shell.init). */
   Pomodoro?: PomodoroEngine;
   /** First-run coach-mark tour (components/onboarding.js, injected by Shell.init). */

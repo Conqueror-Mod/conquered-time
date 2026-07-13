@@ -98,6 +98,15 @@ window.addEventListener('DOMContentLoaded', async () => {
     const tr = td.closest('tr') as HTMLElement;
     startEdit(td, parseInt(tr.dataset.idx || ''), td.dataset.field as StrField);
   });
+  // Right-click a filled row → Edit / Duplicate / Clear (shared Shell.contextMenu).
+  tbody.addEventListener('contextmenu', e => {
+    const tr = (e.target as HTMLElement).closest<HTMLElement>('tr[data-idx]');
+    if (!tr) return;
+    const idx = parseInt(tr.dataset.idx || '');
+    if (isNaN(idx) || !rowsData[idx] || !isRowFilled(rowsData[idx])) return;
+    selectRow(idx);
+    rowContextMenu(e as MouseEvent, idx);
+  });
 
   // Live 12h/24h switch — re-render already-drawn rows in place (no reload).
   document.addEventListener('ct:settings-changed', e => {
@@ -944,6 +953,29 @@ async function saveSession(silent = false, fromTimer = false): Promise<void> {
 function clearSelectedRow(): void {
   if (selectedIndex == null || !rowsData[selectedIndex]) return;
   rowsData[selectedIndex] = emptyRow();
+  normalizeRows();
+  renderTable();
+  updateTotals();
+  autoSave();
+}
+
+// Right-click quick actions for a filled tracker row.
+function rowContextMenu(ev: MouseEvent, idx: number): void {
+  const firstEditable = document.querySelector<HTMLElement>(`#tbody tr[data-idx="${idx}"] td.editable[data-field]`);
+  Shell.contextMenu(ev, [
+    { label: '✎ Edit', disabled: !firstEditable, action: () => {
+      if (firstEditable) startEdit(firstEditable, idx, firstEditable.dataset.field as StrField);
+    } },
+    { label: '⧉ Duplicate', action: () => duplicateRow(idx) },
+    { separator: true },
+    { label: '🗑 Clear row', danger: true, action: () => { selectRow(idx); clearSelectedRow(); } },
+  ]);
+}
+
+function duplicateRow(idx: number): void {
+  const r = rowsData[idx];
+  if (!r) return;
+  rowsData.splice(idx + 1, 0, { ...r });
   normalizeRows();
   renderTable();
   updateTotals();

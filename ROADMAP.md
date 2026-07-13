@@ -19,12 +19,12 @@ _Built and merged — landing in the next release._
 - **Company colors everywhere** — the Galaxy identity hues now carry through the
   whole app: color dots on Recent Activity, the Global Log, and the invoice
   ledger, matching each company's bubble (Insights' client mix already did).
+- **Richer right-click menus** — right-click a Global Log session, a company in
+  the list, an invoice, or a tracker row for quick actions (open, edit, export,
+  delete, mark paid…) right where you'd expect them, instead of hunting for
+  buttons.
 
 ## 🗓️ Planned (next up)
-
-- **Richer right-click menus** — grow the context menus across the app
-  (the Galaxy ships the first wave: galaxy- and project-level menus with
-  Edit Color and quick actions where you'd expect them).
 
 ### Polish pass (smaller items, mixed in between features)
 
