@@ -46,6 +46,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     onOpenTracker: (co) => { sessionStorage.setItem('active_company', JSON.stringify(co)); api.send('navigate', 'tracker'); },
     onGalaxyContext: (galaxy, ev) => showGalaxyCtx(galaxy, ev),
     onSystemContext: (co, ev) => showCtxAt(co, ev),
+    onSelect: (co) => focusFromWeb(co),
+    onHover: (co) => hoverFromWeb(co),
   });
 
   await loadCompanies();
@@ -277,6 +279,37 @@ function selectCompany(id: number): void {
   );
   const co = companies.find(c => c.id === id);
   if (co) renderDetail(co);
+}
+
+// Clicking a system bubble in the galaxy web focuses its row on the right:
+// select it, re-render so its accordion group opens (selectedId auto-expands
+// the group), scroll it into view, then pulse a glow so the eye follows the
+// click from the bubble to its list entry.
+function focusFromWeb(co: Company): void {
+  selectedId = co.id;
+  renderDetail(co);
+  renderList();
+  const item = document.querySelector<HTMLElement>(`.company-list-item[data-id="${co.id}"]`);
+  if (!item) return;
+  const reduced = document.documentElement.getAttribute('data-reduced-motion') === 'true';
+  item.scrollIntoView({ block: 'nearest', behavior: reduced ? 'auto' : 'smooth' });
+  item.classList.remove('glow-focus');
+  void item.offsetWidth;   // restart the animation if already glowing
+  item.classList.add('glow-focus');
+  setTimeout(() => item.classList.remove('glow-focus'), 1400);
+}
+
+// Hovering a bubble steadily glows its matching list row, so the eye can track
+// any company — including single-project / single-entry ones that never trigger
+// a click-select — across to the expanded panel. Passing null clears it.
+function hoverFromWeb(co: Company | null): void {
+  const id = co ? co.id : null;
+  document.querySelectorAll<HTMLElement>('.company-list-item.hover-glow').forEach(el => {
+    if (parseInt(el.dataset.id || '') !== id) el.classList.remove('hover-glow');
+  });
+  if (id == null) return;
+  const item = document.querySelector<HTMLElement>(`.company-list-item[data-id="${id}"]`);
+  if (item) item.classList.add('hover-glow');
 }
 
 function renderDetail(co: Company): void {

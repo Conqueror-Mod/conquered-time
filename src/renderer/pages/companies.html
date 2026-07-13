@@ -149,6 +149,19 @@
   }
   .company-list-item:hover    { border-color: var(--accent); background: var(--surface-2); box-shadow: var(--shadow-2); }
   .company-list-item.selected { border-color: var(--accent); background: var(--accent-dim); }
+  /* Glow pulse when a row is focused from a galaxy-bubble click — ties the two panels together. */
+  .company-list-item.glow-focus { animation: ct-row-glow 1.4s ease-out; }
+  @keyframes ct-row-glow {
+    0%   { box-shadow: 0 0 0 0 var(--accent), var(--shadow-1); border-color: var(--accent); }
+    30%  { box-shadow: 0 0 14px 3px var(--accent), var(--shadow-2); border-color: var(--accent); }
+    100% { box-shadow: var(--shadow-1); }
+  }
+  /* Steady glow while a bubble is hovered — mirrors the click pulse's peak, held. */
+  .company-list-item.hover-glow {
+    border-color: var(--accent);
+    box-shadow: 0 0 12px 2px var(--accent), var(--shadow-2);
+    transition: box-shadow var(--transition), border-color var(--transition);
+  }
   .company-dot {
     width: 9px; height: 9px;
     border-radius: 50%;
