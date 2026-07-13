@@ -96,6 +96,45 @@
   .hbar-value { flex: 0 0 auto; font-family: var(--mono); font-size: 11px; color: var(--text-muted); min-width: 62px; text-align: right; }
 
   .insight-empty { font-size: 12px; color: var(--text-dim); text-align: center; padding: 28px 12px; line-height: 1.6; }
+
+  /* ── Depth pass ── */
+  .insight-chip { box-shadow: var(--shadow-2); }
+  .insight-panel.hud-panel {
+    box-shadow: var(--shadow-2), inset 0 1px 0 rgba(255,255,255,0.03);
+    border-radius: var(--radius-lg);
+  }
+
+  /* ── Donut (Client Mix / Earnings) ── */
+  .donut-row { display: flex; align-items: center; gap: 18px; }
+  .donut-svg { flex-shrink: 0; width: 150px; height: 150px; }
+  .donut-svg path { transition: opacity 0.12s ease; cursor: default; }
+  .donut-legend { flex: 1; display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+  .dl-row { display: flex; align-items: center; gap: 8px; font-family: var(--sans); font-size: 12px; cursor: default; padding: 1px 0; }
+  .dl-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+  .dl-dot.ended { opacity: 0.45; }
+  .dl-name { color: var(--text-bright); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dl-val { color: var(--text-muted); font-family: var(--mono); font-size: 11px; }
+  .dl-pct { color: var(--text-dim); font-family: var(--mono); font-size: 11px; min-width: 34px; text-align: right; }
+  .dl-row.dim .dl-dot, .dl-row.dim .dl-name, .dl-row.dim .dl-val, .dl-row.dim .dl-pct { opacity: 0.4; }
+
+  /* ── Shared hover tooltip ── */
+  .ins-tooltip {
+    position: fixed;
+    z-index: 3000;
+    pointer-events: none;
+    background: var(--surface-3);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius);
+    padding: 7px 11px;
+    box-shadow: var(--shadow-2);
+    font-family: var(--sans);
+    font-size: 12px;
+    color: var(--text-bright);
+    white-space: nowrap;
+  }
+  .ins-tooltip .tt-name { font-weight: 600; }
+  .ins-tooltip .tt-val  { font-family: var(--mono); font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .chart-svg-wrap rect[data-tip], .donut-svg path[data-tip] { cursor: default; }
 </style>
 </head>
 <body>
@@ -167,10 +206,17 @@
 
 </div>
 
+<!-- Shared hover tooltip (donut slices + bars) -->
+<div id="ins-tooltip" class="ins-tooltip" style="display:none;"></div>
+
 <script src="../components/settings.js"></script>
 <script src="../components/about.js"></script>
 <script src="../components/shell.js"></script>
 <script src="../row-utils.js"></script>
+<!-- canvas-text + bubble-web supply the shared galaxy identity-color helper
+     (BubbleWeb.identityCss / groupKey) so donut slices match the company web. -->
+<script src="../canvas-text.js"></script>
+<script src="../bubble-web.js"></script>
 <script src="../insights-compute.js"></script>
 <script src="insights.js"></script>
 </body>

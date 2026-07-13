@@ -55,6 +55,7 @@ async function loadData(): Promise<void> {
   companies = cos || [];
   companyMap = {};
   companies.forEach(c => { companyMap[Number(c.id)] = c; });
+  _colorGroups = null; // identity-color groups depend on companies + entries
   defaultCurrency = (profile && profile.default_currency) || 'USD';
   entries = (raw || []).map(e => {
     let rows: InsightEntry['rows'] = [];
@@ -157,6 +158,109 @@ function emptySvg(svg: SVGElement, W: number, H: number, msg: string): void {
   svg.innerHTML = `<text x="${W / 2}" y="${H / 2}" text-anchor="middle" fill="var(--text-dim)" font-size="12" font-family="var(--sans)">${escapeHtml(msg)}</text>`;
 }
 
+// Depth defs for the bar charts — a vertical accent gradient (bright top → dim
+// bottom) + a soft drop shadow, so bars read as raised rather than flat. Both
+// reference the theme accent via CSS var, so they repaint on theme change.
+function barDefs(gradId: string): string {
+  return `<defs>
+    <linearGradient id="${gradId}" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="var(--accent)" stop-opacity="0.95"/>
+      <stop offset="1" stop-color="var(--accent)" stop-opacity="0.45"/>
+    </linearGradient>
+    <filter id="${gradId}-sh" x="-40%" y="-25%" width="180%" height="150%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000" flood-opacity="0.42"/>
+    </filter>
+  </defs>`;
+}
+
+// ── Identity colors (shared galaxy hue per company — matches web + week band) ──
+// Groups companies by hier_company and derives recency from the full entry set,
+// then defers to BubbleWeb.identityCss so a client's donut slice is the exact
+// colour of its galaxy bubble. Cached; invalidated on data reload (loadData).
+let _colorGroups: Map<string, { rows: Company[]; lastDays: number }> | null = null;
+function colorGroups(): Map<string, { rows: Company[]; lastDays: number }> {
+  if (_colorGroups) return _colorGroups;
+  const today = RowUtils.localDateStr();
+  const lastByCo: Record<number, string> = {};
+  for (const e of entries) {
+    if (e.log_date <= today && (!lastByCo[e.company_id] || e.log_date > lastByCo[e.company_id]))
+      lastByCo[e.company_id] = e.log_date;
+  }
+  const dayMs = 86400000;
+  const groups = new Map<string, { rows: Company[]; lastDays: number }>();
+  for (const co of companies) {
+    const key = BubbleWeb.groupKey(co);
+    let g = groups.get(key);
+    if (!g) { g = { rows: [], lastDays: Infinity }; groups.set(key, g); }
+    g.rows.push(co);
+    const lastDays = lastByCo[co.id]
+      ? Math.max(0, Math.round((new Date(today + 'T00:00').getTime() - new Date(lastByCo[co.id] + 'T00:00').getTime()) / dayMs))
+      : Infinity;
+    g.lastDays = Math.min(g.lastDays, lastDays);
+  }
+  _colorGroups = groups;
+  return groups;
+}
+function identityColorFor(companyId: number): string {
+  const co = companyMap[companyId];
+  const g = co ? colorGroups().get(BubbleWeb.groupKey(co)) : null;
+  return g ? BubbleWeb.identityCss(g) : 'var(--text-muted)';
+}
+
+// ── Donut (Client Mix / Earnings) ────────────────────────────────────────────
+interface DonutSlice { label: string; value: number; color: string; ended?: boolean; disp: string; }
+function buildDonut(container: HTMLElement, slices: DonutSlice[], centerTop: string, centerBot: string, emptyMsg: string): void {
+  const total = slices.reduce((s, d) => s + d.value, 0);
+  if (!total) { container.innerHTML = `<div class="insight-empty">${escapeHtml(emptyMsg)}</div>`; return; }
+
+  const cx = 80, cy = 80, rO = 72, rI = 46, TAU = Math.PI * 2;
+  const gap = slices.length > 1 ? 0.035 : 0;
+  const polar = (r: number, ang: number): [number, number] => [cx + r * Math.cos(ang), cy + r * Math.sin(ang)];
+  let a = -Math.PI / 2;
+  const paths = slices.map((d) => {
+    const frac = d.value / total, a1 = a + frac * TAU;
+    const s0 = a + gap / 2, s1 = a1 - gap / 2;
+    const large = (s1 - s0) > Math.PI ? 1 : 0;
+    const [x0, y0] = polar(rO, s0), [x1, y1] = polar(rO, s1), [x2, y2] = polar(rI, s1), [x3, y3] = polar(rI, s0);
+    a = a1;
+    const pct = Math.round(d.value / total * 100);
+    const dPath = `M${x0.toFixed(2)} ${y0.toFixed(2)} A${rO} ${rO} 0 ${large} 1 ${x1.toFixed(2)} ${y1.toFixed(2)} L${x2.toFixed(2)} ${y2.toFixed(2)} A${rI} ${rI} 0 ${large} 0 ${x3.toFixed(2)} ${y3.toFixed(2)} Z`;
+    return `<path d="${dPath}" fill="${d.color}" data-tip-name="${escapeHtml(d.label)}" data-tip-val="${escapeHtml(d.disp + ' · ' + pct + '%')}"/>`;
+  }).join('');
+  const svg = `<svg class="donut-svg" viewBox="0 0 160 160" aria-hidden="true">${paths}`
+    + `<text x="80" y="76" text-anchor="middle" fill="var(--text-white)" font-family="var(--mono)" font-size="19" font-weight="600">${escapeHtml(centerTop)}</text>`
+    + `<text x="80" y="93" text-anchor="middle" fill="var(--text-dim)" font-family="var(--sans)" font-size="10">${escapeHtml(centerBot)}</text></svg>`;
+  const legend = slices.map(d => {
+    const pct = Math.round(d.value / total * 100);
+    return `<div class="dl-row"><span class="dl-dot ${d.ended ? 'ended' : ''}" style="background:${d.color}"></span>`
+      + `<span class="dl-name">${escapeHtml(d.label)}</span><span class="dl-val">${escapeHtml(d.disp)}</span><span class="dl-pct">${pct}%</span></div>`;
+  }).join('');
+  container.innerHTML = `<div class="donut-row">${svg}<div class="donut-legend">${legend}</div></div>`;
+}
+
+// Shared hover tooltip for donut slices + bars — any mark carrying
+// data-tip-name/data-tip-val shows it. Installed once. textContent-only
+// (values are re-decoded from attributes, so escape via textContent).
+function installChartTooltips(): void {
+  const tip = document.getElementById('ins-tooltip');
+  const root = document.getElementById('insights-scroll');
+  if (!tip || !root) return;
+  const show = (el: Element) => {
+    const name = el.getAttribute('data-tip-name'); if (name == null) return;
+    tip.textContent = '';
+    const n = document.createElement('div'); n.className = 'tt-name'; n.textContent = name;
+    const v = document.createElement('div'); v.className = 'tt-val'; v.textContent = el.getAttribute('data-tip-val') || '';
+    tip.append(n, v); tip.style.display = '';
+  };
+  root.addEventListener('mouseover', e => { const el = (e.target as Element); if (el.getAttribute?.('data-tip-name') != null) show(el); });
+  root.addEventListener('mousemove', e => {
+    if (tip.style.display === 'none') return;
+    tip.style.left = ((e as MouseEvent).clientX + 14) + 'px';
+    tip.style.top = ((e as MouseEvent).clientY + 14) + 'px';
+  });
+  root.addEventListener('mouseout', e => { if ((e.target as Element).getAttribute?.('data-tip-name') != null) tip.style.display = 'none'; });
+}
+
 // ── Trends over time (bars + moving-average line) ────────────────────────────
 function renderTrend(es: InsightEntry[]): void {
   const ctx = svgFor('trend-wrap', 'trend-svg');
@@ -180,7 +284,7 @@ function renderTrend(es: InsightEntry[]): void {
   const yFor = (h: number) => pT + cH - (h / maxH) * cH;
   const xMid = (i: number) => pL + i * slotW + slotW / 2;
 
-  let out = '';
+  let out = barDefs('trend-grad');
   // y grid
   for (let i = 0; i <= 4; i++) {
     const y = pT + cH - (cH * i / 4);
@@ -192,7 +296,7 @@ function renderTrend(es: InsightEntry[]): void {
     const h = b.mins / 60;
     const bh = h > 0 ? Math.max(1, (h / maxH) * cH) : 0;
     const x = pL + i * slotW + (slotW - barW) / 2;
-    out += `<rect x="${x.toFixed(1)}" y="${(pT + cH - bh).toFixed(1)}" width="${barW.toFixed(1)}" height="${bh.toFixed(1)}" rx="1.5" fill="var(--accent)" fill-opacity="0.55"/>`;
+    if (h > 0) out += `<rect x="${x.toFixed(1)}" y="${(pT + cH - bh).toFixed(1)}" width="${barW.toFixed(1)}" height="${bh.toFixed(1)}" rx="3" fill="url(#trend-grad)" fill-opacity="0.75" filter="url(#trend-grad-sh)" data-tip-name="${escapeHtml(b.label)}" data-tip-val="${escapeHtml(fmtH(b.mins))}"/>`;
   });
   // moving-average line
   const pts = avg.map((v, i) => `${xMid(i).toFixed(1)},${yFor(v).toFixed(1)}`).join(' ');
@@ -225,14 +329,15 @@ function renderDayOfWeek(es: InsightEntry[]): void {
   const slotW = cW / 7;
   const barW = Math.min(slotW - 8, 34);
 
-  let out = '';
+  const fullLabels = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  let out = barDefs('dow-grad');
   vals.forEach((v, i) => {
     const bh = v > 0 ? Math.max(1, (v / maxV) * cH) : 0;
     const x = pL + i * slotW + (slotW - barW) / 2;
-    const fill = i === busiest ? 'var(--accent)' : 'var(--accent)';
-    const op = i === busiest ? '0.9' : '0.4';
-    out += `<rect x="${x.toFixed(1)}" y="${(pT + cH - bh).toFixed(1)}" width="${barW.toFixed(1)}" height="${bh.toFixed(1)}" rx="2" fill="${fill}" fill-opacity="${op}"/>`;
-    if (v > 0) out += `<text x="${(x + barW / 2).toFixed(1)}" y="${(pT + cH - bh - 4).toFixed(1)}" text-anchor="middle" fill="var(--text-muted)" font-size="9" font-family="var(--mono)">${fmtH(v)}</text>`;
+    if (v > 0) {
+      out += `<rect x="${x.toFixed(1)}" y="${(pT + cH - bh).toFixed(1)}" width="${barW.toFixed(1)}" height="${bh.toFixed(1)}" rx="4" fill="url(#dow-grad)" fill-opacity="${i === busiest ? '1' : '0.7'}" filter="url(#dow-grad-sh)" data-tip-name="${fullLabels[i]}" data-tip-val="${escapeHtml(fmtH(v))}"/>`;
+      out += `<text x="${(x + barW / 2).toFixed(1)}" y="${(pT + cH - bh - 5).toFixed(1)}" text-anchor="middle" fill="var(--text-muted)" font-size="9" font-family="var(--mono)">${fmtH(v)}</text>`;
+    }
     out += `<text x="${(pL + i * slotW + slotW / 2).toFixed(1)}" y="${H - 6}" text-anchor="middle" fill="${i === busiest ? 'var(--accent)' : 'var(--text-dim)'}" font-size="10" font-family="var(--sans)">${labels[i]}</text>`;
   });
   svg.innerHTML = out;
@@ -254,11 +359,12 @@ function renderHourOfDay(es: InsightEntry[]): void {
   const slotW = cW / 24;
   const barW = Math.max(2, slotW - 2);
 
-  let out = '';
+  const hourLbl = (h: number) => `${String(h).padStart(2, '0')}:00–${String((h + 1) % 24).padStart(2, '0')}:00`;
+  let out = barDefs('hour-grad');
   vals.forEach((v, i) => {
     const bh = v > 0 ? Math.max(1, (v / maxV) * cH) : 0;
     const x = pL + i * slotW + (slotW - barW) / 2;
-    out += `<rect x="${x.toFixed(1)}" y="${(pT + cH - bh).toFixed(1)}" width="${barW.toFixed(1)}" height="${bh.toFixed(1)}" rx="1" fill="var(--accent)" fill-opacity="${i === peak ? '0.95' : '0.45'}"/>`;
+    if (v > 0) out += `<rect x="${x.toFixed(1)}" y="${(pT + cH - bh).toFixed(1)}" width="${barW.toFixed(1)}" height="${bh.toFixed(1)}" rx="2" fill="url(#hour-grad)" fill-opacity="${i === peak ? '1' : '0.6'}" filter="url(#hour-grad-sh)" data-tip-name="${hourLbl(i)}" data-tip-val="${escapeHtml(fmtH(v))}"/>`;
   });
   [0, 6, 12, 18].forEach(h => {
     out += `<text x="${(pL + h * slotW + slotW / 2).toFixed(1)}" y="${H - 6}" text-anchor="middle" fill="var(--text-dim)" font-size="9" font-family="var(--mono)">${String(h).padStart(2, '0')}</text>`;
@@ -267,7 +373,7 @@ function renderHourOfDay(es: InsightEntry[]): void {
   svg.innerHTML = out;
 }
 
-// ── Client mix (share-of-hours horizontal bars) ──────────────────────────────
+// ── Client mix (share-of-hours donut, coloured by galaxy identity) ────────────
 function renderClientMix(es: InsightEntry[]): void {
   const body = $id('client-mix-body');
   const byCo = InsightsCompute.byCompany(es);
@@ -276,37 +382,20 @@ function renderClientMix(es: InsightEntry[]): void {
     .filter(r => r.mins > 0)
     .sort((a, b) => b.mins - a.mins);
   const total = rows.reduce((s, r) => s + r.mins, 0);
-  if (!rows.length) { body.innerHTML = `<div class="insight-empty">No activity in this range yet.</div>`; return; }
 
-  // Top 6 + aggregated "Others".
+  // Top 6 + aggregated "N others" so the donut never fragments into slivers.
   const TOP = 6;
   const shown = rows.slice(0, TOP);
   const rest = rows.slice(TOP);
   const restMins = rest.reduce((s, r) => s + r.mins, 0);
-  const max = shown[0].mins;
 
-  let out = '';
-  shown.forEach(r => {
-    const co = companyMap[r.id];
-    const ended = !!(co && co.date_end);
-    const pct = total ? Math.round((r.mins / total) * 100) : 0;
-    out += `
-      <div class="hbar-row">
-        <div class="hbar-label"><span class="hbar-dot ${ended ? 'ended' : ''}" style="background:${ended ? 'var(--text-dim)' : 'var(--accent)'};"></span>${escapeHtml(coName(r.id))}</div>
-        <div class="hbar-track"><div class="hbar-fill" style="width:${Math.max(2, (r.mins / max) * 100).toFixed(1)}%;"></div></div>
-        <div class="hbar-value">${fmtH(r.mins)} · ${pct}%</div>
-      </div>`;
-  });
-  if (restMins > 0) {
-    const pct = total ? Math.round((restMins / total) * 100) : 0;
-    out += `
-      <div class="hbar-row">
-        <div class="hbar-label"><span class="hbar-dot" style="background:var(--text-muted);"></span>${rest.length} other${rest.length !== 1 ? 's' : ''}</div>
-        <div class="hbar-track"><div class="hbar-fill" style="width:${Math.max(2, (restMins / max) * 100).toFixed(1)}%;background:var(--text-muted);"></div></div>
-        <div class="hbar-value">${fmtH(restMins)} · ${pct}%</div>
-      </div>`;
-  }
-  body.innerHTML = out;
+  const slices: DonutSlice[] = shown.map(r => ({
+    label: coName(r.id), value: r.mins, color: identityColorFor(r.id),
+    ended: !!(companyMap[r.id] && companyMap[r.id].date_end), disp: fmtH(r.mins),
+  }));
+  if (restMins > 0) slices.push({ label: `${rest.length} other${rest.length !== 1 ? 's' : ''}`, value: restMins, color: 'var(--text-muted)', disp: fmtH(restMins) });
+
+  buildDonut(body, slices, fmtH(total).replace('.0', ''), 'total', 'No activity in this range yet.');
 }
 
 // ── Estimated earnings (hours × rate, per client) ────────────────────────────
@@ -322,17 +411,30 @@ function renderEarnings(es: InsightEntry[]): void {
     body.innerHTML = `<div class="insight-empty">No billable rate set on any client with logged time.<br>Add a Pay Rate in a company's details to see earnings.</div>`;
     return;
   }
-  const maxMins = Math.max(...rows.map(r => r.mins), 1);
-  let out = '';
-  rows.forEach(r => {
-    out += `
-      <div class="hbar-row">
-        <div class="hbar-label">${escapeHtml(coName(r.id))}</div>
-        <div class="hbar-track"><div class="hbar-fill gold" style="width:${Math.max(2, (r.mins / maxMins) * 100).toFixed(1)}%;"></div></div>
-        <div class="hbar-value">${escapeHtml(fmtMoney(r.amount, r.cur))}</div>
-      </div>`;
-  });
-  body.innerHTML = out;
+  // Donut is proportional, so it needs one currency. Use the dominant currency
+  // (most clients) for the slices + centre total; a footnote flags any others.
+  const curCount: Record<string, number> = {};
+  rows.forEach(r => { curCount[r.cur] = (curCount[r.cur] || 0) + 1; });
+  const mainCur = Object.entries(curCount).sort((a, b) => b[1] - a[1])[0][0];
+  const inCur = rows.filter(r => r.cur === mainCur && r.amount > 0).sort((a, b) => b.amount - a.amount);
+  const otherCurs = Object.keys(curCount).filter(c => c !== mainCur).length;
+
+  const TOP = 6;
+  const shown = inCur.slice(0, TOP);
+  const rest = inCur.slice(TOP);
+  const restAmt = rest.reduce((s, r) => s + r.amount, 0);
+  const total = inCur.reduce((s, r) => s + r.amount, 0);
+
+  const slices: DonutSlice[] = shown.map(r => ({
+    label: coName(r.id), value: r.amount, color: identityColorFor(r.id),
+    ended: !!(companyMap[r.id] && companyMap[r.id].date_end), disp: fmtMoney(r.amount, mainCur),
+  }));
+  if (restAmt > 0) slices.push({ label: `${rest.length} other${rest.length !== 1 ? 's' : ''}`, value: restAmt, color: 'var(--text-muted)', disp: fmtMoney(restAmt, mainCur) });
+
+  buildDonut(body, slices, fmtMoney(total, mainCur), 'estimated', 'No earnings in this range.');
+  if (otherCurs > 0) {
+    body.insertAdjacentHTML('beforeend', `<div class="insight-hint">+ ${otherCurs} other currenc${otherCurs === 1 ? 'y' : 'ies'} not shown (the donut totals one currency).</div>`);
+  }
 }
 
 // ── Range toggles ────────────────────────────────────────────────────────────
@@ -350,6 +452,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   const mc = document.getElementById('main-content');
   if (mc) { mc.style.display = 'flex'; mc.style.flexDirection = 'column'; mc.style.overflow = 'hidden'; }
 
+  installChartTooltips();
   await loadData();
   renderAll();
   // The SVG charts render in real pixel coordinates, so they need the wraps to
