@@ -56,13 +56,12 @@ window.addEventListener('DOMContentLoaded', async () => {
   setupTabs();
   initPeriodFilter();
 
-  $id('btn-acknowledge-wizard').addEventListener('click', () => {
+  // Unified audit wizard — one window that shows the suggested fix (with an
+  // Apply Fix button when the issue is auto-fixable) AND lets you acknowledge.
+  // (Replaces the old split acknowledge-mode / fix-mode buttons.)
+  $id('btn-review-wizard').addEventListener('click', () => {
     const theme = document.documentElement.getAttribute('data-theme') || 'memoria';
-    api.invoke('audit:open-wizard', { mode: 'acknowledge', theme });
-  });
-  $id('btn-fix-wizard').addEventListener('click', () => {
-    const theme = document.documentElement.getAttribute('data-theme') || 'memoria';
-    api.invoke('audit:open-wizard', { mode: 'fix', theme });
+    api.invoke('audit:open-wizard', { theme });
   });
 
   // Audit toolbar + row actions (CSP-safe; replaces inline on* handlers)
@@ -411,10 +410,8 @@ function renderAuditLog(): void {
   }
   const clearBtn = document.getElementById('btn-clear-dismissed');
   if (clearBtn) clearBtn.style.display = totalDismissed ? '' : 'none';
-  const ackBtn = document.getElementById('btn-acknowledge-wizard') as HTMLButtonElement | null;
-  const fixBtn = document.getElementById('btn-fix-wizard') as HTMLButtonElement | null;
-  if (ackBtn) ackBtn.disabled = flagged === 0;
-  if (fixBtn) fixBtn.disabled = flagged === 0;
+  const reviewBtn = document.getElementById('btn-review-wizard') as HTMLButtonElement | null;
+  if (reviewBtn) reviewBtn.disabled = flagged === 0;
 
   if (!visible.length) {
     tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;color:var(--text-dim);padding:32px;">No audit entries found.</td></tr>`;

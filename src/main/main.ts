@@ -384,7 +384,8 @@ function centerOnAppDisplay(width: number, height: number): { x: number; y: numb
   };
 }
 
-function createAuditWizardWindow(mode?: string, theme?: string) {
+// Unified review wizard (no more fix/acknowledge modes — the window does both).
+function createAuditWizardWindow(theme?: string) {
   const W = 680, H = 520;
   const pos = centerOnAppDisplay(W, H);
   const wizard = new BrowserWindow({
@@ -403,7 +404,7 @@ function createAuditWizardWindow(mode?: string, theme?: string) {
     }
   });
   wizard.loadFile(path.join(RENDERER_DIR, 'pages/audit-wizard.html'), {
-    query: { mode: mode || 'fix', theme: theme || 'memoria' }
+    query: { theme: theme || 'memoria' }
   });
   wizard.on('closed', () => {
     if (mainWindow && !mainWindow.isDestroyed()) {
