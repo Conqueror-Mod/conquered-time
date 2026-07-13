@@ -317,6 +317,40 @@ td {
 }
 #ct-tooltip.visible { opacity: 1; transform: translateY(0); }
 
+/* Shared context menu (Shell.contextMenu) — one floating menu for every surface. */
+#ct-context-menu {
+  position: fixed;
+  z-index: 10001;
+  min-width: 168px;
+  padding: 5px;
+  background: var(--surface-3);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-3);
+  font-family: var(--sans);
+}
+#ct-context-menu .ctx-item {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  border: none;
+  background: none;
+  text-align: left;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-bright);
+  cursor: pointer;
+  border-radius: var(--radius);
+  transition: all var(--transition);
+}
+#ct-context-menu .ctx-item:hover        { background: var(--accent-dim); color: var(--accent); }
+#ct-context-menu .ctx-item.danger       { color: var(--red); }
+#ct-context-menu .ctx-item.danger:hover  { background: var(--red-dim); color: var(--red); }
+#ct-context-menu .ctx-item[disabled]     { color: var(--text-dim); cursor: default; background: none; }
+#ct-context-menu .ctx-sep { height: 1px; background: var(--border); margin: 4px 6px; }
+
 /* ══════════════════════════════════════════════════════════════
    POMODORO (Dispatch cycle panel + action-toast alerts)
    ══════════════════════════════════════════════════════════════ */

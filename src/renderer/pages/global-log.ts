@@ -55,6 +55,13 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (tr) toggleDetail(Number(tr.dataset.idx));
   });
 
+  // Right-click a session row → quick actions (shared Shell.contextMenu).
+  $id('log-tbody').addEventListener('contextmenu', e => {
+    const tr = (e.target as HTMLElement).closest<HTMLElement>('tr[data-idx]');
+    if (!tr) return;
+    rowContextMenu(e as MouseEvent, Number(tr.dataset.idx));
+  });
+
   // Live 12h/24h switch — re-render expandable detail times in place (no reload).
   document.addEventListener('ct:settings-changed', e => {
     if ((e as CustomEvent).detail?.key === 'timeFormat') {
@@ -171,6 +178,41 @@ function toggleDetail(idx: number): void {
   row.classList.toggle('open');
   const arrow=document.getElementById(`arrow-${idx}`);
   if (arrow) arrow.textContent=row.classList.contains('open')?'▼':'▶';
+}
+
+// Right-click quick actions for one session row (idx into `filtered`).
+function rowContextMenu(ev: MouseEvent, idx: number): void {
+  const e = filtered[idx];
+  if (!e) return;
+  const co = compMap[e.company_id];
+  Shell.contextMenu(ev, [
+    { label: '⏱ Open in Tracker', action: () => openInTracker(e.company_id, e.log_date, e.id) },
+    { label: '📄 Export PDF', action: () => exportSessionPDF(idx) },
+    { label: '⧉ Copy summary', action: () => copySummary(e, co) },
+    { separator: true },
+    { label: '🗑 Delete session', danger: true, action: () => deleteSession(e) },
+  ]);
+}
+
+function copySummary(e: TimeEntry, co: Company | undefined): void {
+  const mins = e.total_mins || 0;
+  const dur = Math.floor(mins / 60) + 'h ' + (mins % 60) + 'm';
+  const text = [co?.name || '—', e.log_date, e.session_label || '', dur].filter(Boolean).join(' · ');
+  navigator.clipboard.writeText(text).then(
+    () => Shell.toast('Summary copied', 'success', 2000),
+    () => Shell.toast('Copy failed', 'error', 2500),
+  );
+}
+
+async function deleteSession(e: TimeEntry): Promise<void> {
+  const co = compMap[e.company_id];
+  if (!confirm(`Delete this session?\n\n${co?.name || '—'} · ${e.log_date}${e.session_label ? ' · ' + e.session_label : ''}\n\nA safety snapshot is saved first; this can't be undone from here.`)) return;
+  const res = await api.invoke('entries:delete', e.id);
+  if (!res || !res.ok) { Shell.toast('Delete failed: ' + ((res && res.error) || 'unknown'), 'error'); return; }
+  await Store.invalidate('entries');
+  Shell.toast('Session deleted', 'success', 2500);
+  await loadData();
+  applyFilters();
 }
 
 function openInTracker(companyId: number, date: string, entryId: number): void {

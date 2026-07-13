@@ -725,6 +725,7 @@ const Shell = (() => {
     // Wire delegated handlers (CSP-safe; replaces inline on* attributes).
     installShellDelegation();
     installTooltips();
+    installContextMenu();
     // Backdrop close is special — must fire only when the modal element itself
     // (not its box children) is clicked, so it can't use the closest() dispatcher.
     document.getElementById('settings-modal')?.addEventListener('click', handleModalBackdrop);
@@ -972,7 +973,7 @@ const Shell = (() => {
     setTimeout(() => el.remove(), duration);
   }
 
-  return { init, toast, showSidebarTimer, hideSidebarTimer, showLiveBadge, hideLiveBadge, setSidebarAvatar };
+  return { init, toast, showSidebarTimer, hideSidebarTimer, showLiveBadge, hideLiveBadge, setSidebarAvatar, contextMenu: openContextMenu };
 })();
 
 // ── Settings modal controls (global scope) ────────────────────────────────────
@@ -2090,4 +2091,92 @@ function installTooltips() {
   document.addEventListener('keydown', e => { if (e.key === 'Escape') hide(); }, true);
   window.addEventListener('scroll', hide, true);
   window.addEventListener('resize', hide);
+}
+
+// ── Shared context menu ──────────────────────────────────────────────────────
+// One reusable floating menu any surface opens via Shell.contextMenu(ev, items).
+// items: [{ label, action, danger?, disabled?, hidden? } | { separator:true } | null].
+// CSP-safe (delegated click, no inline on*), positioned at the cursor and
+// clamped to the viewport, dismissed on outside-click / scroll / Escape / blur.
+/** @type {HTMLElement|null} */ let _ctxMenuEl = null;
+/** @type {Array<any>} */       let _ctxItems = [];
+
+function installContextMenu() {
+  if (window.__ctxMenuInstalled) return;
+  window.__ctxMenuInstalled = true;
+
+  const el = document.createElement('div');
+  el.id = 'ct-context-menu';
+  el.setAttribute('role', 'menu');
+  el.style.display = 'none';
+  document.body.appendChild(el);
+  _ctxMenuEl = el;
+
+  // Delegated item dispatch — survives innerHTML rebuilds, no per-item wiring.
+  el.addEventListener('click', (e) => {
+    const btn = e.target instanceof Element ? e.target.closest('.ctx-item') : null;
+    if (!btn || btn.hasAttribute('disabled')) return;
+    const item = _ctxItems[Number(btn.getAttribute('data-i'))];
+    closeContextMenu();
+    if (item && typeof item.action === 'function') item.action();
+  });
+
+  // Dismissal — capture-phase so it wins over the surface underneath.
+  document.addEventListener('mousedown', (e) => {
+    if (el.style.display !== 'none' && !(e.target instanceof Node && el.contains(e.target))) closeContextMenu();
+  }, true);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeContextMenu(); }, true);
+  window.addEventListener('scroll', closeContextMenu, true);
+  window.addEventListener('resize', closeContextMenu);
+  window.addEventListener('blur', closeContextMenu);
+}
+
+function closeContextMenu() {
+  if (_ctxMenuEl) _ctxMenuEl.style.display = 'none';
+  _ctxItems = [];
+}
+
+/**
+ * Open the shared context menu at the event position.
+ * @param {MouseEvent} ev
+ * @param {Array<{label?:string, action?:Function, danger?:boolean, disabled?:boolean, hidden?:boolean, separator?:boolean}|null>} items
+ */
+function openContextMenu(ev, items) {
+  if (ev && typeof ev.preventDefault === 'function') ev.preventDefault();
+  if (!_ctxMenuEl) installContextMenu();
+  const el = _ctxMenuEl;
+
+  // Drop hidden entries; collapse consecutive/leading/trailing separators.
+  /** @type {any[]} */
+  const clean = [];
+  for (const it of (items || [])) {
+    if (!it || it.separator) {
+      if (clean.length && !clean[clean.length - 1]._sep) clean.push({ _sep: true });
+      continue;
+    }
+    if (it.hidden) continue;
+    clean.push(it);
+  }
+  while (clean.length && clean[clean.length - 1]._sep) clean.pop();
+  if (!clean.some(it => !it._sep)) return;   // nothing actionable
+  _ctxItems = clean;
+
+  el.innerHTML = clean.map((it, i) => it._sep
+    ? '<div class="ctx-sep"></div>'
+    : `<button type="button" class="ctx-item${it.danger ? ' danger' : ''}" data-i="${i}"${it.disabled ? ' disabled' : ''}>${escapeHtml(it.label || '')}</button>`
+  ).join('');
+
+  // Measure hidden, then position at the cursor and clamp to the viewport.
+  el.style.visibility = 'hidden';
+  el.style.display = 'block';
+  el.style.left = '0px';
+  el.style.top = '0px';
+  const mw = el.offsetWidth, mh = el.offsetHeight;
+  const vw = window.innerWidth, vh = window.innerHeight, EDGE = 6;
+  let x = ev.clientX, y = ev.clientY;
+  if (x + mw + EDGE > vw) x = Math.max(EDGE, x - mw);
+  if (y + mh + EDGE > vh) y = Math.max(EDGE, y - mh);
+  el.style.left = Math.round(x) + 'px';
+  el.style.top = Math.round(y) + 'px';
+  el.style.visibility = 'visible';
 }

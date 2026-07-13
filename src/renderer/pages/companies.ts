@@ -15,6 +15,9 @@ let statusFilter: 'all' | 'active' | 'ended' = 'all';
 let typeFilter = '';                     // '' = all work types
 let editingId: number | null = null, selectedId: number | null = null;
 let ctxTarget: Company | null = null;
+// Viewport coords of the last context-menu open — anchors the (position:fixed)
+// color picker, so Edit Color works from both the galaxy menu and the list menu.
+let ctxAnchorX = 0, ctxAnchorY = 0;
 
 // ── Packed-bubble web (Company Web v2) ─────────────────────────────────────
 let web: BubbleWebController | null = null;
@@ -107,6 +110,14 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
     const item = (e.target as HTMLElement).closest<HTMLElement>('.company-list-item');
     if (item && item.dataset.id) selectCompany(Number(item.dataset.id));
+  });
+
+  // Right-click a company row → the same quick actions as its galaxy bubble.
+  $id('company-list').addEventListener('contextmenu', e => {
+    const item = (e.target as HTMLElement).closest<HTMLElement>('.company-list-item[data-id]');
+    if (!item || !item.dataset.id) return;
+    const co = companies.find(c => c.id === Number(item.dataset.id));
+    if (co) listContextMenu(e as MouseEvent, co);
   });
 
   // ── Search / filter controls ───────────────────────────────────────────
@@ -485,6 +496,7 @@ async function deleteSelected(): Promise<void> {
 // ── Context menu ──
 function showCtxAt(co: Company, ev: MouseEvent): void {
   ctxTarget = co;
+  ctxAnchorX = ev.clientX; ctxAnchorY = ev.clientY;
   const wrap = $id('spiderweb-wrap');
   const wr = wrap.getBoundingClientRect();
   const m = $id('ctx-menu');
@@ -560,6 +572,21 @@ async function saveGalaxyColor(rows: Company[], hex: string | null): Promise<voi
   await loadCompanies();
   refreshWeb();
 }
+// Company-list right-click — reuses the galaxy menu's actions via the shared
+// Shell.contextMenu (ctxTarget + ctxAnchor drive the existing ctx* handlers).
+function listContextMenu(ev: MouseEvent, co: Company): void {
+  ctxTarget = co;
+  selectCompany(co.id);   // select so the detail panel tracks the menu target
+  ctxAnchorX = ev.clientX; ctxAnchorY = ev.clientY;
+  Shell.contextMenu(ev, [
+    { label: '⏱ Open Time Tracker', action: ctxOpenTracker },
+    { label: '✎ Edit', action: ctxEditCompany },
+    { label: '🎨 Edit Color', action: ctxEditColor },
+    { label: '↺ Reset to auto color', hidden: !co.color, action: ctxResetColor },
+    { separator: true },
+    { label: '🗑 Delete', danger: true, action: ctxDeleteCompany },
+  ]);
+}
 function ctxOpenTracker(): void { if (!ctxTarget) return; sessionStorage.setItem('active_company', JSON.stringify(ctxTarget)); api.send('navigate', 'tracker'); }
 function ctxEditCompany(): void { if (ctxTarget) openModal(ctxTarget); }
 
@@ -573,9 +600,8 @@ function ctxEditColor(): void {
   const target = ctxTarget;
   const original = target.color;
   const pick = $field('ctx-color-pick') as HTMLInputElement;
-  const menu = $id('ctx-menu');
-  pick.style.left = menu.style.left;
-  pick.style.top = menu.style.top;
+  pick.style.left = ctxAnchorX + 'px';
+  pick.style.top = ctxAnchorY + 'px';
   pick.value = target.color || '#4aa8c0';
   let committed = false;
   pick.oninput = () => {            // live preview while dragging in the picker

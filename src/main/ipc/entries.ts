@@ -4,7 +4,7 @@ const { ipcMain } = require('electron');
 const { session, decryptEntry } = require('../session');
 const { dbAll, dbGet, dbRun, persistDB } = require('../db');
 const { readCache, cacheOwner, invalidateEntriesCache } = require('../cache');
-const { performBackup } = require('../backups');
+const { performBackup, performSafetySnapshot } = require('../backups');
 const { encrypt, decrypt } = require('../vault-crypto');
 
 function register() {
@@ -62,6 +62,26 @@ ipcMain.handle('entries:save', (_: unknown, entry: any) => {
       }
       return { ok: true, id: newId, updated_at: newTs };
     }
+  } catch (e) { return { ok: false, error: e.message }; }
+});
+
+// Delete a whole session (time entry) + its entry-scoped task_items. Destructive,
+// so it snapshots the vault BEFORE the delete (data-safety-net protected class),
+// mirroring companies:delete. Keyed on rowid (gotcha #1) + user_id.
+ipcMain.handle('entries:delete', (_: unknown, id: any) => {
+  if (!session.key || !session.user) return { ok: false };
+  try {
+    const rid = Number(id);
+    const row = dbGet('SELECT rowid FROM time_entries WHERE rowid=? AND user_id=?', [rid, session.user.id]);
+    if (!row) return { ok: false, error: 'Session not found.' };
+    persistDB(); performSafetySnapshot('session-delete'); // protected pre-action snapshot
+    // task_items are entry_id-scoped — remove them before the entry.
+    dbRun('DELETE FROM task_items WHERE user_id=? AND entry_id=?', [session.user.id, rid]);
+    dbRun('DELETE FROM time_entries WHERE rowid=? AND user_id=?', [rid, session.user.id]);
+    if (Number(session.activeEntryId) === rid) session.activeEntryId = null;
+    persistDB(); performBackup();
+    invalidateEntriesCache();
+    return { ok: true };
   } catch (e) { return { ok: false, error: e.message }; }
 });
 

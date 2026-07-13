@@ -57,6 +57,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   // Ledger row actions — delegated so re-rendered rows need no re-wiring.
   $id('ledger-tbody').addEventListener('click', onLedgerClick);
+  $id('ledger-tbody').addEventListener('contextmenu', onLedgerContext);
 
   // Backdrop click closes modals.
   for (const mid of ['preview-modal', 'numbering-modal']) {
@@ -177,7 +178,7 @@ async function loadLedger(): Promise<void> {
       ? `<button class="mini-btn" data-act="unpaid" data-id="${r.id}">Mark Unpaid</button>`
       : (r.status === 'void' ? '' : `<button class="mini-btn" data-act="paid" data-id="${r.id}">Mark Paid</button>`);
     const voidBtn = r.status === 'void' ? '' : `<button class="mini-btn danger" data-act="void" data-id="${r.id}">Void</button>`;
-    return `<tr>
+    return `<tr data-id="${r.id}" data-status="${r.status}">
       <td class="mono">${escapeHtml(r.number)}</td>
       <td>${r.company_id != null ? `<span class="co-dot" style="background:${colorFor(r.company_id)}"></span>` : ''}${escapeHtml(r.company_name || '—')}</td>
       <td class="mono">${period}</td>
@@ -195,28 +196,44 @@ async function loadLedger(): Promise<void> {
 async function onLedgerClick(e: Event): Promise<void> {
   const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-act]');
   if (!btn) return;
-  const id = Number(btn.dataset.id);
-  const act = btn.dataset.act;
   btn.disabled = true;
-  try {
-    if (act === 'pdf') {
-      const res = await api.invoke('invoices:save-pdf', id);
-      if (res.ok) Shell.toast('Invoice PDF saved.', 'success');
-      else if (!res.canceled) Shell.toast(res.error || 'Could not save PDF.', 'error');
-    } else if (act === 'email') {
-      const res = await api.invoke('invoices:email', id);
-      if (res.ok) Shell.toast(`Invoice emailed to ${res.to}.`, 'success');
-      else Shell.toast(res.error || 'Could not email invoice.', 'error');
-    } else if (act === 'paid' || act === 'unpaid' || act === 'void') {
-      if (act === 'void' && !confirm('Void this invoice? It stays in the ledger but is marked void.')) return;
-      const status = act === 'unpaid' ? 'unpaid' : act;
-      const res = await api.invoke('invoices:set-status', { id, status });
-      if (res.ok) await loadLedger();
-      else Shell.toast(res.error || 'Could not update status.', 'error');
-    }
-  } finally {
-    btn.disabled = false;
+  try { await runLedgerAction(Number(btn.dataset.id), btn.dataset.act || ''); }
+  finally { btn.disabled = false; }
+}
+
+// Shared by the row buttons and the right-click menu.
+async function runLedgerAction(id: number, act: string): Promise<void> {
+  if (act === 'pdf') {
+    const res = await api.invoke('invoices:save-pdf', id);
+    if (res.ok) Shell.toast('Invoice PDF saved.', 'success');
+    else if (!res.canceled) Shell.toast(res.error || 'Could not save PDF.', 'error');
+  } else if (act === 'email') {
+    const res = await api.invoke('invoices:email', id);
+    if (res.ok) Shell.toast(`Invoice emailed to ${res.to}.`, 'success');
+    else Shell.toast(res.error || 'Could not email invoice.', 'error');
+  } else if (act === 'paid' || act === 'unpaid' || act === 'void') {
+    if (act === 'void' && !confirm('Void this invoice? It stays in the ledger but is marked void.')) return;
+    const status = act === 'unpaid' ? 'unpaid' : act;
+    const res = await api.invoke('invoices:set-status', { id, status });
+    if (res.ok) await loadLedger();
+    else Shell.toast(res.error || 'Could not update status.', 'error');
   }
+}
+
+// Right-click an invoice row → the same actions as its row buttons.
+function onLedgerContext(e: MouseEvent): void {
+  const tr = (e.target as HTMLElement).closest<HTMLElement>('tr[data-id]');
+  if (!tr || !tr.dataset.id) return;
+  const id = Number(tr.dataset.id);
+  const status = tr.dataset.status || '';
+  Shell.contextMenu(e, [
+    { label: '📄 Save PDF', action: () => void runLedgerAction(id, 'pdf') },
+    { label: '✉ Email', action: () => void runLedgerAction(id, 'email') },
+    { separator: true },
+    { label: '✓ Mark Paid', hidden: status !== 'unpaid', action: () => void runLedgerAction(id, 'paid') },
+    { label: '↺ Mark Unpaid', hidden: status !== 'paid', action: () => void runLedgerAction(id, 'unpaid') },
+    { label: '⦸ Void', danger: true, hidden: status === 'void', action: () => void runLedgerAction(id, 'void') },
+  ]);
 }
 
 // ── Numbering ──
