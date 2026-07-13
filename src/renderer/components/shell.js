@@ -434,6 +434,14 @@ const Shell = (() => {
               </div>
 
               <div class="settings-group">
+                <div class="settings-group-title">Import Data</div>
+                <div class="settings-row-label">Bring in existing clients and tracked time from a spreadsheet. Export your data as a <strong>.csv</strong> file, then map its columns to Conquered Time's fields — companies and sessions are created for you (a safety snapshot is taken first).</div>
+                <div style="margin-top:10px;">
+                  <button class="s-btn" data-action="openImport">Import from CSV…</button>
+                </div>
+              </div>
+
+              <div class="settings-group">
                 <div class="settings-group-title">Export Vault</div>
                 <div class="settings-row-label">Save a portable copy of your entire vault to a location of your choice. The exported file stays encrypted and still needs your account password to open — safe to store on a USB drive or cloud folder.</div>
                 <div style="margin-top:10px;">
@@ -702,6 +710,7 @@ const Shell = (() => {
       reports:      'Reports',
       invoices:     'Invoices',
       'global-log': 'Global Log',
+      import:       'Import Data',
     };
 
     const existingContent = document.body.innerHTML;
@@ -2220,6 +2229,7 @@ function installShellDelegation() {
     executeSafeDisable:    ()      => executeSafeDisable(),
     toggleProfileMenu:     ()      => toggleProfileMenu(),
     openProfileFromSettings: ()    => { closeSettingsModal(); api.send('navigate', 'profile'); },
+    openImport:              ()    => { closeSettingsModal(); api.send('navigate', 'import'); },
   };
 
   function toggleProfileMenu() {

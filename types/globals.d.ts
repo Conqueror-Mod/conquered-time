@@ -477,6 +477,21 @@ interface RowUtilsApi {
   localDateStr(d?: Date): string;
 }
 
+/** CSV import parser/mapper (src/renderer/import-parse.js). Pure; used by the
+ *  Import Data page (import.ts). */
+interface ImportField { key: string; label: string; required?: boolean; aliases?: string[]; }
+interface ImportError { row: number; msg: string; }
+interface ImportSession { company: string; log_date: string; session_label: string; total_mins?: number; rows: EntryRow[]; }
+interface ImportParseApi {
+  parseCSV(text: string): { headers: string[]; rows: string[][] };
+  autoMap(headers: string[], fields: ImportField[]): Record<string, number>;
+  normalizeDate(raw: string): string | null;
+  buildCompanies(rows: string[][], mapping: Record<string, number>): { companies: Array<Record<string, unknown>>; errors: ImportError[] };
+  buildEntries(rows: string[][], mapping: Record<string, number>): { sessions: ImportSession[]; companies: string[]; errors: ImportError[] };
+  COMPANY_FIELDS: ImportField[];
+  ENTRY_FIELDS: ImportField[];
+}
+
 /** Branded in-app export builders (src/renderer/export-html.js) — the tracker
  *  and Global Log PDF exports share the emailed-report visual identity. */
 interface ExportRow {
@@ -656,6 +671,7 @@ interface Window {
   Validator: ValidatorApi;
   RowUtils: RowUtilsApi;
   InsightsCompute: InsightsComputeApi;
+  ImportParse: ImportParseApi;
   ExportHtml: ExportHtmlApi;
   CanvasText: CanvasTextApi;
   BubbleWeb: BubbleWebApi;
@@ -734,6 +750,7 @@ declare const Store: StoreApi;
 declare const Validator: ValidatorApi;
 declare const RowUtils: RowUtilsApi;
 declare const InsightsCompute: InsightsComputeApi;
+declare const ImportParse: ImportParseApi;
 declare const ExportHtml: ExportHtmlApi;
 declare const CanvasText: CanvasTextApi;
 declare const BubbleWeb: BubbleWebApi;
