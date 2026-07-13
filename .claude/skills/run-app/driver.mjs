@@ -22,21 +22,24 @@ const electronBin = process.platform === 'win32'
 let app = null, page = null;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-// Playwright pins an emulated viewport (~1280×800) on Electron windows, so a
-// maximized OS window renders its content in the top-left corner with dead
-// space around it — it LOOKS like a broken app during driven tests, but users
-// can never see it (harness-only artifact). Sync the emulated viewport to the
-// window's real content size whenever we (re)bind a page.
-async function syncViewport() {
-  if (!page || page.isClosed()) return;
-  try {
-    const [w, h] = await app.evaluate(({ BrowserWindow }) => {
-      const win = BrowserWindow.getAllWindows().find(b => b.isVisible()) || BrowserWindow.getAllWindows()[0];
-      return win ? win.getContentSize() : [1280, 800];
-    });
-    await page.setViewportSize({ width: w, height: h });
-  } catch {}
-}
+// VIEWPORT — do NOT call page.setViewportSize() anywhere in this driver.
+//
+// A Playwright-driven Electron page tracks its BrowserWindow's real content
+// size natively, LIVE — resize or maximize the window and window.innerWidth
+// follows on its own (verified: the main window is created 1280×800, and
+// innerWidth follows to ~1920 the moment the post-splash maximize fires, with
+// no intervention). The one thing that BREAKS this is calling setViewportSize:
+// it switches the page into fixed emulation pinned to that snapshot, after
+// which the page goes blind to every later resize.
+//
+// An earlier version of this driver "synced" the viewport via setViewportSize
+// at each bind point to kill dead-space in screenshots. That was the wrong
+// fix — the dead space was just a screenshot taken mid-maximize (the window
+// briefly 1280 inside a 1920 frame), and the pinning it introduced silently
+// corrupted anything reading layout after a resize: the galaxy web's
+// ResizeObserver, scrollHeight/overflow checks, elementFromPoint. Leaving the
+// viewport untouched fixes both — native tracking is always correct, and the
+// per-command sleeps already let a maximize settle before a screenshot.
 
 async function waitURL(frag, timeout = 20000) {
   const t0 = Date.now();
@@ -67,7 +70,6 @@ const COMMANDS = {
     page = await app.firstWindow();
     await waitURL('login');                       // splash may precede this
     await page.waitForSelector('#login-username', { timeout: 15_000 });
-    await syncViewport();
     console.log('launched — at login screen');
   },
 
@@ -79,7 +81,6 @@ const COMMANDS = {
     await page.evaluate(() => doLogin());
     await waitURL('dashboard');
     await sleep(1200);
-    await syncViewport();
     console.log('logged in — at dashboard');
   },
 
@@ -88,7 +89,6 @@ const COMMANDS = {
     await page.evaluate(d => api.send('navigate', d), dest);
     await waitURL(dest);
     await sleep(800);
-    await syncViewport();
     console.log('navigated to', dest);
   },
 
