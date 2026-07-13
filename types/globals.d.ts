@@ -351,6 +351,15 @@ interface IpcInvokeMap {
   'invoices:email': (id: number) => { ok: boolean; to?: string; error?: string };
   'invoices:get-counter': () => { ok: boolean; prefix?: string; pad?: number; next?: number };
   'invoices:set-counter': (payload: { prefix?: string; next?: number }) => { ok: boolean; prefix?: string; next?: number };
+  // data import
+  'import:commit': (payload: {
+    companies?: Array<Record<string, unknown>>;
+    sessions?: Array<{ company: string; log_date: string; session_label?: string; total_mins?: number; rows?: EntryRow[] }>;
+  }) => {
+    ok: boolean; error?: string;
+    companiesCreated?: number; companiesMatched?: number;
+    sessionsCreated?: number; sessionsSkipped?: number; rowsCreated?: number;
+  };
   // window / prefs
   'win:get-displays': () => Array<{
     id: number; index: number; isPrimary: boolean; width: number; height: number;

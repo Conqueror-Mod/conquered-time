@@ -29,6 +29,7 @@ const ALLOWED_INVOKE = new Set([
   'win:get-start-minimized', 'win:set-start-minimized',
   'win:get-punch-hotkey', 'win:set-punch-hotkey',
   'win:set-zoom',
+  'import:commit',
   'beta:status', 'beta:redeem'
 ]);
 
