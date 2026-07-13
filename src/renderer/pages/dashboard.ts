@@ -85,7 +85,7 @@ function fmtH(mins: number): string {
 }
 
 // ── Week band (docs/PLAN-week-view.md — Direction A volume columns) ──────────
-// Seven Mon–Sun day-columns of stacked per-session blocks, sized by hours and
+// Seven Sun–Sat day-columns of stacked per-session blocks, sized by hours and
 // colored with the company's Galaxy identity hue. NOTE: this is a fixed
 // CALENDAR week with prev/next paging — the "This Week" stat chip above is a
 // rolling 7-day total. Their numbers intentionally differ; do not "fix".
@@ -100,14 +100,15 @@ function renderWeekBand(): void {
   const axis = document.getElementById('week-axis');
   if (!cols || !axis) return;
 
-  // Monday of the viewed week — date-part arithmetic (DST-safe), local dates
-  // throughout (never toISOString; see the UTC-date gotcha).
+  // Sunday of the viewed week — date-part arithmetic (DST-safe), local dates
+  // throughout (never toISOString; see the UTC-date gotcha). Week runs
+  // Sun–Sat (getDay(): Sun=0 → subtract 0, Sat=6 → subtract 6).
   const now = new Date();
-  const monday = new Date(now.getFullYear(), now.getMonth(),
-    now.getDate() - ((now.getDay() + 6) % 7) + weekOffset * 7);
+  const weekStart = new Date(now.getFullYear(), now.getMonth(),
+    now.getDate() - now.getDay() + weekOffset * 7);
   const dayDates: string[] = [];
   for (let i = 0; i < 7; i++) {
-    dayDates.push(RowUtils.localDateStr(new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i)));
+    dayDates.push(RowUtils.localDateStr(new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + i)));
   }
   const inWeek = new Set(dayDates);
 
@@ -159,7 +160,7 @@ function renderWeekBand(): void {
   const pxPerHour = PLOT / maxDayH;
 
   weekBlocks = [];
-  const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   if (weekTotal === 0) {
     // Branded empty state — an invitation, not an apology. The CTA differs by
     // tense: past weeks are history (no CTA), the current/future week can
@@ -196,15 +197,15 @@ function renderWeekBand(): void {
       + `<div class="wh">${mins ? fmtH(mins) : '0h'}</div></div>`;
   }).join('');
 
-  // Header: range label ("Mar 9 – 15", cross-month "Mar 30 – Apr 5", year
+  // Header: range label ("Mar 8 – 14", cross-month "Mar 30 – Apr 5", year
   // suffix when not the current year), grand total, This-week reset.
-  const sunday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6);
+  const weekEnd = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 6);
   const mon = (dt: Date) => dt.toLocaleDateString('en-US', { month: 'short' });
-  let range = monday.getMonth() === sunday.getMonth()
-    ? `${mon(monday)} ${monday.getDate()} – ${sunday.getDate()}`
-    : `${mon(monday)} ${monday.getDate()} – ${mon(sunday)} ${sunday.getDate()}`;
-  if (monday.getFullYear() !== now.getFullYear() || sunday.getFullYear() !== now.getFullYear())
-    range += `, ${sunday.getFullYear()}`;
+  let range = weekStart.getMonth() === weekEnd.getMonth()
+    ? `${mon(weekStart)} ${weekStart.getDate()} – ${weekEnd.getDate()}`
+    : `${mon(weekStart)} ${weekStart.getDate()} – ${mon(weekEnd)} ${weekEnd.getDate()}`;
+  if (weekStart.getFullYear() !== now.getFullYear() || weekEnd.getFullYear() !== now.getFullYear())
+    range += `, ${weekEnd.getFullYear()}`;
   const rangeEl = document.getElementById('week-range');
   const totalEl = document.getElementById('week-total');
   const todayBtn = document.getElementById('week-today');

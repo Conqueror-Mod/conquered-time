@@ -63,8 +63,8 @@ equal the chip — surfacing both is fine and expected. (Documenting this here s
 session doesn't "fix" the mismatch as a bug, à la the gotchas in CLAUDE.md.)
 
 Use `RowUtils.localDateStr()` for every date boundary — never `toISOString`/`valueAsDate`
-(UTC = tomorrow all evening; see the UTC-date gotcha). Week start day: **Monday** default
-(most timesheet-natural); revisit if Chris prefers Sunday.
+(UTC = tomorrow all evening; see the UTC-date gotcha). Week start day: **Sunday** (Sun–Sat) —
+Chris's expected view; shipped Monday-start in v3.21.0, corrected to Sunday-start post-release.
 
 ## Data & rendering
 
