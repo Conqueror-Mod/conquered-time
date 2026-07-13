@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy"
+  content="default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'self';">
+<title>Conquered Time — Import Data</title>
+<link rel="stylesheet" href="../styles/design-system.css">
+<script src="theme-init.js"></script>
+<style>
+  .import-wrap { max-width: 880px; }
+  .import-steps { display: flex; gap: 8px; margin-bottom: 22px; }
+  .import-step {
+    flex: 1; text-align: center; font-family: var(--sans); font-size: 12px;
+    color: var(--text-dim); padding: 8px 4px; border-radius: var(--radius);
+    border: 1px solid var(--border); background: var(--surface-1);
+  }
+  .import-step.active { color: var(--accent); border-color: var(--accent); background: var(--accent-dim); font-weight: 600; }
+  .import-step.done   { color: var(--text-muted); }
+
+  .import-panel { padding: 22px; }
+  .import-hint { font-family: var(--sans); font-size: 13px; color: var(--text-muted); line-height: 1.55; margin-bottom: 16px; }
+
+  .type-toggle { display: flex; gap: 10px; margin-bottom: 18px; }
+  .type-btn {
+    flex: 1; padding: 14px; border-radius: var(--radius-lg); border: 1px solid var(--border);
+    background: var(--surface-1); color: var(--text-muted); cursor: pointer; text-align: left;
+    font-family: var(--sans);
+  }
+  .type-btn.active { border-color: var(--accent); background: var(--accent-dim); color: var(--text-bright); }
+  .type-btn .tb-title { font-size: 14px; font-weight: 600; }
+  .type-btn .tb-desc  { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+
+  .drop-zone {
+    border: 2px dashed var(--border-light); border-radius: var(--radius-lg);
+    padding: 38px 20px; text-align: center; cursor: pointer; transition: all .15s;
+    background: var(--surface-1);
+  }
+  .drop-zone:hover, .drop-zone.drag { border-color: var(--accent); background: var(--accent-dim); }
+  .drop-zone .dz-icon { color: var(--accent); opacity: .85; }
+  .drop-zone .dz-main { font-family: var(--sans); font-size: 14px; color: var(--text-bright); margin-top: 8px; }
+  .drop-zone .dz-sub  { font-family: var(--sans); font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+  .file-row { display: flex; align-items: center; justify-content: space-between; margin-top: 14px;
+    font-family: var(--sans); font-size: 13px; color: var(--text-muted); }
+
+  .map-table { width: 100%; border-collapse: collapse; }
+  .map-table td { padding: 7px 8px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  .map-field { font-family: var(--sans); font-size: 13px; color: var(--text-bright); white-space: nowrap; }
+  .map-field .req { color: var(--red); margin-left: 3px; }
+  .map-select { width: 100%; }
+  .map-warn { color: var(--yellow); font-size: 12px; margin-top: 10px; font-family: var(--sans); }
+
+  .review-stats { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+  .rv-chip { background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--radius-lg);
+    padding: 12px 16px; min-width: 120px; }
+  .rv-chip .rv-num { font-family: var(--mono); font-size: 22px; color: var(--text-bright); }
+  .rv-chip .rv-lbl { font-family: var(--sans); font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; margin-top: 2px; }
+  .rv-chip.warn .rv-num { color: var(--yellow); }
+
+  .error-list { max-height: 180px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 8px 12px; margin-top: 8px; }
+  .error-list .er-row { font-family: var(--sans); font-size: 12px; color: var(--text-muted); padding: 2px 0; }
+  .error-list .er-row b { color: var(--yellow); }
+
+  .preview-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
+  .preview-table th, .preview-table td { padding: 6px 8px; border-bottom: 1px solid var(--border); text-align: left;
+    font-family: var(--sans); color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
+  .preview-table th { color: var(--text-bright); font-weight: 600; }
+
+  .import-actions { display: flex; justify-content: space-between; gap: 10px; margin-top: 20px; }
+  .done-icon { color: var(--green, var(--accent)); text-align: center; }
+  .done-title { font-family: var(--sans); font-size: 18px; font-weight: 600; color: var(--text-bright); text-align: center; margin-top: 10px; }
+</style>
+</head>
+<body>
+  <div class="page-header">
+    <div class="page-title-block">
+      <div class="page-eyebrow">Data</div>
+      <div class="page-title">Import Data</div>
+    </div>
+  </div>
+
+  <div class="import-wrap">
+    <div class="import-steps">
+      <div class="import-step" id="step-ind-1">1 · Choose file</div>
+      <div class="import-step" id="step-ind-2">2 · Map columns</div>
+      <div class="import-step" id="step-ind-3">3 · Review</div>
+      <div class="import-step" id="step-ind-4">4 · Done</div>
+    </div>
+
+    <!-- Step 1 — choose -->
+    <div class="hud-panel import-panel" id="step-1">
+      <div class="import-hint">
+        Bring in your existing clients and tracked time from a spreadsheet. Export your data as a
+        <b>.csv</b> file (every spreadsheet app can — File → Save As / Export → CSV), then drop it below.
+        Not sure of the columns? <a href="#" data-action="download-template" class="link">Download a template</a>.
+      </div>
+
+      <div class="type-toggle">
+        <button class="type-btn active" id="type-entries" data-action="set-type" data-arg="entries">
+          <div class="tb-title">Time entries</div>
+          <div class="tb-desc">Your tracked sessions. Missing companies are created automatically.</div>
+        </button>
+        <button class="type-btn" id="type-companies" data-action="set-type" data-arg="companies">
+          <div class="tb-title">Companies</div>
+          <div class="tb-desc">Just your client / company list.</div>
+        </button>
+      </div>
+
+      <div class="drop-zone" id="drop-zone">
+        <div class="dz-icon"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M8 8l4-4 4 4"/><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg></div>
+        <div class="dz-main">Drop a .csv file here, or click to choose</div>
+        <div class="dz-sub" id="dz-sub">Reads on your device — nothing is uploaded.</div>
+        <input type="file" id="file-input" accept=".csv,text/csv" hidden>
+      </div>
+      <div class="file-row" id="file-row" hidden><span id="file-name"></span></div>
+    </div>
+
+    <!-- Step 2 — map -->
+    <div class="hud-panel import-panel" id="step-2" hidden>
+      <div class="import-hint">Match your file's columns to Conquered Time's fields. We guessed where we could — adjust anything that's off.</div>
+      <table class="map-table"><tbody id="map-body"></tbody></table>
+      <div class="map-warn" id="map-warn" hidden></div>
+      <div class="import-actions">
+        <button class="btn-neutral" data-action="back-to-1">← Back</button>
+        <button class="btn-primary" data-action="to-review">Preview import →</button>
+      </div>
+    </div>
+
+    <!-- Step 3 — review -->
+    <div class="hud-panel import-panel" id="step-3" hidden>
+      <div class="review-stats" id="review-stats"></div>
+      <div id="review-errors"></div>
+      <div id="review-preview"></div>
+      <div class="import-actions">
+        <button class="btn-neutral" data-action="back-to-2">← Back</button>
+        <button class="btn-primary" id="btn-commit" data-action="commit">Import</button>
+      </div>
+    </div>
+
+    <!-- Step 4 — done -->
+    <div class="hud-panel import-panel" id="step-4" hidden>
+      <div class="done-icon"><svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-6"/></svg></div>
+      <div class="done-title">Import complete</div>
+      <div class="review-stats" id="done-stats" style="justify-content:center;margin-top:16px;"></div>
+      <div class="import-actions" style="justify-content:center;">
+        <button class="btn-neutral" data-action="import-another">Import another file</button>
+        <button class="btn-primary" data-action="go-global-log">View in Global Log</button>
+      </div>
+    </div>
+  </div>
+
+<script src="../components/settings.js"></script>
+<script src="../components/about.js"></script>
+<script src="../components/shell.js"></script>
+<script src="../time-parse.js"></script>
+<script src="../import-parse.js"></script>
+<script src="import.js"></script>
+</body>
+</html>

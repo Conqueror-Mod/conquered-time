@@ -121,6 +121,7 @@ require('./ipc/entries').register();
 require('./ipc/audit').register({ createAuditWizardWindow });
 require('./ipc/email').register();
 require('./ipc/invoices').register();
+require('./ipc/import').register();
 require('./ipc/settings').register({
   getMainWindow: () => mainWindow,
   applyLaunchAtStartup, loginItemOpts, getAppPref, setAppPref,
