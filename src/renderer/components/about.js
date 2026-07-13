@@ -24,6 +24,11 @@ const About = (() => {
   // Changelog — newest first. Edit HERE and both About surfaces update. The two
   // most recent entries render in-panel; older notes live on GitHub Releases.
   const CHANGELOG = [
+    { version: 'v3.22.0', items: [
+      'Insights got a visual overhaul — Client Mix and Estimated Earnings are now donut charts colored per client (matching the company web), the bar charts have real depth, and hovering any chart shows the exact value',
+      'New Shortcuts tab in Settings — see every keyboard shortcut in one place (navigation, actions, and the global hotkey), and rebind or disable the Clock In / Out hotkey right there',
+      'Audit review is now one window — a single "Review Discrepancies" button (in Reports → Audit) replaces the separate Acknowledge and Suggest-fix buttons; for each issue you can apply the suggested fix or acknowledge it, in place',
+    ] },
     { version: 'v3.21.1', items: [
       'Week view now starts on Sunday (Sun–Sat) to match the usual calendar week',
       'Fixed: the live session timer now starts at 0:00 when you clock in from the tray or the global hotkey (it could start a few seconds in)',

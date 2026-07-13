@@ -6,7 +6,7 @@ Discord's **#roadmap** channel mirrors this file automatically.
 
 **Status legend:** ✅ Shipped · 🔨 In progress · 🗓️ Planned · 💡 Under consideration
 
-_Last curated: 2026-07-13 (v3.21.1 — week-view Sunday start, tray-punch timer fix, polish — released)_
+_Last curated: 2026-07-13 (v3.22.0 — Insights overhaul, Shortcuts tab, unified audit review — released)_
 
 ## 🗓️ Planned (next up)
 
@@ -45,6 +45,14 @@ _Last curated: 2026-07-13 (v3.21.1 — week-view Sunday start, tray-punch timer 
 
 ## ✅ Recently shipped
 
+- **Insights overhaul** (v3.22.0) — Client Mix and Estimated Earnings are now
+  donut charts colored per client (matching the company web), the bar charts
+  have real depth, and hovering any chart shows the exact value.
+- **Shortcuts tab** (v3.22.0) — a new Settings tab listing every keyboard
+  shortcut in one place, with the global Clock In / Out hotkey rebindable there.
+- **Unified audit review** (v3.22.0) — a single "Review Discrepancies" button
+  replaces the separate Acknowledge and Suggest-fix flows; apply the suggested
+  fix or acknowledge each issue in one window.
 - **v3.21.1 (patch)** — the week view now starts on Sunday (Sun–Sat); the live
   session timer starts at 0:00 when you clock in from the tray or hotkey; clearer
   guidance on the Reports email app-password; plus profile-card and labelling polish.
