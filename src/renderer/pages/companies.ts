@@ -101,6 +101,12 @@ window.addEventListener('DOMContentLoaded', async () => {
   // Company list — delegated so dynamically-rendered rows need no re-wiring.
   // Galaxy headers toggle their accordion; project rows select as before.
   $id('company-list').addEventListener('click', e => {
+    // Empty-state CTA — opens the Add Company modal (page-local, so it can't
+    // route through the shell's generic navigate dispatcher).
+    if ((e.target as HTMLElement).closest('.ct-empty-cta[data-cta="add-company"]')) {
+      openModal();
+      return;
+    }
     const head = (e.target as HTMLElement).closest<HTMLElement>('.galaxy-head');
     if (head) {
       const key = head.dataset.gkey || '';
@@ -230,7 +236,12 @@ const openGroups = new Set<string>();
 function renderList(): void {
   const el = $id('company-list');
   if (companies.length === 0) {
-    el.innerHTML = `<div class="company-list-empty">No companies yet.<br>Add one to begin.</div>`;
+    el.innerHTML = Shell.emptyState({
+      icon: 'companies',
+      title: 'No companies yet',
+      body: 'Add your first company to start tracking time against it — each one becomes a galaxy in the web above.',
+      cta: { label: '+ Add Company', cta: 'add-company' },
+    });
     return;
   }
   const list = filteredCompanies();

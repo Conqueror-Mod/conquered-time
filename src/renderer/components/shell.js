@@ -973,7 +973,46 @@ const Shell = (() => {
     setTimeout(() => el.remove(), duration);
   }
 
-  return { init, toast, showSidebarTimer, hideSidebarTimer, showLiveBadge, hideLiveBadge, setSidebarAvatar, contextMenu: openContextMenu };
+  // ── Branded empty states ──────────────────────────────────────────────────
+  // Line-art illustrations for first-run / no-data placeholders. Inline SVG
+  // (CSP-safe, no external images); stroke uses currentColor so .ct-empty-art
+  // tints them with var(--accent) and they follow the theme automatically.
+  const EMPTY_ICONS = {
+    // Three linked bubbles — the company-galaxy motif.
+    companies: '<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+      + '<circle cx="16" cy="18" r="8"/><circle cx="34" cy="14" r="5"/><circle cx="32" cy="33" r="6.5"/>'
+      + '<path d="M23 15.5 29.5 14M21 23.5 27.5 29" stroke-dasharray="2 3"/></svg>',
+    // Stopwatch — a tracked session.
+    sessions: '<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+      + '<circle cx="24" cy="27" r="14"/><path d="M24 27V19M24 27l6 4M20 7h8M24 7v6M37 15l2.5-2.5"/></svg>',
+    // Document with lines — an invoice.
+    invoices: '<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+      + '<path d="M13 6h15l7 7v29H13z"/><path d="M28 6v7h7"/><path d="M18 22h12M18 28h12M18 34h7"/></svg>',
+  };
+
+  // Returns an HTML string (drop into a container or a table cell). `opts`:
+  //   icon:  key into EMPTY_ICONS ('companies' | 'sessions' | 'invoices')
+  //   title, body: plain text (escaped)
+  //   cta:   optional { label, action?, arg?, cta? } — action/arg route through
+  //          the shell delegation (e.g. navigate); `cta` sets data-cta for a
+  //          page-local delegated handler.
+  function emptyState(opts) {
+    const o = opts || {};
+    const art = EMPTY_ICONS[o.icon] || EMPTY_ICONS.sessions;
+    const body = o.body ? `<div class="ct-empty-body">${escapeHtml(o.body)}</div>` : '';
+    let cta = '';
+    if (o.cta && o.cta.label) {
+      const attrs = [];
+      if (o.cta.action) attrs.push(`data-action="${escapeHtml(o.cta.action)}"`);
+      if (o.cta.arg) attrs.push(`data-arg="${escapeHtml(o.cta.arg)}"`);
+      if (o.cta.cta) attrs.push(`data-cta="${escapeHtml(o.cta.cta)}"`);
+      cta = `<button class="btn-primary ct-empty-cta" ${attrs.join(' ')}>${escapeHtml(o.cta.label)}</button>`;
+    }
+    return `<div class="ct-empty"><div class="ct-empty-art">${art}</div>`
+      + `<div class="ct-empty-title">${escapeHtml(o.title || '')}</div>${body}${cta}</div>`;
+  }
+
+  return { init, toast, showSidebarTimer, hideSidebarTimer, showLiveBadge, hideLiveBadge, setSidebarAvatar, contextMenu: openContextMenu, emptyState };
 })();
 
 // ── Settings modal controls (global scope) ────────────────────────────────────

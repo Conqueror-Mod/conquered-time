@@ -171,7 +171,14 @@ async function loadLedger(): Promise<void> {
   const rows = await api.invoke('invoices:list');
   const tb = $id('ledger-tbody');
   $id('ledger-count').textContent = rows.length ? `${rows.length} invoice${rows.length === 1 ? '' : 's'}` : '';
-  if (!rows.length) { tb.innerHTML = `<tr class="empty-row"><td colspan="6">No invoices yet. Generate one above.</td></tr>`; return; }
+  if (!rows.length) {
+    tb.innerHTML = `<tr class="empty-row"><td colspan="6">${Shell.emptyState({
+      icon: 'invoices',
+      title: 'No invoices yet',
+      body: 'Pick a company and date range above, preview, then issue your first invoice. Issued invoices land here as a paid / unpaid ledger you can save as a PDF or email.',
+    })}</td></tr>`;
+    return;
+  }
   tb.innerHTML = rows.map(r => {
     const period = `${escapeHtml(r.period_from)} → ${escapeHtml(r.period_to)}`;
     const paidBtn = r.status === 'paid'
