@@ -6,29 +6,7 @@ Discord's **#roadmap** channel mirrors this file automatically.
 
 **Status legend:** ✅ Shipped · 🔨 In progress · 🗓️ Planned · 💡 Under consideration
 
-_Last curated: 2026-07-13 (v3.22.0 — Insights overhaul, Shortcuts tab, unified audit review — released)_
-
-## 🔨 In the next update
-
-_Built and merged — landing in the next release._
-
-- **Galaxy fly-through** — drilling into a company now flies the camera into the
-  bubble you clicked, single-project companies warp into the tracker, and
-  clicking or hovering a bubble glows its matching row in the list beside it.
-  Archived-company bubbles are legible again, too.
-- **Company colors everywhere** — the Galaxy identity hues now carry through the
-  whole app: color dots on Recent Activity, the Global Log, and the invoice
-  ledger, matching each company's bubble (Insights' client mix already did).
-- **Richer right-click menus** — right-click a Global Log session, a company in
-  the list, an invoice, or a tracker row for quick actions (open, edit, export,
-  delete, mark paid…) right where you'd expect them, instead of hunting for
-  buttons.
-- **Smarter dashboard stats** — the Today and This Week tiles now show how you're
-  trending: Today vs the same weekday last week, This Week vs the week before,
-  plus a 7-day sparkline of your daily hours.
-- **Interactive Insights** — click any client in the Client Mix or Earnings
-  charts to jump straight to the Global Log filtered to that client over the
-  range you're viewing (charts already show exact values on hover).
+_Last curated: 2026-07-13 (v3.23.0 — Galaxy fly-through, company colors everywhere, right-click menus, smarter dashboard stats, interactive Insights — released)_
 
 ## 🗓️ Planned (next up)
 
@@ -55,6 +33,20 @@ _Built and merged — landing in the next release._
 
 ## ✅ Recently shipped
 
+- **Galaxy fly-through** (v3.23.0) — drilling into a company flies the camera into
+  the bubble you clicked; single-project companies warp into the tracker; clicking
+  or hovering a bubble glows its matching list row; archived bubbles are legible
+  again.
+- **Company colors everywhere** (v3.23.0) — each company's Galaxy identity color
+  shows as a dot beside its name on Recent Activity, the Global Log, and the
+  invoice ledger.
+- **Richer right-click menus** (v3.23.0) — right-click a Global Log session, a
+  company in the list, an invoice, or a tracker row for quick actions where you'd
+  expect them.
+- **Smarter dashboard stats** (v3.23.0) — the Today and This Week tiles show
+  trend (vs last week / prior week) plus a 7-day sparkline of daily hours.
+- **Interactive Insights** (v3.23.0) — click a client in the Client Mix or
+  Earnings charts to jump to the Global Log filtered to that client.
 - **Insights overhaul** (v3.22.0) — Client Mix and Estimated Earnings are now
   donut charts colored per client (matching the company web), the bar charts
   have real depth, and hovering any chart shows the exact value.

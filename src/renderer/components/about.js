@@ -24,6 +24,13 @@ const About = (() => {
   // Changelog — newest first. Edit HERE and both About surfaces update. The two
   // most recent entries render in-panel; older notes live on GitHub Releases.
   const CHANGELOG = [
+    { version: 'v3.23.0', items: [
+      'Galaxy fly-through — drilling into a company now flies the camera into the bubble you clicked, and single-project companies warp into the tracker instead of a hard cut. Clicking or hovering a bubble glows its matching row in the list beside it, and archived-company bubbles are legible again',
+      'Company colors everywhere — each company\'s Galaxy identity color now shows as a dot next to its name on Recent Activity, the Global Log, and the invoice ledger, so a client reads as the same color across the whole app',
+      'Richer right-click menus — right-click a Global Log session, a company in the list, an invoice, or a tracker row for quick actions (open, edit, export, delete, mark paid…) right where you expect them',
+      'Smarter dashboard stats — the Today and This Week tiles now show how you\'re trending: Today vs the same weekday last week, This Week vs the week before, plus a 7-day sparkline of your daily hours',
+      'Interactive Insights — click any client in the Client Mix or Earnings charts to jump straight to the Global Log filtered to that client over the range you\'re viewing',
+    ] },
     { version: 'v3.22.0', items: [
       'Insights got a visual overhaul — Client Mix and Estimated Earnings are now donut charts colored per client (matching the company web), the bar charts have real depth, and hovering any chart shows the exact value',
       'New Shortcuts tab in Settings — see every keyboard shortcut in one place (navigation, actions, and the global hotkey), and rebind or disable the Clock In / Out hotkey right there',
