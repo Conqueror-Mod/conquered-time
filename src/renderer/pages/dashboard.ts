@@ -49,17 +49,31 @@ async function loadData(): Promise<void> {
   colorFor   = BubbleWeb.colorMap(companies, allEntries).colorFor;
 
   // LOCAL dates — toISOString is UTC and bucketed evening hours into tomorrow.
-  const today   = RowUtils.localDateStr();
-  const weekAgo = RowUtils.localDateStr(new Date(Date.now() - 7*86400000));
+  const today = RowUtils.localDateStr();
+  const dOf = (offset: number): string => RowUtils.localDateStr(new Date(Date.now() - offset * 86400000));
+  const byDate: Record<string, number> = {};
+  for (const e of allEntries) if (e.total_mins) byDate[e.log_date] = (byDate[e.log_date] || 0) + e.total_mins;
 
-  const todayMins   = allEntries.filter(e => e.log_date === today).reduce((a,e) => a+e.total_mins, 0);
-  const weekMins    = allEntries.filter(e => e.log_date >= weekAgo).reduce((a,e) => a+e.total_mins, 0);
-  const allTimeMins = allEntries.reduce((a,e) => a+e.total_mins, 0);
+  // Rolling 7-day windows (offset 0 = today). This aligns the headline number,
+  // its delta, and the sparkline on ONE window; the calendar week band below is
+  // deliberately a different (Sun–Sat) view — see renderWeekBand.
+  let thisWeek = 0, priorWeek = 0;
+  for (let o = 0; o <= 6; o++) thisWeek  += byDate[dOf(o)]  || 0;
+  for (let o = 7; o <= 13; o++) priorWeek += byDate[dOf(o)] || 0;
+  const todayMins   = byDate[today] || 0;
+  const lastWeekDay = byDate[dOf(7)] || 0;   // same weekday, 7 days ago
+  const allTimeMins = allEntries.reduce((a, e) => a + e.total_mins, 0);
 
   document.getElementById('stat-today')!.textContent     = fmtH(todayMins);
-  document.getElementById('stat-week')!.textContent      = fmtH(weekMins);
+  document.getElementById('stat-week')!.textContent      = fmtH(thisWeek);
   document.getElementById('stat-alltime')!.textContent   = fmtH(allTimeMins);
   document.getElementById('stat-companies')!.textContent = String(companies.length);
+
+  // Deltas (arrow glyph carries direction — colorblind-safe) + 7-day sparkline.
+  setDelta('delta-today', todayMins - lastWeekDay, 'vs last ' + weekdayName(today));
+  setDelta('delta-week', thisWeek - priorWeek, 'vs prior week');
+  const sparkDates = Array.from({ length: 7 }, (_, i) => dOf(6 - i));   // oldest → today
+  renderSparkline('spark-week', sparkDates.map(d => byDate[d] || 0), sparkDates, today);
 
   const compMap: Record<number, string> = {};
   companies.forEach(c => compMap[c.id] = c.name || '—');
@@ -85,6 +99,47 @@ async function loadData(): Promise<void> {
 function fmtH(mins: number): string {
   if (!mins) return '0h';
   return (mins / 60).toFixed(1) + 'h';
+}
+
+// Compact hours for deltas/sparkline tips: 1 decimal under 10h, whole above.
+function fmtHShort(mins: number): string {
+  const h = mins / 60;
+  return (h >= 10 ? Math.round(h) : Math.round(h * 10) / 10) + 'h';
+}
+function weekdayName(dateStr: string): string {
+  return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][new Date(dateStr + 'T00:00').getDay()];
+}
+
+// Delta chip under a stat value. The ▲/▼/≈ glyph carries the meaning (color is a
+// secondary cue only — colorblind-safe). Sub-3-minute swings read as "even".
+function setDelta(id: string, deltaMins: number, label: string): void {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const abs = Math.abs(deltaMins);
+  if (abs < 3) { el.className = 'stat-delta even'; el.textContent = `≈ even ${label}`; return; }
+  const up = deltaMins > 0;
+  el.className = 'stat-delta ' + (up ? 'up' : 'down');
+  el.textContent = `${up ? '▲' : '▼'} ${fmtHShort(abs)} ${label}`;
+}
+
+// 7-day micro-sparkline (inline SVG, one bar per day, today highlighted). Single
+// accent hue, static — colorblind-safe and no motion to gate. The daily
+// breakdown rides along as a data-tip for the shared tooltip system.
+function renderSparkline(id: string, vals: number[], dates: string[], todayStr: string): void {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const max = Math.max(1, ...vals);
+  const W = 92, H = 26, n = vals.length, gap = 3;
+  const bw = (W - gap * (n - 1)) / n;
+  let bars = '';
+  for (let i = 0; i < n; i++) {
+    const h = Math.max(2, Math.round((vals[i] / max) * (H - 2)));
+    const x = i * (bw + gap), y = H - h;
+    const op = dates[i] === todayStr ? '1' : '0.45';
+    bars += `<rect x="${x.toFixed(1)}" y="${y}" width="${bw.toFixed(1)}" height="${h}" rx="1.5" fill="var(--accent)" opacity="${op}"></rect>`;
+  }
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true">${bars}</svg>`;
+  el.setAttribute('data-tip', dates.map((d, i) => `${weekdayName(d)} ${fmtHShort(vals[i])}`).join(' · '));
 }
 
 // ── Week band (docs/PLAN-week-view.md — Direction A volume columns) ──────────
