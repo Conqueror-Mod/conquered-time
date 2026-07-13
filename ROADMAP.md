@@ -6,32 +6,34 @@ Discord's **#roadmap** channel mirrors this file automatically.
 
 **Status legend:** ✅ Shipped · 🔨 In progress · 🗓️ Planned · 💡 Under consideration
 
-_Last curated: 2026-07-13 (v3.23.0 — Galaxy fly-through, company colors everywhere, right-click menus, smarter dashboard stats, interactive Insights — released)_
+_Last curated: 2026-07-13 (v3.24.0 — CSV data import, global search, branded empty states, layout hardening — released)_
 
 ## 🗓️ Planned (next up)
 
-### Polish pass (smaller items, mixed in between features)
-
-- **UI Scale & responsiveness fixes** — live feedback while changing UI Scale
-  in Settings, and layouts that adapt properly to unusual window shapes.
-  _(Two known beta reports.)_
-- **Branded empty states** — first-run screens (no companies, no sessions, no
-  invoices yet) get a proper illustration and a clear call-to-action instead of
-  plain text.
+_Open to community suggestions — use `/feedback` in the Discord._
 
 ## 💡 Under consideration
 
 - **Multi-platform packaging** — macOS and Linux builds via GitHub Actions CI
   (icons are already prepared). On the backburner while feature work leads.
-- **Global search** — a shell-wide omnibox (⌘/Ctrl+K) that jumps to companies
-  and entries across pages, beyond the per-tab Companies filter above.
-- **Multi-account (DBA) handling** — one person working several Navigator IDs /
-  accounts. _(The Company Galaxy's company › project › ID grouping covers the
-  visual side of this; anything beyond that still needs a data-model decision.)_
+- **Multiple billing identities (DBA)** — issue invoices under several business
+  names, each with its own address, tax ID and numbering. _(Design sketched; not
+  yet scheduled.)_
 - **Language / internationalization** — lowest priority, highest complexity;
   slated for last.
 
 ## ✅ Recently shipped
+
+- **Import your data** (v3.24.0) — bring existing clients and tracked time in
+  from a spreadsheet. Save as CSV, then a guided wizard maps the columns,
+  previews what will be created, and imports it — companies are auto-created and
+  a safety snapshot is taken first. Under Settings → Data → Import from CSV.
+- **Global search** (v3.24.0) — press Ctrl / ⌘ + K on any page to jump to a
+  company, a time session, or a page. Companies open focused in the list;
+  sessions open in the Tracker.
+- **Branded empty states** (v3.24.0) — first-run Companies, Global Log and
+  invoice screens now show an illustration and a clear next step instead of a
+  bare line of text, plus layout hardening for unusual window shapes.
 
 - **Galaxy fly-through** (v3.23.0) — drilling into a company flies the camera into
   the bubble you clicked; single-project companies warp into the tracker; clicking

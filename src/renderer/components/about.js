@@ -24,6 +24,12 @@ const About = (() => {
   // Changelog — newest first. Edit HERE and both About surfaces update. The two
   // most recent entries render in-panel; older notes live on GitHub Releases.
   const CHANGELOG = [
+    { version: 'v3.24.0', items: [
+      'Import your data — bring existing clients and tracked time in from a spreadsheet. Save your data as a CSV, then a guided wizard maps its columns, previews exactly what will be created, and imports it (companies are created automatically, and a safety snapshot is taken first so it\'s always undoable). Find it under Settings → Data → Import from CSV',
+      'Global search (Ctrl / ⌘ + K) — a shell-wide search box on any page; jump straight to a company, a time session, or a page. Companies open focused in the list, sessions open in the Tracker',
+      'Branded empty states — the first-run Companies, Global Log, and invoice screens now show a proper illustration and a clear next step instead of a bare line of text',
+      'Polish — hardened the layout against unusual window shapes so content and the Settings panel always scroll cleanly',
+    ] },
     { version: 'v3.23.0', items: [
       'Galaxy fly-through — drilling into a company now flies the camera into the bubble you clicked, and single-project companies warp into the tracker instead of a hard cut. Clicking or hovering a bubble glows its matching row in the list beside it, and archived-company bubbles are legible again',
       'Company colors everywhere — each company\'s Galaxy identity color now shows as a dot next to its name on Recent Activity, the Global Log, and the invoice ledger, so a client reads as the same color across the whole app',
