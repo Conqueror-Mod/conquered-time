@@ -6,19 +6,13 @@ Discord's **#roadmap** channel mirrors this file automatically.
 
 **Status legend:** ✅ Shipped · 🔨 In progress · 🗓️ Planned · 💡 Under consideration
 
-_Last curated: 2026-07-12 (v3.20.0 — Company Galaxy — released)_
+_Last curated: 2026-07-12 (v3.21.0 — Tray punch, data safety net, week view — released)_
 
 ## 🗓️ Planned (next up)
 
 - **Richer right-click menus** — grow the context menus across the app
   (the Galaxy ships the first wave: galaxy- and project-level menus with
   Edit Color and quick actions where you'd expect them).
-- **Punch from the tray + global hotkey** — Clock In / Clock Out without
-  opening the app: tray-menu punch actions and a system-wide keyboard shortcut,
-  so starting the clock is instant instead of launch-login-navigate-click.
-- **Week view** — see your week spatially: a 7-day grid of session blocks
-  (colored per company) alongside the day-based tracker and the aggregate
-  Insights — the "Tuesday was heavy, Thursday was empty" view.
 
 ### Polish pass (smaller items, mixed in between features)
 
@@ -51,8 +45,17 @@ _Last curated: 2026-07-12 (v3.20.0 — Company Galaxy — released)_
 
 ## ✅ Recently shipped
 
-- **Data safety net** — your history is no longer one misclick from gone.
-  Before any destructive action (deleting a company, clearing time data or
+- **Punch from the tray + global hotkey** (v3.21.0) — Clock In / Clock Out
+  without opening the app. Right-click the tray icon to punch, or press the
+  global hotkey (default Ctrl+Alt+P) from anywhere — it clocks in on your last
+  task if you're out, clocks out if you're in, even while the app is hidden in
+  the tray. Rebind or disable it under Settings → Window.
+- **Week view** (v3.21.0) — see your week at a glance on the Dashboard: a
+  seven-day band of session blocks (colored per company, sized by hours) with
+  day totals and prev/next week paging — the "Tuesday was heavy, Thursday was
+  empty" view. Click any block to jump straight to that session in the Tracker.
+- **Data safety net** (v3.21.0) — your history is no longer one misclick from
+  gone. Before any destructive action (deleting a company, clearing time data or
   companies, restoring a backup), Conquered Time now automatically saves a
   **protected safety snapshot** — kept separately from the routine autosave
   backups so a busy day can't prune it away, and marked with what it was taken

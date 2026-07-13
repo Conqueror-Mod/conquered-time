@@ -24,6 +24,19 @@ const About = (() => {
   // Changelog — newest first. Edit HERE and both About surfaces update. The two
   // most recent entries render in-panel; older notes live on GitHub Releases.
   const CHANGELOG = [
+    { version: 'v3.21.0', items: [
+      'Punch from the tray or a global hotkey — Clock In / Clock Out without opening the app. Right-click the tray icon to punch, or press the hotkey (default Ctrl+Alt+P) from anywhere: it clocks in on your last task if you\'re out, clocks out if you\'re in, even while the app is hidden in the tray. Rebind or disable it under Settings → Window',
+      'Week view — the Dashboard now shows your week at a glance: a seven-day band of session blocks (colored per company, sized by hours) with day totals and prev/next week paging. Click any block to jump to that session in the Tracker',
+      'Data safety net — before any destructive action (deleting a company, clearing time data, or restoring a backup) the app now saves a protected safety snapshot, kept separately from the routine backups so a busy day can\'t prune it away and labelled with what it was taken before. Plus a new Export Vault button (Settings → Data) saves a portable, still-encrypted copy of your whole vault anywhere you like, and Full Database Clear offers to export first before it wipes everything',
+    ] },
+    { version: 'v3.20.1', items: [
+      'Window placement fix — the app now reopens on the display it was closed on, and remembers its last size and position more reliably',
+    ] },
+    { version: 'v3.20.0', items: [
+      'Company Galaxy — the company web, reimagined. Companies are packed bubbles sized by hours (over a 30-day / 90-day / all-time window), with idle and ended companies folding into an expandable Archive cluster and per-company identity colors that fade as a client goes idle (colorblind-safe palette + right-click color picker)',
+      'It also went hierarchical: each company is a galaxy that opens into its projects and platforms, which break down into their IDs and logins — click to expand in place, click deeper to zoom (a breadcrumb backs you out), right-click for galaxy- and project-level menus',
+      'The company list gained matching company › project grouping, and the dashboard mini-web jumps you straight into a company\'s galaxy',
+    ] },
     { version: 'v3.19.1', items: [
       'Profile moved — it now lives behind your avatar in the bottom-left corner (click it → Edit Profile) and under Settings → Profile, instead of taking a slot in the navigation. (Community request)',
       'Setup guide polish — the Profile step now points at your avatar and walks through saving your billing details, a new Insights step explains the analytics page, and the flash between tour steps is gone (the dim now carries smoothly across pages)',
