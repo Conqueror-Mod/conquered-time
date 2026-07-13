@@ -126,7 +126,7 @@ const Shell = (() => {
              the delegated dispatcher (it's a focusable data-action element). -->
         <div class="sidebar-user-identity sidebar-user-clickable" id="sidebar-user-identity"
              tabindex="0" role="button" aria-haspopup="menu" aria-label="Profile"
-             data-action="toggleProfileMenu" data-tip="Your profile — click to edit">
+             data-action="toggleProfileMenu">
           <div class="sidebar-avatar" id="sidebar-avatar"></div>
           <div class="sidebar-user-text">
             <div class="sidebar-user-name">${user?.display_name || user?.username || '—'}</div>
@@ -453,7 +453,8 @@ const Shell = (() => {
                   <div>
                     <div class="settings-row-label" style="margin-bottom:4px;">Password / App Password</div>
                     <div style="position:relative;">
-                      <input class="sc-input" id="email-pass" type="password" placeholder="•••••••••" autocomplete="new-password" style="padding-right:36px;width:100%;">
+                      <input class="sc-input" id="email-pass" type="password" placeholder="•••••••••" autocomplete="new-password" style="padding-right:36px;width:100%;"
+                             data-tip="For Gmail/Outlook with 2-factor sign-in, your normal password won't work here — you need an app-specific password. In your email account's security settings, create an ‘App Password’ (Gmail: Security → App passwords) and paste that 16-character code here.">
                       <button id="email-pass-toggle" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:0;color:var(--text-muted);" title="Show/hide">
                         <svg id="email-eye-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                       </button>

@@ -210,7 +210,13 @@ function punchIn(): Record<string, any> {
 
   const today = localDateStr();
   const t = nowTime();
-  const newRow = { label: last.label, name: last.name, desc: '', clock_in: t, clock_out: '', total_mins: 0 };
+  // clock_in_ms: precise epoch-ms start so the live session badge begins at
+  // 0:00, not up to 59s into the minute. The tracker's own clockIn() sets this;
+  // a tray/hotkey punch must too, or the badge falls back to the minute-
+  // truncated clock_in and starts mid-minute (v3.21.0 bug — the timer-not-at-
+  // 0:00 report). The renderer only trusts it while its minute still matches
+  // clock_in, so a later hand-edit safely reverts to the HH:MM computation.
+  const newRow = { label: last.label, name: last.name, desc: '', clock_in: t, clock_out: '', total_mins: 0, clock_in_ms: Date.now() };
 
   // Reuse today's entry for that company if one exists (same rule as the
   // tracker page loading "today"); otherwise start a fresh session entry.
