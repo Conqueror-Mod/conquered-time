@@ -30,6 +30,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   await Shell.init('global-log');
   document.documentElement.style.visibility = '';
   await loadData();
+  consumeInsightsHandoff();   // Insights "view in Global Log" → pre-set filters
   applyFilters();
 
   // ── Static control wiring (CSP-safe; replaces inline on* handlers) ──────
@@ -105,6 +106,24 @@ function clearFilters(): void {
   $field('filter-to').value='';
   $field('filter-range').value='';
   applyFilters();
+}
+
+// Consume a one-shot handoff from Insights (click-through on a client chart):
+// pre-set the company + date-range filters, then clear the keys so a manual
+// revisit isn't re-filtered.
+function consumeInsightsHandoff(): void {
+  const co = sessionStorage.getItem('glog_company');
+  if (!co) return;
+  sessionStorage.removeItem('glog_company');
+  const from = sessionStorage.getItem('glog_from') || '';
+  const to = sessionStorage.getItem('glog_to') || '';
+  sessionStorage.removeItem('glog_from');
+  sessionStorage.removeItem('glog_to');
+  const sel = $field('filter-company') as HTMLSelectElement;
+  if ([...sel.options].some(o => o.value === co)) sel.value = co;
+  $field('filter-from').value = from;
+  $field('filter-to').value = to;
+  $field('filter-range').value = 'custom';
 }
 
 function applyFilters(): void {

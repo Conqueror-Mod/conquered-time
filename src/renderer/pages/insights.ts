@@ -37,6 +37,15 @@ function coName(id: number): string { return companyMap[id]?.name || `#${id}`; }
 function coCurrency(id: number): string { return companyMap[id]?.currency || defaultCurrency; }
 
 // Inclusive cutoff date for the active range ('' = all time).
+// Hand off to the Global Log pre-filtered to this client over the current range.
+// The Global Log reads these sessionStorage keys on load (see global-log.ts).
+function openInGlobalLog(companyId: number): void {
+  sessionStorage.setItem('glog_company', String(companyId));
+  sessionStorage.setItem('glog_from', cutoffFor(range));   // '' for all-time
+  sessionStorage.setItem('glog_to', RowUtils.localDateStr());
+  api.send('navigate', 'global-log');
+}
+
 function cutoffFor(r: Range): string {
   if (r === 'all') return '';
   const days = Number(r);
@@ -184,7 +193,7 @@ function identityColorFor(companyId: number): string {
 }
 
 // ── Donut (Client Mix / Earnings) ────────────────────────────────────────────
-interface DonutSlice { label: string; value: number; color: string; ended?: boolean; disp: string; }
+interface DonutSlice { label: string; value: number; color: string; ended?: boolean; disp: string; coId?: number; }
 function buildDonut(container: HTMLElement, slices: DonutSlice[], centerTop: string, centerBot: string, emptyMsg: string): void {
   const total = slices.reduce((s, d) => s + d.value, 0);
   if (!total) { container.innerHTML = `<div class="insight-empty">${escapeHtml(emptyMsg)}</div>`; return; }
@@ -201,14 +210,17 @@ function buildDonut(container: HTMLElement, slices: DonutSlice[], centerTop: str
     a = a1;
     const pct = Math.round(d.value / total * 100);
     const dPath = `M${x0.toFixed(2)} ${y0.toFixed(2)} A${rO} ${rO} 0 ${large} 1 ${x1.toFixed(2)} ${y1.toFixed(2)} L${x2.toFixed(2)} ${y2.toFixed(2)} A${rI} ${rI} 0 ${large} 0 ${x3.toFixed(2)} ${y3.toFixed(2)} Z`;
-    return `<path d="${dPath}" fill="${d.color}" data-tip-name="${escapeHtml(d.label)}" data-tip-val="${escapeHtml(d.disp + ' · ' + pct + '%')}"/>`;
+    const val = d.disp + ' · ' + pct + '%' + (d.coId != null ? ' · click to view in Global Log' : '');
+    const co = d.coId != null ? ` data-co="${d.coId}" class="clickable"` : '';
+    return `<path d="${dPath}" fill="${d.color}"${co} data-tip-name="${escapeHtml(d.label)}" data-tip-val="${escapeHtml(val)}"/>`;
   }).join('');
   const svg = `<svg class="donut-svg" viewBox="0 0 160 160" aria-hidden="true">${paths}`
     + `<text x="80" y="76" text-anchor="middle" fill="var(--text-white)" font-family="var(--mono)" font-size="19" font-weight="600">${escapeHtml(centerTop)}</text>`
     + `<text x="80" y="93" text-anchor="middle" fill="var(--text-dim)" font-family="var(--sans)" font-size="10">${escapeHtml(centerBot)}</text></svg>`;
   const legend = slices.map(d => {
     const pct = Math.round(d.value / total * 100);
-    return `<div class="dl-row"><span class="dl-dot ${d.ended ? 'ended' : ''}" style="background:${d.color}"></span>`
+    const co = d.coId != null ? ` data-co="${d.coId}" title="Open ${escapeHtml(d.label)} in the Global Log"` : '';
+    return `<div class="dl-row${d.coId != null ? ' clickable' : ''}"${co}><span class="dl-dot ${d.ended ? 'ended' : ''}" style="background:${d.color}"></span>`
       + `<span class="dl-name">${escapeHtml(d.label)}</span><span class="dl-val">${escapeHtml(d.disp)}</span><span class="dl-pct">${pct}%</span></div>`;
   }).join('');
   container.innerHTML = `<div class="donut-row">${svg}<div class="donut-legend">${legend}</div></div>`;
@@ -367,7 +379,7 @@ function renderClientMix(es: InsightEntry[]): void {
 
   const slices: DonutSlice[] = shown.map(r => ({
     label: coName(r.id), value: r.mins, color: identityColorFor(r.id),
-    ended: !!(companyMap[r.id] && companyMap[r.id].date_end), disp: fmtH(r.mins),
+    ended: !!(companyMap[r.id] && companyMap[r.id].date_end), disp: fmtH(r.mins), coId: r.id,
   }));
   if (restMins > 0) slices.push({ label: `${rest.length} other${rest.length !== 1 ? 's' : ''}`, value: restMins, color: 'var(--text-muted)', disp: fmtH(restMins) });
 
@@ -403,7 +415,7 @@ function renderEarnings(es: InsightEntry[]): void {
 
   const slices: DonutSlice[] = shown.map(r => ({
     label: coName(r.id), value: r.amount, color: identityColorFor(r.id),
-    ended: !!(companyMap[r.id] && companyMap[r.id].date_end), disp: fmtMoney(r.amount, mainCur),
+    ended: !!(companyMap[r.id] && companyMap[r.id].date_end), disp: fmtMoney(r.amount, mainCur), coId: r.id,
   }));
   if (restAmt > 0) slices.push({ label: `${rest.length} other${rest.length !== 1 ? 's' : ''}`, value: restAmt, color: 'var(--text-muted)', disp: fmtMoney(restAmt, mainCur) });
 
@@ -439,6 +451,13 @@ window.addEventListener('DOMContentLoaded', async () => {
   $id('range-toggles').addEventListener('click', e => {
     const btn = (e.target as HTMLElement).closest<HTMLElement>('.range-btn');
     if (btn && btn.dataset.range) setRange(btn.dataset.range as Range);
+  });
+
+  // Click-through: a client donut slice / legend row → Global Log filtered to
+  // that company over the range currently in view.
+  $id('insights-scroll').addEventListener('click', e => {
+    const el = (e.target as Element).closest<HTMLElement>('[data-co]');
+    if (el && el.dataset.co) openInGlobalLog(Number(el.dataset.co));
   });
 
   // Redraw the SVG charts when the layout width changes (charts render in real

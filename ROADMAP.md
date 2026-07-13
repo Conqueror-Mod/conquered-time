@@ -26,13 +26,14 @@ _Built and merged — landing in the next release._
 - **Smarter dashboard stats** — the Today and This Week tiles now show how you're
   trending: Today vs the same weekday last week, This Week vs the week before,
   plus a 7-day sparkline of your daily hours.
+- **Interactive Insights** — click any client in the Client Mix or Earnings
+  charts to jump straight to the Global Log filtered to that client over the
+  range you're viewing (charts already show exact values on hover).
 
 ## 🗓️ Planned (next up)
 
 ### Polish pass (smaller items, mixed in between features)
 
-- **Interactive Insights** — hover values on every chart and click-through
-  (click a client's bar to jump to its filtered Global Log).
 - **UI Scale & responsiveness fixes** — live feedback while changing UI Scale
   in Settings, and layouts that adapt properly to unusual window shapes.
   _(Two known beta reports.)_
