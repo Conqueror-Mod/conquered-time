@@ -96,6 +96,20 @@
   color: var(--text-muted);
   white-space: nowrap;
 }
+/* Week-over-week delta chip — arrow glyph is the primary cue, color secondary. */
+.stat-delta {
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--text-dim);
+}
+.stat-delta.up   { color: var(--green); }
+.stat-delta.down { color: var(--text-muted); }
+.stat-delta.even { color: var(--text-dim); }
+/* 7-day micro-sparkline under the This Week value. */
+.stat-spark { margin-top: 6px; line-height: 0; }
+.stat-spark svg { display: block; }
 
 /* ══════════════════════════════════════════════════════════════
    BUTTONS

@@ -23,14 +23,14 @@ _Built and merged — landing in the next release._
   the list, an invoice, or a tracker row for quick actions (open, edit, export,
   delete, mark paid…) right where you'd expect them, instead of hunting for
   buttons.
+- **Smarter dashboard stats** — the Today and This Week tiles now show how you're
+  trending: Today vs the same weekday last week, This Week vs the week before,
+  plus a 7-day sparkline of your daily hours.
 
 ## 🗓️ Planned (next up)
 
 ### Polish pass (smaller items, mixed in between features)
 
-- **Smarter dashboard stats** — the Today / This Week tiles gain deltas
-  ("up 1.2h vs last week") and a 7-day micro-sparkline, so the numbers tell a
-  story at a glance.
 - **Interactive Insights** — hover values on every chart and click-through
   (click a client's bar to jump to its filtered Global Log).
 - **UI Scale & responsiveness fixes** — live feedback while changing UI Scale
