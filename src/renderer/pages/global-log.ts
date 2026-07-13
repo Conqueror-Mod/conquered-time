@@ -153,7 +153,17 @@ function renderTable(): void {
   const tbody=$id('log-tbody');
   $id('row-count').textContent=`Showing ${filtered.length} session${filtered.length!==1?'s':''}`;
   if (filtered.length===0) {
-    tbody.innerHTML=`<tr><td colspan="6"><div class="empty-state">No sessions match the current filters.</div></td></tr>`;
+    // First-run (no sessions at all) gets the branded invitation; a filtered
+    // miss stays a compact one-liner (an active filter, not an empty vault).
+    const cell = allEntries.length === 0
+      ? Shell.emptyState({
+          icon: 'sessions',
+          title: 'No time logged yet',
+          body: 'Clock in on the Tracker and your sessions land here — filter by company or date, expand the task detail, and export to PDF or CSV.',
+          cta: { label: '⏱ Open the Tracker', action: 'navigate', arg: 'tracker' },
+        })
+      : `<div class="empty-state">No sessions match the current filters.</div>`;
+    tbody.innerHTML=`<tr><td colspan="6">${cell}</td></tr>`;
     return;
   }
   const todayStr=RowUtils.localDateStr(); // C6 (D-009): badge future-dated sessions (LOCAL date)

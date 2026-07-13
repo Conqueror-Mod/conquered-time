@@ -923,6 +923,46 @@ hr.divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; 
   vertical-align: 1px;
 }
 
+/* ── Branded empty state ──────────────────────────────────────────────────
+   Shared first-run / no-data placeholder: a line-art illustration, a title, a
+   line of guidance and an optional call-to-action. Built via Shell.emptyState()
+   so every surface (Companies, Global Log, invoice ledger) reads as one system.
+   Theme-aware — the SVG art inherits var(--accent) via currentColor. */
+.ct-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 11px;
+  padding: 40px 24px;
+  min-height: 200px;
+  box-sizing: border-box;
+  font-style: normal; /* reset — some hosts (invoice .empty-row td) italicize */
+}
+.ct-empty-art {
+  width: 84px;
+  height: 84px;
+  color: var(--accent);
+  opacity: 0.92;
+}
+.ct-empty-art svg { width: 100%; height: 100%; display: block; }
+.ct-empty-title {
+  font-family: var(--sans);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-bright);
+}
+.ct-empty-body {
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-muted);
+  max-width: 340px;
+  font-style: normal;
+}
+.ct-empty-cta { margin-top: 5px; }
+
 /* Company identity dot — the Galaxy hue as a small inline marker before a
    company name, so a company reads as the same color everywhere (Recent
    Activity, Global Log, invoice ledger). Background is set inline per-row from

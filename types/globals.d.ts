@@ -615,6 +615,14 @@ interface ShellApi {
   contextMenu(ev: MouseEvent, items: Array<
     { label: string; action?: () => void; danger?: boolean; disabled?: boolean; hidden?: boolean; separator?: boolean }
     | { separator: true } | null>): void;
+  /** Branded first-run / no-data placeholder markup (HTML string). Drop into a
+   *  container or a table cell. See components/shell.js. */
+  emptyState(opts: {
+    icon?: 'companies' | 'sessions' | 'invoices';
+    title?: string;
+    body?: string;
+    cta?: { label: string; action?: string; arg?: string; cta?: string };
+  }): string;
 }
 
 // Globals exposed on window (classic-script world). `Settings` is a top-level
