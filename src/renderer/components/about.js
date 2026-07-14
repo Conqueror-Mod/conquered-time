@@ -24,6 +24,9 @@ const About = (() => {
   // Changelog — newest first. Edit HERE and both About surfaces update. The two
   // most recent entries render in-panel; older notes live on GitHub Releases.
   const CHANGELOG = [
+    { version: 'v3.24.1', items: [
+      'New app icon — a refreshed gold-and-blue hourglass mark, cropped to a clean circular badge, across the app icon, taskbar, tray, splash, About screen, and the installer',
+    ] },
     { version: 'v3.24.0', items: [
       'Import your data — bring existing clients and tracked time in from a spreadsheet. Save your data as a CSV, then a guided wizard maps its columns, previews exactly what will be created, and imports it (companies are created automatically, and a safety snapshot is taken first so it\'s always undoable). Find it under Settings → Data → Import from CSV',
       'Global search (Ctrl / ⌘ + K) — a shell-wide search box on any page; jump straight to a company, a time session, or a page. Companies open focused in the list, sessions open in the Tracker',
