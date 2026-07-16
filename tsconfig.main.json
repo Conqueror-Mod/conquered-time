@@ -34,6 +34,7 @@
     "src/main/**/*",
     "src/shared/**/*",
     "src/renderer/row-utils.js",
+    "src/renderer/identity-color.js",
     "src/renderer/time-parse.js"
   ],
   "exclude": ["node_modules", "dist", "dist-main"]

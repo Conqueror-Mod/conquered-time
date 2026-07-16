@@ -40,6 +40,10 @@ interface ReportInput {
   entries: ReportEntry[];
   /** rowid → company name. */
   companyNames: Record<number, string>;
+  /** rowid → identity CSS color (the company's bubble color — built via
+   *  IdentityColor.colorMap by the caller). Optional: without it every bar/dot
+   *  falls back to a neutral slate and the report stays fully renderable. */
+  companyColors?: Record<number, string>;
   /** Optional @font-face CSS (Inter base64) injected into the document. */
   fontCss?: string;
 }
@@ -63,7 +67,9 @@ interface Aggregates {
   totalMins: number;
   sessionCount: number;
   byDate: Array<[string, number]>;
-  byCompany: Array<[string, { mins: number; sessions: number }]>;
+  /** date → (companyId → minutes) — feeds the stacked daily bars. */
+  byDateCompany: Record<string, Record<number, number>>;
+  byCompany: Array<[string, { mins: number; sessions: number; companyId: number }]>;
   byLabel: Array<[string, number]>;
 }
 
@@ -71,7 +77,8 @@ interface Aggregates {
 // disagree about the numbers they present.
 function aggregate(entries: ReportEntry[], companyNames: Record<number, string>): Aggregates {
   const byDate: Record<string, number> = {};
-  const byCompany: Record<string, { mins: number; sessions: number }> = {};
+  const byDateCompany: Record<string, Record<number, number>> = {};
+  const byCompany: Record<string, { mins: number; sessions: number; companyId: number }> = {};
   const byLabel: Record<string, number> = {};
   let totalMins = 0;
 
@@ -80,8 +87,10 @@ function aggregate(entries: ReportEntry[], companyNames: Record<number, string>)
     totalMins += mins;
     const d = e.log_date || '';
     byDate[d] = (byDate[d] || 0) + mins;
-    const co = companyNames[Number(e.company_id)] || '(unknown)';
-    const c = byCompany[co] || (byCompany[co] = { mins: 0, sessions: 0 });
+    const cid = Number(e.company_id);
+    (byDateCompany[d] || (byDateCompany[d] = {}))[cid] = (byDateCompany[d]?.[cid] || 0) + mins;
+    const co = companyNames[cid] || '(unknown)';
+    const c = byCompany[co] || (byCompany[co] = { mins: 0, sessions: 0, companyId: cid });
     c.mins += mins; c.sessions += 1;
     try {
       JSON.parse(e.rows_json || '[]').forEach((r: any) => {
@@ -97,36 +106,72 @@ function aggregate(entries: ReportEntry[], companyNames: Record<number, string>)
     totalMins,
     sessionCount: entries.length,
     byDate: Object.entries(byDate).sort(([a], [b]) => a.localeCompare(b)),
+    byDateCompany,
     byCompany: Object.entries(byCompany).sort((a, b) => b[1].mins - a[1].mins),
     byLabel: Object.entries(byLabel).sort((a, b) => b[1] - a[1]),
   };
 }
 
-// Inline hourglass mark — no asset dependency, prints crisply at any DPI.
+// Inline vector-family hourglass mark (matches the v3.24.3 app icon) — no
+// asset dependency, prints crisply at any DPI.
 const HOURGLASS_SVG =
-  '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">' +
-  '<path d="M6 2h12v2.5c0 2.6-2.1 4.8-4.2 6.6l-1 .9 1 .9c2.1 1.8 4.2 4 4.2 6.6V22H6v-2.5c0-2.6 2.1-4.8 4.2-6.6l1-.9-1-.9C8.1 9.3 6 7.1 6 4.5V2z" ' +
-  'stroke="#0d9488" stroke-width="1.6" stroke-linejoin="round"/>' +
-  '<path d="M8.5 19.5c.7-1.9 2-3.1 3.5-3.1s2.8 1.2 3.5 3.1z" fill="#0d9488"/></svg>';
+  '<svg width="26" height="26" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">' +
+  '<rect x="6" y="0" width="52" height="10" rx="3" fill="#b8862e"/>' +
+  '<rect x="6" y="54" width="52" height="10" rx="3" fill="#b8862e"/>' +
+  '<path d="M12 10 h40 v6 c0 9 -9 14 -15 19 6 5 15 10 15 19 v6 h-40 v-6 c0 -9 9 -14 15 -19 -6 -5 -15 -10 -15 -19 z" fill="#d9b45a"/>' +
+  '<path d="M20 14 h24 v3 c0 6 -7 10 -12 14 -5 -4 -12 -8 -12 -14 z" fill="#5b7fd4"/>' +
+  '<path d="M32 36 l9 8 c2.5 2.5 3 5 3 8 h-24 c0 -3 0.5 -5.5 3 -8 z" fill="#5b7fd4"/></svg>';
+
+// Print-safe fallback when the caller supplies no identity color for a company.
+const NEUTRAL = '#94a3b8';
+
+// Weekday prefix for the daily-bars axis ('2026-07-06' → 'Mon 07-06').
+function dayLabel(d: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d);
+  if (!m) return d;
+  const names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const dt = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return `${names[dt.getDay()]} ${m[2]}-${m[3]}`;
+}
 
 function buildEmailReportHTML(input: ReportInput): string {
   const { title, fromDate, toDate, coLabel, entries, companyNames, fontCss } = input;
+  const colors = input.companyColors || {};
+  const colorOf = (cid: number) => colors[cid] || NEUTRAL;
   const agg = aggregate(entries, companyNames);
   const daysWorked = agg.byDate.filter(([, m]) => m > 0).length;
+  const maxDay = Math.max(1, ...agg.byDate.map(([, m]) => m));
 
-  const dateRows = agg.byDate
-    .map(([d, m]) => `<tr><td class="mono">${escapeHtml(d)}</td><td class="num mono">${fmtMins(m)}</td></tr>`)
-    .join('');
+  // Daily Hours — horizontal bars, stacked by company identity color when a
+  // day spans several companies. Width is relative to the busiest day.
+  const dateBars = agg.byDate.map(([d, m]) => {
+    const segs = Object.entries(agg.byDateCompany[d] || {})
+      .sort((a, b) => Number(b[1]) - Number(a[1]))
+      .map(([cid, cm]) =>
+        `<div class="seg" style="width:${(Number(cm) / maxDay) * 100}%;background:${escapeHtml(colorOf(Number(cid)))}"></div>`)
+      .join('');
+    return `<div class="brow"><div class="bd mono">${escapeHtml(dayLabel(d))}</div>` +
+      `<div class="btrack">${segs}</div><div class="bt mono">${fmtMins(m)}</div></div>`;
+  }).join('');
+
+  // Legend: companies in period order of weight, dot = identity color.
+  const legend = agg.byCompany.map(([name, c]) =>
+    `<span class="lg"><i style="background:${escapeHtml(colorOf(c.companyId))}"></i>${escapeHtml(name)}</span>`).join('');
+
   const companyRows = agg.byCompany
     .map(([name, c]) =>
-      `<tr><td>${escapeHtml(name)}</td><td class="num mono">${c.sessions}</td><td class="num mono">${fmtMins(c.mins)}</td><td class="num mono">${pct(c.mins, agg.totalMins)}</td></tr>`)
+      `<tr><td><i class="dot" style="background:${escapeHtml(colorOf(c.companyId))}"></i>${escapeHtml(name)}</td>` +
+      `<td class="num mono">${c.sessions}</td><td class="num mono">${fmtMins(c.mins)}</td>` +
+      `<td class="num"><div class="share"><div class="sbar"><div class="sfill" style="width:${pct(c.mins, agg.totalMins) === '—' ? 0 : Math.round((c.mins / agg.totalMins) * 100)}%;background:${escapeHtml(colorOf(c.companyId))}"></div></div><span class="mono">${pct(c.mins, agg.totalMins)}</span></div></td></tr>`)
     .join('');
   const labelRows = agg.byLabel
     .map(([l, m]) =>
-      `<tr><td>${escapeHtml(l)}</td><td class="num mono">${fmtMins(m)}</td><td class="num mono">${pct(m, agg.totalMins)}</td></tr>`)
+      `<tr><td>${escapeHtml(l)}</td><td class="num mono">${fmtMins(m)}</td>` +
+      `<td class="num"><div class="share"><div class="sbar"><div class="sfill" style="width:${agg.totalMins > 0 ? Math.round((m / agg.totalMins) * 100) : 0}%;background:#5b7fd4"></div></div><span class="mono">${pct(m, agg.totalMins)}</span></div></td></tr>`)
     .join('');
 
   const empty = '<tr><td colspan="4" class="empty">No time recorded in this period.</td></tr>';
+  const emptyBars = '<div class="empty">No time recorded in this period.</div>';
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title>
 <style>
@@ -135,26 +180,37 @@ ${fontCss || ''}
 *{box-sizing:border-box;}
 body{font-family:'Inter','Segoe UI',Arial,sans-serif;font-size:12px;color:#1f2937;margin:0;padding:44px 48px;max-width:860px;margin:0 auto;background:#fff;}
 .mono{font-variant-numeric:tabular-nums;}
-.brand{display:flex;align-items:center;justify-content:space-between;padding-bottom:14px;border-bottom:3px solid #0d9488;}
+.brand{display:flex;align-items:center;justify-content:space-between;padding-bottom:14px;border-bottom:3px solid #b8862e;}
 .brand-left{display:flex;align-items:center;gap:10px;}
-.wordmark{font-size:15px;font-weight:600;letter-spacing:3px;color:#0f172a;}
-.wordmark span{color:#0d9488;}
+.wordmark{font-size:15px;font-weight:600;letter-spacing:3px;color:#141c2e;}
+.wordmark span{color:#b8862e;}
 .report-title{text-align:right;}
-.report-title h1{font-size:19px;font-weight:600;margin:0;color:#0f172a;}
+.report-title h1{font-size:19px;font-weight:600;margin:0;color:#141c2e;}
 .report-title .period{font-size:11px;color:#64748b;margin-top:2px;}
 .summary{display:flex;gap:10px;margin:20px 0 6px;}
 .stat{flex:1;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px 14px;}
-.stat .v{font-size:17px;font-weight:600;color:#0f172a;}
+.stat .v{font-size:17px;font-weight:600;color:#141c2e;}
 .stat .k{font-size:9.5px;letter-spacing:1.2px;text-transform:uppercase;color:#64748b;margin-top:2px;}
-h2{font-size:12px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:#0d9488;margin:26px 0 8px;}
+h2{font-size:12px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:#b8862e;margin:26px 0 10px;}
+.brow{display:flex;align-items:center;gap:10px;padding:3.5px 0;}
+.bd{width:86px;font-size:11px;color:#475569;flex-shrink:0;}
+.btrack{flex:1;height:13px;background:#f1f3f7;border-radius:4px;overflow:hidden;display:flex;}
+.seg{height:100%;}
+.bt{width:64px;text-align:right;font-size:11px;color:#141c2e;font-weight:600;flex-shrink:0;}
+.legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:8px;font-size:10px;color:#64748b;}
+.lg i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;}
+.share{display:flex;align-items:center;gap:8px;justify-content:flex-end;}
+.sbar{width:70px;height:8px;background:#f1f3f7;border-radius:4px;overflow:hidden;}
+.sfill{height:100%;border-radius:4px;}
 table{width:100%;border-collapse:collapse;}
-th{background:#f1f5f9;padding:7px 10px;text-align:left;font-size:10px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;color:#475569;border-bottom:2px solid #0d9488;}
+th{background:#f1f5f9;padding:7px 10px;text-align:left;font-size:10px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;color:#475569;border-bottom:2px solid #b8862e;}
 td{padding:6px 10px;border-bottom:1px solid #e5e7eb;font-size:11.5px;}
 .num{text-align:right;}th.num{text-align:right;}
 tr.total td{font-weight:600;background:#f8fafc;border-bottom:none;border-top:2px solid #cbd5e1;}
 .empty{color:#94a3b8;text-align:center;padding:16px;}
 .footer{margin-top:36px;padding-top:10px;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;font-size:9.5px;color:#94a3b8;}
-.footer .conf{letter-spacing:1.5px;font-weight:600;}
+.footer .conf{letter-spacing:1.5px;font-weight:600;color:#b8862e;}
 </style></head><body>
 <div class="brand">
   <div class="brand-left">${HOURGLASS_SVG}<div class="wordmark">CONQUERED <span>TIME</span></div></div>
@@ -168,9 +224,8 @@ tr.total td{font-weight:600;background:#f8fafc;border-bottom:none;border-top:2px
   <div class="stat"><div class="v mono">${agg.byCompany.length}</div><div class="k">Companies</div></div>
 </div>
 <h2>Daily Hours</h2>
-<table><thead><tr><th>Date</th><th class="num">Time</th></tr></thead>
-<tbody>${dateRows || empty}
-<tr class="total"><td>Total</td><td class="num mono">${fmtMins(agg.totalMins)}</td></tr></tbody></table>
+<div class="bars">${dateBars || emptyBars}
+<div class="legend">${legend}</div></div>
 <h2>By Company</h2>
 <table><thead><tr><th>Company</th><th class="num">Sessions</th><th class="num">Time</th><th class="num">Share</th></tr></thead>
 <tbody>${companyRows || empty}</tbody></table>

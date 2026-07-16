@@ -151,10 +151,12 @@ interface InvoiceDoc {
 }
 
 const HOURGLASS_SVG =
-  '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">' +
-  '<path d="M6 2h12v2.5c0 2.6-2.1 4.8-4.2 6.6l-1 .9 1 .9c2.1 1.8 4.2 4 4.2 6.6V22H6v-2.5c0-2.6 2.1-4.8 4.2-6.6l1-.9-1-.9C8.1 9.3 6 7.1 6 4.5V2z" ' +
-  'stroke="#0d9488" stroke-width="1.6" stroke-linejoin="round"/>' +
-  '<path d="M8.5 19.5c.7-1.9 2-3.1 3.5-3.1s2.8 1.2 3.5 3.1z" fill="#0d9488"/></svg>';
+  '<svg width="26" height="26" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">' +
+  '<rect x="6" y="0" width="52" height="10" rx="3" fill="#b8862e"/>' +
+  '<rect x="6" y="54" width="52" height="10" rx="3" fill="#b8862e"/>' +
+  '<path d="M12 10 h40 v6 c0 9 -9 14 -15 19 6 5 15 10 15 19 v6 h-40 v-6 c0 -9 9 -14 15 -19 -6 -5 -15 -10 -15 -19 z" fill="#d9b45a"/>' +
+  '<path d="M20 14 h24 v3 c0 6 -7 10 -12 14 -5 -4 -12 -8 -12 -14 z" fill="#5b7fd4"/>' +
+  '<path d="M32 36 l9 8 c2.5 2.5 3 5 3 8 h-24 c0 -3 0.5 -5.5 3 -8 z" fill="#5b7fd4"/></svg>';
 
 /** Render a branded, print-safe invoice HTML document. */
 function buildInvoiceHTML(doc: InvoiceDoc): string {
@@ -203,24 +205,24 @@ ${doc.fontCss || ''}
 *{box-sizing:border-box;}
 body{font-family:'Inter','Segoe UI',Arial,sans-serif;font-size:12px;color:#1f2937;margin:0;padding:44px 48px;max-width:860px;margin:0 auto;background:#fff;}
 .mono{font-variant-numeric:tabular-nums;}
-.brand{display:flex;align-items:center;justify-content:space-between;padding-bottom:14px;border-bottom:3px solid #0d9488;}
+.brand{display:flex;align-items:center;justify-content:space-between;padding-bottom:14px;border-bottom:3px solid #b8862e;}
 .brand-left{display:flex;align-items:center;gap:10px;}
-.wordmark{font-size:15px;font-weight:600;letter-spacing:3px;color:#0f172a;}
-.wordmark span{color:#0d9488;}
+.wordmark{font-size:15px;font-weight:600;letter-spacing:3px;color:#141c2e;}
+.wordmark span{color:#b8862e;}
 .doc-title{text-align:right;}
-.doc-title h1{font-size:22px;font-weight:600;margin:0;color:#0f172a;letter-spacing:1px;}
+.doc-title h1{font-size:22px;font-weight:600;margin:0;color:#141c2e;letter-spacing:1px;}
 .doc-title .num{font-size:12px;color:#64748b;margin-top:2px;}
 .parties{display:flex;justify-content:space-between;gap:24px;margin:24px 0 6px;}
 .party{flex:1;}
-.party .lbl{font-size:9.5px;letter-spacing:1.2px;text-transform:uppercase;color:#0d9488;font-weight:600;margin-bottom:5px;}
-.party .who{font-size:14px;font-weight:600;color:#0f172a;}
+.party .lbl{font-size:9.5px;letter-spacing:1.2px;text-transform:uppercase;color:#b8862e;font-weight:600;margin-bottom:5px;}
+.party .who{font-size:14px;font-weight:600;color:#141c2e;}
 .party .addr{font-size:11px;color:#475569;margin-top:2px;line-height:1.5;}
 .meta{min-width:220px;}
 .meta>div{display:flex;justify-content:space-between;gap:16px;padding:3px 0;font-size:11.5px;}
 .meta .mk{color:#64748b;}
-.meta .mv{font-weight:600;color:#0f172a;}
+.meta .mv{font-weight:600;color:#141c2e;}
 table{width:100%;border-collapse:collapse;margin-top:22px;}
-th{background:#f1f5f9;padding:8px 10px;text-align:left;font-size:10px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;color:#475569;border-bottom:2px solid #0d9488;}
+th{background:#f1f5f9;padding:8px 10px;text-align:left;font-size:10px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;color:#475569;border-bottom:2px solid #b8862e;}
 td{padding:7px 10px;border-bottom:1px solid #e5e7eb;font-size:11.5px;}
 .num{text-align:right;}th.num{text-align:right;}
 .empty{color:#94a3b8;text-align:center;padding:16px;}
@@ -228,9 +230,9 @@ td{padding:7px 10px;border-bottom:1px solid #e5e7eb;font-size:11.5px;}
 .totals table{margin:0;}
 .totals td{border:none;padding:5px 10px;}
 .totals .tk{color:#64748b;}
-.totals tr.grand td{font-size:15px;font-weight:700;color:#0f172a;border-top:2px solid #0d9488;padding-top:9px;}
+.totals tr.grand td{font-size:15px;font-weight:700;color:#141c2e;border-top:2px solid #b8862e;padding-top:9px;}
 .pay{margin-top:26px;padding:12px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;font-size:11px;color:#475569;line-height:1.5;}
-.pay-h{font-size:9.5px;letter-spacing:1.2px;text-transform:uppercase;color:#0d9488;font-weight:600;margin-bottom:4px;}
+.pay-h{font-size:9.5px;letter-spacing:1.2px;text-transform:uppercase;color:#b8862e;font-weight:600;margin-bottom:4px;}
 .footer{margin-top:36px;padding-top:10px;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;font-size:9.5px;color:#94a3b8;}
 </style></head><body>
 <div class="brand">

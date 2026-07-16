@@ -94,8 +94,6 @@ interface BubbleWebOpts {
 
 // Identity palettes (v2) — hues tuned for both grounds; the CB variant avoids
 // red↔green confusable pairs (deutan/protan). Names always carry identity too.
-const PALETTE = [187, 262, 43, 12, 152, 210, 322, 88, 280, 335];
-const PALETTE_CB = [210, 40, 285, 65, 235, 320, 20, 190];
 
 function isLightTheme(): boolean {
   const theme = document.documentElement.getAttribute('data-theme') || 'memoria';
@@ -107,29 +105,14 @@ function isColorblind(): boolean {
 function reducedMotion(): boolean {
   return document.documentElement.getAttribute('data-reduced-motion') === 'true';
 }
-function paletteHue(id: number): number {
-  const pal = isColorblind() ? PALETTE_CB : PALETTE;
-  return pal[Math.abs(id) % pal.length];
-}
-function hexToHS(hex: string): { h: number; s: number } | null {
-  const m = /^#([0-9a-f]{6})$/i.exec(hex || '');
-  if (!m) return null;
-  const n = parseInt(m[1], 16);
-  const r = (n >> 16 & 255) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255;
-  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
-  let h = 0;
-  if (d) {
-    h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
-    h = Math.round(h * 60); if (h < 0) h += 360;
-  }
-  const l = (mx + mn) / 2, sat = d ? d / (1 - Math.abs(2 * l - 1)) : 0;
-  return { h, s: Math.round(sat * 100) };
-}
+// Identity-color math lives in identity-color.js (shared with the main
+// process's emailed report — pages load it before this file). These wrappers
+// feed it the DOM-derived environment so callers here keep the old signatures.
+const IC = (window as any).IdentityColor;
+const icOpts = () => ({ lightTheme: isLightTheme(), colorblind: isColorblind() });
+function paletteHue(id: number): number { return IC.paletteHue(id, isColorblind()); }
 /** 1 = worked today → 0 = 60d+ idle; drives the saturation fade. */
-function recencyT(lastDays: number): number {
-  if (!isFinite(lastDays)) return 0;
-  return Math.max(0, Math.min(1, 1 - lastDays / 60));
-}
+const recencyT: (lastDays: number) => number = IC.recencyT;
 
 // Minimal structural shape for identity-color computation — GalaxyModel
 // satisfies it, and outside consumers (the Dashboard week band) can build one
@@ -138,18 +121,11 @@ function recencyT(lastDays: number): number {
 interface IdentityGroup { rows: Array<{ id: number; color?: string }>; lastDays: number; }
 
 interface HueSpec { h: number; s: number; boost: number; }
-function galaxyHue(g: IdentityGroup): HueSpec {
-  const t = recencyT(g.lastDays);
-  const ovRow = g.rows.find(r => r.color);
-  const ov = ovRow?.color ? hexToHS(ovRow.color) : null;
-  if (ov) return { h: ov.h, s: Math.max(30, Math.min(85, ov.s)) * (0.55 + 0.45 * t), boost: 0.65 + 0.55 * t };
-  const minId = Math.min(...g.rows.map(r => r.id));
-  return { h: paletteHue(minId), s: 28 + 44 * t, boost: 0.65 + 0.55 * t };
-}
+function galaxyHue(g: IdentityGroup): HueSpec { return IC.galaxyHue(g, icOpts()); }
 
 // The galaxy grouping key — rows sharing it form one identity family. Module
 // scope (not attach-local) so identity consumers group exactly like the web.
-const groupKey = (co: Company): string => (co.hier_company || co.name || '—').trim() || '—';
+const groupKey: (co: Company) => string = IC.groupKey;
 
 // Ready-to-use CSS color for flat UI surfaces (week-band blocks, list dots)
 // carrying the same identity as the web's bubbles. The web itself keeps its
@@ -157,12 +133,7 @@ const groupKey = (co: Company): string => (co.hier_company || co.name || '—').
 // a legibility floor on saturation (a long-idle company still needs a readable
 // block even though its bubble fades toward grey), lightness tuned per ground
 // so white block labels pass on light themes too.
-function identityCss(g: IdentityGroup): string {
-  const spec = galaxyHue(g);
-  const s = Math.max(38, Math.round(spec.s));
-  const l = isLightTheme() ? 44 : 52;
-  return `hsl(${spec.h}, ${s}%, ${l}%)`;
-}
+function identityCss(g: IdentityGroup): string { return IC.identityCss(g, icOpts()); }
 // Build a companyId → identity CSS color lookup for flat list surfaces
 // (Recent Activity, Global Log, invoice ledger, Insights). Groups companies by
 // groupKey and derives recency (lastDays) from the latest worked log_date,
@@ -174,33 +145,7 @@ function colorMap(
   companies: Company[],
   entries: Array<{ company_id: number; log_date: string }>,
 ): { colorFor: (companyId: number) => string } {
-  const today = RowUtils.localDateStr();
-  const lastByCo: Record<number, string> = {};
-  for (const e of entries) {
-    if (e.log_date <= today && (!lastByCo[e.company_id] || e.log_date > lastByCo[e.company_id]))
-      lastByCo[e.company_id] = e.log_date;
-  }
-  const dayMs = 86400000;
-  const groups = new Map<string, { rows: Company[]; lastDays: number }>();
-  const coById: Record<number, Company> = {};
-  for (const co of companies) {
-    coById[co.id] = co;
-    const key = groupKey(co);
-    let g = groups.get(key);
-    if (!g) { g = { rows: [], lastDays: Infinity }; groups.set(key, g); }
-    g.rows.push(co);
-    const lastDays = lastByCo[co.id]
-      ? Math.max(0, Math.round((new Date(today + 'T00:00').getTime() - new Date(lastByCo[co.id] + 'T00:00').getTime()) / dayMs))
-      : Infinity;
-    g.lastDays = Math.min(g.lastDays, lastDays);
-  }
-  return {
-    colorFor(companyId: number): string {
-      const co = coById[companyId];
-      const g = co ? groups.get(groupKey(co)) : null;
-      return g ? identityCss(g) : 'var(--border-light)';
-    },
-  };
+  return IC.colorMap(companies, entries, icOpts());
 }
 
 // Identity path: systems keep the parent hue, stepped saturation/boost.

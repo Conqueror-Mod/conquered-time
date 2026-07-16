@@ -537,6 +537,25 @@ interface InsightsComputeApi {
   weekKey(d: Date): string;
 }
 
+/** Identity-color options — DOM-free environment facts callers must supply. */
+interface IdentityColorOpts { lightTheme?: boolean; colorblind?: boolean; today?: string; fallback?: string; }
+interface IdentityColorGroup { rows: Array<{ id: number; color?: string }>; lastDays: number; }
+/** Shared company identity-color math (src/renderer/identity-color.js) — the
+ *  single source bubble-web.ts AND the main process's emailed report defer to. */
+interface IdentityColorApi {
+  PALETTE: number[];
+  PALETTE_CB: number[];
+  paletteHue(id: number, colorblind?: boolean): number;
+  hexToHS(hex: string): { h: number; s: number } | null;
+  recencyT(lastDays: number): number;
+  galaxyHue(g: IdentityColorGroup, opts?: IdentityColorOpts): { h: number; s: number; boost: number };
+  groupKey(co: { hier_company?: string | null; name?: string | null }): string;
+  identityCss(g: IdentityColorGroup, opts?: IdentityColorOpts): string;
+  colorMap(companies: Array<{ id: number; hier_company?: string | null; name?: string | null; color?: string }>,
+           entries: Array<{ company_id: number; log_date: string }>,
+           opts?: IdentityColorOpts): { colorFor: (companyId: number) => string };
+}
+
 /** Structural on purpose — the unit tests exercise CanvasText with a stub ctx. */
 interface MeasuringCtx {
   font: string;
@@ -671,6 +690,7 @@ interface Window {
   Validator: ValidatorApi;
   RowUtils: RowUtilsApi;
   InsightsCompute: InsightsComputeApi;
+  IdentityColor: IdentityColorApi;
   ImportParse: ImportParseApi;
   ExportHtml: ExportHtmlApi;
   CanvasText: CanvasTextApi;
@@ -750,6 +770,7 @@ declare const Store: StoreApi;
 declare const Validator: ValidatorApi;
 declare const RowUtils: RowUtilsApi;
 declare const InsightsCompute: InsightsComputeApi;
+declare const IdentityColor: IdentityColorApi;
 declare const ImportParse: ImportParseApi;
 declare const ExportHtml: ExportHtmlApi;
 declare const CanvasText: CanvasTextApi;
