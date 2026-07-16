@@ -86,3 +86,28 @@ test('movingAverage is a trailing mean over the window', () => {
   // window larger than index → mean of everything so far
   assert.deepStrictEqual(IC.movingAverage([3, 5, 10], 5), [3, 4, 6]);
 });
+
+// ── Stress campaign v2 (D-102) ───────────────────────────────────────────────
+
+test('trendBuckets caps gap-fill on absurd date spans (no 400k-bucket hang)', () => {
+  const entries = [
+    { log_date: '2025-01-06', total_mins: 60 },
+    { log_date: '9999-12-31', total_mins: 30 },
+  ];
+  const wk = IC.trendBuckets(entries, 'week');
+  assert.strictEqual(wk.length, 2);            // data buckets only, no fill
+  assert.strictEqual(wk[0].mins, 60);
+  assert.strictEqual(wk[1].mins, 30);
+  const mo = IC.trendBuckets(entries, 'month');
+  assert.strictEqual(mo.length, 2);
+});
+
+test('trendBuckets still gap-fills normal spans', () => {
+  const entries = [
+    { log_date: '2026-06-01', total_mins: 60 },  // Mon
+    { log_date: '2026-06-15', total_mins: 30 },  // 2 weeks later
+  ];
+  const wk = IC.trendBuckets(entries, 'week');
+  assert.strictEqual(wk.length, 3);            // filled middle week
+  assert.strictEqual(wk[1].mins, 0);
+});

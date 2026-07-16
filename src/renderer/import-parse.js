@@ -125,6 +125,13 @@
       return null;
     }
     if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+    // Real-calendar check (rejects Feb 31 etc. — JS Date would roll them over
+    // into the next month and store a date that never happened) + a sane year
+    // window so a typo'd year can't land a far-past/future entry in the vault
+    // (downstream trend charts gap-fill between first and last date).
+    if (y < 1970 || y > 2100) return null;
+    const dt = new Date(y, mo - 1, d);
+    if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return null;
     return `${y}-${pad(mo)}-${pad(d)}`;
   }
 
@@ -177,6 +184,9 @@
       if (co) { const p = TP.parseClockInput(co); if (!p.ok) { errors.push({ row: rownum, msg: `Unrecognized clock-out: "${co}"` }); return; } clock_out = p.hhmm; }
 
       let total_mins = parseNum(get('duration_mins'));
+      // A single row can't honestly exceed 24h — a huge value is a unit mixup
+      // (seconds? a serial?) and would poison totals, insights, and invoices.
+      if (total_mins > 1440) { errors.push({ row: rownum, msg: `Duration out of range (max 1440 mins): "${get('duration_mins')}"` }); return; }
       if (!(total_mins > 0) && clock_in && clock_out) total_mins = TP.computeDiffMins(clock_in, clock_out);
       total_mins = Math.max(0, Math.round(Number.isFinite(total_mins) ? total_mins : 0));
 

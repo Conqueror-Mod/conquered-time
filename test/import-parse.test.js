@@ -105,3 +105,31 @@ test('buildEntries: explicit duration wins; midnight wrap; bad rows skipped', ()
   assert.strictEqual(sessions.find((s) => s.company === 'B').total_mins, 45);
   assert.strictEqual(errors.length, 3);
 });
+
+// ── Stress campaign v2 (D-101 / D-103) ──────────────────────────────────────
+
+test('normalizeDate rejects impossible calendar dates', () => {
+  assert.strictEqual(IP.normalizeDate('2/31/2025'), null);
+  assert.strictEqual(IP.normalizeDate('2025-02-30'), null);
+  assert.strictEqual(IP.normalizeDate('4/31/2025'), null);
+  assert.strictEqual(IP.normalizeDate('2/29/2025'), null);   // not a leap year
+  assert.strictEqual(IP.normalizeDate('2/29/2024'), '2024-02-29'); // leap year OK
+});
+
+test('normalizeDate rejects out-of-window years (typo protection)', () => {
+  assert.strictEqual(IP.normalizeDate('12/31/9999'), null);
+  assert.strictEqual(IP.normalizeDate('1/6/0209'), null);
+  assert.strictEqual(IP.normalizeDate('1/6/1969'), null);
+  assert.strictEqual(IP.normalizeDate('1/6/1970'), '1970-01-06');
+  assert.strictEqual(IP.normalizeDate('12/31/2100'), '2100-12-31');
+});
+
+test('buildEntries rejects per-row durations over 24h', () => {
+  const csv = 'Company,Date,Duration\nA,7/13/2026,1000000000\nB,7/13/2026,1440\n';
+  const { headers, rows } = IP.parseCSV(csv);
+  const { sessions, errors } = IP.buildEntries(rows, IP.autoMap(headers, IP.ENTRY_FIELDS));
+  assert.strictEqual(sessions.length, 1);
+  assert.strictEqual(sessions[0].company, 'B');
+  assert.strictEqual(errors.length, 1);
+  assert.match(errors[0].msg, /out of range/i);
+});
