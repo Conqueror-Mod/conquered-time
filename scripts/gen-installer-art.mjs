@@ -61,8 +61,8 @@ async function writeBmp(image, w, h, bg, outName) {
           <stop offset="1" stop-color="#0c1626"/>
         </linearGradient>
         <radialGradient id="glow" cx="50%" cy="30%" r="46%">
-          <stop offset="0" stop-color="#00b8cc" stop-opacity="0.30"/>
-          <stop offset="1" stop-color="#00b8cc" stop-opacity="0"/>
+          <stop offset="0" stop-color="#e9b949" stop-opacity="0.30"/>
+          <stop offset="1" stop-color="#e9b949" stop-opacity="0"/>
         </radialGradient>
       </defs>
       <rect width="${W}" height="${H}" fill="url(#g)"/>
@@ -70,7 +70,7 @@ async function writeBmp(image, w, h, bg, outName) {
       <text x="${W / 2}" y="210" text-anchor="middle" font-family="Consolas,monospace" font-size="17" letter-spacing="3" font-weight="700" fill="#ffffff">CONQUERED</text>
       <text x="${W / 2}" y="232" text-anchor="middle" font-family="Consolas,monospace" font-size="17" letter-spacing="7" font-weight="700" fill="#ffffff">TIME</text>
       <text x="${W / 2}" y="256" text-anchor="middle" font-family="Segoe UI,sans-serif" font-size="9" letter-spacing="0.6" fill="#8aa0b8">Take back your time.</text>
-      <rect x="${W / 2 - 22}" y="268" width="44" height="2" rx="1" fill="#00b8cc"/>
+      <rect x="${W / 2 - 22}" y="268" width="44" height="2" rx="1" fill="#e9b949"/>
     </svg>`
   );
   const icon = await sharp(path.join(ASSETS, 'icon-1024.png'))
@@ -88,7 +88,7 @@ async function writeBmp(image, w, h, bg, outName) {
       <rect width="${W}" height="${H}" fill="#ffffff"/>
       <text x="50" y="26" font-family="Segoe UI,sans-serif" font-size="13" font-weight="700" fill="#13243c">Conquered</text>
       <text x="50" y="43" font-family="Segoe UI,sans-serif" font-size="13" font-weight="700" fill="#13243c">Time</text>
-      <rect x="0" y="${H - 2}" width="${W}" height="2" fill="#00b8cc"/>
+      <rect x="0" y="${H - 2}" width="${W}" height="2" fill="#e9b949"/>
     </svg>`
   );
   const icon = await sharp(path.join(ASSETS, 'icon-256.png'))
