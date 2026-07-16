@@ -22,8 +22,11 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 const UpdateNotice = (() => {
-  /** @type {HTMLElement|null} the single persistent sticky toast (rebuilt per state). */
+  /** @type {HTMLElement|null} the single persistent sticky toast (rebuilt per STATE
+   *  change only — progress ticks update it in place, see 'download-progress'). */
   let el = null;
+  /** Which state `el` was built for; lets a same-state tick reuse the node. */
+  let elState = null;
   /** The state the user last dismissed with "Later"; re-shown when state changes. */
   let dismissedFor = null;
   let wired = false;
@@ -42,22 +45,47 @@ const UpdateNotice = (() => {
     setTimeout(() => t.remove(), 5000);
   }
 
-  function clearSticky() { if (el) { el.remove(); el = null; } }
+  function clearSticky() { if (el) { el.remove(); el = null; elState = null; } }
 
   /**
    * @param {string} msg
    * @param {Array<{label: string, fn: () => void, primary?: boolean}>} actions
+   * @param {{state?: string, progress?: number}} [opts] - `state` keys the node for
+   *   in-place reuse; `progress` (0-100) renders a fill bar under the message.
    */
-  function renderSticky(msg, actions) {
+  function renderSticky(msg, actions, opts = {}) {
     const c = container();
     if (!c) return;
+    // Same-state re-render (e.g. each download-progress tick): mutate the live
+    // node instead of remove+append — recreating it replays the .toast entry
+    // animation on every tick, which reads as a translucent flicker for the
+    // whole download.
+    if (el && opts.state && elState === opts.state) {
+      const t = el.querySelector('.update-toast-msg');
+      if (t) t.textContent = msg;
+      const fill = el.querySelector('.update-toast-fill');
+      if (fill && typeof opts.progress === 'number') {
+        fill.style.width = `${Math.max(0, Math.min(100, opts.progress))}%`;
+      }
+      return;
+    }
     clearSticky();
     el = document.createElement('div');
+    elState = opts.state || null;
     el.className = 'toast info update-toast';
     const text = document.createElement('div');
     text.className = 'update-toast-msg';
     text.textContent = msg;
     el.appendChild(text);
+    if (typeof opts.progress === 'number') {
+      const bar = document.createElement('div');
+      bar.className = 'update-toast-bar';
+      const fill = document.createElement('div');
+      fill.className = 'update-toast-fill';
+      fill.style.width = `${Math.max(0, Math.min(100, opts.progress))}%`;
+      bar.appendChild(fill);
+      el.appendChild(bar);
+    }
     if (actions.length) {
       const row = document.createElement('div');
       row.className = 'update-toast-btns';
@@ -94,7 +122,7 @@ const UpdateNotice = (() => {
         break;
       case 'download-progress': {
         const pct = Math.round(status.percent || 0);
-        renderSticky(`Downloading update… ${pct}%`, []);
+        renderSticky(`Downloading update… ${pct}%`, [], { state: 'download-progress', progress: pct });
         break;
       }
       case 'downloaded':
@@ -129,7 +157,8 @@ const UpdateNotice = (() => {
     if (!wired) { api.on('update:status', handle); wired = true; }
   }
 
-  return { init };
+  // _handle mirrors shell.js's _-prefixed exports: test/driver access only.
+  return { init, _handle: handle };
 })();
 
 window.UpdateNotice = UpdateNotice;

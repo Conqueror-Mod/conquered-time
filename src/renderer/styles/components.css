@@ -429,6 +429,19 @@ td {
   border-left: 3px solid var(--accent);
 }
 .update-toast-msg { font-weight: 600; }
+.update-toast-bar {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--surface-1);
+  overflow: hidden;
+}
+.update-toast-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 2px;
+  background: var(--accent);
+  transition: width 0.25s ease; /* smooths the gaps between progress events */
+}
 .update-toast-btns { display: flex; gap: 8px; }
 .update-toast-btns button { font-size: var(--toast-btn-font); padding: var(--toast-btn-pad-y) var(--toast-btn-pad-x); }
 
