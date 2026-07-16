@@ -23,9 +23,10 @@ const browser = await chromium.launch({ executablePath: CHROME, headless: true }
 const page = await browser.newPage();
 const data = await page.evaluate(async (jobs) => {
   const out = {};
-  for (const [px, svg] of jobs) {
+  for (const [pxRaw, svg] of jobs) {
+    const px = Number(pxRaw);
     const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej;
-      i.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg))); });
+      i.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(String(svg)))); });
     const c = document.createElement('canvas'); c.width = c.height = px;
     c.getContext('2d').drawImage(img, 0, 0, px, px);
     const { data: id } = c.getContext('2d').getImageData(0, 0, px, px);

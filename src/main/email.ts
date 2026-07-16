@@ -39,16 +39,39 @@ function loadPdfFontCss(): string {
   return pdfFontCssCache;
 }
 
-// Decrypted company list for the logged-in user (rowid, name, report_email).
-function getReportCompanies(): Array<{ id: number; name: string; report_email: string }> {
-  const list: Array<{ id: number; name: string; report_email: string }> = [];
+// Decrypted company list for the logged-in user. hier_company/color ride along
+// so the emailed report can compute the same identity colors the app shows.
+function getReportCompanies(): Array<{ id: number; name: string; report_email: string; hier_company?: string; color?: string }> {
+  const list: Array<{ id: number; name: string; report_email: string; hier_company?: string; color?: string }> = [];
   dbAll('SELECT rowid as rid, * FROM companies WHERE user_id=?', [session.user.id]).forEach((co: any) => {
     try {
       const data = JSON.parse(decrypt({ data: co.data_enc, iv: co.data_iv, tag: co.data_tag }, session.key));
-      list.push({ id: Number(co.rid), name: data.name || '', report_email: (data.report_email || '').trim() });
+      list.push({
+        id: Number(co.rid), name: data.name || '', report_email: (data.report_email || '').trim(),
+        hier_company: data.hier_company || '', color: data.color || undefined,
+      });
     } catch {}
   });
   return list;
+}
+
+// companyId → identity CSS color for the report's bars/dots — the SAME color
+// the company's galaxy bubble / list dot shows in the app (identity-color.js
+// is the shared source; a manual Edit Color override wins here too). Report
+// documents are always light-ground, so lightTheme is fixed true; the
+// colorblind-safe palette follows the profile's accessibility setting.
+function getReportColorMap(entries: Array<Record<string, any>>): Record<number, string> {
+  const IdentityColor = require('../renderer/identity-color');
+  const colorblind = ((dbGet('SELECT value FROM app_settings WHERE key=?', ['ui_colorblind']) || {}).value || 'off') !== 'off';
+  const companies = getReportCompanies();
+  const { colorFor } = IdentityColor.colorMap(
+    companies,
+    entries.map((e: any) => ({ company_id: Number(e.company_id), log_date: e.log_date || '' })),
+    { lightTheme: true, colorblind, fallback: '#94a3b8' },
+  );
+  const map: Record<number, string> = {};
+  for (const co of companies) map[co.id] = colorFor(co.id);
+  return map;
 }
 
 // Decrypted company-name map for the logged-in user (rowid → name).
@@ -179,7 +202,8 @@ async function sendPeriodReport({ title, fromDate, toDate, companyId, subject, r
   const companyNames = getCompanyNames();
   const coLabel = companyId ? (companyNames[Number(companyId)] || 'Selected Company') : 'All Companies';
   const htmlContent = buildEmailReportHTML({
-    title, fromDate, toDate, coLabel, entries, companyNames, fontCss: loadPdfFontCss(),
+    title, fromDate, toDate, coLabel, entries, companyNames,
+    companyColors: getReportColorMap(entries), fontCss: loadPdfFontCss(),
   });
   await doSendReport({ htmlContent, subject, recipients, entries, fromDate, toDate });
 }

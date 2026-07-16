@@ -34,7 +34,9 @@ test('aggregate: one shared pass drives both HTML and CSV numbers', () => {
   assert.strictEqual(agg.sessionCount, 3);
   assert.deepStrictEqual(agg.byDate, [['2026-07-01', 120], ['2026-07-02', 105]]);
   assert.strictEqual(agg.byCompany[0][0], 'Zenith Analytics');   // 165m, sorted first
-  assert.deepStrictEqual(agg.byCompany[0][1], { mins: 165, sessions: 2 });
+  assert.deepStrictEqual(agg.byCompany[0][1], { mins: 165, sessions: 2, companyId: 1 });
+  // byDateCompany feeds the stacked daily bars — same numbers, per-company.
+  assert.deepStrictEqual(agg.byDateCompany['2026-07-02'], { 1: 45, 2: 60 });
   // Labels come from row-level minutes; corrupt rows_json contributes none.
   assert.deepStrictEqual(agg.byLabel, [['QA', 90], ['<img src=x onerror=alert(1)>', 60], ['Admin', 30]]);
 });
@@ -92,4 +94,30 @@ test('CSV: desc-only rows are included (C3/D-011 contract)', () => {
     rows_json: JSON.stringify([{ label: '', name: '', desc: 'only a description', total_mins: 0, clock_in: '', clock_out: '' }]) }];
   const csv = buildReportCSV({ entries: descOnly, companyNames, fromDate: '2026-07-03', toDate: '2026-07-03' });
   assert.ok(csv.includes('"only a description"'));
+});
+
+test('HTML: company identity colors drive bars and dots when provided', () => {
+  const html = buildEmailReportHTML({ ...input, companyColors: { 1: 'hsl(187, 60%, 44%)', 2: 'hsl(43, 60%, 44%)' } });
+  assert.ok(html.includes('hsl(187, 60%, 44%)'), 'company 1 identity color present');
+  assert.ok(html.includes('hsl(43, 60%, 44%)'), 'company 2 identity color present');
+  assert.match(html, /class="seg" style="width:[\d.]+%;background:hsl\(187/, 'stacked segment colored');
+  // Without colors: neutral fallback, never a broken var() in a standalone doc.
+  const plain = buildEmailReportHTML(input);
+  assert.ok(plain.includes('#94a3b8'), 'neutral fallback used');
+  assert.ok(!plain.includes('var(--'), 'no CSS vars leak into the standalone document');
+});
+
+test('identity-color: pure module matches its contract', () => {
+  const IC = require('../src/renderer/identity-color.js');
+  const g = { rows: [{ id: 3 }], lastDays: 0 };
+  // Deterministic: same group, same opts → same color; colorblind swaps palette.
+  assert.strictEqual(IC.identityCss(g, { lightTheme: true }), IC.identityCss(g, { lightTheme: true }));
+  assert.notStrictEqual(IC.paletteHue(3, false), IC.paletteHue(3, true));
+  // Manual Edit Color override wins.
+  const ov = { rows: [{ id: 3, color: '#ff0000' }], lastDays: 0 };
+  assert.match(IC.identityCss(ov, { lightTheme: true }), /^hsl\(0, /);
+  // colorMap: unknown company → fallback.
+  const { colorFor } = IC.colorMap([{ id: 1, name: 'A' }], [{ company_id: 1, log_date: '2026-07-01' }], { today: '2026-07-02', fallback: '#94a3b8' });
+  assert.match(colorFor(1), /^hsl\(/);
+  assert.strictEqual(colorFor(999), '#94a3b8');
 });
