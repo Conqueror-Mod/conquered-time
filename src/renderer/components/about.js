@@ -24,6 +24,10 @@ const About = (() => {
   // Changelog — newest first. Edit HERE and both About surfaces update. The two
   // most recent entries render in-panel; older notes live on GitHub Releases.
   const CHANGELOG = [
+    { version: 'v3.24.2', items: [
+      'Import hardening — the CSV import wizard now catches impossible dates (like Feb 31), typo\'d years, and durations over 24 hours as row errors in the review step, instead of quietly writing them into your data',
+      'Insights stability — a single far-out date (from a typo or corrupted import) can no longer freeze the Trends chart; the chart now plots only real data past a 10-year span',
+    ] },
     { version: 'v3.24.1', items: [
       'New app icon — a refreshed gold-and-blue hourglass mark, cropped to a clean circular badge, across the app icon, taskbar, tray, splash, About screen, and the installer',
     ] },
