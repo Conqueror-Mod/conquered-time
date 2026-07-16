@@ -23,7 +23,12 @@ catch { console.warn('[beta] beta-secret.js not found — beta-key gate disabled
 
 // ── Single instance lock ───────────────────────────────────────────────────
 const gotLock = app.requestSingleInstanceLock();
-if (!gotLock) { app.quit(); process.exit(0); }
+if (!gotLock) {
+  // Loud exit: a silent instant quit here cost real debugging time (a --dev
+  // launch dies with code 0 while the installed app sits in the tray).
+  console.error('[conquered-time] Another instance already holds the single-instance lock (installed app in the tray?) — exiting.');
+  app.quit(); process.exit(0);
+}
 
 // ── Source paths ────────────────────────────────────────────────────────────
 // The compiled main process runs from dist-main/main/, but the renderer pages

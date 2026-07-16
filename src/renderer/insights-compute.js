@@ -116,7 +116,24 @@
     const keys = Object.keys(sums).sort();
     const first = keys[0], last = keys[keys.length - 1];
 
-    // Fill the gap between first and last so the series is continuous.
+    // Fill the gap between first and last so the series is continuous — but
+    // capped: one corrupted/typo'd far-out date (e.g. year 9999) would
+    // otherwise fill hundreds of thousands of empty buckets and hang the
+    // renderer. Past ~10 years of span, skip the fill and plot only the
+    // buckets that actually have data.
+    const MAX_FILL = bucket === 'month' ? 121 : 522;
+    const span = bucket === 'month'
+      ? (Number(last.slice(0, 4)) - Number(first.slice(0, 4))) * 12
+        + (Number(last.slice(5, 7)) - Number(first.slice(5, 7))) + 1
+      : Math.floor((parseLocalDate(last).getTime() - parseLocalDate(first).getTime()) / (7 * 86400000)) + 1;
+    if (span > MAX_FILL) {
+      return keys.map(k => ({
+        key: k,
+        label: bucket === 'month' ? monthLabel(k) : weekLabel(k),
+        mins: sums[k],
+      }));
+    }
+
     const filled = [];
     if (bucket === 'month') {
       let [y, m] = first.split('-').map(Number);
