@@ -24,6 +24,10 @@ const About = (() => {
   // Changelog — newest first. Edit HERE and both About surfaces update. The two
   // most recent entries render in-panel; older notes live on GitHub Releases.
   const CHANGELOG = [
+    { version: 'v3.25.0', items: [
+      'Redesigned emailed reports — the PDF report now matches the app\'s look: your companies appear in their own identity colors (the same colors as their bubbles, including any custom color you picked), daily hours draw as color-coded bars, and days split across companies show as stacked segments',
+      'Invoices and the installer now carry the same gold-and-blue brand as the new app icon, so everything Conquered Time produces looks like one product',
+    ] },
     { version: 'v3.24.3', items: [
       'All-new app icon family — one unified gold-and-blue hourglass design drawn at every size, so the taskbar, tray, and title bar icons are finally crisp at 16px and 32px instead of a dark smudge',
       'Smoother updates — the download toast no longer flickers while an update downloads; it now stays solid and shows a real progress bar',

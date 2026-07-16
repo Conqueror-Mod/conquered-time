@@ -6,7 +6,7 @@ Discord's **#roadmap** channel mirrors this file automatically.
 
 **Status legend:** ✅ Shipped · 🔨 In progress · 🗓️ Planned · 💡 Under consideration
 
-_Last curated: 2026-07-13 (v3.24.0 — CSV data import, global search, branded empty states, layout hardening — released)_
+_Last curated: 2026-07-16 (v3.25.0 — redesigned emailed reports; icon family v3.24.3; stress-campaign hardening v3.24.2)_
 
 ## 🗓️ Planned (next up)
 
