@@ -12,13 +12,14 @@ _Last curated: 2026-07-13 (v3.24.0 — CSV data import, global search, branded e
 
 _Open to community suggestions — use `/feedback` in the Discord._
 
+- **Emailed report redesign** — both emailed report formats (PDF and CSV)
+  redesigned from the ground up — layout, content, and branding to match the
+  new invoice/icon design language. _(From beta-tester feedback.)_
+
 ## 💡 Under consideration
 
 - **Multi-platform packaging** — macOS and Linux builds via GitHub Actions CI
   (icons are already prepared). On the backburner while feature work leads.
-- **Multiple billing identities (DBA)** — issue invoices under several business
-  names, each with its own address, tax ID and numbering. _(Design sketched; not
-  yet scheduled.)_
 - **Language / internationalization** — lowest priority, highest complexity;
   slated for last.
 
