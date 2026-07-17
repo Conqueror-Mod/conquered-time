@@ -2,7 +2,7 @@
 //   node .claude/skills/run-app/driver.mjs
 // Designed for agents: type commands at the `driver>` prompt, one per line.
 // Windows host with a real display — no xvfb. Launches with --dev so the
-// profile selector is skipped and dev-data/dev-vault.db loads directly; the
+// profile selector is skipped and IGNORE/dev-data/dev-vault.db loads directly; the
 // seeded devuser has dev_mode=1 so TOTP is bypassed. Run `npm run seed` first.
 import { _electron as electron } from 'playwright-core';
 import * as readline from 'node:readline';

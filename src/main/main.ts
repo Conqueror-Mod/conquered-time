@@ -48,7 +48,7 @@ const IS_DEV        = process.argv.includes('--dev') && !app.isPackaged;
 // never to a manual open.
 const STARTED_AT_LOGIN = process.argv.includes('--startup');
 const ROOT_DATA_DIR = IS_DEV
-  ? path.join(__dirname, '..', '..', 'dev-data')
+  ? path.join(__dirname, '..', '..', 'IGNORE', 'dev-data')
   : path.join(app.getPath('userData'), 'conquered-data');
 const PROFILES_DIR  = IS_DEV ? null : path.join(ROOT_DATA_DIR, 'profiles');
 

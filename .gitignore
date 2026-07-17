@@ -12,8 +12,8 @@ dist-main/
 # converted page; remove the source .js from git when converting.
 src/renderer/pages/dashboard.js
 src/renderer/pages/task-timer.js
-# dev-data lives in IGNORE/ now, but keep the root pattern too — dev runs and
-# `npm run seed` recreate dev-data/ at the repo root.
+# dev sandbox lives in IGNORE/dev-data (seeder + --dev both point there);
+# the root pattern stays as a belt-and-suspenders for stale checkouts.
 dev-data/
 IGNORE/dev-data/
 *.db

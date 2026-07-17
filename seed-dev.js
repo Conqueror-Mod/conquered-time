@@ -1,7 +1,7 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════
  *  CONQUERED TIME — Stress-Test Dev Seed v4.0
- *  Run:  npm run seed      → seeds ./dev-data/dev-vault.db (never touches real vault)
+ *  Run:  npm run seed      → seeds ./IGNORE/dev-data/dev-vault.db (never touches real vault)
  *        npm run dev       → launches app using dev-vault.db
  *
  *  v4 turns the seed into a MEASUREMENT INSTRUMENT for the quality campaign:
@@ -76,7 +76,7 @@ const fs     = require('fs');
 const crypto = require('crypto');
 
 // ── Paths ──────────────────────────────────────────────────────────────────
-const DATA_DIR   = path.join(__dirname, 'dev-data');
+const DATA_DIR   = path.join(__dirname, 'IGNORE', 'dev-data');
 const DB_FILE    = path.join(DATA_DIR, 'dev-vault.db');
 const BACKUP_DIR = path.join(DATA_DIR, 'backups');
 

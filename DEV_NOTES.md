@@ -16,7 +16,7 @@ node --version    # confirm v20.11.1
 cd conquered-time
 npm install
 
-# 3. Seed a dev account (wipes dev-data/, creates devuser/devpass123, dev_mode=1;
+# 3. Seed a dev account (wipes IGNORE/dev-data/, creates devuser/devpass123, dev_mode=1;
 #    v4.0 stress fixture: 10 companies + 103 entries incl. a 6-discrepancy audit
 #    session (fixture-wide audit total = 7), unicode/emoji/XSS-canary companies,
 #    edge-probe entries; prints a self-check ledger + verification packet)

@@ -10,7 +10,7 @@ REPL driver at `.claude/skills/run-app/driver.mjs`.
 
 The host is **Windows with a real display — no xvfb needed.** The driver
 launches with `--dev`, which skips the profile selector and loads
-`dev-data/dev-vault.db` directly. The seeded `devuser` has `dev_mode=1`, so TOTP
+`IGNORE/dev-data/dev-vault.db` directly. The seeded `devuser` has `dev_mode=1`, so TOTP
 is bypassed at login.
 
 All paths below are relative to the repo root.
@@ -20,7 +20,7 @@ All paths below are relative to the repo root.
 ```bash
 npm install            # if node_modules is missing
 npm install --save-dev playwright-core   # only if not already a devDependency
-npm run seed           # creates devuser/devpass123 + sample companies/entries (dev-data/, gitignored)
+npm run seed           # creates devuser/devpass123 + sample companies/entries (IGNORE/dev-data/, gitignored)
 ```
 
 `npm run seed` resets the dev vault to a known state — run it before a verify run
