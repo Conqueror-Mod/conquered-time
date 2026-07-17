@@ -1,6 +1,6 @@
-# Stress Campaign N — <date>
+# Crucible N — <date>
 
-> Copy this file to `docs/quality/defect-register-vN.md` when the campaign
+> Copy this file to `docs/quality/defect-register-vN.md` when the Crucible run
 > starts. It doubles as the checklist and the register.
 
 ## Define
@@ -40,4 +40,4 @@
 - [ ] Regression test per defect (rejection + adjacent legal behavior)
 - [ ] Release cut: v___
 - [ ] Lessons made permanent: CLAUDE.md gotcha / seed probe / test oracle / memory
-- [ ] Campaign history table in `Testing Method/README.md` updated
+- [ ] Crucible history table in `The Crucible/README.md` updated

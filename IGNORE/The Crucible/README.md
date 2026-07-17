@@ -1,8 +1,9 @@
-# The Testing Method — RCA › DMAIC › PDCA
+# The Crucible — RCA › DMAIC › PDCA
 
-This folder documents the quality methodology used for Conquered Time's full-app
-stress campaigns. It has been run twice — **Campaign 1** (2026-07-01/02, 14
-defects → v3.10.0) and **Campaign 2** (2026-07-16, 4 defects → v3.24.2) — and
+The Crucible is Conquered Time's quality methodology: a full-app stress
+campaign where everything shipped is melted down to burn out the impurities
+and prove what survives. It has been run twice — **Crucible I** (2026-07-01/02, 14
+defects → v3.10.0) and **Crucible II** (2026-07-16, 4 defects → v3.24.2) — and
 this is the playbook for running it again.
 
 The name reads inside-out: **RCA** (Root Cause Analysis) is the discipline
@@ -57,7 +58,7 @@ repo) that throws hostile inputs at them:
 - **Structural abuse**: duplicate headers/names, whitespace-only fields, BOM,
   lone quotes mid-field, corrupt JSON
 
-**Chase interplay, not just crashes.** Campaign 2's worst find (D-102) was two
+**Chase interplay, not just crashes.** Crucible II's worst find (D-102) was two
 individually-defensible functions composing badly: the import validator let a
 typo'd year through, and the trend chart gap-filled 416,115 empty buckets
 trying to graph it. When a probe finds bad data being *accepted*, immediately
@@ -99,12 +100,12 @@ numbers. **Low** = guarded-but-ugly, DX friction, missing diagnostics.
 
 ## 4. Improve — PDCA per cluster
 
-Group defects that share a fix locus into **clusters** (Campaign 1: six
-cluster PRs C1–C6; Campaign 2: one PR covering C1–C3). Per cluster:
+Group defects that share a fix locus into **clusters** (Crucible I: six
+cluster PRs C1–C6; Crucible II: one PR covering C1–C3). Per cluster:
 
 - **Plan** — decide the fix and its blast radius. Prefer fixing the *acceptor*
   (validate at the boundary) AND the *reader* (defensive cap) when a defect is
-  an interplay — Campaign 2 fixed both the import validator and the chart cap.
+  an interplay — Crucible II fixed both the import validator and the chart cap.
 - **Do** — implement, plus a regression test per defect that asserts the
   rejection AND that adjacent legal behavior still works (leap day accepted,
   1440 exactly allowed, normal spans still gap-fill).
@@ -122,8 +123,8 @@ cluster PRs C1–C6; Campaign 2: one PR covering C1–C3). Per cluster:
 - Cut the release; the register lists it.
 - **Lessons become permanent**: anything structural goes to CLAUDE.md
   (gotchas), the seed (new probes for next time), or the test suite
-  (properties/oracles). Campaign 1 produced the shared `row-utils.js` /
-  `time-parse.js` modules and later the property-testing oracle; Campaign 2
+  (properties/oracles). Crucible I produced the shared `row-utils.js` /
+  `time-parse.js` modules and later the property-testing oracle; Crucible II
   produced calendar validation, the bucket cap, and the loud lock exit.
 
 ---
@@ -135,18 +136,18 @@ One table row per defect:
 | ID | Sev | Surface | Defect (root cause, one paragraph) | Verified how |
 |----|-----|---------|-------------------------------------|--------------|
 
-IDs are campaign-scoped (`D-1xx` for campaign 2, `D-2xx` for campaign 3, …).
+IDs are campaign-scoped (`D-1xx` for Crucible II, `D-2xx` for Crucible III, …).
 Below the table, always include a **"Verified clean"** section — the things
 you attacked that held. It's half the value of the campaign: the next person
 should know the XSS canary was swept and passed, so they don't re-sweep it.
 
-## Campaign history
+## Crucible history
 
 | # | Date | Scope | Found | Fixed in | Shipped |
 |---|------|-------|-------|----------|---------|
 | 1 | 2026-07-01/02 | Full app (first sweep) | 14 defects (C1–C6) | PRs #41–#46 | v3.10.0 |
 | 2 | 2026-07-16 | Everything since v3.10.0 | 4 defects (D-101–104) | PR #157 | v3.24.2 |
 
-The trajectory (14 → 4 on a much larger surface) is the method's own
+The trajectory (14 → 4 on a much larger surface) is the Crucible's own
 measurement: shared modules, property tests, and the seed's canaries catch
 whole defect classes before a campaign ever runs.
