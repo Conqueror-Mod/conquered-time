@@ -85,6 +85,20 @@ single-instance lock is shared. Close it first (`Get-Process 'Conquered Time'
 | Stop-Process`), relaunch it from
 `%LOCALAPPDATA%\Programs\Conquered Time\Conquered Time.exe` when done.
 
+### 2d. Layout lint (visual sweep — mechanical tier)
+`lint [name]` in the run-app driver injects `The Crucible/probe-layout.js`
+into the current page and reports **geometrically provable** layout faults:
+clipped text (no ellipsis/scroll), collapsed elements (the flex-shrink class,
+gotcha #7), overlapping interactive controls, offscreen controls (scroll-
+container aware — below-the-fold inside `#main-content` is NOT offscreen),
+low-contrast text (< 2.5:1 on a solid background), and invisible text. These
+are deterministic and register-grade. Two softer visual tiers exist above it
+and are deliberately NOT register-grade: golden-screenshot diffing (regression
+only — needs blessed baselines) and the rubric'd screenshot review (subjective;
+findings go to the notes backlog unless converted to a mechanical repro).
+Sweep every in-scope page × at least the current theme; full JSON lands in
+`.tmp-shots/lint-<name>.json`.
+
 ## 3. Analyze — RCA per finding
 
 Every finding gets a register row **only after** its root cause is understood.

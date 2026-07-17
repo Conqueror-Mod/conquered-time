@@ -148,6 +148,23 @@ const COMMANDS = {
                    : `FAIL — expected 1, got ${delta}`));
   },
 
+  // The Crucible's layout linter (Measure layer 2d): injects
+  // IGNORE/The Crucible/probe-layout.js into the current page and reports
+  // geometrically provable layout faults (clipped/collapsed/overlap/offscreen/
+  // contrast). Full JSON lands in SHOT_DIR. Usage: lint [name]
+  async lint(name) {
+    const src = fs.readFileSync(path.join(APP_DIR, 'IGNORE/The Crucible/probe-layout.js'), 'utf8');
+    const res = await page.evaluate(code => {
+      // eslint-disable-next-line no-eval
+      (0, eval)(code);
+      return window.runLayoutLint();
+    }, src);
+    const f = path.join(SHOT_DIR, `lint-${name || res.url || Date.now()}.json`);
+    fs.writeFileSync(f, JSON.stringify(res, null, 2));
+    const summary = Object.entries(res.counts).map(([k, v]) => `${k}:${v}`).join(' ') || 'CLEAN';
+    console.log(`lint ${res.url} [${res.theme} ${res.viewport}] scanned=${res.scanned} ${res.ms}ms → ${summary} (${f})`);
+  },
+
   async windows() {
     if (!app) return console.log('launch first');
     for (const w of app.windows()) console.log(' ', w.url());
