@@ -7,6 +7,7 @@ const ALLOWED_INVOKE = new Set([
   'profiles:list', 'profiles:select', 'profiles:load', 'profiles:deselect', 'profiles:delete',
   'auth:check-setup', 'auth:setup', 'auth:login', 'auth:recover', 'auth:browse-backup',
   'auth:safe-check', 'auth:safe-setup', 'auth:safe-login', 'auth:safe-disable', 'auth:quick-unlock',
+  'auth:reset-check', 'auth:reset-password',
   'totp:generate',
   'session:get', 'session:heartbeat',
   'companies:list', 'companies:save', 'companies:delete',

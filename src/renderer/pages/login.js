@@ -31,6 +31,7 @@ function installLoginDelegation() {
     showRecMode:            a       => showRecMode(a),
     doRecovery:             ()      => doRecovery(),
     doPasswordReset:        ()      => doPasswordReset(),
+    doDeviceReset:          ()      => doDeviceReset(),
     doBrowseRestore:        ()      => doBrowseRestore(),
     showRecovery:           ()      => showRecovery(),
     // pre-auth settings
@@ -548,6 +549,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       }
       if (currentMode === 'recovery-unlock') doRecovery();
       if (currentMode === 'recovery-reset')  doPasswordReset();
+      if (currentMode === 'recovery-device') doDeviceReset();
     }
   });
 });
@@ -627,21 +629,52 @@ function setMode(mode) {
 }
 
 function showRecMode(sub) {
-  const subs = ['picker','unlock','reset','restore'];
+  const subs = ['picker','device','unlock','reset','restore'];
   subs.forEach(s => {
     const el = document.getElementById(s === 'picker' ? 'rec-mode-picker' : `rec-sub-${s}`);
     if (!el) return;
     el.style.display = s === sub ? 'block' : 'none';
   });
   if (sub === 'picker') currentMode = 'recovery';
+  if (sub === 'device') currentMode = 'recovery-device';
   if (sub === 'unlock') currentMode = 'recovery-unlock';
   if (sub === 'reset')  currentMode = 'recovery-reset';
   if (sub === 'restore') currentMode = 'recovery-restore';
   // Clear errors when switching
-  ['rec-error','rec-reset-error','rec-restore-error'].forEach(id => {
+  ['rec-error','rec-device-error','rec-reset-error','rec-restore-error'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = 'none';
   });
+  // Device-bound reset only appears when the loaded profile has an
+  // auto-enrolled DPAPI recovery packet (auth:reset-check).
+  if (sub === 'picker') {
+    api.invoke('auth:reset-check').then(r => {
+      const btn = document.getElementById('rec-device-option');
+      if (btn) btn.style.display = r?.available ? 'block' : 'none';
+    }).catch(() => {});
+  }
+}
+
+async function doDeviceReset() {
+  const p1 = document.getElementById('rec-device-password').value;
+  const p2 = document.getElementById('rec-device-password2').value;
+  const errEl = document.getElementById('rec-device-error');
+  errEl.style.display = 'none';
+  if (!p1) return showErr(errEl, 'Enter a new password.');
+  if (p1 !== p2) return showErr(errEl, 'Passwords do not match.');
+  if (p1.length < 8) return showErr(errEl, 'Password must be at least 8 characters.');
+  const btn = /** @type {HTMLButtonElement|null} */ (document.getElementById('rec-device-btn'));
+  if (btn) btn.disabled = true;
+  const res = await api.invoke('auth:reset-password', { newPassword: p1 });
+  if (btn) btn.disabled = false;
+  if (res?.ok) {
+    toast('Password reset successfully. Please log in.', 'success');
+    document.getElementById('rec-device-password').value = '';
+    document.getElementById('rec-device-password2').value = '';
+    setMode('login');
+  } else {
+    showErr(errEl, res?.error || 'Reset failed.');
+  }
 }
 
 function showRecovery() {
@@ -1102,7 +1135,7 @@ async function paRenderDeleteUser() {
       <div class="pa-delete-confirm" id="pa-del-confirm-${i}" style="display:none;">
         <div class="pa-delete-warning">⚠ This permanently deletes this profile and all its data. This cannot be undone.</div>
         <div class="pa-delete-pw-row">
-          <input type="password" id="pa-del-pw-${i}" placeholder="Enter this profile's password to confirm" autocomplete="current-password">
+          <input type="text" id="pa-del-pw-${i}" placeholder="Type the username (${escapeHtml(p.username)}) to confirm" autocomplete="off" spellcheck="false">
           <button class="dba-confirm-btn danger" data-action="paExecuteDelete" data-arg="${i}">Delete Profile</button>
           <button class="dba-confirm-btn" data-action="paDisarmDelete" data-arg="${i}">Cancel</button>
         </div>
@@ -1132,8 +1165,12 @@ async function paExecuteDelete(i) {
   const p = _paDeleteProfiles[i];
   if (!p) return;
   const pwEl = /** @type {HTMLInputElement|null} */ (document.getElementById(`pa-del-pw-${i}`));
-  const pw = pwEl?.value || '';
-  if (!pw) { toast('Enter the profile\'s password to confirm deletion.', 'error'); return; }
+  const typed = (pwEl?.value || '').trim();
+  if (typed.toLowerCase() !== String(p.username || '').toLowerCase()) {
+    toast('Type the profile\'s username exactly to confirm deletion.', 'error');
+    if (pwEl) pwEl.focus();
+    return;
+  }
 
   // profiles:delete removes the LOADED profile — load the chosen one first
   // (deselect any other profile the user had open behind the modal).
@@ -1141,7 +1178,7 @@ async function paExecuteDelete(i) {
   const load = await api.invoke('profiles:load', { username: p.username });
   if (!load?.ok) { toast(load?.error || 'Could not open that profile.', 'error'); return; }
 
-  const res = await api.invoke('profiles:delete', { password: pw });
+  const res = await api.invoke('profiles:delete', { confirmUsername: typed });
   if (!res?.ok) {
     toast(res?.error || 'Deletion failed.', 'error');
     if (pwEl) { pwEl.value = ''; pwEl.focus(); }

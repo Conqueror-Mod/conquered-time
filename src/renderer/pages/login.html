@@ -626,6 +626,10 @@
           ACCOUNT RECOVERY
         </div>
         <div style="display:flex;flex-direction:column;gap:8px;">
+          <button class="btn-neutral" id="rec-device-option" data-action="showRecMode" data-arg="device" style="display:none;text-align:left;padding:10px 14px;">
+            <div style="font-size:13px;font-weight:600;">Reset password on this device</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">No recovery code needed — verify with Windows Hello and choose a new password.</div>
+          </button>
           <button class="btn-neutral" data-action="showRecMode" data-arg="unlock" style="text-align:left;padding:10px 14px;">
             <div style="font-size:13px;font-weight:600;">Unlock account</div>
             <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Too many failed attempts? Clear the lockout with your recovery code.</div>
@@ -639,6 +643,25 @@
             <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Replace the current vault with a local backup file.</div>
           </button>
         </div>
+      </div>
+
+      <!-- Sub-form D: Device-bound reset (Windows Hello / DPAPI, no code needed) -->
+      <div id="rec-sub-device" style="display:none;flex-direction:column;gap:10px;">
+        <div style="font-family:var(--mono);font-size:9px;color:var(--text-muted);letter-spacing:1px;">RESET PASSWORD — THIS DEVICE</div>
+        <div style="font-size:12px;color:var(--text-muted);line-height:1.5;">
+          This profile has a device-bound recovery key. Choose a new password, then confirm the reset with Windows Hello (or your Windows PIN). Your data stays intact.
+        </div>
+        <div class="field-group">
+          <label class="field-label">New Password</label>
+          <input type="password" id="rec-device-password" placeholder="New password">
+        </div>
+        <div class="field-group">
+          <label class="field-label">Confirm Password</label>
+          <input type="password" id="rec-device-password2" placeholder="Confirm new password">
+        </div>
+        <div class="error-msg" id="rec-device-error"></div>
+        <button class="btn-primary" id="rec-device-btn" data-action="doDeviceReset">⊕ Verify &amp; Reset Password</button>
+        <button class="btn-neutral" data-action="showRecMode" data-arg="picker" style="margin-top:6px;width:100%;">← Back</button>
       </div>
 
       <!-- Sub-form A: Unlock -->
