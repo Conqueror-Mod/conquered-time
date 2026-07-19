@@ -226,6 +226,7 @@ interface IpcInvokeMap {
   'profiles:delete': (payload: { confirmUsername: string }) => MutResult;
   'auth:reset-check': () => { available: boolean };
   'auth:reset-password': (payload: { newPassword: string }) => MutResult & { passwordReset?: boolean };
+  'auth:save-recovery-file': (payload: { username: string; recoveryCode: string }) => MutResult & { canceled?: boolean; path?: string };
   // auth
   'auth:check-setup': () => { needsSetup: boolean };
   'auth:setup': (payload: {

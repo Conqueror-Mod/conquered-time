@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { execFile } = require('child_process');
-const { app, ipcMain, safeStorage } = require('electron');
+const { app, ipcMain, safeStorage, dialog } = require('electron');
 const { session, decryptEntry, resetIdleTimer, sweepOrphanTaskItems } = require('../session');
 const {
   dbGet, dbAll, dbRun, dbInsert, persistDB, hasDb, closeDb, setDbFile,
@@ -583,6 +583,48 @@ ipcMain.handle('auth:recover', async (_: unknown, { username, recoveryCode, newP
     persistDB(); performBackup();
     return { ok: true, passwordReset: true };
   } catch(e) { return { ok: false, error: 'Recovery failed: ' + e.message }; }
+});
+
+// Save the just-generated recovery code as a downloadable file (setup screen
+// only — that is the sole moment the plaintext code exists). Nothing secret is
+// read from any vault; the renderer passes the code it just generated. The
+// file is deliberately plain text: it must be readable in ten years on any
+// machine, and the code alone is useless without the vault files + TOTP device.
+ipcMain.handle('auth:save-recovery-file', async (_: unknown, { username, recoveryCode }: Record<string, any>) => {
+  const code = String(recoveryCode || '').trim();
+  if (!/^[A-Z2-9]{4}(-[A-Z2-9]{4}){3}$/.test(code))
+    return { ok: false, error: 'Invalid recovery code.' };
+  const safeName = String(username || 'account').replace(/[^a-zA-Z0-9_\-]/g, '') || 'account';
+  const res = await dialog.showSaveDialog({
+    title: 'Save Recovery File',
+    defaultPath: path.join(app.getPath('documents'), `Conquered Time Recovery - ${safeName}.txt`),
+    filters: [{ name: 'Text File', extensions: ['txt'] }],
+  });
+  if (res.canceled || !res.filePath) return { ok: false, canceled: true };
+  try {
+    const body = [
+      'CONQUERED TIME — ACCOUNT RECOVERY FILE',
+      '======================================',
+      '',
+      `Profile:       ${safeName}`,
+      `Created:       ${new Date().toISOString().slice(0, 10)}`,
+      '',
+      `Recovery code: ${code}`,
+      '',
+      'Keep this file somewhere OFF this computer — a cloud drive',
+      '(Google Drive, OneDrive, Dropbox) or a USB stick. It is your',
+      'way back in if this device is lost or Windows is reinstalled.',
+      '',
+      'To use it: open Conquered Time -> Recovery tab ->',
+      '"Unlock account" or "Reset my password" and enter the code.',
+      '',
+      'This code cannot open your data by itself — it only works',
+      'inside the app against your encrypted vault.',
+      '',
+    ].join('\r\n');
+    fs.writeFileSync(res.filePath, body);
+    return { ok: true, path: res.filePath };
+  } catch (e) { return { ok: false, error: e.message }; }
 });
 
 ipcMain.handle('totp:generate', async () => {

@@ -170,9 +170,15 @@ test('B3: write-phase rollback — onCommit throws → ok:false, restored db int
 
 test('B4: migrateTimeEntries — migrates exactly the plaintext rows, idempotent, content preserved', async () => {
   SQL = SQL || await initSqlJs();
+  // Legacy rows are stored as PLAINTEXT rows_json via db.run, and sql.js
+  // truncates bound strings at the first NUL byte ('a\0b' stores as 'a') —
+  // so a NUL can never round-trip through the plaintext column in the first
+  // place. Strip it from the legacy arbitrary; encrypted-path arbitraries
+  // (B1–B3) keep full binary strings since ciphertext is hex before binding.
+  const arbLegacyJson = arbContent.map(s => s.replace(/\u0000/g, ''));
   const arbMixed = fc.array(
     fc.record({
-      json: fc.oneof(fc.constant(''), fc.constant('[]'), arbContent),
+      json: fc.oneof(fc.constant(''), fc.constant('[]'), arbLegacyJson),
       legacy: fc.boolean(),
     }),
     { maxLength: 6 }

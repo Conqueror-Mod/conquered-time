@@ -32,6 +32,7 @@ function installLoginDelegation() {
     doRecovery:             ()      => doRecovery(),
     doPasswordReset:        ()      => doPasswordReset(),
     doDeviceReset:          ()      => doDeviceReset(),
+    saveRecoveryFile:       ()      => saveRecoveryFile(),
     doBrowseRestore:        ()      => doBrowseRestore(),
     showRecovery:           ()      => showRecovery(),
     // pre-auth settings
@@ -695,6 +696,23 @@ async function generateTOTP() {
   document.getElementById('recovery-code-display').textContent = recoveryCode;
   document.getElementById('recovery-code-display').style.display = 'block';
   document.getElementById('recovery-section').style.display = 'block';
+  const saveBtn = document.getElementById('save-recovery-btn');
+  if (saveBtn) { saveBtn.textContent = '⬇ Save Recovery File…'; /** @type {HTMLButtonElement} */ (saveBtn).disabled = false; }
+}
+
+async function saveRecoveryFile() {
+  if (!recoveryCode) return;
+  const u = document.getElementById('setup-username').value.trim() || 'account';
+  const btn = /** @type {HTMLButtonElement|null} */ (document.getElementById('save-recovery-btn'));
+  if (btn) btn.disabled = true;
+  const res = await api.invoke('auth:save-recovery-file', { username: u, recoveryCode });
+  if (btn) btn.disabled = false;
+  if (res?.ok) {
+    if (btn) btn.textContent = '✓ Recovery file saved';
+    toast('Recovery file saved. Keep it off this PC — cloud drive or USB.', 'success');
+  } else if (!res?.canceled) {
+    toast(res?.error || 'Could not save recovery file.', 'error');
+  }
 }
 
 function generateRecoveryCode() {
