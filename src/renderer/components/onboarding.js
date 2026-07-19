@@ -281,7 +281,7 @@ const Onboarding = (() => {
     // The card may anchor to a DIFFERENT element than the spotlight (cardAt)
     // so it doesn't sit on top of the content the step is explaining.
     let cardAnchor = step.cardAt ? measure(step.cardAt.sel) : anchor;
-    placeCard(card, cardAnchor || anchor, step.cardAt?.side);
+    placeCard(card, cardAnchor || anchor, step.cardAt?.side, anchor);
     next.focus();
 
     // Spot + card start invisible and fade in AS SOON AS the layout is stable:
@@ -326,14 +326,14 @@ const Onboarding = (() => {
            Math.abs(fresh.width - anchor.width) > 2 || Math.abs(fresh.height - anchor.height) > 2)) {
         anchor = fresh;
         if (spot) placeSpot(spot, anchor);
-        if (!step.cardAt) placeCard(card, anchor);
+        if (!step.cardAt) placeCard(card, anchor, undefined, anchor);
       }
       if (step.cardAt) {
         const freshCard = measure(step.cardAt.sel);
         if (freshCard && (!cardAnchor ||
             Math.abs(freshCard.left - cardAnchor.left) > 2 || Math.abs(freshCard.top - cardAnchor.top) > 2)) {
           cardAnchor = freshCard;
-          placeCard(card, cardAnchor, step.cardAt.side);
+          placeCard(card, cardAnchor, step.cardAt.side, anchor);
         }
       }
     }, FOLLOW_TICK);
@@ -364,7 +364,14 @@ const Onboarding = (() => {
    * would clip). side 'below': forced below.
    * @param {HTMLElement} card @param {DOMRect|null} anchor @param {('right'|'below')=} side
    */
-  function placeCard(card, anchor, side) {
+  // Places the card near the anchor WITHOUT covering it. The old version
+  // picked one side, flipped once, then clamped into the viewport — and the
+  // clamp could slide the card right back over the spotlighted element (user
+  // report: "some window locations obscure the data behind it"). Now every
+  // side is tried in preference order and the first candidate that both fits
+  // the viewport and clears the anchor wins; if none clears (tiny windows),
+  // the least-overlapping candidate is used.
+  function placeCard(card, anchor, side, avoid = null) {
     const vw = window.innerWidth, vh = window.innerHeight;
     const cw = card.offsetWidth, ch = card.offsetHeight;
     const EDGE = 12, GAP = 14;
@@ -373,20 +380,35 @@ const Onboarding = (() => {
       card.style.top  = `${Math.round((vh - ch) / 2)}px`;
       return;
     }
-    let x, y;
-    if (side === 'right') {
-      x = anchor.right + GAP;
-      if (x + cw > vw - EDGE) x = anchor.left - cw - GAP; // flip left
-      y = anchor.top;
-    } else {
-      x = anchor.left + anchor.width / 2 - cw / 2;
-      y = anchor.bottom + GAP;
-      if (side !== 'below' && y + ch > vh - EDGE) y = anchor.top - ch - GAP;
+    const cand = {
+      below: { x: anchor.left + anchor.width / 2 - cw / 2, y: anchor.bottom + GAP },
+      above: { x: anchor.left + anchor.width / 2 - cw / 2, y: anchor.top - ch - GAP },
+      right: { x: anchor.right + GAP, y: anchor.top },
+      left:  { x: anchor.left - cw - GAP, y: anchor.top },
+    };
+    const order = side === 'right' ? ['right', 'left', 'below', 'above']
+                : ['below', 'above', 'right', 'left'];
+    const clamp = (p) => ({
+      x: Math.max(EDGE, Math.min(p.x, vw - cw - EDGE)),
+      y: Math.max(EDGE, Math.min(p.y, vh - ch - EDGE)),
+    });
+    // Avoid the card anchor AND (when the card anchors elsewhere via cardAt)
+    // the spotlighted rect itself — that's the "data behind it".
+    const rects = avoid && avoid !== anchor ? [anchor, avoid] : [anchor];
+    const overlapArea = (p) => rects.reduce((sum, r) => {
+      const ox = Math.max(0, Math.min(p.x + cw, r.right) - Math.max(p.x, r.left));
+      const oy = Math.max(0, Math.min(p.y + ch, r.bottom) - Math.max(p.y, r.top));
+      return sum + ox * oy;
+    }, 0);
+    let best = null, bestOverlap = Infinity;
+    for (const key of order) {
+      const p = clamp(cand[key]);
+      const ov = overlapArea(p);
+      if (ov === 0) { best = p; break; }            // clears the anchor — done
+      if (ov < bestOverlap) { bestOverlap = ov; best = p; }
     }
-    x = Math.max(EDGE, Math.min(x, vw - cw - EDGE));
-    y = Math.max(EDGE, Math.min(y, vh - ch - EDGE));
-    card.style.left = `${Math.round(x)}px`;
-    card.style.top  = `${Math.round(y)}px`;
+    card.style.left = `${Math.round(best.x)}px`;
+    card.style.top  = `${Math.round(best.y)}px`;
   }
 
   // ── Profile step hooks ────────────────────────────────────────────────────

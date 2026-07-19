@@ -230,6 +230,17 @@ const Shell = (() => {
                   <button class="s-btn" data-tf="12h" data-action="applyTimeFormat" data-arg="12h">12-Hour (2:30 PM)</button>
                 </div>
               </div>
+
+              <div class="settings-group">
+                <div class="settings-group-title">Company Archive</div>
+                <div class="settings-row-label">How long a company can sit idle before the Galaxy folds it into the Archive — new companies stay Active for the same period</div>
+                <div class="settings-btn-group" id="archive-btns" style="margin-top:8px;">
+                  <button class="s-btn" data-ad="30"  data-action="applyArchiveDays" data-arg="30">30 days</button>
+                  <button class="s-btn" data-ad="90"  data-action="applyArchiveDays" data-arg="90">90 days</button>
+                  <button class="s-btn" data-ad="182" data-action="applyArchiveDays" data-arg="182">6 months</button>
+                  <button class="s-btn" data-ad="365" data-action="applyArchiveDays" data-arg="365">1 year</button>
+                </div>
+              </div>
             </div>
 
             <!-- ── WINDOW ────────────────────────────────────── -->
@@ -1657,6 +1668,11 @@ function syncSettingsModal() {
     b.classList.toggle('active', parseInt(b.dataset.al, 10) === s.autoLockMinutes);
   });
 
+  // Archive-interval buttons
+  document.querySelectorAll('[data-ad]').forEach(b => {
+    b.classList.toggle('active', parseInt(b.dataset.ad, 10) === (s.archiveDays || 30));
+  });
+
   // Idle-punch reminder buttons
   document.querySelectorAll('[data-ip]').forEach(b => {
     b.classList.toggle('active', parseInt(b.dataset.ip, 10) === s.idlePunchMinutes);
@@ -2278,6 +2294,12 @@ async function applyAutoLock(minutes) {
   syncSettingsModal();
 }
 
+async function applyArchiveDays(days) {
+  // Settings.set dispatches ct:settings-changed — the Galaxy rebuilds live.
+  await Settings.set('archiveDays', Number(days));
+  syncSettingsModal();
+}
+
 async function applyIdlePunch(minutes) {
   await Settings.set('idlePunchMinutes', Number(minutes));
   // The watcher reads the live Settings value each tick, so no restart needed.
@@ -2308,6 +2330,7 @@ function installShellDelegation() {
     applyTimeFormat:       a       => applyTimeFormat(a),
     applyAutoSave:         a       => applyAutoSave(Number(a)),
     applyAutoLock:         a       => applyAutoLock(Number(a)),
+    applyArchiveDays:      a       => applyArchiveDays(Number(a)),
     applyIdlePunch:        a       => applyIdlePunch(Number(a)),
     applyColorblind:       a       => applyColorblind(a),
     applyToggle:           (a, el) => applyToggle(a, el),

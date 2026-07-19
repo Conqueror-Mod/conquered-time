@@ -71,6 +71,8 @@ interface Company {
   pay_rate?: number;
   date_start?: string;
   date_end?: string;
+  /** Plaintext column (unix seconds), passed through by companies:list; null on pre-column rows. */
+  created_at?: number | null;
   hier_company?: string;
   hier_project?: string;
   hier_platform?: string;
