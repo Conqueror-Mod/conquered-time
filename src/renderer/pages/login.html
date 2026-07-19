@@ -611,7 +611,8 @@
       <div style="display:none;" id="recovery-section">
         <div style="font-family:var(--mono);font-size:8px;letter-spacing:2px;color:var(--yellow);text-transform:uppercase;margin-bottom:8px;">⚠ Save this recovery code — it cannot be shown again</div>
         <div class="recovery-code-display" id="recovery-code-display"></div>
-        <div style="font-family:var(--mono);font-size:9px;color:var(--text-muted);margin-top:8px;text-align:center;">Print or write this down before continuing.</div>
+        <button class="btn-neutral" data-action="saveRecoveryFile" id="save-recovery-btn" style="width:100%;margin-top:8px;">⬇ Save Recovery File…</button>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center;line-height:1.5;">Save the file to a cloud drive or USB stick — it's your way back in if this PC is lost. (Writing the code down works too.)</div>
       </div>
       <div class="error-msg" id="setup-error"></div>
       <button class="btn-primary" data-action="doSetup" id="setup-btn">⊕ Create Account</button>
