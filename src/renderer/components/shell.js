@@ -573,6 +573,14 @@ const Shell = (() => {
               </div>
 
               <div class="settings-group">
+                <div class="settings-group-title">Account Recovery</div>
+                <div class="settings-row-label">Ways back into this profile if you forget your password</div>
+                <div id="recovery-status" style="margin-top:12px;">
+                  <div class="settings-row-label" style="color:var(--text-muted)">Checking recovery status…</div>
+                </div>
+              </div>
+
+              <div class="settings-group">
                 <div class="settings-group-title">Windows Hello / Secure Sign-in</div>
                 <div class="settings-row-label">Sign in without your password using your Windows account credentials</div>
                 <div id="safe-storage-status" style="margin-top:12px;">
@@ -1298,6 +1306,7 @@ async function switchSettingsCategory(cat) {
   if (cat === 'security' && !_safeStorageLoaded) {
     _safeStorageLoaded = true;
     loadSafeStorageStatus();
+    loadRecoveryStatus();
   }
 
   if (cat === 'data' && !_dataCompaniesLoaded) {
@@ -2046,6 +2055,106 @@ function showAuditWarning(count, action) {
 // the onboarding tour's welcome step now carries that reassurance. Old
 // ui_encryptionNoticeAck values in existing vaults are simply ignored.)
 
+// ── Account Recovery (Settings → Security) ──────────────────────────────────
+// Status of the two ways back in: the auto-enrolled device-bound packet
+// (recovery_key.json, DPAPI) and the recovery code. The regenerate flow lets a
+// user who lost their code mint a fresh one from an active session
+// (password-gated) and save it as a recovery file.
+
+/** @type {string} plaintext code held only between regenerate and save/close */
+let _freshRecoveryCode = '';
+
+async function loadRecoveryStatus() {
+  const area = document.getElementById('recovery-status');
+  if (!area) return;
+  _freshRecoveryCode = '';
+  let deviceOk = false;
+  try { deviceOk = !!(await api.invoke('auth:reset-check'))?.available; } catch {}
+
+  const deviceLine = deviceOk
+    ? `<div class="toggle-row" style="align-items:flex-start;gap:12px;">
+         <div class="toggle-info">
+           <div class="toggle-label" style="color:var(--success,#4caf7d);">✓ Device recovery active</div>
+           <div class="toggle-desc">You can reset a forgotten password on this PC via Windows Hello — no code needed</div>
+         </div>
+       </div>`
+    : `<div class="toggle-row" style="align-items:flex-start;gap:12px;">
+         <div class="toggle-info">
+           <div class="toggle-label" style="color:var(--yellow,#e0b04f);">⚠ Device recovery unavailable</div>
+           <div class="toggle-desc">Windows secure storage isn't available here, so a forgotten password can only be reset with your recovery code — make sure you have your recovery file saved somewhere safe</div>
+         </div>
+       </div>`;
+
+  area.innerHTML = `
+    ${deviceLine}
+    <div class="dba-card" style="margin-top:12px;border-color:var(--border);">
+      <div class="dba-card-header">
+        <div>
+          <div class="dba-card-title">Generate New Recovery Code</div>
+          <div class="dba-card-desc">Lost your code or never saved the file? Mint a fresh one — the old code stops working</div>
+        </div>
+        <button class="dba-trigger-btn" data-action="armRecoveryRegen">Generate</button>
+      </div>
+      <div id="recovery-regen-confirm" style="display:none;padding:0 0 4px;">
+        <div class="dba-confirm-warning" style="margin-bottom:8px;">Enter your password to confirm.</div>
+        <div class="dba-confirm-row">
+          <input type="password" class="dba-confirm-input" id="recovery-regen-pw" placeholder="Current password" autocomplete="current-password">
+          <button class="dba-confirm-btn" data-action="executeRecoveryRegen">Confirm</button>
+          <button class="dba-confirm-btn" data-action="disarmRecoveryRegen">Cancel</button>
+        </div>
+        <div class="error-msg" id="recovery-regen-err" style="display:none;margin-top:6px;"></div>
+      </div>
+      <div id="recovery-regen-result" style="display:none;padding:4px 0;">
+        <div class="dba-confirm-warning" style="margin-bottom:8px;">⚠ Your new recovery code — it cannot be shown again after you leave this screen.</div>
+        <div id="recovery-regen-code" style="font-family:var(--mono);font-size:14px;letter-spacing:3px;color:var(--yellow,#e0b04f);text-align:center;border:1px solid var(--yellow,#e0b04f);border-radius:var(--radius);padding:12px;margin-bottom:8px;"></div>
+        <button class="dba-confirm-btn" id="recovery-save-btn" data-action="saveRecoveryFileShell" style="width:100%;">⬇ Save Recovery File…</button>
+        <div class="toggle-desc" style="margin-top:8px;text-align:center;">Save it to a cloud drive or USB stick — it's your way back in if this PC is lost.</div>
+      </div>
+    </div>`;
+}
+
+function armRecoveryRegen() {
+  document.getElementById('recovery-regen-confirm').style.display = 'block';
+  document.getElementById('recovery-regen-pw')?.focus();
+}
+function disarmRecoveryRegen() {
+  document.getElementById('recovery-regen-confirm').style.display = 'none';
+  const pw = document.getElementById('recovery-regen-pw'); if (pw) pw.value = '';
+  const err = document.getElementById('recovery-regen-err'); if (err) err.style.display = 'none';
+}
+async function executeRecoveryRegen() {
+  const pw  = document.getElementById('recovery-regen-pw')?.value || '';
+  const err = document.getElementById('recovery-regen-err');
+  if (!pw) { err.textContent = 'Password required.'; err.style.display = 'block'; return; }
+  const res = await api.invoke('auth:regenerate-recovery', { password: pw });
+  if (!res.ok) {
+    err.textContent = res.error || 'Could not generate a new code.';
+    err.style.display = 'block';
+    const inp = document.getElementById('recovery-regen-pw'); if (inp) { inp.value = ''; inp.focus(); }
+    return;
+  }
+  _freshRecoveryCode = res.recoveryCode || '';
+  disarmRecoveryRegen();
+  document.getElementById('recovery-regen-code').textContent = _freshRecoveryCode;
+  document.getElementById('recovery-regen-result').style.display = 'block';
+  Shell.toast('New recovery code generated. The old code no longer works.', 'success');
+}
+async function saveRecoveryFileShell() {
+  if (!_freshRecoveryCode) return;
+  let username = 'account';
+  try { username = (await api.invoke('session:get'))?.username || 'account'; } catch {}
+  const btn = document.getElementById('recovery-save-btn');
+  if (btn) btn.disabled = true;
+  const res = await api.invoke('auth:save-recovery-file', { username, recoveryCode: _freshRecoveryCode });
+  if (btn) btn.disabled = false;
+  if (res?.ok) {
+    if (btn) btn.textContent = '✓ Recovery file saved';
+    Shell.toast('Recovery file saved. Keep it off this PC — cloud drive or USB.', 'success');
+  } else if (!res?.canceled) {
+    Shell.toast(res?.error || 'Could not save recovery file.', 'error');
+  }
+}
+
 // ── Safe Storage (Windows Hello bridge) ──────────────────────────────────────
 
 async function loadSafeStorageStatus() {
@@ -2221,6 +2330,10 @@ function installShellDelegation() {
     sendScheduledNow:      ()      => sendScheduledNow(),
     saveScheduleConfig:    ()      => saveScheduleConfig(),
     openExternal:          a       => Shell._openExternal(a),
+    armRecoveryRegen:      ()      => armRecoveryRegen(),
+    disarmRecoveryRegen:   ()      => disarmRecoveryRegen(),
+    executeRecoveryRegen:  ()      => executeRecoveryRegen(),
+    saveRecoveryFileShell: ()      => saveRecoveryFileShell(),
     armSafeSetup:          ()      => armSafeSetup(),
     disarmSafeSetup:       ()      => disarmSafeSetup(),
     executeSafeSetup:      ()      => executeSafeSetup(),

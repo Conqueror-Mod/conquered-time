@@ -585,8 +585,38 @@ ipcMain.handle('auth:recover', async (_: unknown, { username, recoveryCode, newP
   } catch(e) { return { ok: false, error: 'Recovery failed: ' + e.message }; }
 });
 
-// Save the just-generated recovery code as a downloadable file (setup screen
-// only — that is the sole moment the plaintext code exists). Nothing secret is
+// Rotate the recovery code from an active session (Settings → Security →
+// Account Recovery). For users who lost their code: generates a fresh one,
+// re-hashes it, and re-seals the CURRENT vault key under it — the old code
+// stops working for resets/unlocks immediately. Password-gated so a stranger
+// at an unlocked app can't silently swap the code. Returns the plaintext code
+// once (renderer shows it + offers auth:save-recovery-file).
+ipcMain.handle('auth:regenerate-recovery', async (_: unknown, { password }: Record<string, any>) => {
+  if (!session.key || !session.user) return { ok: false, error: 'No active session.' };
+  try {
+    const bcrypt = require('bcryptjs');
+    const user = dbGet('SELECT rowid as rid, password_hash FROM users WHERE rowid=?', [session.user.id]);
+    if (!user) return { ok: false, error: 'User not found.' };
+    if (!bcrypt.compareSync(password, user.password_hash))
+      return { ok: false, error: 'Incorrect password.' };
+
+    // Same charset/format as the setup-screen generator (no I/O/0/1)
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const seg = () => Array.from({ length: 4 }, () => chars[crypto.randomInt(chars.length)]).join('');
+    const code = `${seg()}-${seg()}-${seg()}-${seg()}`;
+
+    const recoveryKeySalt = crypto.randomBytes(32).toString('hex');
+    const blob = encrypt(session.key.toString('hex'), deriveKey(code, recoveryKeySalt));
+    dbRun('UPDATE users SET recovery_hash=?, recovery_key_enc=?, recovery_key_iv=?, recovery_key_tag=?, recovery_key_salt=? WHERE rowid=?',
+      [bcrypt.hashSync(code, 12), blob.data, blob.iv, blob.tag, recoveryKeySalt, session.user.id]);
+    persistDB();
+    return { ok: true, recoveryCode: code };
+  } catch (e) { return { ok: false, error: e.message }; }
+});
+
+// Save the just-generated recovery code as a downloadable file (setup screen,
+// or Settings → Security right after auth:regenerate-recovery — the only
+// moments the plaintext code exists). Nothing secret is
 // read from any vault; the renderer passes the code it just generated. The
 // file is deliberately plain text: it must be readable in ten years on any
 // machine, and the code alone is useless without the vault files + TOTP device.
