@@ -137,6 +137,13 @@ const Onboarding = (() => {
 
   /** Start (or restart) the tour from the first step. */
   function begin() {
+    // If the audit login-notice is already up, hide it and let the shell
+    // re-show it after the tour (ct:tour-done) — never share the screen.
+    const audit = document.getElementById('audit-warning-modal');
+    if (audit && audit.style.display !== 'none') {
+      audit.style.display = 'none';
+      sessionStorage.setItem('audit_after_tour', '1');
+    }
     sessionStorage.setItem(KEY, '0');
     showStep(0);
   }
@@ -155,6 +162,9 @@ const Onboarding = (() => {
     teardown();
     try { await api.invoke('settings:set', { key: 'ui_onboardingDone', value: '1' }); } catch {}
     if (completed) Shell.toast('Setup guide complete — conquer your time.', 'success');
+    // Let the shell release anything it deferred while the tour was running
+    // (the audit login-notice pauses during the tour — never over/under it).
+    try { document.dispatchEvent(new CustomEvent('ct:tour-done')); } catch {}
   }
 
   /** @param {number} idx */
