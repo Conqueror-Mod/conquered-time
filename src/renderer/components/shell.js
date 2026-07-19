@@ -890,6 +890,10 @@ const Shell = (() => {
       if (!onboardDone) {
         window.Onboarding?.begin();
         tourStarted = true;
+        // The audit login-notice is PAUSED for the whole tour (user report
+        // 2026-07-19: it used to sit behind the wizard overlay) — released by
+        // the ct:tour-done listener below when the tour finishes or is skipped.
+        sessionStorage.setItem('audit_after_tour', '1');
       } else {
         try {
           const n = await api.invoke('audit:count');
@@ -897,6 +901,16 @@ const Shell = (() => {
         } catch {}
       }
     }
+
+    // Deferred audit notice: fires on whichever page the tour ends on.
+    document.addEventListener('ct:tour-done', async () => {
+      if (!sessionStorage.getItem('audit_after_tour')) return;
+      sessionStorage.removeItem('audit_after_tour');
+      try {
+        const n = await api.invoke('audit:count');
+        if (n > 0) showAuditWarning(n, 'login');
+      } catch {}
+    });
 
     // ── Sidebar active-task timer ──────────────────────────────────────────
     // Delegate to showSidebarTimer (the single tracked interval) — do NOT start a
@@ -2031,6 +2045,15 @@ function showAuditWarning(count, action) {
   const viewBtn    = document.getElementById('audit-warn-view');
   const dismissBtn = document.getElementById('audit-warn-dismiss');
   if (!modal || !body) return;
+
+  // Onboarding tour running? The informational login notice must never share
+  // the screen with the wizard — pause it until ct:tour-done. (Close/lock
+  // warnings still show: they gate an explicit user action.)
+  if (action === 'login' &&
+      (document.getElementById('ct-tour-card') || sessionStorage.getItem('ct_tour') != null)) {
+    sessionStorage.setItem('audit_after_tour', '1');
+    return;
+  }
 
   // An exit/lock/login interrupt supersedes any transient in-page modal (e.g.
   // the invoice preview / numbering dialogs). Close open .modal-overlay layers

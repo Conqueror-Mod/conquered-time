@@ -27,7 +27,9 @@ const Settings = (() => {
   // (win:set-zoom → webContents.setZoomFactor), so the WHOLE window scales
   // uniformly — sidebar, titlebar, modals, and content together. (Superseded the
   // old CSS `zoom` on #main-content, which left the chrome unscaled.)
-  const SCALE_ZOOM = { compact: 0.85, normal: 1.0, comfortable: 1.15, large: 1.3 };
+  // Large was 1.3 but overflowed smaller screens (user report 2026-07-19,
+  // dual-office-monitor setup) — cut to 1.2. Keep in sync with PA_ZOOM (login.js).
+  const SCALE_ZOOM = { compact: 0.85, normal: 1.0, comfortable: 1.15, large: 1.2 };
 
   // ── Apply settings to DOM ──────────────────────────────────────────────────
   function apply(settings) {

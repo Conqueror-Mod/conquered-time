@@ -992,7 +992,7 @@ function paApplyTheme(theme) {
 
 // UI scale → app-wide zoom factor (must match settings.js SCALE_ZOOM so the
 // login screen and the in-app scale feel identical).
-const PA_ZOOM = { compact: 0.85, normal: 1.0, comfortable: 1.15, large: 1.3 };
+const PA_ZOOM = { compact: 0.85, normal: 1.0, comfortable: 1.15, large: 1.2 };
 function paApplyZoom(scale) {
   try { api.invoke('win:set-zoom', PA_ZOOM[scale] ?? 1); } catch (e) {}
 }

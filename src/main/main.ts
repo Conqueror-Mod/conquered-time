@@ -748,7 +748,16 @@ app.whenReady().then(async () => {
   if (rememberPos && lastBoundsRaw) {
     try {
       const b = JSON.parse(lastBoundsRaw);
-      mainWindow.setBounds({ x: b.x, y: b.y, width: b.width, height: b.height }, false);
+      // Clamp restored bounds to the target display's WORK AREA. Raw saved
+      // bounds could exceed it (saved on a bigger monitor, or while the
+      // taskbar was hidden/moved) — the restored window then sat on top of /
+      // pushed under the taskbar (user report 2026-07-19).
+      const wa = screen.getDisplayMatching(b).workArea;
+      const width  = Math.min(b.width,  wa.width);
+      const height = Math.min(b.height, wa.height);
+      const x = Math.min(Math.max(b.x, wa.x), wa.x + wa.width  - width);
+      const y = Math.min(Math.max(b.y, wa.y), wa.y + wa.height - height);
+      mainWindow.setBounds({ x, y, width, height }, false);
     } catch {}
   } else if (prefDisplay !== 'primary') {
     // Move onto the preferred display; always maximize to avoid off-screen issues

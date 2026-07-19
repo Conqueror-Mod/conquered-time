@@ -155,6 +155,22 @@ window.addEventListener('DOMContentLoaded', async () => {
     } catch {}
   }
 
+  // No explicit handoff (sessionStorage) restored a session? If there's an
+  // active punch, land on ITS session instead of an empty "Select a company"
+  // page — finishing a task elsewhere and returning here to clock out used to
+  // require re-selecting the company by hand (user report 2026-07-19).
+  if (!currentEntryId) {
+    try {
+      const act = await api.invoke('entries:get-active') as TimeEntry | null;
+      if (act && act.company_id) {
+        $input('company-select').value = String(act.company_id);
+        $input('log-date').value = act.log_date || RowUtils.localDateStr();
+        sessionStorage.setItem('tracker_entry', String(act.id)); // land on the punched session
+        await onCompanyChange();
+      }
+    } catch {}
+  }
+
   // Only build the blank 5-row table when nothing was restored above —
   // buildRows() unconditionally wipes rowsData, which erased the loaded
   // session on the Global-Log-Open / dashboard-node path (found during C6).
