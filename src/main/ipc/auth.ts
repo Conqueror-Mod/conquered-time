@@ -130,21 +130,27 @@ ipcMain.handle('profiles:deselect', () => {
   return { ok: true };
 });
 
-// Delete the currently-loaded profile after verifying the user's password.
-// Called from the pre-auth settings modal — the profile must already be loaded
-// via profiles:load (vault is open, but no session key yet).
-// Returns { ok, error } — on success the profile directory is removed from disk
-// and the caller should navigate back to login (profile selector).
-ipcMain.handle('profiles:delete', async (_: unknown, { password }: Record<string, any>) => {
+// Delete the currently-loaded profile. Called from the pre-auth settings
+// modal — the profile must already be loaded via profiles:load (vault is
+// open, but no session key yet).
+//
+// Intent gate, NOT an auth gate: the caller must send the profile's username
+// (typed by the user) and it must match the loaded profile directory. The old
+// password check was removed on purpose — a user who forgot their password
+// AND lost their recovery code was permanently unable to delete their own
+// locked-out profile, and the check added no real security (anyone with
+// filesystem access can delete the encrypted vault dir directly; deletion
+// discloses nothing). Do not reintroduce a password requirement here.
+// Returns { ok, error } — on success the profile directory is removed from
+// disk and the caller should navigate back to login (profile selector).
+ipcMain.handle('profiles:delete', async (_: unknown, { confirmUsername }: Record<string, any>) => {
   if (!hasDb()) return { ok: false, error: 'No profile loaded.' };
   try {
-    const bcrypt = require('bcryptjs');
-    const user   = dbGet('SELECT rowid as rid, password_hash FROM users LIMIT 1');
-    if (!user) return { ok: false, error: 'Profile has no account — cannot verify.' };
-    if (!bcrypt.compareSync(password, user.password_hash))
-      return { ok: false, error: 'Incorrect password.' };
-
     const profileDir = session.profileDir;
+    const dirName = profileDir ? path.basename(profileDir) : '';
+    const typed   = String(confirmUsername || '').trim();
+    if (!typed || typed.toLowerCase() !== dirName.toLowerCase())
+      return { ok: false, error: 'Username does not match this profile.' };
 
     // Close DB and clear all session state before deleting files
     closeDb();
@@ -169,6 +175,38 @@ ipcMain.handle('profiles:delete', async (_: unknown, { password }: Record<string
 
 const SAFE_KEY_FILENAME = 'safe_key.json';
 function safeKeyPath() { return session.profileDir ? path.join(session.profileDir, SAFE_KEY_FILENAME) : null; }
+
+// ── Device-bound recovery packet (auto-enrolled) ──────────────────────────
+// recovery_key.json seals the vault key under safeStorage (DPAPI on Windows),
+// same format as safe_key.json, but written AUTOMATICALLY on setup and every
+// successful login — no opt-in, nothing to write down. It powers the
+// "Forgot password?" reset on the login screen: DPAPI unseals the key on the
+// same Windows user account (gated behind a Windows Hello / PIN prompt when
+// available), then the vault is re-encrypted under the new password via the
+// same reEncryptVault path the recovery-code reset uses. Device-bound by
+// nature: the packet is useless on any other machine or Windows account, so
+// the recovery code / backup restore remain the device-loss fallbacks.
+const RECOVERY_KEY_FILENAME = 'recovery_key.json';
+function recoveryKeyPath() { return session.profileDir ? path.join(session.profileDir, RECOVERY_KEY_FILENAME) : null; }
+
+function sealKeyFile(filePath: string, key: Buffer) {
+  const encKey = safeStorage.encryptString(key.toString('hex')).toString('base64');
+  const canary = encrypt('conquered-time-v1', key); // { data, iv, tag }
+  fs.writeFileSync(filePath, JSON.stringify({ version: 1, key: encKey, canary }));
+}
+
+// Best-effort — a failed write must never break login. Also refreshes an
+// existing safe_key.json (Hello fast-path) so both sealed files self-heal to
+// the current vault key after any password change/reset. safe_key.json stays
+// opt-in: it is only rewritten here if the user already enrolled it.
+function refreshSealedKeyFiles(key: Buffer) {
+  try {
+    if (!session.profileDir || !safeStorage.isEncryptionAvailable()) return;
+    sealKeyFile(recoveryKeyPath()!, key);
+    const skPath = safeKeyPath();
+    if (skPath && fs.existsSync(skPath)) sealKeyFile(skPath, key);
+  } catch (e) { console.warn('[recovery] sealed key refresh failed:', e.message); }
+}
 
 ipcMain.handle('auth:safe-check', () => {
   const available = safeStorage.isEncryptionAvailable();
@@ -261,6 +299,7 @@ ipcMain.handle('auth:safe-login', async () => {
     resetIdleTimer();
     migrateTimeEntries();
     sweepOrphanTaskItems(); // C6 (D-012): stop orphaned running tasks/breaks
+    refreshSealedKeyFiles(key); // auto-enroll / refresh device recovery packet
     // Catch up any scheduled report missed while the app was closed (session is
     // now available). Mirrors auth:login — without this, Quick Unlock / Windows
     // Hello sign-ins never run the on-launch schedule check.
@@ -299,6 +338,7 @@ ipcMain.handle('auth:quick-unlock', async (_: unknown, { password }: Record<stri
     resetIdleTimer();
     migrateTimeEntries();
     sweepOrphanTaskItems(); // C6 (D-012): stop orphaned running tasks/breaks
+    refreshSealedKeyFiles(key); // auto-enroll / refresh device recovery packet
     // Catch up any scheduled report missed while the app was closed (session is
     // now available). Mirrors auth:login — without this, Quick Unlock / Windows
     // Hello sign-ins never run the on-launch schedule check.
@@ -330,6 +370,57 @@ ipcMain.handle('auth:safe-disable', async (_: unknown, { password }: Record<stri
   } catch (e) { return { ok: false, error: e.message }; }
 });
 
+// ── IPC: Device-bound password reset ("Forgot password?") ─────────────────
+ipcMain.handle('auth:reset-check', () => {
+  const rkPath = recoveryKeyPath();
+  const available = !!(hasDb() && rkPath && fs.existsSync(rkPath) && safeStorage.isEncryptionAvailable());
+  return { available };
+});
+
+ipcMain.handle('auth:reset-password', async (_: unknown, { newPassword }: Record<string, any>) => {
+  if (!hasDb()) return { ok: false, error: 'No profile loaded.' };
+  if (!newPassword || String(newPassword).length < 8)
+    return { ok: false, error: 'Password must be at least 8 characters.' };
+  const rkPath = recoveryKeyPath();
+  if (!rkPath || !fs.existsSync(rkPath) || !safeStorage.isEncryptionAvailable())
+    return { ok: false, error: 'Device recovery is not available for this profile.' };
+  try {
+    // Windows Hello / PIN gate. DPAPI alone would let anyone at an unlocked
+    // Windows session reset the password silently; Hello adds a presence check.
+    // NotAvailable/Error still proceeds — DPAPI already binds the packet to
+    // this Windows account, and there is no password to fall back to here.
+    const hello = await requestWindowsHelloConsent();
+    if (hello === 'Cancelled') return { ok: false, error: 'Verification cancelled.' };
+
+    const stored = JSON.parse(fs.readFileSync(rkPath, 'utf8'));
+    const keyHex = safeStorage.decryptString(Buffer.from(stored.key, 'base64'));
+    const oldKey = Buffer.from(keyHex, 'hex');
+    if (decrypt(stored.canary, oldKey) !== 'conquered-time-v1')
+      return { ok: false, error: 'Recovery data on this device is stale. Use your recovery code or restore a backup instead.' };
+
+    const bcrypt = require('bcryptjs');
+    const user   = dbGet('SELECT rowid as rid, * FROM users LIMIT 1');
+    if (!user) return { ok: false, error: 'No account found in this profile.' };
+    const newKey = deriveKey(newPassword, user.key_salt || user.totp_secret);
+
+    const res = reEncryptVault({
+      oldKey, newKey, userId: Number(user.rid), user,
+      onCommit: () => dbRun('UPDATE users SET password_hash=?, failed_attempts=0, locked_until=NULL WHERE rowid=?',
+        [bcrypt.hashSync(newPassword, 12), Number(user.rid)]),
+    });
+    if (!res.ok) return res;
+
+    // Reseal both device key files under the new vault key. Note: the
+    // recovery-CODE packet (recovery_key_enc) cannot be resealed here — we
+    // don't know the code — so it goes stale for future password resets
+    // (the code still works for lockout unlock; a stale reset attempt fails
+    // cleanly inside reEncryptVault's decrypt phase and rolls back).
+    refreshSealedKeyFiles(newKey);
+    persistDB(); performBackup();
+    return { ok: true, passwordReset: true };
+  } catch (e) { return { ok: false, error: 'Device reset failed: ' + e.message }; }
+});
+
 // ── IPC: Auth ──────────────────────────────────────────────────────────────
 ipcMain.handle('auth:check-setup', () => {
   if (!hasDb()) return { needsSetup: true };
@@ -357,6 +448,7 @@ ipcMain.handle('auth:setup', async (_: unknown, { username, password, totpSecret
       [username, passwordHash, totpSecret, recoveryHash, keySalt, recoveryKeyBlob.data, recoveryKeyBlob.iv, recoveryKeyBlob.tag, recoveryKeySalt]
     );
     persistDB();
+    refreshSealedKeyFiles(sessionKeyBuf); // auto-enroll device recovery packet at setup
     // Write profile manifest so the selector card appears on next launch
     if (session.profileDir && !IS_DEV) {
       writeManifest(session.profileDir, {
@@ -425,6 +517,9 @@ ipcMain.handle('auth:login', async (_: unknown, { username, password, totpCode }
     migrateTimeEntries();
     sweepOrphanTaskItems(); // C6 (D-012): stop orphaned running tasks/breaks
 
+    // Auto-enroll / refresh the device-bound recovery packet (best-effort)
+    refreshSealedKeyFiles(session.key);
+
     // Fire scheduled email check shortly after login (session now available)
     setTimeout(runScheduledEmailCheck, 5000);
 
@@ -475,6 +570,15 @@ ipcMain.handle('auth:recover', async (_: unknown, { username, recoveryCode, newP
         [bcrypt.hashSync(newPassword, 12), Number(user.rid)]),
     });
     if (!res.ok) return res;
+
+    // Reseal the recovery-code packet under the NEW vault key — without this,
+    // the packet still held the old key and a second recovery-code reset would
+    // fail. Also refresh the DPAPI-sealed device key files.
+    const newRecoverySalt = crypto.randomBytes(32).toString('hex');
+    const newRecoveryBlob = encrypt(newKey.toString('hex'), deriveKey(recoveryCode, newRecoverySalt));
+    dbRun('UPDATE users SET recovery_key_enc=?, recovery_key_iv=?, recovery_key_tag=?, recovery_key_salt=? WHERE rowid=?',
+      [newRecoveryBlob.data, newRecoveryBlob.iv, newRecoveryBlob.tag, newRecoverySalt, Number(user.rid)]);
+    refreshSealedKeyFiles(newKey);
 
     persistDB(); performBackup();
     return { ok: true, passwordReset: true };
@@ -556,6 +660,7 @@ ipcMain.handle('auth:change-password', async (_: unknown, { currentPassword, tot
   if (!res.ok) return res;
 
   session.key = newKey;
+  refreshSealedKeyFiles(newKey); // keep device recovery + Hello fast-path in sync
   persistDB(); performBackup();
   return { ok: true };
 });
