@@ -55,6 +55,8 @@ interface GalaxyModel {
   systems: SystemModel[];
   hours: number;
   lastDays: number;
+  /** Days since the newest row in the galaxy was created (Infinity if unknown). */
+  createdDays: number;
   archived: boolean;
 }
 interface Node {
@@ -286,25 +288,37 @@ function attach(opts: BubbleWebOpts): BubbleWebController {
       if (e.log_date <= today && (!last[e.company_id] || e.log_date > last[e.company_id])) last[e.company_id] = e.log_date;
     }
     const dayMs = 86400000;
+    // Archival interval (Settings → Appearance, ui_archiveDays; default 30).
+    // Settings is a top-level const, NOT a window property — typeof guard.
+    const archiveDays = (typeof Settings !== 'undefined' && Number(Settings.current?.archiveDays)) || 30;
     const byKey = new Map<string, GalaxyModel>();
     for (const co of companies) {
       const key = groupKey(co);
       let g = byKey.get(key);
-      if (!g) { g = { key, name: key, rows: [], systems: [], hours: 0, lastDays: Infinity, archived: false }; byKey.set(key, g); }
+      if (!g) { g = { key, name: key, rows: [], systems: [], hours: 0, lastDays: Infinity, createdDays: Infinity, archived: false }; byKey.set(key, g); }
       const hours = (mins[co.id] || 0) / 60;
       const lastDays = last[co.id]
         ? Math.max(0, Math.round((new Date(today + 'T00:00').getTime() - new Date(last[co.id] + 'T00:00').getTime()) / dayMs))
+        : Infinity;
+      // Days since this row was created (unix-seconds column; missing = ancient)
+      const createdDays = co.created_at
+        ? Math.max(0, (Date.now() - co.created_at * 1000) / dayMs)
         : Infinity;
       g.rows.push(co);
       g.systems.push({ co, hours, lastDays });
       g.hours += hours;
       g.lastDays = Math.min(g.lastDays, lastDays);
+      g.createdDays = Math.min(g.createdDays, createdDays);
     }
     galaxies = [...byKey.values()];
     for (const g of galaxies) {
       g.systems.sort((a, b) => b.hours - a.hours);
-      // Archive rule: every row ended, or no work in the selected window.
-      g.archived = g.rows.every(r => !!r.date_end) || g.hours <= 0;
+      // Archive rule: every row explicitly ended, OR idle beyond the archival
+      // interval. "Idle" means no work within archiveDays AND created more
+      // than archiveDays ago — a brand-new zero-hour company stays Active for
+      // its grace period instead of being born straight into the Archive.
+      g.archived = g.rows.every(r => !!r.date_end)
+        || Math.min(g.lastDays, g.createdDays) > archiveDays;
     }
     // One-galaxy vault (full web only): skip L0, land on its systems.
     const active = galaxies.filter(g => !g.archived);
@@ -798,8 +812,12 @@ function attach(opts: BubbleWebOpts): BubbleWebController {
 
   const ro = new ResizeObserver(() => layout());
   ro.observe(wrap);
-  const onSettings = (): void => draw();
+  // Rebuild on settings changes — the archival interval (ui_archiveDays)
+  // changes which galaxies fold into the Archive, not just the paint.
+  // Settings.set dispatches on document (window kept for older dispatchers).
+  const onSettings = (): void => { buildModel(); layout(); };
   window.addEventListener('ct:settings-changed', onSettings);
+  document.addEventListener('ct:settings-changed', onSettings);
 
   return {
     update(cos: Company[], ents: EntrySummary[], r: '30' | '90' | 'all'): void {
@@ -830,6 +848,7 @@ function attach(opts: BubbleWebOpts): BubbleWebController {
       canvas.removeEventListener('contextmenu', onContext);
       opts.breadcrumb?.root.removeEventListener('click', crumbClick);
       window.removeEventListener('ct:settings-changed', onSettings);
+      document.removeEventListener('ct:settings-changed', onSettings);
     },
   };
 }

@@ -20,8 +20,10 @@ ipcMain.handle('companies:list', () => {
         const parsed = JSON.parse(plain);
         // Ensure id is never null/NaN — always a real positive integer
         const finalId = (id && !isNaN(id)) ? id : Number(r.rid);
-        return { ...parsed, id: finalId };
-      } catch { return { id: Number(r.rid), name: '[Decryption Error]' }; }
+        // created_at is a plaintext column (unix seconds) — the Galaxy uses it
+        // to keep brand-new zero-hour companies out of the Archive.
+        return { ...parsed, id: finalId, created_at: r.created_at != null ? Number(r.created_at) : null };
+      } catch { return { id: Number(r.rid), name: '[Decryption Error]', created_at: r.created_at != null ? Number(r.created_at) : null }; }
     });
   });
 });

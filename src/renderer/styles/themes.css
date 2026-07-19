@@ -340,6 +340,16 @@
   box-shadow: 0 0 16px rgba(57,255,20,0.32);
   text-shadow: 0 0 10px rgba(57,255,20,0.50);
 }
+/* Light themes: the neon #39FF14 glow washes out on pale sidebars — swap to a
+   deep readable green, solid tint, no emission (user-reported, 2026-07-19). */
+[data-theme="memoria"] .sidebar-active-badge,
+[data-theme="rabanastre"] .sidebar-active-badge {
+  color: #15803d;
+  border-color: rgba(21,128,61,0.55);
+  background: rgba(21,128,61,0.10);
+  box-shadow: none;
+  text-shadow: none;
+}
 
 /* Selected/active table row picks up the current accent */
 [data-theme] tbody tr.row-active {
