@@ -78,7 +78,8 @@ const COMMANDS = {
     const [u = 'devuser', p = 'devpass123'] = (arg || '').split(/\s+/).filter(Boolean);
     await page.fill('#login-username', u);
     await page.fill('#login-password', p);
-    await page.evaluate(() => doLogin());
+    // login.js is IIFE-wrapped — doLogin() isn't a page global; click the button.
+    await page.click('#login-btn');
     await waitURL('dashboard');
     await sleep(1200);
     console.log('logged in — at dashboard');
@@ -133,16 +134,17 @@ const COMMANDS = {
       set('input-name', 'Cursed Path Test');
       set('input-desc', 'clock in/out + repeated autosave');
     });
-    await page.evaluate(() => clockIn());        await sleep(600);  // save #1 (insert)
-    await page.evaluate(() => saveSession(true)); await sleep(400); // save #2 (update)
-    await page.evaluate(() => clockOut());       await sleep(600);  // save #3 (update)
-    await page.evaluate(() => saveSession(true)); await sleep(800); // save #4 (update)
+    // tracker.js is IIFE-wrapped (Phase 3 TS refactor) — its clockIn/saveSession/
+    // clockOut and currentEntryId are NOT page globals. Drive the real buttons.
+    await page.click('#btn-clock-in');     await sleep(600);  // save #1 (insert)
+    await page.click('#btn-save-session'); await sleep(400);  // save #2 (update)
+    await page.click('#btn-clock-out');    await sleep(600);  // save #3 (update)
+    await page.click('#btn-save-session'); await sleep(800);  // save #4 (update)
 
-    const eid   = await page.evaluate(() => (typeof currentEntryId !== 'undefined' ? currentEntryId : 'n/a'));
     const after = await page.evaluate(async d =>
       (await api.invoke('entries:all')).filter(e => e.log_date === d).length, today);
     const delta = after - baseline;
-    console.log(`today=${today} baseline=${baseline} after=${after} currentEntryId=${eid}`);
+    console.log(`today=${today} baseline=${baseline} after=${after}`);
     console.log(`4 saves on one session -> ${delta} new row(s): ` +
       (delta === 1 ? 'PASS — no duplication (gotcha #6 holds)'
                    : `FAIL — expected 1, got ${delta}`));

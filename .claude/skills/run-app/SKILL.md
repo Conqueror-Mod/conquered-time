@@ -73,9 +73,12 @@ npm run dev        # opens against the dev-data sandbox (--dev)
 
 ## What "verify-cursed-path" proves
 
-Picks a company with no entry today, fills the task fields, then fires
-`clockIn → saveSession → clockOut → saveSession` (4 save ops on ONE session) and
-asserts exactly **one** new row appears in `entries:all`. This exercises both
+Picks a company with no entry today, fills the task fields, then clicks the real
+UI buttons — `#btn-clock-in → #btn-save-session → #btn-clock-out →
+#btn-save-session` (4 save ops on ONE session) — and asserts exactly **one** new
+row appears in `entries:all`. (It drives buttons, not page globals: tracker.js is
+IIFE-wrapped since the Phase 3 TS refactor, so `clockIn()`/`currentEntryId` are
+not reachable from `page.evaluate`.) This exercises both
 fragile paths at once: rowid→id normalization (gotcha #1) and the INSERT→capture
 `currentEntryId`→UPDATE autosave loop (gotcha #6). Historically this produced 4
 duplicate sessions in the Global Log.
