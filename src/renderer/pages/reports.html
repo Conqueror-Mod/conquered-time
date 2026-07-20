@@ -155,6 +155,8 @@
     scrollbar-width: thin;
     scrollbar-color: var(--border-light) transparent;
   }
+  /* Gotcha #7: children of the scrollable breakdown panel must not shrink. */
+  .breakdown-panel > * { flex-shrink: 0; }
   .label-row { display: flex; flex-direction: column; gap: 4px; }
   .label-row-hdr { display: flex; justify-content: space-between; align-items: baseline; }
   .label-name  { font-family: var(--sans);  font-size: 12px; font-weight: 500; color: var(--text-bright); }
