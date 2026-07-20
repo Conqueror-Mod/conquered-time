@@ -79,13 +79,13 @@
 
 | Cluster | Defects | Fix | PR | Checked by |
 |---------|---------|-----|----|-----------|
-| C1 | D-301, D-302 | **Deferred — needs owner decision**: `--text-dim` / active-tab contrast is a theme-token design call (themes.css layer). Raising the linter floor to 3:1 waits until this lands | — | re-lint all themes after |
+| C1 | D-301, D-302 | **Fixed (owner approved 2026-07-19)** — theme layer: `--text-dim` retuned in all 5 themes to ≥3:1 against bg+surface-3 (hue/sat preserved, lightness only); new per-theme `--accent-ink` token for text on solid accent fills (Reports active tab, btn-primary:hover, s-btn-primary:hover — white was 1.78:1 on Zanarkand cyan, 2.81:1 on Treno amber); dashboard week-band blocks pick dark/light ink from the fill's WCAG luminance (`inkOn()` in dashboard.ts). Linter contrast floor raised 2.5 → 3.0 per the pre-registered plan | C1 PR | full re-lint: 10 pages × 5 themes at the 3:1 floor → **0 faults**; suite 126/126; visual pass on Zanarkand reports + dashboard |
 | C2 | D-304, D-305, D-306 | identity-color: min-rowid override precedence + non-finite-id palette pin; report-html: fmtMins NaN guard. 7 regression tests (test/identity-color.test.js) | this campaign's PR | original probes re-run → ALL PASS; suite 126/126 |
 | C3 | D-303 | Fixed pre-campaign by PR #165 (archive created-date grace); field report was from a pre-fix build | #165 | code + timeline; ships in today's release |
 
 ## Control — close-out
-- [x] All register rows fixed or explicitly deferred (C1 deferred: theme-token
-  design decision belongs to the owner; everything else fixed)
+- [x] All register rows fixed — including C1 (owner approved the token pass
+  2026-07-19; nothing deferred)
 - [x] Regression test per fixed defect (rejection + adjacent legal behavior)
 - [x] Crucible history table updated (README)
 - [ ] Release cut (owner)

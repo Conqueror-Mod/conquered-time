@@ -46,6 +46,7 @@
   --border-light: #d4d7eb;
 
   --accent:       #6d4ed8;
+  --accent-ink:   #ffffff;   /* C1: ink on solid accent fills (>=3:1) */
   --accent-dim:   rgba(109,78,216,0.11);
   --accent-glow:  rgba(109,78,216,0.26);
   --accent-2:     #b44fad;
@@ -62,7 +63,7 @@
 
   /* Deep navy-indigo text — reads as sophisticated dark, not overtly purple */
   --text:         #2c2d55;
-  --text-dim:     #c2c6de;
+  --text-dim:     #6f79b1;   /* C1 (Crucible III): >=3:1 on bg+surface-3 */
   --text-muted:   #5c5e90;
   --text-bright:  #16163a;
   --text-white:   #0c0c28;
@@ -95,6 +96,7 @@
 
   /* Amber gold — the color of a gas flame catching on glass */
   --accent:       #c8902a;
+  --accent-ink:   #1a1006;   /* C1: ink on solid accent fills (>=3:1) */
   --accent-dim:   rgba(200,144,42,0.13);
   --accent-glow:  rgba(200,144,42,0.32);
   /* Deep wine-burgundy — velvet, secrets, old money */
@@ -112,7 +114,7 @@
 
   /* Warm ivory — candlelight on parchment, not clinical white */
   --text:         #b8a8c2;
-  --text-dim:     #5a4a66;
+  --text-dim:     #7c668c;   /* C1: >=3:1 */
   --text-muted:   #c0b0d0;
   --text-bright:  #ddd0e8;
   --text-white:   #f0e8f8;
@@ -145,6 +147,7 @@
 
   /* Cold steel blue — mid-tone, works as both text/icon and component fill */
   --accent:       #5888c8;
+  --accent-ink:   #ffffff;   /* C1: ink on solid accent fills (>=3:1) */
   --accent-dim:   rgba(88,136,200,0.12);
   --accent-glow:  rgba(88,136,200,0.28);
   /* Icy silver-white secondary — used for edge highlights and shimmer */
@@ -162,8 +165,8 @@
 
   /* Cool silver — no warmth at any level */
   --text:         #8a96a8;
-  --text-dim:     #384258;
-  --text-muted:   #606e84;
+  --text-dim:     #607196;   /* C1: >=3:1 */
+  --text-muted:   #627087;   /* C1: >=3:1 */
   --text-bright:  #c8d4e0;
   --text-white:   #e8edf4;
 
@@ -199,6 +202,7 @@
 
   /* Bioluminescent aqua — brighter now, reads as actual light emission */
   --accent:       #10d6e8;
+  --accent-ink:   #04333a;   /* C1: ink on solid accent fills (>=3:1) */
   --accent-dim:   rgba(16,214,232,0.13);
   --accent-glow:  rgba(16,214,232,0.45);
   /* Twilight violet — the sky reflected in every surface */
@@ -216,7 +220,7 @@
 
   /* Moonlight on water — lifted for legibility (body ~7:1 on the deep base) */
   --text:         #aacfe4;
-  --text-dim:     #35547f;
+  --text-dim:     #4c78b4;   /* C1: >=3:1 */
   --text-muted:   #7fabcc;
   --text-bright:  #d6ecf8;
   --text-white:   #eef8ff;
@@ -250,6 +254,7 @@
 
   /* Deep oasis teal — marketplace awnings, Dalmascan jewelry */
   --accent:       #1e6e78;
+  --accent-ink:   #ffffff;   /* C1: ink on solid accent fills (>=3:1) */
   --accent-dim:   rgba(30,110,120,0.12);
   --accent-glow:  rgba(30,110,120,0.28);
   /* Burnt sienna — clay walls at dusk, terracotta rooftops */
@@ -267,7 +272,7 @@
 
   /* Aged manuscript — deep warm charcoal, not cold black */
   --text:         #3a2c18;
-  --text-dim:     #c0a880;
+  --text-dim:     #876e43;   /* C1: >=3:1 */
   --text-muted:   #6e5030;
   --text-bright:  #1e1408;
   --text-white:   #140e04;

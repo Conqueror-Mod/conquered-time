@@ -136,7 +136,7 @@ button {
 }
 .btn-primary:hover {
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-ink);  /* C1: readable ink on accent */
   box-shadow: 0 0 0 3px var(--accent-dim);
 }
 .btn-danger {
@@ -770,7 +770,7 @@ hr.divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; 
   border: none;
   border-radius: var(--radius);
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-ink);  /* C1 */
   font-family: var(--sans);
   font-size: 13px;
   font-weight: 600;
