@@ -55,6 +55,7 @@ function escapeHtml(v: unknown): string {
 }
 
 function fmtMins(m: number): string {
+  if (!Number.isFinite(m)) m = 0;   // D-306: NaN total_mins would print "NaNm"
   const h = Math.floor(m / 60), mn = m % 60;
   return h > 0 ? `${h}h ${String(mn).padStart(2, '0')}m` : `${mn}m`;
 }

@@ -25,7 +25,11 @@
 
   function paletteHue(id, colorblind) {
     const pal = colorblind ? PALETTE_CB : PALETTE;
-    return pal[Math.abs(id) % pal.length];
+    // Non-finite ids (undefined/NaN from a malformed row) would index pal[NaN]
+    // → hue undefined → `hsl(undefined, …)` — an invalid color the browser
+    // silently drops. Pin them to slot 0 instead (D-305, Crucible III).
+    const n = Number(id);
+    return pal[Number.isFinite(n) ? Math.abs(Math.round(n)) % pal.length : 0];
   }
 
   function hexToHS(hex) {
@@ -53,7 +57,11 @@
   // any row wins; otherwise the min-rowid hash into the curated palette.
   function galaxyHue(g, opts) {
     const t = recencyT(g.lastDays);
-    const ovRow = g.rows.find((r) => r.color);
+    // When several rows carry (different) manual overrides, pick by min rowid —
+    // the same anchor the palette hash uses — so the winning color is a fact of
+    // the data, not of whatever order this surface iterated rows (D-304).
+    const ovRow = g.rows.filter((r) => r.color)
+      .sort((a, b) => (Number(a.id) || 0) - (Number(b.id) || 0))[0];
     const ov = ovRow && ovRow.color ? hexToHS(ovRow.color) : null;
     if (ov) return { h: ov.h, s: Math.max(30, Math.min(85, ov.s)) * (0.55 + 0.45 * t), boost: 0.65 + 0.55 * t };
     const minId = Math.min(...g.rows.map((r) => r.id));
