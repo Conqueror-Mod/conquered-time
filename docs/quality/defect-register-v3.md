@@ -88,7 +88,7 @@
   2026-07-19; nothing deferred)
 - [x] Regression test per fixed defect (rejection + adjacent legal behavior)
 - [x] Crucible history table updated (README)
-- [ ] Release cut (owner)
+- [x] Release cut — **v3.25.1**, published 2026-07-20 (installer + latest.yml on GitHub Releases)
 
 **Baseline at close: 126/126 (119 baseline + 7 new), typecheck clean.**
 
