@@ -277,7 +277,7 @@ function renderTrend(es: InsightEntry[]): void {
   for (let i = 0; i <= 4; i++) {
     const y = pT + cH - (cH * i / 4);
     out += `<line x1="${pL}" y1="${y.toFixed(1)}" x2="${pL + cW}" y2="${y.toFixed(1)}" stroke="var(--border)" stroke-width="0.5"/>`;
-    out += `<text x="${pL - 5}" y="${(y + 3).toFixed(1)}" text-anchor="end" fill="var(--text-dim)" font-size="9" font-family="var(--mono)">${(maxH * i / 4).toFixed(0)}h</text>`;
+    out += `<text x="${pL - 5}" y="${(y + 3).toFixed(1)}" text-anchor="end" fill="var(--text-dim)" font-size="9" font-family="var(--mono)">${(maxH * i / 4).toFixed(maxH < 4 ? 1 : 0)}h</text>`;
   }
   // bars
   buckets.forEach((b, i) => {

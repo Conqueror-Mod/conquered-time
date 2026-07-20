@@ -16,6 +16,10 @@
     flex-direction: column;
     gap: 16px;
   }
+  /* Gotcha #7: children of a scrollable flex column shrink to fit the viewport
+     by default instead of overflowing into the scrollbar — on short windows the
+     Trends panel collapsed to zero height (beta report 2026-07-19). */
+  #insights-scroll > * { flex-shrink: 0; }
 
   /* Range preset toggles */
   .range-toggles { display: flex; gap: 6px; }
