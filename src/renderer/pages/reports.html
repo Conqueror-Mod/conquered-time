@@ -33,7 +33,9 @@
     transition: all var(--transition);
   }
   .tab-btn:hover  { color: var(--text-bright); background: var(--surface-2); }
-  .tab-btn.active { color: var(--text-white);  background: var(--accent); }
+  /* D-301 (Crucible III): --text-white on a bright accent was 1.65:1 on
+     Zanarkand; --accent-ink is the per-theme readable ink for accent fills. */
+  .tab-btn.active { color: var(--accent-ink);  background: var(--accent); }
 
   /* ── Filter bar ── */
   .filter-bar {

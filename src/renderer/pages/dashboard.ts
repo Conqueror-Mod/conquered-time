@@ -96,6 +96,25 @@ async function loadData(): Promise<void> {
   `).join('');
 }
 
+// Ink for text drawn ON an identity-color fill (week-band blocks). Identity
+// colors are always `hsl(h, s%, l%)` (identity-color.js); pick dark/light ink
+// by the fill's WCAG luminance so bright hues (Zanarkand cyan) don't get
+// white-on-cyan at ~2:1 (C1 / D-302 straggler, Crucible III). Any luminance
+// threshold in [0.12, 0.30] guarantees ≥3:1 either way; 0.2 splits the range.
+function inkOn(cssFill: string): string {
+  const m = /^hsl\((\d+(?:\.\d+)?),\s*(\d+(?:\.\d+)?)%,\s*(\d+(?:\.\d+)?)%\)$/.exec(cssFill);
+  if (!m) return '#fff';
+  const h = Number(m[1]) / 360, s = Number(m[2]) / 100, l = Number(m[3]) / 100;
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s, p = 2 * l - q;
+  const chan = (t: number): number => {
+    if (t < 0) t += 1; if (t > 1) t -= 1;
+    const c = t < 1 / 6 ? p + (q - p) * 6 * t : t < 1 / 2 ? q : t < 2 / 3 ? p + (q - p) * (2 / 3 - t) * 6 : p;
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  };
+  const lum = 0.2126 * chan(h + 1 / 3) + 0.7152 * chan(h) + 0.0722 * chan(h - 1 / 3);
+  return lum > 0.2 ? '#101318' : '#fff';
+}
+
 function fmtH(mins: number): string {
   if (!mins) return '0h';
   return (mins / 60).toFixed(1) + 'h';
@@ -219,8 +238,9 @@ function renderWeekBand(): void {
         const px = Math.max(6, Math.round(h * pxPerHour));
         const name = coById[e.company_id]?.name || '—';
         const tip = `${name}${e.session_label ? ' · ' + e.session_label : ''} · ${fmtH(e.total_mins)} — click to open in the Tracker`;
+        const fill = colorFor(e.company_id);
         return `<div class="week-blk" data-i="${i}" data-tip="${escapeHtml(tip)}"`
-          + ` style="height:${px}px;background:${colorFor(e.company_id)};">`
+          + ` style="height:${px}px;background:${fill};color:${inkOn(fill)};">`
           + (px >= 17 ? escapeHtml(fmtH(e.total_mins)) : '') + '</div>';
       }).join('');
       return `<div class="week-col">${blocks}</div>`;
