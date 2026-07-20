@@ -1,0 +1,3 @@
+# Hide the backburnered Android companion app from GitHub's language stats.
+# The code stays tracked and buildable — this only affects linguist detection.
+android/** linguist-detectable=false
