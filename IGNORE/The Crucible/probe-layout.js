@@ -3,8 +3,9 @@
 // ═════════════════════════════════════════════════════════════════════════════
 //  probe-layout.js — The Crucible's layout linter (Measure layer 2d).
 //
-//  Injected into a live page by the run-app driver (`lint` command). Sweeps the
-//  DOM for GEOMETRICALLY PROVABLE layout faults — the mechanically-detectable
+//  Injected into a live page (by crucible-scan, or any driver that can eval a
+//  script and read the return). Sweeps the DOM for GEOMETRICALLY PROVABLE
+//  layout faults — the mechanically-detectable
 //  subclass of "user-observed" visual bugs — and returns a JSON fault list.
 //  Deterministic and reproducible, so findings meet the RCA admission standard
 //  and are register-grade (unlike screenshot-diff or rubric findings).
@@ -12,7 +13,7 @@
 //  Fault types:
 //    clipped-text   — element's own text overflows its box with no ellipsis/scroll
 //    collapsed      — visible element with text but ~zero rendered size
-//                     (the historical flex-shrink class, gotcha #7)
+//                     (the flex-shrink collapse class)
 //    overlap        — two interactive controls materially overlapping
 //    offscreen      — visible interactive control outside the document bounds
 //    low-contrast   — text below ~2.5:1 WCAG ratio on a solid background
@@ -37,6 +38,22 @@
       if (SKIP_IDS.has(n.id) || n.hasAttribute?.('data-lint-ignore')) return true;
     }
     return false;
+  }
+
+  // Screen-reader-only text ("visually-hidden" / "sr-only" idiom): content is
+  // INTENTIONALLY clipped to a 1px box so assistive tech reads it while it's
+  // visually gone — the deliberate inverse of the flex-collapse fault. Detected
+  // structurally (not by class name, which varies): a ~1px box whose content
+  // overflows, hidden via clip/clip-path or a clip-rect inset. Skipping these
+  // keeps `collapsed` honest (a11y headings must not read as collapsed panels).
+  function isVisuallyHidden(el, cs, rect) {
+    if (rect.width > 2 || rect.height > 2) return false;
+    if ((el.scrollWidth || 0) <= 2 && (el.scrollHeight || 0) <= 2) return false; // empty 1px box — not this idiom
+    const clip = cs.clip || '', cp = cs.clipPath || cs.webkitClipPath || '';
+    const clipped = /rect\(/.test(clip) || (cp && cp !== 'none') || cs.overflow === 'hidden';
+    // The canonical recipe pins position and collapses the box; require at least
+    // the clip + a tiny box so a genuinely collapsed visible element still flags.
+    return clipped && (cs.position === 'absolute' || cs.position === 'fixed' || cs.clip !== 'auto');
   }
 
   function visible(el) {
@@ -154,9 +171,36 @@
         add('clipped-text', el, `scrollHeight ${el.scrollHeight} > clientHeight ${el.clientHeight} (vertical)`);
       }
 
-      // collapsed: has text, effectively zero box (gotcha #7 class).
-      if (text && (rect.height < 4 || rect.width < 4)) {
-        add('collapsed', el, `rendered ${Math.round(rect.width)}x${Math.round(rect.height)} with text`);
+      // collapsed: has text, effectively zero box (the flex-shrink collapse
+      // class). The box must also be smaller than its own content — a naturally
+      // thin glyph (e.g. a 3px-wide "›" separator) fits its box and is NOT
+      // collapsed — and it must not be the deliberate screen-reader-only idiom
+      // (a11y headings clip content to 1px on purpose).
+      if (text && ((rect.height < 4 && el.scrollHeight > 4) || (rect.width < 4 && el.scrollWidth > 4))
+          && !isVisuallyHidden(el, cs, rect)) {
+        add('collapsed', el, `rendered ${Math.round(rect.width)}x${Math.round(rect.height)} with content ${el.scrollWidth}x${el.scrollHeight}`);
+      }
+
+      // flex-squeeze: the flex-shrink collapse detected WITHOUT needing own
+      // text — a shrinkable child of a scrollable flex column rendered
+      // materially shorter than its content. This catches the blank-panel case
+      // where a container owns no direct text (so `collapsed` misses it) and
+      // isn't overflowing inline (so `clipped-text` misses it too). Only fires
+      // when the squeeze is REAL (content lost), so run it at small window
+      // sizes to force latent cases out.
+      {
+        const p = el.parentElement;
+        if (p) {
+          const pcs = getComputedStyle(p);
+          if (/flex/.test(pcs.display) && pcs.flexDirection.startsWith('column')
+              && /(auto|scroll)/.test(pcs.overflowY)
+              && parseFloat(cs.flexShrink) > 0
+              && !/(auto|scroll)/.test(cs.overflowY)
+              && el.scrollHeight > el.clientHeight + 8) {
+            add('flex-squeeze', el,
+              `content ${el.scrollHeight}px squeezed to ${el.clientHeight}px in scrollable flex column (add flex-shrink:0)`);
+          }
+        }
       }
 
       // contrast (own text on a computable solid background)
@@ -166,7 +210,9 @@
         if (fg && bg && fg.a > 0.9) {
           const r = ratio(fg, bg);
           if (r < 1.15) add('invisible-text', el, `contrast ${r.toFixed(2)}:1`);
-          else if (r < (opts.contrastMin || 2.5)) add('low-contrast', el, `contrast ${r.toFixed(2)}:1`);
+          // Floor: 3.0 (WCAG large-text). Override via opts.contrastMin — some
+          // campaigns keep it at 2.5 until a known token fix lands, then raise.
+          else if (r < (opts.contrastMin || 3.0)) add('low-contrast', el, `contrast ${r.toFixed(2)}:1`);
         }
       }
     }

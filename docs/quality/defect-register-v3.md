@@ -1,6 +1,6 @@
 # Crucible III — 2026-07-19
 
-> Campaign register. Method: RCA › DMAIC › PDCA (see IGNORE/The Crucible/README.md).
+> Campaign register. Method: RCA › DMAIC › PDCA (see the Crucible repo, Conqueror-Mod/Crucible).
 > First campaign to test the paper's two open claims: absorbing external field
 > reports into Define, and the layout linter as a register-grade detector.
 
