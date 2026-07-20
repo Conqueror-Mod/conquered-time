@@ -312,7 +312,11 @@ function renderDayOfWeek(es: InsightEntry[]): void {
 
   const maxV = Math.max(...vals, 1);
   const busiest = vals.indexOf(maxV);
-  const pL = 8, pR = 8, pT = 10, pB = 20;
+  // pT reserves headroom for the value label above the TALLEST bar: its
+  // baseline sits at pT-5, and the 10px glyphs need ~8px of ascent — with the
+  // old pT=10 the top half of the label was clipped by the SVG viewport
+  // (user report 2026-07-19, visible at every UI scale).
+  const pL = 8, pR = 8, pT = 18, pB = 20;
   const cW = W - pL - pR, cH = H - pT - pB;
   const slotW = cW / 7;
   const barW = Math.min(slotW - 8, 34);
@@ -324,7 +328,7 @@ function renderDayOfWeek(es: InsightEntry[]): void {
     const x = pL + i * slotW + (slotW - barW) / 2;
     if (v > 0) {
       out += `<rect x="${x.toFixed(1)}" y="${(pT + cH - bh).toFixed(1)}" width="${barW.toFixed(1)}" height="${bh.toFixed(1)}" rx="4" fill="url(#dow-grad)" fill-opacity="${i === busiest ? '1' : '0.7'}" filter="url(#dow-grad-sh)" data-tip-name="${fullLabels[i]}" data-tip-val="${escapeHtml(fmtH(v))}"/>`;
-      out += `<text x="${(x + barW / 2).toFixed(1)}" y="${(pT + cH - bh - 5).toFixed(1)}" text-anchor="middle" fill="var(--text-muted)" font-size="9" font-family="var(--mono)">${fmtH(v)}</text>`;
+      out += `<text x="${(x + barW / 2).toFixed(1)}" y="${(pT + cH - bh - 5).toFixed(1)}" text-anchor="middle" fill="${i === busiest ? 'var(--text)' : 'var(--text-muted)'}" font-size="10" font-family="var(--mono)">${fmtH(v)}</text>`;
     }
     out += `<text x="${(pL + i * slotW + slotW / 2).toFixed(1)}" y="${H - 6}" text-anchor="middle" fill="${i === busiest ? 'var(--accent)' : 'var(--text-dim)'}" font-size="10" font-family="var(--sans)">${labels[i]}</text>`;
   });
