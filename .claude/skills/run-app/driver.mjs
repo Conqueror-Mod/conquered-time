@@ -167,6 +167,41 @@ const COMMANDS = {
     console.log(`lint ${res.url} [${res.theme} ${res.viewport}] scanned=${res.scanned} ${res.ms}ms → ${summary} (${f})`);
   },
 
+  // Crucible size sweep: run the layout linter on every inner page at several
+  // window sizes (down to near the 900x600 floor), forcing latent gotcha-#7
+  // flex-squeeze faults out of hiding — the 2026-07-19 Insights blank-panel
+  // bug only manifested below ~1280x760, so a maximized-only lint misses the
+  // class entirely. Requires a logged-in session. Aggregate JSON lands in
+  // SHOT_DIR/sweep-<name>.json; per-cell counts print live; the window is
+  // re-maximized afterwards. Usage: sweep [name]
+  async sweep(name) {
+    const PAGES = ['dashboard', 'companies', 'tracker', 'global-log', 'reports',
+      'insights', 'invoices', 'task-timer', 'profile', 'import'];
+    const SIZES = [[1600, 900], [1280, 720], [950, 620]];
+    const src = fs.readFileSync(path.join(APP_DIR, 'IGNORE/The Crucible/probe-layout.js'), 'utf8');
+    const out = { startedAt: new Date().toISOString(), cells: [] };
+    let totalFaults = 0;
+    for (const dest of PAGES) {
+      await COMMANDS.nav(dest);
+      for (const [w, h] of SIZES) {
+        await app.evaluate(({ BrowserWindow }, [ww, hh]) => {
+          const win = BrowserWindow.getAllWindows()[0];
+          win.unmaximize(); win.setSize(ww, hh);
+        }, [w, h]);
+        await sleep(700);                       // let ResizeObservers settle
+        const res = await page.evaluate(code => { (0, eval)(code); return window.runLayoutLint(); }, src);
+        out.cells.push(res);
+        totalFaults += res.faults.length;
+        const summary = Object.entries(res.counts).map(([k, v]) => `${k}:${v}`).join(' ') || 'CLEAN';
+        console.log(`  sweep ${dest} @ ${w}x${h} → ${summary}`);
+      }
+    }
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].maximize());
+    const f = path.join(SHOT_DIR, `sweep-${name || Date.now()}.json`);
+    fs.writeFileSync(f, JSON.stringify(out, null, 2));
+    console.log(`sweep done: ${out.cells.length} cells, ${totalFaults} faults → ${f}`);
+  },
+
   async windows() {
     if (!app) return console.log('launch first');
     for (const w of app.windows()) console.log(' ', w.url());

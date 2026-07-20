@@ -848,6 +848,8 @@ hr.divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; 
   overflow-y: auto;
   margin-bottom: 12px;
 }
+/* Gotcha #7: rows in a max-height flex column must not shrink to fit. */
+.tt-task-list > * { flex-shrink: 0; }
 .tt-task-row {
   display: flex;
   align-items: center;

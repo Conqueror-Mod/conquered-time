@@ -238,6 +238,8 @@
     flex-direction: column;
     gap: 14px;
   }
+  /* Gotcha #7: detail sections in the scrollable pane must not shrink. */
+  .detail-body > * { flex-shrink: 0; }
   .detail-header-row {
     display: flex;
     align-items: flex-start;
