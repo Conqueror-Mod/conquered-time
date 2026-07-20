@@ -24,6 +24,13 @@ const About = (() => {
   // Changelog — newest first. Edit HERE and both About surfaces update. The two
   // most recent entries render in-panel; older notes live on GitHub Releases.
   const CHANGELOG = [
+    { version: 'v3.25.1', items: [
+      'Fixed the blank Trends Over Time chart — on smaller windows the Insights trend panel could collapse to nothing (thanks Georgia for the report!); every screen is now hardened against the same class of collapse',
+      'New companies no longer drop straight into the Archive — a fresh company stays active for its full archive window (adjustable in Settings → Appearance) even before its first tracked hour',
+      'Readability pass across all five themes — dim helper text, chart labels, and the highlighted Reports tab now meet a 3:1 contrast floor everywhere; week-view hour labels pick dark or light ink to stay readable on any company color',
+      'Busiest Days chart labels no longer clip at the top, and window size/scale handling got several small fixes (scale cap, off-screen window recovery, tracker punch auto-load)',
+      'Under the hood: the Crucible III quality campaign — every page swept for layout faults at multiple window sizes, hostile-input probes on the color and report engines, and fixes for three subtle color/report edge cases',
+    ] },
     { version: 'v3.25.0', items: [
       'Redesigned emailed reports — the PDF report now matches the app\'s look: your companies appear in their own identity colors (the same colors as their bubbles, including any custom color you picked), daily hours draw as color-coded bars, and days split across companies show as stacked segments',
       'Invoices and the installer now carry the same gold-and-blue brand as the new app icon, so everything Conquered Time produces looks like one product',
