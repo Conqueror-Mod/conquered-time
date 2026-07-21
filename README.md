@@ -50,8 +50,8 @@ That's it. The app **updates itself** from GitHub Releases: it checks shortly af
 
 ### Make it yours
 - **Multi-user profiles** — isolated encrypted vaults per user with an avatar profile selector at login
-- **5 Final Fantasy city themes** — Memoria (default, light), Zanarkand, Rabanastre, Treno, Nibelheim — plus 4 UI scale steps, 12/24-hour display, and accessibility modes (reduced motion, high contrast, colorblind-safe palette)
-- **Steam-style Settings**, first-run onboarding tour, tooltips, close-to-tray, launch-at-startup, start-minimized
+- **5 handcrafted themes** — Memoria (default, light), Zanarkand (dark), Rabanastre (light), Treno (dark), Nibelheim (dark) — plus 4 UI scale steps, 12/24-hour display, and accessibility modes (reduced motion, high contrast, colorblind-safe palette)
+- **Split-panel Settings**, first-run onboarding tour, tooltips, close-to-tray, launch-at-startup, start-minimized
 
 ---
 
@@ -59,14 +59,16 @@ That's it. The app **updates itself** from GitHub Releases: it checks shortly af
 
 | Shortcut | Action |
 |---|---|
-| `Ctrl+Alt+P` | Clock in / out (system-wide, configurable) |
+| `Ctrl+Alt+P` | Clock in / out — works system-wide, even with the app in the tray (configurable) |
 | `Ctrl+K` | Global search |
-| `Ctrl+1–5` | Dashboard · Companies · Tracker · Reports · Global Log |
+| `Ctrl+1` – `Ctrl+7` | Dashboard · Companies · Time Tracker · Dispatch · Reports · Invoices · Global Log |
 | `Ctrl+,` | Settings |
 | `Ctrl+L` | Lock session |
+| `Ctrl+P` | Export PDF |
+| `Ctrl+Q` | Quit |
 | `↑↑↓↓←→←→BA↵` | ??? (profile selector only) |
 
-The full list lives in Settings → Shortcuts.
+The same list lives in-app under Settings → Shortcuts.
 
 ---
 
@@ -111,9 +113,9 @@ You do **not** need to build from source to use the app — installers are on th
 
 ```bash
 npm install       # once
-npm run seed      # dev vault with stress fixture (devuser / devpass123, TOTP bypassed)
-npm run dev       # compile + launch in dev mode
+npm start         # compile + launch
 npm test          # node --test suites + typecheck (unit + fast-check property tests)
+npm run build     # NSIS installer → dist/
 ```
 
 Tests cover the security-critical paths (vault crypto round-trips, all-or-nothing re-encryption, read-cache isolation, beta keys) plus a differential audit oracle over randomized vaults; `npm run coverage:critical` prints a scoped c8 report.
