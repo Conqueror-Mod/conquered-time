@@ -2,7 +2,7 @@
 
 /* ══════════════════════════════════════════════════════════════
    CONQUERED TIME — Themes
-   Five Final Fantasy city palettes, all selectable in the theme pickers
+   Five city palettes, all selectable in the theme pickers
    (shell.js + login.html) and listed in settings.js:
      Light: Memoria (default), Rabanastre
      Dark:  Zanarkand, Treno, Nibelheim
@@ -23,7 +23,7 @@
 }
 
 /* ══════════════════════════════════════════════════════════════
-   MEMORIA — The Lost City of Dreams (FF9)
+   MEMORIA — The Lost City of Dreams
    Ethereal, crystalline, melancholic. A realm of fading memories.
    Light theme. Soft lavenders, pale violet-white, amethyst accents.
    Default theme.
@@ -77,7 +77,7 @@
 }
 
 /* ══════════════════════════════════════════════════════════════
-   TRENO — City of Nobles (FF9)
+   TRENO — City of Nobles
    Dark, elegant, aristocratic. Gas lamps on wet cobblestones.
    Velvet curtains, gothic spires, amber gold, deep wine-burgundy.
    Warmth lives only in the light — everything else is shadow.
@@ -128,7 +128,7 @@
 }
 
 /* ══════════════════════════════════════════════════════════════
-   NIBELHEIM — Mountain Village (FF7)
+   NIBELHEIM — Mountain Village
    Cold, stark, unsettling. Snow and slate under a pale moon.
    Near-black slate base, icy silver-white accent, zero warmth.
    Something is slightly wrong. Controlled. Precise.
@@ -179,7 +179,7 @@
 }
 
 /* ══════════════════════════════════════════════════════════════
-   ZANARKAND — The Dream City (FF10)
+   ZANARKAND — The Dream City
    A city that only exists in memory. Twilight forever.
    Bioluminescent towers rising from dark ocean water.
    Everything glows. Everything is reflected. Everything is already gone.
@@ -235,7 +235,7 @@
 }
 
 /* ══════════════════════════════════════════════════════════════
-   RABANASTRE — Desert Capital of Dalmasca (FF12)
+   RABANASTRE — Desert Capital of Dalmasca
    Sun-baked, opulent, ancient. Sandstone, terracotta, desert gold.
    Warm sandy light base, deep teal accents from oasis markets.
    Conquered and proud. Warmth without softness.

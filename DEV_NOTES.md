@@ -143,7 +143,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
 ## Theme System Quick Reference
 
-5 Final Fantasy themes via `document.documentElement.setAttribute('data-theme', 'memoria'|'zanarkand'|'rabanastre'|'treno'|'nibelheim')`, applied by `settings.js`'s `apply()`. **Default is `memoria`** (settings.js). The splash always uses `zanarkand` as a brand moment. All theme tokens are CSS custom properties defined once per `[data-theme="x"]` block in `themes.css` (imported by `design-system.css`) — components reference `var(--accent)`, `var(--surface-1)`, etc., never hardcoded colors, so new themes drop in cleanly.
+5 themes via `document.documentElement.setAttribute('data-theme', 'memoria'|'zanarkand'|'rabanastre'|'treno'|'nibelheim')`, applied by `settings.js`'s `apply()`. **Default is `memoria`** (settings.js). The splash always uses `zanarkand` as a brand moment. All theme tokens are CSS custom properties defined once per `[data-theme="x"]` block in `themes.css` (imported by `design-system.css`) — components reference `var(--accent)`, `var(--surface-1)`, etc., never hardcoded colors, so new themes drop in cleanly.
 
 Canvas-drawn elements (spiderweb nodes) **cannot** use CSS variables directly — they read the active theme via `document.documentElement.getAttribute('data-theme')` and branch through a local `getCanvasColors()` helper (duplicated in both `dashboard.js` and `companies.js` — if you change node colors, update both places).
 
@@ -157,7 +157,7 @@ Typography rule: **DM Sans** (`var(--sans)`) for all UI text, **JetBrains Mono**
 - `font-size`-based UI scaling (didn't actually scale anything visually — switched to `zoom`)
 - `better-sqlite3` (native compilation requirement)
 - Deriving encryption keys from TOTP
-- (Historical, pre-FF-rename theme experiments — all superseded by the current 5 Final Fantasy themes; don't resurrect the old names: "Ember" amber/orange "ugly", "Dusk" violet "derivative", an earlier all-white "Paper" "too blinding". The old Slate/Void/Arctic/Paper/Quartz set no longer exists.)
+- (Historical, pre-rename theme experiments — all superseded by the current 5 themes; don't resurrect the old names: "Ember" amber/orange "ugly", "Dusk" violet "derivative", an earlier all-white "Paper" "too blinding". The old Slate/Void/Arctic/Paper/Quartz set no longer exists.)
 - Light-theme polish / theme reordering / ASCII-egg redesign — dropped as irrelevant (2026-06-29); do not reintroduce as open items
 
 ---

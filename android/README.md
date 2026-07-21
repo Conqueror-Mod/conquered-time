@@ -9,7 +9,7 @@ on purpose.
 A native Kotlin/Jetpack Compose **read-only vault viewer**: open a portable vault export
 (`vault.db` copy) on a phone, unlock it with the account password (+ optional TOTP), and
 browse the Global Log — search, date-range filter, CSV export via the Android share sheet.
-It never writes to the vault. The 5 Final Fantasy desktop themes are mirrored with a live
+It never writes to the vault. The 5 desktop themes are mirrored with a live
 picker.
 
 ## Why it lives in this repo

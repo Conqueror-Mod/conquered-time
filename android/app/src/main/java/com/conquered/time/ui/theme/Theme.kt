@@ -8,7 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 /**
- * The five Final Fantasy city palettes, ported from the desktop themes.css
+ * The five city palettes, ported from the desktop themes.css
  * (the --bg, --surface, --accent and --text custom properties). Kept in the
  * desktop's picker order: Zanarkand, Memoria, Rabanastre, Treno, Nibelheim.
  */
