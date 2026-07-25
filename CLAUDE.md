@@ -21,7 +21,7 @@ This file gives Claude Code full context to continue work on **Conquered Time** 
 
 2. **sql.js quirks are the #1 historical source of bugs in this project.** See "Known Architecture Gotchas" below before touching any database code.
 
-3. **The user is non-technical-ish but capable** — comfortable in cmd, willing to read console errors and screenshot them, but needs exact copy-pasteable commands and plain explanations of *why* something broke, not just the fix.
+3. **Chris is an experienced engineer and designer who writes tersely** — read economy as compression, not unfamiliarity. He'll read console errors and screenshot them, and he locates bugs from symptoms (the UTC date corruption and the post-delete backup ordering were both his catches). Give him exact copy-pasteable commands and the *why* behind a fix, not just the fix — the "why" is him auditing the reasoning, so don't skip it. Bring architecture decisions as trade-offs to weigh, not finished calls to approve.
 
 4. **Design philosophy has shifted over the project's life**: it started as a "game-HUD meets professional timesheet" HUD aesthetic (heavy monospace, glowing teal, corner brackets) and was deliberately matured into a professional, restrained, DM-Sans-typography design system with five selectable **city themes** (see Design System section). The original glowing-HUD spirit survives mainly in the dark **Zanarkand** theme, not the default (Memoria).
 
