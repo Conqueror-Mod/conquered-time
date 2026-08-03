@@ -16,10 +16,12 @@ npm test
 Runs `build:main` → `node --test` → `typecheck` (all three tsconfig projects).
 All of it must pass.
 
-**Release from the main repo at `D:\My Projects\CURRENT-RELEASE\conquered-time` —
+**Release from the primary checkout — currently `D:\My Projects\conquered-time` —
 never from a worktree under `.claude/worktrees/`.** `src/shared/beta-secret.js` is
 gitignored, so it exists only in the primary checkout. A worktree build produces
-an installer with a dead beta gate.
+an installer with a dead beta gate. (The old `D:\My Projects\CURRENT-RELEASE\`
+path this file used to name no longer exists; verify `src/shared/beta-secret.js`
+is present before building — that's the real test of "am I in the right tree".)
 
 ## Bump targets
 

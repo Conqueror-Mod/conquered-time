@@ -24,6 +24,10 @@ const About = (() => {
   // Changelog — newest first. Edit HERE and both About surfaces update. The two
   // most recent entries render in-panel; older notes live on GitHub Releases.
   const CHANGELOG = [
+    { version: 'v3.25.2', items: [
+      'Fixed a bug where the app could stop accepting input — after deleting a company or session, the next dialog would open with its fields frozen until you clicked away from the app and back. Every confirmation prompt is now a proper in-app dialog instead of a system pop-up, so this can no longer happen',
+      'Those confirmation prompts now match the app\'s theme, explain what will happen, and remind you that a safety snapshot is saved first — with Cancel selected by default so nothing destructive is ever one stray keypress away',
+    ] },
     { version: 'v3.25.1', items: [
       'Fixed the blank Trends Over Time chart — on smaller windows the Insights trend panel could collapse to nothing (thanks Georgia for the report!); every screen is now hardened against the same class of collapse',
       'New companies no longer drop straight into the Archive — a fresh company stays active for its full archive window (adjustable in Settings → Appearance) even before its first tracked hour',
