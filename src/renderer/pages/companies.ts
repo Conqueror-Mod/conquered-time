@@ -499,7 +499,13 @@ async function saveCompany(): Promise<void> {
 }
 
 async function deleteCompany(): Promise<void> {
-  if (!editingId || !confirm('Delete this company and all its time entries?')) return;
+  if (!editingId) return;
+  const ok = await Shell.confirm({
+    title: 'Delete company?',
+    message: 'This deletes the company and all of its time entries.\n\nA safety snapshot is saved first — it can be restored from Settings → Data → Backup Library.',
+    confirmLabel: 'Delete',
+  });
+  if (!ok) return;
   await IPC.companies.delete(editingId);
   Shell.toast('Company deleted.', 'warning');
   if (selectedId === editingId) closeDetail();
@@ -510,7 +516,13 @@ async function deleteCompany(): Promise<void> {
 }
 
 async function deleteSelected(): Promise<void> {
-  if (!selectedId || !confirm('Delete this company and all its time entries?')) return;
+  if (!selectedId) return;
+  const ok = await Shell.confirm({
+    title: 'Delete company?',
+    message: 'This deletes the company and all of its time entries.\n\nA safety snapshot is saved first — it can be restored from Settings → Data → Backup Library.',
+    confirmLabel: 'Delete',
+  });
+  if (!ok) return;
   await IPC.companies.delete(selectedId);
   Shell.toast('Company deleted.', 'warning');
   closeDetail();
@@ -663,10 +675,19 @@ async function saveColor(co: Company, hex: string | null): Promise<void> {
   refreshWeb();
 }
 async function ctxDeleteCompany(): Promise<void> {
-  if (!ctxTarget || !confirm(`Delete ${ctxTarget.name}?`)) return;
-  await IPC.companies.delete(ctxTarget.id);
+  if (!ctxTarget) return;
+  // Capture the target before awaiting — the confirm is async now, and another
+  // right-click during it would otherwise repoint ctxTarget mid-delete.
+  const target = ctxTarget;
+  const ok = await Shell.confirm({
+    title: `Delete ${target.name}?`,
+    message: 'This deletes the company and all of its time entries.\n\nA safety snapshot is saved first — it can be restored from Settings → Data → Backup Library.',
+    confirmLabel: 'Delete',
+  });
+  if (!ok) return;
+  await IPC.companies.delete(target.id);
   Shell.toast('Company deleted.', 'warning');
-  if (selectedId === ctxTarget.id) closeDetail();
+  if (selectedId === target.id) closeDetail();
   ctxTarget = null;
   Store.invalidate('all');
   await loadCompanies();

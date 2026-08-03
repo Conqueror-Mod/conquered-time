@@ -219,7 +219,14 @@ async function runLedgerAction(id: number, act: string): Promise<void> {
     if (res.ok) Shell.toast(`Invoice emailed to ${res.to}.`, 'success');
     else Shell.toast(res.error || 'Could not email invoice.', 'error');
   } else if (act === 'paid' || act === 'unpaid' || act === 'void') {
-    if (act === 'void' && !confirm('Void this invoice? It stays in the ledger but is marked void.')) return;
+    if (act === 'void') {
+      const ok = await Shell.confirm({
+        title: 'Void this invoice?',
+        message: 'It stays in the ledger but is marked void.',
+        confirmLabel: 'Void Invoice',
+      });
+      if (!ok) return;
+    }
     const status = act === 'unpaid' ? 'unpaid' : act;
     const res = await api.invoke('invoices:set-status', { id, status });
     if (res.ok) await loadLedger();
