@@ -3,7 +3,7 @@
 Project-specific companion to the global `ship-release` skill. That skill holds
 the phase order and the hard rules; this file holds what's true here.
 
-**Current version: 3.25.1** (verify against `package.json` — this line drifts).
+**Current version: 3.25.2** (verify against `package.json` — this line drifts).
 
 ---
 
