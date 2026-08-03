@@ -68,7 +68,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   $id('btn-clock-out').addEventListener('click', () => clockOut());
   $id('btn-manual-entry').addEventListener('click', addManualRow);
   $id('btn-clear-row').addEventListener('click', clearSelectedRow);
-  $id('btn-clear-all').addEventListener('click', () => clearAll());
+  $id('btn-clear-all').addEventListener('click', () => clearAllPrompt());
   $id('btn-save-session').addEventListener('click', () => saveSession());
   $id('btn-export-pdf').addEventListener('click', exportPDF);
   $id('btn-break').addEventListener('click', () => togglePunch('break'));
@@ -253,7 +253,7 @@ async function loadEntryIntoTracker(existing: TimeEntry | null): Promise<void> {
   } else {
     currentEntryId = null;
     currentEntryUpdatedAt = null;
-    clearAll(true);
+    clearAll();
     await loadTaskItems(null);
   }
   const sw = document.getElementById('btn-switch-session');
@@ -998,13 +998,24 @@ function duplicateRow(idx: number): void {
   autoSave();
 }
 
-function clearAll(silent = false): void {
-  if (!silent && !confirm('Clear all entries?')) return;
+// Kept synchronous: the silent path (session load) must clear the table before
+// the caller's next statement. The interactive confirm lives in clearAllPrompt.
+function clearAll(): void {
   rowsData = [];
   normalizeRows();
   selectedIndex = null;
   renderTable();
   updateTotals();
+}
+
+// Toolbar "Clear All" — confirm first, then wipe the in-memory rows.
+async function clearAllPrompt(): Promise<void> {
+  const ok = await Shell.confirm({
+    title: 'Clear all entries?',
+    message: 'This empties the tracker table for this session. Nothing is saved until you save or clock in again.',
+    confirmLabel: 'Clear All',
+  });
+  if (ok) clearAll();
 }
 
 // ── PDF Export ──

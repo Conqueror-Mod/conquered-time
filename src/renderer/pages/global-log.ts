@@ -235,7 +235,12 @@ function copySummary(e: TimeEntry, co: Company | undefined): void {
 
 async function deleteSession(e: TimeEntry): Promise<void> {
   const co = compMap[e.company_id];
-  if (!confirm(`Delete this session?\n\n${co?.name || '—'} · ${e.log_date}${e.session_label ? ' · ' + e.session_label : ''}\n\nA safety snapshot is saved first; this can't be undone from here.`)) return;
+  const ok = await Shell.confirm({
+    title: 'Delete this session?',
+    message: `${co?.name || '—'} · ${e.log_date}${e.session_label ? ' · ' + e.session_label : ''}\n\nA safety snapshot is saved first; this can't be undone from here.`,
+    confirmLabel: 'Delete',
+  });
+  if (!ok) return;
   const res = await api.invoke('entries:delete', e.id);
   if (!res || !res.ok) { Shell.toast('Delete failed: ' + ((res && res.error) || 'unknown'), 'error'); return; }
   await Store.invalidate('entries');

@@ -1289,7 +1289,7 @@ const Shell = (() => {
     modal.addEventListener('click', e => { if (e.target === modal) closeOmnibox(); });
   }
 
-  return { init, toast, showSidebarTimer, hideSidebarTimer, showLiveBadge, hideLiveBadge, setSidebarAvatar, contextMenu: openContextMenu, emptyState, openSearch: openOmnibox, _installOmnibox: installOmnibox, _isSearchOpen: () => _omniOpen, _closeSearch: closeOmnibox };
+  return { init, toast, showSidebarTimer, hideSidebarTimer, showLiveBadge, hideLiveBadge, setSidebarAvatar, contextMenu: openContextMenu, confirm: showConfirm, emptyState, openSearch: openOmnibox, _installOmnibox: installOmnibox, _isSearchOpen: () => _omniOpen, _closeSearch: closeOmnibox };
 })();
 
 // ── Settings modal controls (global scope) ────────────────────────────────────
@@ -1432,6 +1432,102 @@ function showFullClearNudge() {
     });
     document.addEventListener('keydown', onKey, true);
     document.body.appendChild(overlay);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Shell.confirm — themed, in-DOM replacement for the native window.confirm().
+//
+// WHY THIS EXISTS (do not "simplify" any call site back to window.confirm()):
+// Chromium renders confirm()/alert() as a separate native dialog window owned
+// by the app. In this app's FRAMELESS BrowserWindow, dismissing that dialog
+// hands focus back to the window but does not reliably re-establish focus on
+// the web contents — the renderer keeps painting and click handlers still run,
+// but no element can take keyboard focus. The symptom is a modal that opens
+// with completely dead inputs (element.focus() silently no-ops), recovering
+// only when the user alt-tabs away and back and Windows re-activates the
+// window. It bit the Companies page hardest because companies:delete is a
+// heavy synchronous main-process handler (persistDB → safety snapshot →
+// delete → backup), so its block window overlaps the dialog's.
+//
+// This modal is plain DOM inside the same web contents, so focus never leaves
+// the renderer. Escape and backdrop click both cancel; Tab is trapped between
+// the two buttons; focus starts on Cancel (destructive-safe) and is restored
+// to whatever was focused before on close.
+//
+// @param {{ title?: string, message?: string, confirmLabel?: string,
+//           cancelLabel?: string, danger?: boolean }} [opts]
+// @returns {Promise<boolean>} true = confirmed, false = cancelled
+// ═══════════════════════════════════════════════════════════════════════════
+function showConfirm(opts = {}) {
+  const {
+    title        = 'Are you sure?',
+    message      = '',
+    confirmLabel = 'Confirm',
+    cancelLabel  = 'Cancel',
+    danger       = true,
+  } = opts;
+
+  return new Promise(resolve => {
+    const prevFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'ct-confirm-overlay';
+    overlay.setAttribute('style',
+      'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;' +
+      'background:rgba(0,0,0,0.55);backdrop-filter:blur(2px);');
+    overlay.innerHTML = `
+      <div class="ct-confirm-card" role="alertdialog" aria-modal="true" aria-labelledby="ct-confirm-title"
+           style="max-width:440px;width:90%;background:var(--surface-1,#1a1d24);
+           border:1px solid var(--border,#333);border-radius:12px;padding:22px 24px;
+           box-shadow:var(--shadow-3,0 20px 60px rgba(0,0,0,.5));font-family:var(--sans);">
+        <div id="ct-confirm-title" style="font-size:16px;font-weight:700;color:var(--text,#eee);margin-bottom:10px;"></div>
+        <div class="ct-confirm-msg" style="font-size:13px;line-height:1.5;color:var(--text-muted,#aaa);
+             margin-bottom:18px;white-space:pre-line;"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">
+          <button class="dba-confirm-btn" data-ct-confirm="cancel"></button>
+          <button class="dba-confirm-btn${danger ? ' danger' : ''}" data-ct-confirm="ok"></button>
+        </div>
+      </div>`;
+
+    // Copy is set via textContent, never interpolated into innerHTML, so a
+    // company/session name can't inject markup into the dialog.
+    const q = sel => /** @type {HTMLElement} */ (overlay.querySelector(sel));
+    q('#ct-confirm-title').textContent = title;
+    const msgEl = q('.ct-confirm-msg');
+    msgEl.textContent = message;
+    if (!message) msgEl.style.display = 'none';
+    const cancelBtn = /** @type {HTMLButtonElement} */ (q('[data-ct-confirm="cancel"]'));
+    const okBtn     = /** @type {HTMLButtonElement} */ (q('[data-ct-confirm="ok"]'));
+    cancelBtn.textContent = cancelLabel;
+    okBtn.textContent     = confirmLabel;
+
+    const done = value => {
+      document.removeEventListener('keydown', onKey, true);
+      overlay.remove();
+      // Return focus where it was so the page behaves as if nothing opened.
+      try { prevFocus?.focus(); } catch {}
+      resolve(value);
+    };
+
+    const onKey = e => {
+      if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); done(false); return; }
+      if (e.key === 'Tab') {
+        // Trap focus between the two buttons.
+        e.preventDefault();
+        (document.activeElement === cancelBtn ? okBtn : cancelBtn).focus();
+      }
+    };
+
+    overlay.addEventListener('click', e => {
+      const b = e.target instanceof Element ? e.target.closest('[data-ct-confirm]') : null;
+      if (b) { done(b.getAttribute('data-ct-confirm') === 'ok'); return; }
+      if (e.target === overlay) done(false); // backdrop click = cancel
+    });
+
+    document.addEventListener('keydown', onKey, true);
+    document.body.appendChild(overlay);
+    cancelBtn.focus();
   });
 }
 

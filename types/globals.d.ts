@@ -664,6 +664,17 @@ interface ShellApi {
   contextMenu(ev: MouseEvent, items: Array<
     { label: string; action?: () => void; danger?: boolean; disabled?: boolean; hidden?: boolean; separator?: boolean }
     | { separator: true } | null>): void;
+  /** Themed in-DOM replacement for window.confirm(). ALWAYS use this instead of
+   *  the native dialog — a native confirm() in this frameless window can leave
+   *  the web contents without keyboard focus, making the next modal's inputs
+   *  dead until the window is re-activated. Resolves true on confirm. */
+  confirm(opts?: {
+    title?: string;
+    message?: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
+    danger?: boolean;
+  }): Promise<boolean>;
   /** Branded first-run / no-data placeholder markup (HTML string). Drop into a
    *  container or a table cell. See components/shell.js. */
   emptyState(opts: {
