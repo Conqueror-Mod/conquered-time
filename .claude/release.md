@@ -51,6 +51,14 @@ response from update server"). Do not delete it until the whole beta cohort is o
 The bump commit goes straight to master, matching the existing `docs: bump to vX`
 pattern.
 
+**PUSH the bump commit before running `npm run release`.** electron-builder creates
+the git tag on GitHub from whatever `origin/master` points at *at upload time*. Bump
+locally but push afterwards and the tag lands one commit early — `git checkout v<version>`
+then shows the *previous* version in `package.json`, even though the installer was
+built from the bumped tree. Cosmetic (the auto-updater reads `latest.yml`, not the
+tag) but it makes "what shipped in vX?" lie. Happened on v3.25.2; the tag was moved
+afterwards to correct it.
+
 ## Build and publish
 
 ```bash
