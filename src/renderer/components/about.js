@@ -24,6 +24,10 @@ const About = (() => {
   // Changelog — newest first. Edit HERE and both About surfaces update. The two
   // most recent entries render in-panel; older notes live on GitHub Releases.
   const CHANGELOG = [
+    { version: 'v3.26.0', items: [
+      'Invoices can now show your work, not just your hours — each day on an invoice can expand into the individual tasks behind it, with the task name, its description, and the clock in/out times and duration for every punch',
+      'A new "Include task detail" checkbox on the Generate panel controls this, on by default. Your choice is frozen into the invoice when you issue it, so an invoice always reprints exactly as it was sent — and you can leave the detail off for a client who should only see the totals',
+    ] },
     { version: 'v3.25.2', items: [
       'Fixed a bug where the app could stop accepting input — after deleting a company or session, the next dialog would open with its fields frozen until you clicked away from the app and back. Every confirmation prompt is now a proper in-app dialog instead of a system pop-up, so this can no longer happen',
       'Those confirmation prompts now match the app\'s theme, explain what will happen, and remind you that a safety snapshot is saved first — with Cancel selected by default so nothing destructive is ever one stray keypress away',

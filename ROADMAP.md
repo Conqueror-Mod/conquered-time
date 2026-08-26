@@ -6,7 +6,7 @@ Discord's **#roadmap** channel mirrors this file automatically.
 
 **Status legend:** ✅ Shipped · 🔨 In progress · 🗓️ Planned · 💡 Under consideration
 
-_Last curated: 2026-07-16 (v3.25.0 — redesigned emailed reports; icon family v3.24.3; stress-campaign hardening v3.24.2)_
+_Last curated: 2026-08-26 (v3.26.0 — per-punch task detail on invoices)_
 
 ## 🗓️ Planned (next up)
 
@@ -25,6 +25,11 @@ _Open to community suggestions — use `/feedback` in the Discord._
 
 ## ✅ Recently shipped
 
+- **Task detail on invoices** (v3.26.0) — each day on an invoice can now expand
+  into the tasks behind it: task name, description, and the clock in/out times
+  and duration for every punch. A checkbox on the Generate panel controls it
+  (on by default), and your choice is frozen into the invoice at issue, so an
+  invoice always reprints exactly as it was sent.
 - **Import your data** (v3.24.0) — bring existing clients and tracked time in
   from a spreadsheet. Save as CSV, then a guided wizard maps the columns,
   previews what will be created, and imports it — companies are auto-created and
