@@ -193,7 +193,9 @@ interface AuditDismissedRow {
 }
 
 // ── Invoicing (Phase 3) ──────────────────────────────────────────────────────
-interface InvoiceLineItem { date: string; minutes: number; hours: number; rate: number; amount: number; }
+/** One punch under a day's line item (task label/name, description, clock times). */
+interface InvoiceDetailRow { label: string; name: string; desc: string; clockIn: string; clockOut: string; minutes: number; }
+interface InvoiceLineItem { date: string; minutes: number; hours: number; rate: number; amount: number; detail?: InvoiceDetailRow[]; }
 interface InvoiceParty { name?: string; address?: string; email?: string; taxId?: string; paymentInstructions?: string; }
 /** The frozen invoice snapshot stored (encrypted) at issue time. */
 interface InvoiceDoc {
@@ -202,6 +204,7 @@ interface InvoiceDoc {
   billFrom: InvoiceParty; billTo: InvoiceParty; rate: number;
   lineItems: InvoiceLineItem[]; totalMinutes: number; totalHours: number;
   subtotal: number; taxRate: number; taxAmount: number; total: number; notes?: string;
+  includeDetail?: boolean;
 }
 /** One row in the ledger list. */
 interface InvoiceListRow {
@@ -212,6 +215,7 @@ interface InvoiceListRow {
 interface InvoicePreviewParams {
   companyId: number; fromDate: string; toDate: string;
   taxRate?: number; netDays?: string | number; issueDate?: string; notes?: string;
+  includeDetail?: boolean;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

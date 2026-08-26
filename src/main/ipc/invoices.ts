@@ -11,7 +11,7 @@
 
 const { ipcMain, dialog } = require('electron');
 const fs = require('fs');
-const { session } = require('../session');
+const { session, decryptEntry } = require('../session');
 const { dbAll, dbGet, dbRun, persistDB } = require('../db');
 const { encrypt, decrypt } = require('../vault-crypto');
 const { performBackup } = require('../backups');
@@ -64,13 +64,20 @@ function getCompany(companyId: number) {
   catch { return null; }
 }
 
-// Per-day billable minutes come straight from the plaintext aggregate columns —
-// no rows_json decryption needed (computeInvoice only wants log_date/total_mins).
-function scopedEntries(companyId: number, from: string, to: string) {
-  return dbAll(
-    'SELECT company_id, log_date, total_mins FROM time_entries WHERE user_id=? AND company_id=? AND log_date>=? AND log_date<=? ORDER BY log_date',
+// Per-day billable minutes come from the plaintext aggregate columns. When the
+// invoice includes per-punch detail we additionally decrypt rows_json (task
+// label/name, description, clock in/out) — the only path here that pays AES-GCM,
+// and it's scoped to one company + date range, not the whole history.
+function scopedEntries(companyId: number, from: string, to: string, withDetail: boolean) {
+  const cols = withDetail
+    ? 'rowid as rid, company_id, log_date, total_mins, rows_json, rows_enc, rows_iv, rows_tag'
+    : 'company_id, log_date, total_mins';
+  const rows = dbAll(
+    `SELECT ${cols} FROM time_entries WHERE user_id=? AND company_id=? AND log_date>=? AND log_date<=? ORDER BY log_date`,
     [session.user.id, Number(companyId), from, to]
   );
+  if (withDetail) rows.forEach((r: any) => decryptEntry(r));
+  return rows;
 }
 
 function resolveTerms(netDaysRaw: unknown): { netDays: number | null; terms: string } {
@@ -84,6 +91,8 @@ function resolveTerms(netDaysRaw: unknown): { netDays: number | null; terms: str
 interface DocParams {
   companyId: number; fromDate: string; toDate: string;
   taxRate?: number; netDays?: unknown; issueDate?: string; notes?: string; number: string;
+  /** Include per-punch task detail under each day (default true). */
+  includeDetail?: boolean;
 }
 
 // Assemble a full, self-contained InvoiceDoc (the frozen snapshot shape).
@@ -92,7 +101,8 @@ function buildDoc(params: DocParams) {
   if (!co) throw new Error('Company not found.');
   const from = getBillFrom();
   const currency = (co.currency && String(co.currency).trim()) ? co.currency : (from.defaultCurrency || 'USD');
-  const entries = scopedEntries(params.companyId, params.fromDate, params.toDate);
+  const includeDetail = params.includeDetail !== false;
+  const entries = scopedEntries(params.companyId, params.fromDate, params.toDate, includeDetail);
   const comp = computeInvoice({ entries, rate: Number(co.pay_rate) || 0, taxRate: Number(params.taxRate) || 0 });
 
   const issueDate = params.issueDate || localDateStr();
@@ -112,6 +122,7 @@ function buildDoc(params: DocParams) {
     totalMinutes: comp.totalMinutes, totalHours: comp.totalHours,
     subtotal: comp.subtotal, taxRate: comp.taxRate, taxAmount: comp.taxAmount, total: comp.total,
     notes: params.notes || '',
+    includeDetail,
   };
 }
 

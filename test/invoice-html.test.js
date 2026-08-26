@@ -123,3 +123,55 @@ test('buildInvoiceHTML: omits tax row and payment block when absent', () => {
   assert.match(html, /No billable time in this period\.|€770\.00/); // has the subtotal
   assert.match(html, /€770\.00/);
 });
+
+// ── Per-punch task detail (task name/label, description, clock times) ────────
+const detailEntries = [
+  {
+    log_date: '2026-07-01', total_mins: 120,
+    rows_json: JSON.stringify([
+      { label: 'Dispatch', name: 'Route audit', desc: 'Checked\nthe   manifest', clock_in: '08:00', clock_out: '09:00', total_mins: 60 },
+      { label: 'Dispatch', name: 'Callbacks', desc: '', clock_in: '09:00', clock_out: '10:00', total_mins: 60 },
+      { label: '', name: '', desc: '', clock_in: '', clock_out: '', total_mins: 0 },   // blank row: dropped
+    ]),
+  },
+  // Second session on the same date — its punches append to the same day line.
+  { log_date: '2026-07-01', total_mins: 30, rows_json: JSON.stringify([{ label: 'Admin', name: 'Invoicing', desc: '<b>x</b>', clock_in: '13:00', clock_out: '13:30', total_mins: 30 }]) },
+];
+
+test('computeInvoice: builds per-punch detail and drops empty rows', () => {
+  const inv = computeInvoice({ entries: detailEntries, rate: 50 });
+  assert.equal(inv.lineItems.length, 1);
+  const li = inv.lineItems[0];
+  assert.equal(li.minutes, 150);
+  assert.equal(li.detail.length, 3);                        // blank row filtered out
+  assert.equal(li.detail[0].name, 'Route audit');
+  assert.equal(li.detail[0].desc, 'Checked the manifest');  // whitespace flattened
+  assert.equal(li.detail[0].clockIn, '08:00');
+  assert.equal(li.detail[2].label, 'Admin');                // second session appended
+});
+
+test('computeInvoice: tolerates missing/invalid rows_json', () => {
+  const inv = computeInvoice({ entries: [{ log_date: '2026-07-01', total_mins: 60 }, { log_date: '2026-07-02', total_mins: 60, rows_json: 'not json' }], rate: 10 });
+  assert.deepEqual(inv.lineItems[0].detail, []);
+  assert.deepEqual(inv.lineItems[1].detail, []);
+  assert.equal(inv.subtotal, 20);
+});
+
+test('buildInvoiceHTML: renders detail sub-rows, escaped; includeDetail:false suppresses them', () => {
+  const inv = computeInvoice({ entries: detailEntries, rate: 50 });
+  const base = {
+    invoiceNumber: 'INV-0009', issueDate: '2026-07-06',
+    periodFrom: '2026-07-01', periodTo: '2026-07-07', currency: 'USD',
+    billFrom: { name: 'Me' }, billTo: { name: 'Client' }, ...inv,
+  };
+  const html = buildInvoiceHTML(base);
+  assert.match(html, /Dispatch · Route audit/);
+  assert.match(html, /Checked the manifest/);
+  assert.match(html, /08:00 → 09:00 · 1h 0m/);
+  assert.ok(!html.includes('<b>x</b>'));
+  assert.match(html, /&lt;b&gt;x&lt;\/b&gt;/);
+
+  const plain = buildInvoiceHTML({ ...base, includeDetail: false });
+  assert.ok(!/Route audit/.test(plain));
+  assert.match(plain, /\$125\.00/);   // money unchanged
+});
