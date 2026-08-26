@@ -25,6 +25,19 @@ interface InvoiceEntry {
   company_id?: number | string;
   log_date?: string;
   total_mins?: number;
+  /** Decrypted per-punch rows (tracker rows). Optional — callers that only have
+   *  the plaintext aggregate columns still get correct money, just no detail. */
+  rows_json?: string;
+}
+
+/** One tracker punch, flattened for display under its day's line item. */
+interface DetailRow {
+  label: string;
+  name: string;
+  desc: string;
+  clockIn: string;
+  clockOut: string;
+  minutes: number;
 }
 
 interface LineItem {
@@ -33,6 +46,8 @@ interface LineItem {
   hours: number;
   rate: number;
   amount: number;
+  /** Per-punch breakdown for this day (empty when the caller passed no rows). */
+  detail?: DetailRow[];
 }
 
 interface ComputeInput {
@@ -43,6 +58,28 @@ interface ComputeInput {
   rate: number;
   /** Tax rate as a percentage (0 = no tax). */
   taxRate?: number;
+}
+
+/** Collapse whitespace/newlines so a multi-line description can't break the
+ *  fixed-layout invoice table (mirrors the renderer's window.flattenText). */
+function flatten(v: unknown): string {
+  return String(v == null ? '' : v).replace(/\s+/g, ' ').trim();
+}
+
+/** Pull the displayable punches out of one entry's decrypted rows_json. */
+function entryDetail(e: InvoiceEntry): DetailRow[] {
+  if (!e || !e.rows_json) return [];
+  let rows: any[];
+  try { rows = JSON.parse(e.rows_json); } catch { return []; }
+  if (!Array.isArray(rows)) return [];
+  return rows.map((r) => ({
+    label: flatten(r && r.label),
+    name: flatten(r && r.name),
+    desc: flatten(r && (r.desc || r.description)),
+    clockIn: flatten(r && r.clock_in),
+    clockOut: flatten(r && r.clock_out),
+    minutes: Number((r && r.total_mins) || 0),
+  })).filter((d) => d.label || d.name || d.desc || d.clockIn || d.minutes > 0);
 }
 
 interface ComputedInvoice {
@@ -65,18 +102,22 @@ function computeInvoice(input: ComputeInput): ComputedInvoice {
   const taxRate = Number(input.taxRate) || 0;
 
   const byDate: Record<string, number> = {};
+  const detailByDate: Record<string, DetailRow[]> = {};
   for (const e of input.entries || []) {
     const mins = Number(e.total_mins || 0);
     if (mins <= 0) continue;              // skip empty/zero days
     const d = e.log_date || '';
     byDate[d] = (byDate[d] || 0) + mins;
+    // Multiple sessions can share a date — concatenate their punches in order.
+    const det = entryDetail(e);
+    if (det.length) detailByDate[d] = (detailByDate[d] || []).concat(det);
   }
 
   const lineItems: LineItem[] = Object.entries(byDate)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, minutes]) => {
       const hours = round2(minutes / 60);
-      return { date, minutes, hours, rate, amount: round2(hours * rate) };
+      return { date, minutes, hours, rate, amount: round2(hours * rate), detail: detailByDate[date] || [] };
     });
 
   const totalMinutes = lineItems.reduce((s, li) => s + li.minutes, 0);
@@ -146,8 +187,18 @@ interface InvoiceDoc {
   taxAmount: number;
   total: number;
   notes?: string;
+  /** When false, per-punch detail sub-rows are omitted (frozen per invoice —
+   *  descriptions can carry internal notes the client shouldn't see). */
+  includeDetail?: boolean;
   /** Optional @font-face CSS (Inter base64) injected into the document. */
   fontCss?: string;
+}
+
+/** Format minutes as "1h 30m" / "45m" for the detail sub-rows. */
+function fmtMins(mins: number): string {
+  const m = Math.max(0, Math.round(Number(mins) || 0));
+  const h = Math.floor(m / 60);
+  return h ? `${h}h ${m % 60}m` : `${m}m`;
 }
 
 const HOURGLASS_SVG =
@@ -166,12 +217,36 @@ function buildInvoiceHTML(doc: InvoiceDoc): string {
   // `invoiceNumber`. Accept either so exported/emailed PDFs never render blank.
   const invNo = doc.invoiceNumber || doc.number || '';
 
+  const showDetail = doc.includeDetail !== false;
+
+  // One indented sub-row per punch, spanning the full table width beneath its
+  // day. Task Label · Task Name on the left, clock in → out + duration right.
+  const detailRows = (li: LineItem) => (showDetail && li.detail && li.detail.length)
+    ? li.detail.map((d, i, arr) => {
+        const task = [d.label, d.name].filter(Boolean).map(escapeHtml).join(' · ');
+        const clock = d.clockIn || d.clockOut
+          ? `${escapeHtml(d.clockIn || '—')} → ${escapeHtml(d.clockOut || '—')}`
+          : '';
+        const dur = d.minutes > 0 ? escapeHtml(fmtMins(d.minutes)) : '';
+        const last = i === arr.length - 1 ? ' end' : '';
+        return `<tr class="detail${last}"><td colspan="4">` +
+          `<div class="d-line">` +
+            `<span class="d-task">${task || '—'}</span>` +
+            `<span class="d-clock mono">${clock}${clock && dur ? ' · ' : ''}${dur}</span>` +
+          `</div>` +
+          (d.desc ? `<div class="d-desc">${escapeHtml(d.desc)}</div>` : '') +
+        `</td></tr>`;
+      }).join('')
+    : '';
+
   const lineRows = doc.lineItems.length
-    ? doc.lineItems.map((li) =>
-        `<tr><td class="mono">${escapeHtml(li.date)}</td>` +
-        `<td class="num mono">${li.hours.toFixed(2)}</td>` +
-        `<td class="num mono">${money(li.rate)}</td>` +
-        `<td class="num mono">${money(li.amount)}</td></tr>`).join('')
+    ? doc.lineItems.map((li) => {
+        const det = detailRows(li);
+        return `<tr class="day${det ? ' has-detail' : ''}"><td class="mono">${escapeHtml(li.date)}</td>` +
+          `<td class="num mono">${li.hours.toFixed(2)}</td>` +
+          `<td class="num mono">${money(li.rate)}</td>` +
+          `<td class="num mono">${money(li.amount)}</td></tr>` + det;
+      }).join('')
     : '<tr><td colspan="4" class="empty">No billable time in this period.</td></tr>';
 
   const taxRow = doc.taxRate > 0
@@ -224,6 +299,14 @@ body{font-family:'Inter','Segoe UI',Arial,sans-serif;font-size:12px;color:#1f293
 table{width:100%;border-collapse:collapse;margin-top:22px;}
 th{background:#f1f5f9;padding:8px 10px;text-align:left;font-size:10px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;color:#475569;border-bottom:2px solid #b8862e;}
 td{padding:7px 10px;border-bottom:1px solid #e5e7eb;font-size:11.5px;}
+tr.day td{font-weight:600;}
+tr.day.has-detail td{border-bottom:none;}
+tr.detail td{padding:1px 10px 5px 26px;border-bottom:none;font-size:10.5px;color:#475569;}
+tr.detail.end td{border-bottom:1px solid #e5e7eb;}
+.d-line{display:flex;justify-content:space-between;gap:16px;}
+.d-task{font-weight:600;color:#334155;}
+.d-clock{color:#64748b;white-space:nowrap;}
+.d-desc{color:#64748b;line-height:1.45;margin-top:1px;}
 .num{text-align:right;}th.num{text-align:right;}
 .empty{color:#94a3b8;text-align:center;padding:16px;}
 .totals{margin-top:14px;margin-left:auto;width:300px;}

@@ -261,7 +261,7 @@ Built per `docs/PLAN-pomodoro-tooltips-onboarding.md` (decisions confirmed with 
 - **Additional theme variants** — optional; explore additional city-inspired palettes if desired (the current set is the 5 above).
 
 #### Final / Release
-- **Package for multi-platform release** — Windows (done), macOS, Linux, iOS, Android, iOS Mobile; icon assets already prepared for Win/Mac/Linux
+- **Package for release** — Windows (done). **Android** is the remaining target. **macOS and iOS are explicitly dropped** (2026-08-03 — too costly to support); do not propose Apple packaging, signing, or notarization work. Linux is unplanned/optional. Icon assets exist for Win/Mac/Linux, but the Mac set is unused.
 - **Beta Keys** ✅ — offline early-access gate. A key is a Crockford-base32 blob (`CONQ-XXXXXX-XXXXXX-XXXXXX-XXXXXX`) carrying a signed payload: `version|expiryDays(uint16 LE)|nonce` + a 10-byte HMAC-SHA256 truncation (`src/main/beta-keys.js`, pure + 10 unit tests). Shared-secret (HMAC) scheme — the secret lives in `src/shared/beta-secret.js` (**gitignored**; `beta-secret.example.js` is the tracked template) so it ships in builds but never in the public repo; `src/main/ipc/auth.ts` fails **open** (gate disabled) if the file is absent. Mint keys with `node scripts/gen-beta-key.mjs --expires YYYY-MM-DD [--count N] [--label ..]`. Gate is **new-installs-only**: `beta:status` returns `required:true` only when `!IS_DEV && secret present && no profiles exist && no redeemed key`; a redeemed key is stored in the app-global `app-prefs.json` (`betaKey`). The login screen shows a branded `#beta-gate` card (login.html/login.js `showBetaGate`/`redeemBeta`, routed through `routeInitialScreen`) before account setup; `beta:redeem` validates + reports a clear expired/invalid message. Dev runs and existing installs are never gated. Note: offline validation can't remotely revoke a single key mid-beta — expiry is the lever; and the check is bypassable by patching the binary (fine for a free beta gate, not DRM).
 - **Contributions / monetization** — Patreon, app purchase, or similar; to be designed once feature set is locked
 
@@ -325,14 +325,14 @@ These were real conversations with the user that may resurface — worth knowing
 
 ## Suggested Next Steps (pick up here)
 
-Most feature work is done (auth, recovery, encryption-at-rest, reports/audit, profiles, scheduling, tray). What remains, in rough priority:
-1. **Multi-platform packaging** — Windows installer works; macOS/Linux icons are ready. This is the highest-leverage next step: beta keys, the real-world launch-at-startup test, and monetization all sit downstream of having real installers.
+**The desktop app is feature-complete and in maintenance mode as of 2026-08-03** — bug fixes only, no new desktop features. New development effort goes to the **Android app**. Don't propose desktop feature work (or macOS/iOS support) as a next step; the list below is what's left if and when it's picked up, in rough priority:
+1. **Android app** — the active new-build target. Windows installer works; macOS/iOS are dropped.
 2. **Beta keys** — early-access gating (after packaging).
 3. **Contributions / monetization** — Patreon / purchase; email-vs-donation reminder logic (after packaging).
 4. **CSV/PDF report redesign** — both emailed report formats (layout/content) redesigned, not just fixed (user request 2026-07-05 from beta testing); confirm design direction before building.
 5. ~~QA deep-clean — property-based testing~~ ✅ **COMPLETE 2026-07-06** (PRs #105/#106/#107; plan + results in `docs/PLAN-property-testing.md`) — `fast-check` properties A1–A12 (found+fixed a real `rowHasContent` desc-shadowing bug); `test/vault-fixture.js` builders extracted from `seed-dev.js` (ledger byte-identical), with the `computeExpectedDiscrepancies()` mirror living there; the differential oracle (`test/audit-oracle.props.test.js`) mechanically enforces the `audit.ts` ↔ mirror sync contract on randomized vaults; `reEncryptVault`/`migrateTimeEntries` whole-vault-space properties; `npm run coverage:critical` c8 report. **Maintenance rule:** if audit detection ever changes, update BOTH `countAuditDiscrepancies()` and the fixture mirror — the oracle fails within seconds otherwise.
 6. **Language / i18n** — lowest priority, most complex; tackle last.
-7. **Auth & Encryption Reform** (backburner, design-only) — DPAPI/TPM-sealed key blob; do not start until multi-platform packaging is scoped.
+7. **Auth & Encryption Reform** (backburner, design-only) — DPAPI/TPM-sealed key blob; do not start until the Android work is scoped.
 
 Note: light-theme polish, theme reordering, and the ASCII easter-egg redesign were dropped as not relevant (2026-06-29) — do not reintroduce them as open items.
 

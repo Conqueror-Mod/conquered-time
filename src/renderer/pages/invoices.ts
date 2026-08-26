@@ -110,6 +110,7 @@ function collectParams(): InvoicePreviewParams | null {
     netDays: $sel('gen-terms').value,
     issueDate: $in('gen-issue').value || localDate(),
     notes: $ta('gen-notes').value.trim(),
+    includeDetail: ($id('gen-detail') as HTMLInputElement).checked,
   };
 }
 
@@ -124,11 +125,34 @@ async function doPreview(): Promise<void> {
   $id('preview-modal').classList.add('show');
 }
 
+/** "1h 30m" / "45m" for the detail sub-rows. */
+function fmtMins(mins: number): string {
+  const m = Math.max(0, Math.round(Number(mins) || 0));
+  const h = Math.floor(m / 60);
+  return h ? `${h}h ${m % 60}m` : `${m}m`;
+}
+
 function renderPreview(doc: InvoiceDoc): void {
   const cur = doc.currency;
-  const rows = doc.lineItems.map(li =>
-    `<tr><td>${escapeHtml(li.date)}</td><td class="num">${li.hours.toFixed(2)}</td>` +
-    `<td class="num">${escapeHtml(money(li.rate, cur))}</td><td class="num">${escapeHtml(money(li.amount, cur))}</td></tr>`).join('');
+  const showDetail = doc.includeDetail !== false;
+  const detailRows = (li: InvoiceLineItem) => (showDetail && li.detail && li.detail.length)
+    ? li.detail.map((d, i, arr) => {
+        const task = [d.label, d.name].filter(Boolean).map(escapeHtml).join(' · ');
+        const clock = d.clockIn || d.clockOut
+          ? `${escapeHtml(d.clockIn || '—')} → ${escapeHtml(d.clockOut || '—')}` : '';
+        const dur = d.minutes > 0 ? escapeHtml(fmtMins(d.minutes)) : '';
+        return `<tr class="pv-detail${i === arr.length - 1 ? ' end' : ''}"><td colspan="4">` +
+          `<div class="pv-d-line"><span class="pv-d-task">${task || '—'}</span>` +
+          `<span class="pv-d-clock mono">${clock}${clock && dur ? ' · ' : ''}${dur}</span></div>` +
+          (d.desc ? `<div class="pv-d-desc">${escapeHtml(d.desc)}</div>` : '') +
+        `</td></tr>`;
+      }).join('')
+    : '';
+  const rows = doc.lineItems.map(li => {
+    const det = detailRows(li);
+    return `<tr class="pv-day${det ? ' has-detail' : ''}"><td>${escapeHtml(li.date)}</td><td class="num">${li.hours.toFixed(2)}</td>` +
+      `<td class="num">${escapeHtml(money(li.rate, cur))}</td><td class="num">${escapeHtml(money(li.amount, cur))}</td></tr>` + det;
+  }).join('');
   const taxLine = doc.taxRate > 0
     ? `<div><span>Tax (${escapeHtml(String(doc.taxRate))}%)</span><span class="mono">${escapeHtml(money(doc.taxAmount, cur))}</span></div>` : '';
   const dueBit = doc.dueDate ? `<div>Due <b>${escapeHtml(doc.dueDate)}</b>${doc.terms ? ` · ${escapeHtml(doc.terms)}` : ''}</div>` : '';
