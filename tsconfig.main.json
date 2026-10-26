@@ -8,7 +8,7 @@
   // dist-main/
   // ├── main/       main.js, preload.js, vault-crypto.js, read-cache.js, beta-keys.js
   // ├── shared/     beta-secret.js (gitignored source; absent on fresh clones — gate fails open)
-  // └── renderer/   row-utils.js, time-parse.js (shared helpers required by main)
+  // └── renderer/   row-utils.js, time-parse.js, schedule.js (shared helpers required by main)
   "compilerOptions": {
     "target": "ES2022",
     "lib": ["ES2022"],
@@ -35,7 +35,8 @@
     "src/shared/**/*",
     "src/renderer/row-utils.js",
     "src/renderer/identity-color.js",
-    "src/renderer/time-parse.js"
+    "src/renderer/time-parse.js",
+    "src/renderer/schedule.js"
   ],
   "exclude": ["node_modules", "dist", "dist-main"]
 }

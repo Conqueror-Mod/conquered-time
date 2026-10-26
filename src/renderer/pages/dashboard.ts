@@ -41,6 +41,10 @@ window.addEventListener('DOMContentLoaded', async () => {
   await loadData();
   renderWeekBand();
   drawMiniWeb();
+
+  // Shifts logged from the catch-up prompt (sign-in or a ghost click) →
+  // refresh the stat tiles + band.
+  Store.subscribe('entries', async () => { await loadData(); renderWeekBand(); });
 });
 
 async function loadData(): Promise<void> {
@@ -206,17 +210,35 @@ function renderWeekBand(): void {
   }
   for (const list of byDay.values()) list.sort((a, b) => a.id - b.id);
 
+  // Ghosts: saved-schedule shifts with no session for that company that day.
+  // Rendered from the schedule only — never stored (plan option B).
+  const ghostsByDay = new Map<string, Array<{ co: Company; mins: number }>>();
+  if (typeof Schedule !== 'undefined') {
+    for (const co of companies) {
+      if (!co.schedule) continue;
+      for (const d of dayDates) {
+        const slots = Schedule.slotsOn(co, d);
+        if (!slots.length || (byDay.get(d) || []).some(e => e.company_id === co.id)) continue;
+        const list = ghostsByDay.get(d) || [];
+        list.push({ co, mins: slots.reduce((t, s) => t + Schedule.slotMins(s), 0) });
+        ghostsByDay.set(d, list);
+      }
+    }
+  }
+  const ghostTotals = dayDates.map(d => (ghostsByDay.get(d) || []).reduce((s, g) => s + g.mins, 0));
+  const ghostTotal = ghostTotals.reduce((s, m) => s + m, 0);
+
   // Auto-scale: tallest day fills the plot, but a light week never inflates —
   // anything ≥8h is treated as a full column.
   const dayTotals = dayDates.map(d => (byDay.get(d) || []).reduce((s, e) => s + (e.total_mins || 0), 0));
   const weekTotal = dayTotals.reduce((s, m) => s + m, 0);
   const PLOT = 126;
-  const maxDayH = Math.max(8, Math.max(...dayTotals) / 60);
+  const maxDayH = Math.max(8, Math.max(...dayTotals.map((m, i) => m + ghostTotals[i])) / 60);
   const pxPerHour = PLOT / maxDayH;
 
   weekBlocks = [];
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  if (weekTotal === 0) {
+  if (weekTotal === 0 && ghostTotal === 0) {
     // Branded empty state — an invitation, not an apology. The CTA differs by
     // tense: past weeks are history (no CTA), the current/future week can
     // still be conquered.
@@ -230,8 +252,18 @@ function renderWeekBand(): void {
   } else {
     cols.innerHTML = dayDates.map(d => {
       const sessions = byDay.get(d) || [];
-      if (!sessions.length) return '<div class="week-col"><div class="week-day-empty">—</div></div>';
-      const blocks = sessions.map(e => {
+      const ghosts = ghostsByDay.get(d) || [];
+      if (!sessions.length && !ghosts.length) return '<div class="week-col"><div class="week-day-empty">—</div></div>';
+      // Ghosts sit on top of the logged blocks (column stacks bottom-up).
+      const ghostHtml = ghosts.map(g => {
+        const px = Math.max(6, Math.round((g.mins / 60) * pxPerHour));
+        const due = d <= today;
+        const tip = `Scheduled · ${g.co.name} · ${fmtH(g.mins)} — ${due ? 'not logged yet, click to review' : 'upcoming'}`;
+        const ink = colorFor(g.co.id);
+        return `<div class="week-ghost${due ? ' due' : ''}" data-tip="${escapeHtml(tip)}" style="height:${px}px;border-color:${ink};color:${ink};">`
+          + (px >= 17 ? escapeHtml(fmtH(g.mins)) : '') + '</div>';
+      }).join('');
+      const blocks = ghostHtml + sessions.map(e => {
         const i = weekBlocks.length;
         weekBlocks.push({ entry: e, co: coById[e.company_id] });
         const h = (e.total_mins || 0) / 60;
@@ -266,7 +298,7 @@ function renderWeekBand(): void {
   const totalEl = document.getElementById('week-total');
   const todayBtn = document.getElementById('week-today');
   if (rangeEl) rangeEl.textContent = range;
-  if (totalEl) totalEl.textContent = fmtH(weekTotal) + ' total';
+  if (totalEl) totalEl.textContent = fmtH(weekTotal) + ' total' + (ghostTotal ? ` · +${fmtH(ghostTotal)} scheduled` : '');
   if (todayBtn) todayBtn.style.display = weekOffset === 0 ? 'none' : '';
 }
 
@@ -275,6 +307,10 @@ function renderWeekBand(): void {
 // Global Log "Open" uses); a day label opens the Tracker on that date.
 document.addEventListener('click', ev => {
   const t = ev.target as HTMLElement;
+  if (t.closest('.week-ghost.due')) {
+    void window.ScheduleCatchup?.open();   // entries invalidation re-renders the band
+    return;
+  }
   const blk = t.closest<HTMLElement>('.week-blk');
   if (blk) {
     const b = weekBlocks[Number(blk.dataset.i)];

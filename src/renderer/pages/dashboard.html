@@ -182,6 +182,24 @@
     overflow: hidden;
   }
   .week-blk:hover { filter: brightness(1.18); }
+  /* Scheduled-but-unlogged shift (saved schedule, docs/PLAN-recurring-schedule.md).
+     Drawn from the schedule — nothing stored. Clickable once the day has come. */
+  .week-ghost {
+    flex-shrink: 0;
+    border-radius: 6px;
+    margin-top: 3px;
+    border: 1.5px dashed;
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mono);
+    font-size: 11px;
+    overflow: hidden;
+    opacity: 0.75;
+  }
+  .week-ghost.due { cursor: pointer; }
+  .week-ghost.due:hover { opacity: 1; }
   .week-day-empty {
     border: 1px dashed var(--border-light);
     border-radius: 7px;

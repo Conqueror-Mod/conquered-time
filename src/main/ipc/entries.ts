@@ -6,6 +6,8 @@ const { dbAll, dbGet, dbRun, persistDB } = require('../db');
 const { readCache, cacheOwner, invalidateEntriesCache } = require('../cache');
 const { performBackup, performSafetySnapshot } = require('../backups');
 const { encrypt, decrypt } = require('../vault-crypto');
+const { localDateStr } = require('../../renderer/row-utils');
+const Schedule = require('../../renderer/schedule');
 
 function register() {
 // ── IPC: Time entries ──────────────────────────────────────────────────────
@@ -82,6 +84,60 @@ ipcMain.handle('entries:delete', (_: unknown, id: any) => {
     persistDB(); performBackup();
     invalidateEntriesCache();
     return { ok: true };
+  } catch (e) { return { ok: false, error: e.message }; }
+});
+
+// Log confirmed scheduled shifts (docs/PLAN-recurring-schedule.md). The
+// renderer sends only {companyId, date}; the rows are rebuilt HERE from the
+// company's saved (encrypted) schedule via the shared schedule.js helpers, so
+// the renderer can't write arbitrary times through this path. Rules:
+//   - date must be a real local date <= today (no future-dated hours)
+//   - skip any company+date that already has a session (hand-logged day,
+//     extra shift, or a re-run) — never doubles hours
+//   - safety snapshot before the first write, like import:commit
+ipcMain.handle('entries:fill-schedule', (_: unknown, payload: any) => {
+  if (!session.key || !session.user) return { ok: false, error: 'Not authenticated' };
+  const uid = session.user.id;
+  const items = Array.isArray(payload && payload.items) ? payload.items : [];
+  if (!items.length) return { ok: true, created: 0, skipped: 0 };
+  try {
+    const today = localDateStr();
+    const companies = new Map<number, any>();
+    for (const r of dbAll('SELECT rowid as rid, * FROM companies WHERE user_id=?', [uid])) {
+      try {
+        const co = JSON.parse(decrypt({ iv: r.data_iv, tag: r.data_tag, data: r.data_enc }, session.key));
+        companies.set(Number(r.rid), { ...co, id: Number(r.rid) });
+      } catch { /* undecryptable company — its items are skipped */ }
+    }
+    const logged = new Set<string>();
+    for (const r of dbAll('SELECT company_id, log_date FROM time_entries WHERE user_id=?', [uid])) {
+      logged.add(`${Number(r.company_id)}|${r.log_date}`);
+    }
+
+    const plan: Array<{ cid: number; date: string; rows: any[]; total: number }> = [];
+    let skipped = 0;
+    for (const it of items) {
+      const cid = Number(it && it.companyId);
+      const date = String(it && it.date || '');
+      const co = companies.get(cid);
+      const key = `${cid}|${date}`;
+      if (!co || !Schedule.isDateStr(date) || date > today || logged.has(key)) { skipped++; continue; }
+      const rows = Schedule.slotRows(Schedule.slotsOn(co, date));
+      if (!rows.length) { skipped++; continue; }
+      logged.add(key);
+      plan.push({ cid, date, rows, total: rows.reduce((t: number, r: any) => t + (Number(r.total_mins) || 0), 0) });
+    }
+    if (!plan.length) return { ok: true, created: 0, skipped };
+
+    persistDB(); performSafetySnapshot('before-schedule-fill');
+    for (const p of plan) {
+      const enc = encrypt(JSON.stringify(p.rows), session.key);
+      dbRun('INSERT INTO time_entries (user_id,company_id,log_date,session_label,rows_json,rows_enc,rows_iv,rows_tag,total_mins) VALUES (?,?,?,?,?,?,?,?,?)',
+        [uid, p.cid, p.date, 'Scheduled', '', enc.data, enc.iv, enc.tag, p.total]);
+    }
+    persistDB(); performBackup();
+    invalidateEntriesCache();
+    return { ok: true, created: plan.length, skipped };
   } catch (e) { return { ok: false, error: e.message }; }
 });
 

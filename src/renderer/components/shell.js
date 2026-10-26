@@ -712,6 +712,8 @@ const Shell = (() => {
     await _injectScript('../components/punch-watch.js'); // idle forgotten-punch nudge
     await _injectScript('../components/update-notice.js'); // auto-updater toast (in-app)
     await _injectScript('../components/onboarding.js'); // first-run coach-mark tour
+    await _injectScript('../schedule.js'); // recurring-schedule helpers (window.Schedule)
+    await _injectScript('../components/schedule-catchup.js'); // scheduled-shift catch-up prompt
 
     const [user, profile] = await Promise.all([
       api.invoke('session:get'),
@@ -895,6 +897,10 @@ const Shell = (() => {
         // the ct:tour-done listener below when the tour finishes or is skipped.
         sessionStorage.setItem('audit_after_tour', '1');
       } else {
+        // Scheduled-shift catch-up first (resolves once its prompt closes),
+        // then the audit notice — sequential, never stacked. Logging shifts
+        // can't add audit issues for clean slots, so order is safe.
+        await window.ScheduleCatchup?.check();
         try {
           const n = await api.invoke('audit:count');
           if (n > 0) showAuditWarning(n, 'login');
@@ -906,6 +912,7 @@ const Shell = (() => {
     document.addEventListener('ct:tour-done', async () => {
       if (!sessionStorage.getItem('audit_after_tour')) return;
       sessionStorage.removeItem('audit_after_tour');
+      await window.ScheduleCatchup?.check();
       try {
         const n = await api.invoke('audit:count');
         if (n > 0) showAuditWarning(n, 'login');

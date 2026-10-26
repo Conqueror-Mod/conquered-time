@@ -154,6 +154,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     applyFilters();
     searchInput.focus();
   });
+  $field('f-pay-period').addEventListener('change', syncPayAnchor);
   ($field('company-status-filter') as HTMLSelectElement).addEventListener('change', e => {
     statusFilter = (e.target as HTMLSelectElement).value as typeof statusFilter;
     applyFilters();
@@ -438,15 +439,36 @@ function openModal(co: Company | null = null): void {
     'f-supervisors':   co?.supervisors     || '',
     'f-notes':         co?.notes           || '',
   };
+  // Pay period: '' in the select = default weekly Sun–Sat (no stored value).
+  const pp = co?.pay_period;
+  fields['f-pay-period'] = pp ? (pp.kind === 'weekly' && !pp.anchor ? '' : pp.kind) : '';
+  fields['f-pay-anchor'] = pp?.anchor || '';
   Object.entries(fields).forEach(([id, val]) => {
     const el = document.getElementById(id) as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null;
     if (el) el.value = val;
   });
+  syncPayAnchor();
   $id('company-modal').style.display = 'flex';
   setTimeout(() => {
     const focus = document.getElementById('f-hier-company');
     if (focus) focus.focus();
   }, 50);
+}
+
+// The anchor date only means something for weekly-custom and biweekly.
+function syncPayAnchor(): void {
+  const kind = $field('f-pay-period').value;
+  const needs = kind === 'weekly' || kind === 'biweekly';
+  $id('f-pay-anchor-group').style.display = needs ? '' : 'none';
+  $id('f-pay-anchor-label').textContent = kind === 'biweekly' ? 'A Period Started On' : 'Week Starts On (any date)';
+}
+
+function readPayPeriod(): PayPeriod | undefined {
+  const kind = $field('f-pay-period').value as PayPeriod['kind'] | '';
+  if (!kind) return undefined;
+  const anchor = $field('f-pay-anchor').value;
+  if (kind === 'weekly' || kind === 'biweekly') return anchor ? { kind, anchor } : (kind === 'weekly' ? undefined : { kind });
+  return { kind };
 }
 
 function closeModal(): void {
@@ -458,6 +480,11 @@ async function saveCompany(): Promise<void> {
   const hierCompany = $field('f-hier-company').value.trim();
   if (!hierCompany) { Shell.toast('Company field is required.', 'error'); return; }
   const alias = $field('f-name').value.trim();
+  const payPeriod = readPayPeriod();
+  if (payPeriod?.kind === 'biweekly' && !payPeriod.anchor) {
+    Shell.toast('Every-two-weeks needs a date a pay period started on.', 'error'); return;
+  }
+  const existing = editingId ? companies.find(c => c.id === editingId) : undefined;
   const data = {
     id:              editingId,
     name:            alias || hierCompany,
@@ -482,7 +509,10 @@ async function saveCompany(): Promise<void> {
     // Not a form field — carry the web's Edit Color pick through form saves,
     // otherwise editing any other field would silently wipe the override
     // (companies:save encrypts the whole payload as the new blob).
-    color:           (editingId && companies.find(c => c.id === editingId)?.color) || undefined,
+    color:           existing?.color || undefined,
+    // Same reason: the saved schedule is edited on Insights, not in this form.
+    schedule:        existing?.schedule || undefined,
+    pay_period:      payPeriod,
   };
   const valid = Validator.validateCompany(data as Partial<Company>);
   if (!valid.ok) { Shell.toast(valid.error || 'Invalid company.', 'error'); return; }
