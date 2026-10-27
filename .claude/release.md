@@ -93,7 +93,10 @@ gh release edit v<version> --draft=false --latest --notes-file <scratchpad-path>
 - `releases/latest` resolves to the new version
 - `latest.yml` serves the new version (this is the auto-updater feed — if it's stale, nobody updates)
 - Installer (~84MB) + blockmap + `latest.yml` attached
-- **`beta-secret.js` bundled in the asar** — the gate is inactive without it
+- **`beta-secret.js` bundled in the asar** — the gate is inactive without it. Look for it at
+  **`dist-main/shared/beta-secret.js`** (the main build compiles `src/shared` there; `main.js`
+  requires `../shared/beta-secret`). It is *not* at `src/shared/` inside the asar — don't
+  mistake that absence for a missing secret.
 - **`seed-dev.js` excluded** — `build.files` whitelists `dist-main`, `src/renderer`, `assets`, `package.json`, so it should be, but confirm
 
 Inspect the packaged bundle with `npx asar extract` when anything looks off — that's
