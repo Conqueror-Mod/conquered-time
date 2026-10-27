@@ -24,6 +24,11 @@ const About = (() => {
   // Changelog — newest first. Edit HERE and both About surfaces update. The two
   // most recent entries render in-panel; older notes live on GitHub Releases.
   const CHANGELOG = [
+    { version: 'v3.27.0', items: [
+      'Your regular schedule, logged for you — Insights now spots the shifts you work every week (say Monday 2–5 and Wednesday to Friday 9–12) and offers to save them as a schedule. Once saved, Conquered Time offers to log each shift after it\'s over, so a steady week takes one click instead of a dozen entries',
+      'When you sign in, any scheduled shifts that have passed are listed for a quick review. Untick a day you didn\'t work and it won\'t be offered again; extra hours you add by hand are never doubled. Upcoming shifts show as dashed outlines on the Dashboard week view — nothing is saved until you confirm it',
+      'New Pay Period setting for each company — weekly, every two weeks, twice a month, or monthly. The schedule follows it, and Insights shows how many hours you\'ve logged this period and how many are still scheduled',
+    ] },
     { version: 'v3.26.0', items: [
       'Invoices can now show your work, not just your hours — each day on an invoice can expand into the individual tasks behind it, with the task name, its description, and the clock in/out times and duration for every punch',
       'A new "Include task detail" checkbox on the Generate panel controls this, on by default. Your choice is frozen into the invoice when you issue it, so an invoice always reprints exactly as it was sent — and you can leave the detail off for a client who should only see the totals',

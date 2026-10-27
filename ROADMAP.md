@@ -6,7 +6,7 @@ Discord's **#roadmap** channel mirrors this file automatically.
 
 **Status legend:** ✅ Shipped · 🔨 In progress · 🗓️ Planned · 💡 Under consideration
 
-_Last curated: 2026-08-26 (v3.26.0 — per-punch task detail on invoices)_
+_Last curated: 2026-10-26 (v3.27.0 — recurring schedules and pay periods)_
 
 ## 🗓️ Planned (next up)
 
@@ -25,6 +25,14 @@ _Open to community suggestions — use `/feedback` in the Discord._
 
 ## ✅ Recently shipped
 
+- **Recurring schedules** (v3.27.0) — Insights spots the shifts you work every
+  week and offers to save them as a schedule. After each scheduled shift ends,
+  Conquered Time offers to log it — reviewed at sign-in, with any day you didn't
+  work easy to skip. Upcoming shifts show as dashed outlines on the Dashboard
+  week view, and nothing is saved until you confirm it.
+- **Pay periods** (v3.27.0) — set each company's pay period (weekly, every two
+  weeks, twice a month, or monthly); the schedule follows it, and Insights shows
+  hours logged and still scheduled for the current period.
 - **Task detail on invoices** (v3.26.0) — each day on an invoice can now expand
   into the tasks behind it: task name, description, and the clock in/out times
   and duration for every punch. A checkbox on the Generate panel controls it
