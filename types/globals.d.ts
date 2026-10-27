@@ -23,6 +23,8 @@ interface EntryRow {
   total_mins?: number;
   /** True when added via "+ Manual Entry" (bypasses clock-in requirements). */
   _manual?: boolean;
+  /** True when the row was logged from a saved schedule (entries:fill-schedule). */
+  _scheduled?: boolean;
 }
 
 /** Full time entry as returned by entries:all / entries:list / entries:get-active
@@ -92,6 +94,72 @@ interface Company {
   /** User-picked identity hue for the Company Web (#rrggbb). Overrides the
    *  auto hash-assigned hue in Identity mode; unset = auto. */
   color?: string;
+  /** Saved recurring weekly schedule (docs/PLAN-recurring-schedule.md). */
+  schedule?: CompanySchedule;
+  /** Pay period for schedule catch-up + pay-period summaries. Unset = weekly Sun–Sat. */
+  pay_period?: PayPeriod;
+}
+
+/** One recurring weekly shift. Times are 24h HH:MM; end <= start wraps past midnight. */
+interface ScheduleSlot {
+  id?: string;
+  /** 0 = Sunday … 6 = Saturday (Date.getDay()). */
+  weekday: number;
+  start: string;
+  end: string;
+  label: string;
+  name: string;
+}
+interface CompanySchedule {
+  slots: ScheduleSlot[];
+  /** Shifts before this date are never offered for catch-up. */
+  since: string;
+  paused?: boolean;
+  /** Detected-pattern key the user chose "Keep mine" against — silences
+   *  the drift notice until the detected pattern changes again. */
+  kept?: string;
+}
+interface PayPeriod {
+  kind: 'weekly' | 'biweekly' | 'semimonthly' | 'monthly';
+  /** weekly: first weekday of the period; biweekly: any period start date. */
+  anchor?: string;
+}
+/** A slot found by detectSchedule — carries its evidence. */
+interface DetectedSlot extends ScheduleSlot {
+  id: string;
+  companyId: number;
+  mins: number;
+  weeksSeen: number;
+  weeksTotal: number;
+  confidence: number;
+}
+interface DueShift { companyId: number; date: string; slots: ScheduleSlot[]; mins: number; }
+/** Recurring-schedule + pay-period helpers (src/renderer/schedule.js). Pure. */
+interface ScheduleApi {
+  parseLocalDate(s: string): Date;
+  dateStr(d: Date): string;
+  isDateStr(s: unknown): boolean;
+  addDays(s: string, n: number): string;
+  daysBetween(a: string, b: string): number;
+  weekday(s: string): number;
+  toMin(t: unknown): number | null;
+  fromMin(m: number): string;
+  slotMins(slot: { start: string; end: string }): number;
+  slotId(slot: { weekday: number; start: string; end: string }): string;
+  DETECT_DEFAULTS: { weeks: number; minWeeks: number; minRatio: number; tolerance: number };
+  detectSchedule(entries: Array<{ company_id: number; log_date: string; rows: EntryRow[] }>,
+                 opts?: { today?: string; weeks?: number; minWeeks?: number; minRatio?: number; tolerance?: number }): DetectedSlot[];
+  scheduleDiffers(detected: ScheduleSlot[], saved: ScheduleSlot[]): boolean;
+  PAY_PERIOD_KINDS: string[];
+  periodFor(date: string, pp?: PayPeriod | null): { start: string; end: string };
+  slotsOn(company: Company, date: string): ScheduleSlot[];
+  slotRows(slots: ScheduleSlot[]): EntryRow[];
+  scheduledDays(company: Company, start: string, end: string): Array<{ date: string; slots: ScheduleSlot[]; mins: number }>;
+  dueShifts(companies: Company[], sessions: Array<{ company_id: number; log_date: string }>,
+            opts?: { today?: string; nowMins?: number; lookbackDays?: number; dismissed?: Iterable<string> }): DueShift[];
+  periodSummary(company: Company, sessions: Array<{ company_id: number; log_date: string; total_mins: number }>,
+                opts?: { today?: string }): { start: string; end: string; loggedMins: number; aheadMins: number };
+  makeSchedule(slots: ScheduleSlot[], company: Company | null, today?: string): CompanySchedule;
 }
 
 /** Row of task_items (Dispatch tasks + break/lunch), entry_id-scoped. */
@@ -265,6 +333,11 @@ interface IpcInvokeMap {
   'entries:summary': () => EntrySummary[];
   'entries:get-active': () => TimeEntry | null;
   'entries:get': (id: number) => TimeEntry | null;
+  /** Log confirmed scheduled shifts (dates must be <= today). One "Scheduled"
+   *  session per company+date; skips any company+date that already has a session. */
+  'entries:fill-schedule': (payload: { items: Array<{ companyId: number; date: string }> }) => {
+    ok: boolean; error?: string; created?: number; skipped?: number;
+  };
   // tasks
   'tasks:list': (entryId: number) => TaskItem[];
   'tasks:save': (item: Partial<TaskItem>) => MutResult;
@@ -530,7 +603,7 @@ interface ExportHtmlApi {
 /** Insights entry shape — the parsed rows_json is attached as `rows`. */
 interface InsightEntry {
   log_date: string; total_mins: number; company_id: number;
-  rows: Array<{ clock_in?: string; clock_out?: string; total_mins?: number }>;
+  rows: Array<{ clock_in?: string; clock_out?: string; total_mins?: number; label?: string; name?: string }>;
 }
 interface TrendBucket { key: string; label: string; mins: number; }
 /** Pure aggregation helpers for the Insights page (src/renderer/insights-compute.js). */
@@ -711,6 +784,9 @@ interface Window {
   Validator: ValidatorApi;
   RowUtils: RowUtilsApi;
   InsightsCompute: InsightsComputeApi;
+  Schedule: ScheduleApi;
+  /** Scheduled-shift catch-up prompt (components/schedule-catchup.js, injected by Shell.init). */
+  ScheduleCatchup?: ScheduleCatchupApi;
   IdentityColor: IdentityColorApi;
   ImportParse: ImportParseApi;
   ExportHtml: ExportHtmlApi;
@@ -747,6 +823,15 @@ interface Window {
    * Returns true if a punch was open. Absent off the tracker page.
    */
   __trackerClockOutActive?: (atMs: number) => boolean;
+}
+
+/** window.ScheduleCatchup surface (components/schedule-catchup.js). */
+interface ScheduleCatchupApi {
+  /** Sign-in check: shows the prompt when shifts are due and the opt-out is off.
+   *  Resolves when the prompt closes (or immediately when nothing is due). */
+  check(): Promise<void>;
+  /** Open the prompt now (Insights / week band). Resolves with shifts logged. */
+  open(): Promise<number>;
 }
 
 /** window.PunchWatch surface (components/punch-watch.js). */
@@ -791,6 +876,7 @@ declare const Store: StoreApi;
 declare const Validator: ValidatorApi;
 declare const RowUtils: RowUtilsApi;
 declare const InsightsCompute: InsightsComputeApi;
+declare const Schedule: ScheduleApi;
 declare const IdentityColor: IdentityColorApi;
 declare const ImportParse: ImportParseApi;
 declare const ExportHtml: ExportHtmlApi;

@@ -56,11 +56,13 @@ function cutoffFor(r: Range): string {
 
 // ── Data ────────────────────────────────────────────────────────────────────
 async function loadData(): Promise<void> {
-  const [raw, cos, profile] = await Promise.all([
+  const [raw, cos, profile, dis] = await Promise.all([
     Store.getEntries(),
     Store.getCompanies(),
     api.invoke('profile:get'),
+    api.invoke('settings:get', 'schedule_dismissed'),
   ]);
+  try { const d = JSON.parse(String(dis || '[]')); dismissed = Array.isArray(d) ? d : []; } catch { dismissed = []; }
   companies = cos || [];
   companyMap = {};
   companies.forEach(c => { companyMap[Number(c.id)] = c; });
@@ -89,6 +91,7 @@ function renderCharts(es: InsightEntry[]): void {
 function renderAll(): void {
   const es = scoped();
   renderChips(es);
+  renderSchedule();
   renderCharts(es);
   renderClientMix(es);
   renderEarnings(es);
@@ -429,6 +432,283 @@ function renderEarnings(es: InsightEntry[]): void {
   }
 }
 
+// ── Your Schedule (docs/PLAN-recurring-schedule.md) ─────────────────────────
+// Detection always looks at the last 8 weeks (not the range toggles). A
+// detected pattern is only a suggestion until saved into the company's
+// encrypted blob; logging shifts goes through the shared catch-up prompt.
+const DAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const fmtClock = (t: string): string => (typeof Settings !== 'undefined' ? Settings.formatTime(t) : t);
+const fmtDate = (d: string): string => Schedule.parseLocalDate(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+let detected: DetectedSlot[] = [];
+let dismissed: string[] = [];
+let editingCo: Company | null = null;
+
+const slotText = (s: ScheduleSlot): string => `${DAY[s.weekday]} ${fmtClock(s.start)}–${fmtClock(s.end)}`;
+const patternKey = (slots: ScheduleSlot[]): string => slots.map(Schedule.slotId).sort().join(',');
+
+function sessionsList(): Array<{ company_id: number; log_date: string; total_mins: number }> {
+  return entries.map(e => ({ company_id: e.company_id, log_date: e.log_date, total_mins: e.total_mins }));
+}
+
+function renderSchedule(): void {
+  const body = $id('schedule-body');
+  const today = RowUtils.localDateStr();
+  detected = Schedule.detectSchedule(
+    entries.map(e => ({ company_id: e.company_id, log_date: e.log_date, rows: e.rows as EntryRow[] })), { today });
+  const detBy: Record<number, DetectedSlot[]> = {};
+  detected.forEach(s => { (detBy[s.companyId] ||= []).push(s); });
+  const sessions = sessionsList();
+  const due = Schedule.dueShifts(companies, sessions, { today, dismissed });
+
+  let html = '';
+  if (due.length) {
+    const mins = due.reduce((t, d) => t + d.mins, 0);
+    html += `<div class="sched-due"><span>${due.length} scheduled shift${due.length === 1 ? '' : 's'} (${fmtH(mins)}) not logged yet.</span>`
+      + `<button class="btn-primary sched-btn" data-sched-act="catchup">Review &amp; log</button></div>`;
+  }
+
+  const cos = companies.filter(c => c.schedule || detBy[Number(c.id)]);
+  if (!cos.length) {
+    html += `<div class="insight-empty">No repeating weekly pattern yet. Once the same shift shows up for 3 or more weeks, it appears here.`
+      + (companies.length ? `<br><button class="btn-neutral sched-btn" style="margin-top:10px;" data-sched-act="new">Set up a schedule by hand</button>` : '')
+      + `</div>`;
+    body.innerHTML = html;
+    return;
+  }
+
+  for (const co of cos) {
+    const cid = Number(co.id);
+    const saved = co.schedule;
+    const det = detBy[cid] || [];
+    const shown: ScheduleSlot[] = saved ? saved.slots : det;
+    const pill = saved
+      ? (saved.paused ? '<span class="sched-pill paused">Paused</span>' : '<span class="sched-pill saved">Saved</span>')
+      : '<span class="sched-pill suggest">Suggested</span>';
+    const week = DAY.map((dn, wd) => {
+      const chips = shown.filter(s => Number(s.weekday) === wd).map(s => {
+        const ev = !saved ? (s as DetectedSlot) : null;
+        return `<div class="sched-chip${saved ? '' : ' suggest'}">${escapeHtml(fmtClock(s.start))}–${escapeHtml(fmtClock(s.end))}`
+          + (ev ? `<small>${ev.weeksSeen} of ${ev.weeksTotal} wks</small>` : '') + `</div>`;
+      }).join('');
+      return `<div class="sched-day"><div class="sched-dn">${dn}</div>${chips}</div>`;
+    }).join('');
+
+    let foot: string;
+    if (saved) {
+      const p = Schedule.periodSummary(co, sessions, { today });
+      foot = `<div class="sched-period">Pay period ${escapeHtml(fmtDate(p.start))} – ${escapeHtml(fmtDate(p.end))} · <b>${fmtH(p.loggedMins)}</b> logged`
+        + ` · <b>${fmtH(p.aheadMins)}</b> scheduled ahead</div>`
+        + `<button class="btn-neutral sched-btn" data-sched-act="pause" data-sched-co="${cid}">${saved.paused ? 'Resume' : 'Pause'}</button>`
+        + `<button class="btn-neutral sched-btn" data-sched-act="edit" data-sched-co="${cid}">Edit</button>`;
+    } else {
+      const weekly = det.reduce((t, s) => t + s.mins, 0);
+      foot = `<div class="sched-period">About <b>${fmtH(weekly)}</b> a week. Save it and the app will offer to log these shifts as each day passes.</div>`
+        + `<button class="btn-neutral sched-btn" data-sched-act="adjust" data-sched-co="${cid}">Adjust first…</button>`
+        + `<button class="btn-primary sched-btn" data-sched-act="save" data-sched-co="${cid}">Save as schedule</button>`;
+    }
+
+    let drift = '';
+    if (saved && det.length && Schedule.scheduleDiffers(det, saved.slots) && saved.kept !== patternKey(det)) {
+      drift = `<div class="sched-drift"><span>Your recent weeks look different: ${escapeHtml(det.map(slotText).join(', '))}</span>`
+        + `<button class="btn-neutral sched-btn" data-sched-act="keep" data-sched-co="${cid}">Keep mine</button>`
+        + `<button class="btn-primary sched-btn" data-sched-act="update" data-sched-co="${cid}">Update to match</button></div>`;
+    }
+
+    html += `<div class="sched-co"><div class="sched-co-head"><span class="hbar-dot" style="background:${identityColorFor(cid)};"></span>`
+      + `<span class="sched-co-name">${escapeHtml(co.name)}</span>${pill}</div>`
+      + `<div class="sched-week">${week}</div>${drift}<div class="sched-foot">${foot}</div></div>`;
+  }
+  if (companies.some(c => !c.schedule && !detBy[Number(c.id)])) {
+    html += `<div style="margin-top:12px;"><button class="btn-neutral sched-btn" data-sched-act="new">+ Schedule for another company</button></div>`;
+  }
+  body.innerHTML = html;
+}
+
+async function saveCompanySchedule(co: Company, schedule: CompanySchedule | undefined, payPeriod?: PayPeriod | null): Promise<boolean> {
+  const data: Company = { ...co, schedule };
+  if (!schedule) delete data.schedule;
+  if (payPeriod !== undefined) {
+    if (payPeriod) data.pay_period = payPeriod; else delete data.pay_period;
+  }
+  const res = await IPC.companies.save(data);
+  if (!res.ok) { Shell.toast(res.error || 'Could not save the schedule.', 'error'); return false; }
+  Store.invalidate('companies');
+  await reloadSchedule();
+  return true;
+}
+
+async function reloadSchedule(): Promise<void> {
+  await loadData();
+  renderAll();
+}
+
+// After saving, offer this pay period's already-passed shifts straight away.
+async function offerCatchup(): Promise<void> {
+  const due = Schedule.dueShifts(companies, sessionsList(), { dismissed });
+  if (due.length && window.ScheduleCatchup) {
+    const n = await window.ScheduleCatchup.open();
+    if (n) await reloadSchedule();
+  }
+}
+
+async function onScheduleAction(act: string, cid: number): Promise<void> {
+  const co = companies.find(c => Number(c.id) === cid) || null;
+  const det = detected.filter(s => s.companyId === cid);
+  const today = RowUtils.localDateStr();
+  switch (act) {
+    case 'catchup':
+      if (window.ScheduleCatchup && await window.ScheduleCatchup.open()) await reloadSchedule();
+      else await reloadSchedule();   // dismissed days may have changed
+      return;
+    case 'new':    openEditor(null, []); return;
+    case 'adjust': if (co) openEditor(co, det); return;
+    case 'edit':   if (co && co.schedule) openEditor(co, co.schedule.slots); return;
+  }
+  if (!co) return;
+  if (act === 'save') {
+    if (await saveCompanySchedule(co, Schedule.makeSchedule(det, co, today))) {
+      Shell.toast('Schedule saved.', 'success');
+      await offerCatchup();
+    }
+  } else if (act === 'pause' && co.schedule) {
+    await saveCompanySchedule(co, { ...co.schedule, paused: !co.schedule.paused });
+  } else if (act === 'keep' && co.schedule) {
+    await saveCompanySchedule(co, { ...co.schedule, kept: patternKey(det) });
+  } else if (act === 'update' && co.schedule) {
+    const next = Schedule.makeSchedule(det, co, today);
+    if (await saveCompanySchedule(co, { slots: next.slots, since: co.schedule.since })) Shell.toast('Schedule updated.', 'success');
+  }
+}
+
+// ── Schedule editor ─────────────────────────────────────────────────────────
+function editorRow(s: Partial<ScheduleSlot>): string {
+  const opts = DAY.map((d, i) => `<option value="${i}"${Number(s.weekday ?? 1) === i ? ' selected' : ''}>${d}</option>`).join('');
+  return `<div class="sed-row">
+    <select data-f="weekday">${opts}</select>
+    <input type="text" class="sed-time" data-f="start" placeholder="09:00" value="${escapeHtml(s.start || '')}">
+    <input type="text" class="sed-time" data-f="end" placeholder="12:00" value="${escapeHtml(s.end || '')}">
+    <input type="text" data-f="label" placeholder="e.g. QA" value="${escapeHtml(s.label || '')}">
+    <input type="text" data-f="name" placeholder="e.g. Shift" value="${escapeHtml(s.name || '')}">
+    <button class="btn-neutral sed-x" data-sed-x title="Remove this shift">×</button></div>`;
+}
+
+function syncEditorAnchor(): void {
+  const kind = ($id('sed-pay-period') as HTMLSelectElement).value;
+  $id('sed-anchor-group').style.display = kind === 'weekly' || kind === 'biweekly' ? '' : 'none';
+  $id('sed-anchor-label').textContent = kind === 'biweekly' ? 'A Period Started On' : 'Week Starts On (any date)';
+}
+
+function openEditor(co: Company | null, slots: ScheduleSlot[]): void {
+  editingCo = co;
+  $id('sed-title').textContent = co ? `Schedule — ${co.name}` : 'New Schedule';
+  $id('sed-co-group').style.display = co ? 'none' : '';
+  if (!co) {
+    const choices = companies.filter(c => !c.schedule && !c.date_end);
+    if (!choices.length) { Shell.toast('Every active company already has a schedule.', 'info'); return; }
+    ($id('sed-company') as HTMLSelectElement).innerHTML =
+      choices.map(c => `<option value="${Number(c.id)}">${escapeHtml(c.name)}</option>`).join('');
+  }
+  const pp = co?.pay_period;
+  ($id('sed-pay-period') as HTMLSelectElement).value = pp ? (pp.kind === 'weekly' && !pp.anchor ? '' : pp.kind) : '';
+  ($id('sed-anchor') as HTMLInputElement).value = pp?.anchor || '';
+  syncEditorAnchor();
+  $id('sed-rows').innerHTML = (slots.length ? slots : [{}]).map(editorRow).join('');
+  ($id('sed-paused') as HTMLInputElement).checked = !!co?.schedule?.paused;
+  $id('sed-remove').style.display = co?.schedule ? '' : 'none';
+  $id('sched-editor').style.display = 'flex';
+}
+
+function closeEditor(): void {
+  $id('sched-editor').style.display = 'none';
+  editingCo = null;
+}
+
+// Gotcha #8: stored times are always zero-padded 24h HH:MM.
+function readEditorSlots(): ScheduleSlot[] | null {
+  const out: ScheduleSlot[] = [];
+  for (const row of Array.from($id('sed-rows').querySelectorAll<HTMLElement>('.sed-row'))) {
+    const f = (k: string) => (row.querySelector(`[data-f="${k}"]`) as HTMLInputElement).value.trim();
+    if (!f('start') && !f('end') && !f('label') && !f('name')) continue;   // blank row
+    const a = Schedule.toMin(f('start')), b = Schedule.toMin(f('end'));
+    if (a == null || b == null) { Shell.toast('Use 24-hour times like 09:00 or 14:30.', 'error'); return null; }
+    if (a === b) { Shell.toast('A shift needs different start and end times.', 'error'); return null; }
+    const slot: ScheduleSlot = { weekday: Number(f('weekday')), start: Schedule.fromMin(a), end: Schedule.fromMin(b), label: f('label'), name: f('name') };
+    slot.id = Schedule.slotId(slot);
+    out.push(slot);
+  }
+  return out;
+}
+
+function readEditorPayPeriod(): PayPeriod | null {
+  const kind = ($id('sed-pay-period') as HTMLSelectElement).value as PayPeriod['kind'] | '';
+  const anchor = ($id('sed-anchor') as HTMLInputElement).value;
+  if (!kind) return null;
+  if (kind === 'weekly') return anchor ? { kind, anchor } : null;
+  if (kind === 'biweekly') return anchor ? { kind, anchor } : { kind };
+  return { kind };
+}
+
+async function saveEditor(): Promise<void> {
+  const co = editingCo || companies.find(c => Number(c.id) === Number(($id('sed-company') as HTMLSelectElement).value)) || null;
+  if (!co) return;
+  const slots = readEditorSlots();
+  if (!slots) return;
+  if (!slots.length) { Shell.toast('Add at least one shift, or use Remove schedule.', 'error'); return; }
+  const pp = readEditorPayPeriod();
+  if (pp && pp.kind === 'biweekly' && !pp.anchor) { Shell.toast('Every-two-weeks needs a date a pay period started on.', 'error'); return; }
+  const isNew = !co.schedule;
+  const schedule: CompanySchedule = {
+    ...(co.schedule || {}),
+    slots,
+    since: co.schedule?.since || Schedule.periodFor(RowUtils.localDateStr(), pp).start,
+    paused: ($id('sed-paused') as HTMLInputElement).checked,
+  };
+  closeEditor();
+  if (await saveCompanySchedule(co, schedule, pp)) {
+    Shell.toast('Schedule saved.', 'success');
+    if (isNew) await offerCatchup();
+  }
+}
+
+async function removeSchedule(): Promise<void> {
+  const co = editingCo;
+  if (!co) return;
+  const ok = await Shell.confirm({
+    title: 'Remove this schedule?',
+    message: `Shifts already logged for ${co.name} stay as they are. The app just stops offering new ones.`,
+    confirmLabel: 'Remove', danger: true,
+  });
+  if (!ok) return;
+  closeEditor();
+  if (await saveCompanySchedule(co, undefined)) Shell.toast('Schedule removed.', 'success');
+}
+
+function installScheduleUI(): void {
+  $id('schedule-body').addEventListener('click', e => {
+    const b = (e.target as Element).closest<HTMLElement>('[data-sched-act]');
+    if (b) void onScheduleAction(b.dataset.schedAct || '', Number(b.dataset.schedCo || 0));
+  });
+  $id('sed-rows').addEventListener('click', e => {
+    const x = (e.target as Element).closest('[data-sed-x]');
+    if (x) x.closest('.sed-row')?.remove();
+  });
+  $id('sed-add').addEventListener('click', () => {
+    const last = $id('sed-rows').querySelector<HTMLElement>('.sed-row:last-child');
+    const wd = last ? (Number((last.querySelector('[data-f="weekday"]') as HTMLSelectElement).value) + 1) % 7 : 1;
+    $id('sed-rows').insertAdjacentHTML('beforeend', editorRow({ weekday: wd }));
+  });
+  $id('sed-pay-period').addEventListener('change', syncEditorAnchor);
+  $id('sed-cancel').addEventListener('click', closeEditor);
+  $id('sed-save').addEventListener('click', () => void saveEditor());
+  $id('sed-remove').addEventListener('click', () => void removeSchedule());
+  $id('sched-editor').addEventListener('click', e => { if (e.target === e.currentTarget) closeEditor(); });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && $id('sched-editor').style.display === 'flex') closeEditor();
+  });
+  // A catch-up run from anywhere on this page invalidates entries → refresh.
+  Store.subscribe('entries', () => { void reloadSchedule(); });
+}
+
 // ── Range toggles ────────────────────────────────────────────────────────────
 function setRange(r: Range): void {
   range = r;
@@ -445,6 +725,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   if (mc) { mc.style.display = 'flex'; mc.style.flexDirection = 'column'; mc.style.overflow = 'hidden'; }
 
   installChartTooltips();
+  installScheduleUI();
   await loadData();
   renderAll();
   // The SVG charts render in real pixel coordinates, so they need the wraps to

@@ -144,6 +144,44 @@
   .ins-tooltip .tt-name { font-weight: 600; }
   .ins-tooltip .tt-val  { font-family: var(--mono); font-size: 11px; color: var(--text-muted); margin-top: 2px; }
   .chart-svg-wrap rect[data-tip], .donut-svg path[data-tip] { cursor: default; }
+
+  /* ── Your Schedule (docs/PLAN-recurring-schedule.md) ── */
+  .sched-due {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 12px; margin-bottom: 14px;
+    border: 1px solid var(--accent); border-radius: var(--radius);
+    background: var(--accent-dim); font-size: 13px; color: var(--text-bright);
+  }
+  .sched-due span { flex: 1; }
+  .sched-co { padding: 12px 0; border-top: 1px solid var(--border); }
+  .sched-co:first-of-type { border-top: none; padding-top: 0; }
+  .sched-co-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .sched-co-name { font-size: 13px; font-weight: 600; color: var(--text-bright); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sched-pill { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; padding: 2px 8px; border-radius: 99px; border: 1px solid var(--border-light); color: var(--text-muted); }
+  .sched-pill.saved   { border-color: var(--green); color: var(--green); }
+  .sched-pill.suggest { border-color: var(--accent); color: var(--accent); }
+  .sched-pill.paused  { border-color: var(--yellow); color: var(--yellow); }
+  .sched-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+  .sched-day { min-height: 54px; background: var(--surface-2); border-radius: var(--radius); padding: 6px; display: flex; flex-direction: column; gap: 4px; }
+  .sched-dn { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim); }
+  .sched-chip { font-family: var(--mono); font-size: 11px; line-height: 1.3; padding: 3px 5px; border-radius: 4px; background: var(--accent-dim); color: var(--text-bright); border: 1px solid var(--accent); }
+  .sched-chip.suggest { background: transparent; border-style: dashed; }
+  .sched-chip small { display: block; font-family: var(--sans); font-size: 10px; color: var(--text-dim); }
+  .sched-foot { display: flex; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+  .sched-period { flex: 1; min-width: 200px; font-size: 12px; color: var(--text-muted); }
+  .sched-period b { font-family: var(--mono); font-weight: 500; color: var(--text-bright); }
+  .sched-drift { margin-top: 10px; font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .sched-drift span { flex: 1; min-width: 200px; }
+  .sched-btn { padding: 5px 12px; font-size: 12px; }
+
+  /* Schedule editor rows */
+  .sed-rows { display: flex; flex-direction: column; gap: 6px; max-height: 280px; overflow-y: auto; margin: 6px 0 8px; }
+  .sed-row { display: grid; grid-template-columns: 74px 72px 72px 1fr 1fr 28px; gap: 6px; align-items: center; flex-shrink: 0; }
+  .sed-row input, .sed-row select { width: 100%; min-width: 0; padding: 7px 8px; }
+  .sed-row .sed-time { font-family: var(--mono); }
+  .sed-head { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim); }
+  .sed-x { padding: 4px 0; justify-content: center; }
+  .sed-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
 </style>
 </head>
 <body>
@@ -167,6 +205,16 @@
 
   <!-- Summary chips -->
   <div class="insight-chips" id="insight-chips"></div>
+
+  <!-- Your Schedule — detected weekly pattern → saved schedule → catch-up.
+       Always looks at the last 8 weeks, independent of the range toggles. -->
+  <div class="hud-panel insight-panel full" id="schedule-panel">
+    <div class="hud-panel-header">
+      <div class="hud-panel-title">Your Schedule</div>
+      <span class="hud-panel-title" style="font-weight:400;color:var(--text-dim);font-size:11px;">repeating shifts from the last 8 weeks</span>
+    </div>
+    <div class="insight-panel-body" id="schedule-body"></div>
+  </div>
 
   <!-- Trends over time (full width) -->
   <div class="hud-panel insight-panel full">
@@ -215,6 +263,44 @@
 
 </div>
 
+<!-- Schedule editor -->
+<div class="modal-overlay" id="sched-editor" style="display:none;">
+  <div class="modal-box" style="width:640px;">
+    <div class="modal-title" id="sed-title">Edit Schedule</div>
+    <div class="sed-grid">
+      <div class="field-group" id="sed-co-group">
+        <label class="field-label">Company</label>
+        <select id="sed-company"></select>
+      </div>
+      <div class="field-group">
+        <label class="field-label">Pay Period</label>
+        <select id="sed-pay-period">
+          <option value="">Weekly (Sun–Sat)</option>
+          <option value="weekly">Weekly — custom start day</option>
+          <option value="biweekly">Every two weeks</option>
+          <option value="semimonthly">Twice a month (1–15, 16–end)</option>
+          <option value="monthly">Monthly</option>
+        </select>
+      </div>
+      <div class="field-group" id="sed-anchor-group">
+        <label class="field-label" id="sed-anchor-label">A Period Started On</label>
+        <input type="date" id="sed-anchor">
+      </div>
+    </div>
+    <div class="sed-row sed-head"><div>Day</div><div>Start</div><div>End</div><div>Task Label</div><div>Task Name</div><div></div></div>
+    <div class="sed-rows" id="sed-rows"></div>
+    <button class="btn-neutral sched-btn" id="sed-add">+ Add shift</button>
+    <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-muted);margin-top:12px;cursor:pointer;">
+      <input type="checkbox" id="sed-paused"> Paused — don't offer these shifts for now</label>
+    <div class="insight-hint">Times are 24-hour (e.g. 14:00). An end time before the start runs past midnight.</div>
+    <div class="modal-actions">
+      <button class="btn-danger" id="sed-remove" style="margin-right:auto;">Remove schedule</button>
+      <button class="btn-neutral" id="sed-cancel">Cancel</button>
+      <button class="btn-primary" id="sed-save">Save schedule</button>
+    </div>
+  </div>
+</div>
+
 <!-- Shared hover tooltip (donut slices + bars) -->
 <div id="ins-tooltip" class="ins-tooltip" style="display:none;"></div>
 
@@ -228,6 +314,7 @@
 <script src="../identity-color.js"></script>
 <script src="../bubble-web.js"></script>
 <script src="../insights-compute.js"></script>
+<script src="../schedule.js"></script>
 <script src="insights.js"></script>
 </body>
 </html>

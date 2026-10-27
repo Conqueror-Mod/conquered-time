@@ -644,6 +644,20 @@
         <label class="field-label">Date Ended</label>
         <input type="date" id="f-date-end">
       </div>
+      <div class="field-group">
+        <label class="field-label">Pay Period</label>
+        <select id="f-pay-period" data-tip="How this client's pay periods run. Used by the saved schedule (Insights) to decide which shifts to offer and to total each period.">
+          <option value="">Weekly (Sun–Sat)</option>
+          <option value="weekly">Weekly — custom start day</option>
+          <option value="biweekly">Every two weeks</option>
+          <option value="semimonthly">Twice a month (1–15, 16–end)</option>
+          <option value="monthly">Monthly</option>
+        </select>
+      </div>
+      <div class="field-group" id="f-pay-anchor-group">
+        <label class="field-label" id="f-pay-anchor-label">Period Starts On</label>
+        <input type="date" id="f-pay-anchor" data-tip="Any date a pay period started on. Weekly uses its weekday; every-two-weeks counts 14-day blocks from it.">
+      </div>
 
       <div class="section-divider">Platform Data</div>
 
