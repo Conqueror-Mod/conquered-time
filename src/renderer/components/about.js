@@ -24,6 +24,9 @@ const About = (() => {
   // Changelog — newest first. Edit HERE and both About surfaces update. The two
   // most recent entries render in-panel; older notes live on GitHub Releases.
   const CHANGELOG = [
+    { version: 'v3.27.1', items: [
+      'Fixed a bug where signing in could leave you on a blank screen — when a scheduled shift was waiting to be logged, its prompt opened while the page was still hidden, so nothing appeared and nothing could be clicked. The Dashboard now always loads first, with the prompt on top of it',
+    ] },
     { version: 'v3.27.0', items: [
       'Your regular schedule, logged for you — Insights now spots the shifts you work every week (say Monday 2–5 and Wednesday to Friday 9–12) and offers to save them as a schedule. Once saved, Conquered Time offers to log each shift after it\'s over, so a steady week takes one click instead of a dozen entries',
       'When you sign in, any scheduled shifts that have passed are listed for a quick review. Untick a day you didn\'t work and it won\'t be offered again; extra hours you add by hand are never doubled. Upcoming shifts show as dashed outlines on the Dashboard week view — nothing is saved until you confirm it',

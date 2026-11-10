@@ -6,7 +6,7 @@ Discord's **#roadmap** channel mirrors this file automatically.
 
 **Status legend:** ✅ Shipped · 🔨 In progress · 🗓️ Planned · 💡 Under consideration
 
-_Last curated: 2026-10-26 (v3.27.0 — recurring schedules and pay periods)_
+_Last curated: 2026-11-10 (v3.27.1 — sign-in blank-screen fix)_
 
 ## 🗓️ Planned (next up)
 
@@ -25,6 +25,9 @@ _Open to community suggestions — use `/feedback` in the Discord._
 
 ## ✅ Recently shipped
 
+- **Sign-in fix** (v3.27.1) — signing in no longer lands on a blank screen
+  when a scheduled shift is waiting to be logged; the Dashboard loads first and
+  the catch-up prompt opens on top of it.
 - **Recurring schedules** (v3.27.0) — Insights spots the shifts you work every
   week and offers to save them as a schedule. After each scheduled shift ends,
   Conquered Time offers to log it — reviewed at sign-in, with any day you didn't
