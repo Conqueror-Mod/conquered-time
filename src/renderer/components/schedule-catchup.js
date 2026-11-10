@@ -57,7 +57,9 @@
       const overlay = document.createElement('div');
       overlay.className = 'ct-confirm-overlay';
       overlay.setAttribute('style',
-        'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;' +
+        // visibility:visible so the prompt still shows if it opens while the
+        // page is hidden (<html> is visibility:hidden until Shell.init returns).
+        'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;visibility:visible;' +
         'background:rgba(0,0,0,0.55);backdrop-filter:blur(2px);');
       const rows = due.map((d, i) => {
         const times = d.slots.map(s => `${esc(fmtClock(s.start))} – ${esc(fmtClock(s.end))}`).join(', ');
