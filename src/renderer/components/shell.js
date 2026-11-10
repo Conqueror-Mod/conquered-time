@@ -900,11 +900,16 @@ const Shell = (() => {
         // Scheduled-shift catch-up first (resolves once its prompt closes),
         // then the audit notice — sequential, never stacked. Logging shifts
         // can't add audit issues for clean slots, so order is safe.
-        await window.ScheduleCatchup?.check();
-        try {
-          const n = await api.invoke('audit:count');
-          if (n > 0) showAuditWarning(n, 'login');
-        } catch {}
+        // NOT awaited: pages stay visibility:hidden until Shell.init() returns,
+        // so awaiting a prompt here left it invisible and the page blank
+        // forever (v3.27.0 bug). The chain still runs in order, on its own.
+        (async () => {
+          await window.ScheduleCatchup?.check();
+          try {
+            const n = await api.invoke('audit:count');
+            if (n > 0) showAuditWarning(n, 'login');
+          } catch {}
+        })();
       }
     }
 
